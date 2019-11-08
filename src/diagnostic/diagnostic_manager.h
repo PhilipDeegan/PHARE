@@ -183,8 +183,6 @@ public:
 
     auto& getIons() const { return model_.state.ions; }
 
-    auto getParticlePacker(std::vector<core::Particle<dimension>> const&);
-
     auto getPatchAttributes(GridLayout& grid);
 
 protected:
@@ -226,30 +224,29 @@ public:
     {
     }
 
-    auto get(size_t i) const
+    auto get(core::Particle<dim> const& particle) const
     {
-        auto& particle = particles_[i];
         return std::forward_as_tuple(particle.weight, particle.charge, particle.iCell,
                                      particle.delta, particle.v);
     }
+    auto get(size_t i) { return get(particles_[i]); }
 
     auto& keys() const { return keys_; }
     bool hasNext() const { return it_ < particles_.size(); }
     auto next() { return get(it_++); }
-    auto first() const { return get(0u); }
+
+    static auto empty()
+    {
+        core::Particle<dim> particle;
+        return std::forward_as_tuple(particle.weight, particle.charge, particle.iCell,
+                                     particle.delta, particle.v);
+    }
 
 private:
     core::ParticleArray<dim> const& particles_;
     std::array<std::string, 5> keys_;
     size_t it_ = 0;
 };
-
-template<typename ModelParams>
-auto DiagnosticModelView<solver::type_list_to_hybrid_model_t<ModelParams>, ModelParams>::
-    getParticlePacker(std::vector<core::Particle<dimension>> const& particles)
-{
-    return PHARE::ParticlePacker{particles};
-}
 
 
 

@@ -84,20 +84,20 @@ struct Hi5Diagnostic : public ::testing::Test, public AfullHybridBasicHierarchy
 };
 
 
-TEST_F(Hi5Diagnostic, electromag)
-{
-    dMan.addDiagDict(this->dict("electromag")).dump();
+// TEST_F(Hi5Diagnostic, electromag)
+// {
+//     dMan.addDiagDict(this->dict("electromag")).dump();
 
-    for (auto patch : *basicHierarchy->getHierarchy().getPatchLevel(0))
-    {
-        auto guardedGrid = modelView.guardedGrid(*patch);
-        std::string patchPath(getPatchPath(*patch) + "/");
-        auto& B = hybridModel->state.electromag.B;
-        checkVecField(B, patchPath + B.name());
-        auto& E = hybridModel->state.electromag.E;
-        checkVecField(E, patchPath + E.name());
-    }
-}
+//     for (auto patch : *basicHierarchy->getHierarchy().getPatchLevel(0))
+//     {
+//         auto guardedGrid = modelView.guardedGrid(*patch);
+//         std::string patchPath(getPatchPath(*patch) + "/");
+//         auto& B = hybridModel->state.electromag.B;
+//         checkVecField(B, patchPath + B.name());
+//         auto& E = hybridModel->state.electromag.E;
+//         checkVecField(E, patchPath + E.name());
+//     }
+// }
 
 TEST_F(Hi5Diagnostic, particles)
 {
@@ -117,7 +117,7 @@ TEST_F(Hi5Diagnostic, particles)
 
         PHARE::ParticlePacker packer{particles};
 
-        auto first       = packer.first();
+        auto first       = packer.empty();
         size_t iCellSize = std::get<2>(first).size();
         size_t deltaSize = std::get<3>(first).size();
         size_t vSize     = std::get<4>(first).size();
@@ -147,37 +147,37 @@ TEST_F(Hi5Diagnostic, particles)
         {
             std::string particlePath(patchPath + "/ions/pop/" + pop.name() + "/");
             checkParticles(pop.domainParticles(), particlePath + "domain/");
-            checkParticles(pop.levelGhostParticles(), particlePath + "lvlGhost/");
+            checkParticles(pop.levelGhostParticles(), particlePath + "levelGhost/");
             checkParticles(pop.patchGhostParticles(), particlePath + "patchGhost/");
         }
     }
 }
 
-TEST_F(Hi5Diagnostic, fluid)
-{
-    dMan.addDiagDict(this->dict("fluid")).dump();
+// TEST_F(Hi5Diagnostic, fluid)
+// {
+//     dMan.addDiagDict(this->dict("fluid")).dump();
 
-    auto checkIons = [&](auto& ions, auto patchPath) {
-        std::string path(patchPath + "/ions/");
+//     auto checkIons = [&](auto& ions, auto patchPath) {
+//         std::string path(patchPath + "/ions/");
 
-        for (auto& pop : modelView.getIons())
-        {
-            std::string popPath(path + "pop/" + pop.name() + "/");
-            checkField(pop.density(), popPath + "density");
-            checkVecField(pop.flux(), popPath + "flux");
-        }
+//         for (auto& pop : modelView.getIons())
+//         {
+//             std::string popPath(path + "pop/" + pop.name() + "/");
+//             checkField(pop.density(), popPath + "density");
+//             checkVecField(pop.flux(), popPath + "flux");
+//         }
 
-        checkField(ions.density(), path + "density");
-        checkVecField(ions.velocity(), path + "bulkVelocity");
-    };
+//         checkField(ions.density(), path + "density");
+//         checkVecField(ions.velocity(), path + "bulkVelocity");
+//     };
 
-    for (auto patch : *basicHierarchy->getHierarchy().getPatchLevel(0))
-    {
-        auto guardedGrid = modelView.guardedGrid(*patch);
-        std::string patchPath(getPatchPath(*patch) + "/");
-        checkIons(hybridModel->state.ions, patchPath);
-    }
-}
+//     for (auto patch : *basicHierarchy->getHierarchy().getPatchLevel(0))
+//     {
+//         auto guardedGrid = modelView.guardedGrid(*patch);
+//         std::string patchPath(getPatchPath(*patch) + "/");
+//         checkIons(hybridModel->state.ions, patchPath);
+//     }
+// }
 
 int main(int argc, char** argv)
 {

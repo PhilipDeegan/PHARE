@@ -46,11 +46,40 @@ struct HighFiveFile
 };
 
 
+template<typename HighFiveDiagnostic>
+class Hi5DiagnosticWriter : public PHARE::DiagnosticWriter
+{
+public:
+    using Attributes = typename HighFiveDiagnostic::Attributes;
+    Hi5DiagnosticWriter(HighFiveDiagnostic& hi5)
+        : hi5_(hi5)
+    {
+    }
+
+    virtual void getDataSetInfo(std::string const& patchID, Attributes& patchAttributes) = 0;
+    virtual void initDataSets(std::vector<std::string> const& patchIDs,
+                              Attributes& patchAttributes){};
+
+protected:
+    HighFiveDiagnostic& hi5_;
+};
+
+template<typename T, std::size_t dimension>
+inline constexpr auto is_array_dataset
+    = (core::is_std_array_v<T, dimension> || core::is_std_array_v<T, 3>);
+
+#include "detail/types/electromag.h"
+#include "detail/types/particle.h"
+#include "detail/types/fluid.h"
+
 template<typename ModelView>
 class HighFiveDiagnostic
 {
 public:
-    using GridLayout                  = typename ModelView::GridLayout;
+    using This       = HighFiveDiagnostic<ModelView>;
+    using GridLayout = typename ModelView::GridLayout;
+    using Attributes = typename ModelView::Attributes;
+
     static constexpr auto dimension   = ModelView::dimension;
     static constexpr auto interpOrder = GridLayout::interp_order;
 
@@ -78,42 +107,19 @@ public:
         return "/t#/pl" + std::to_string(iLevel) + "/p" + globalCoords;
     }
 
-private:
-    HighFiveFile hi5_;
-    ModelView& modelView_;
-    std::string patchPath_; // is passed around as "virtual write()" has no parameters
-
-    std::unordered_map<std::string, std::shared_ptr<PHARE::DiagnosticWriter>> writers{
-        {"fluid", make_writer<FluidDiagnosticWriter>()},
-        {"electromag", make_writer<ElectromagDiagnosticWriter>()},
-        {"particles", make_writer<ParticlesDiagnosticWriter>()}};
-
-    template<typename Writer>
-    std::shared_ptr<PHARE::DiagnosticWriter> make_writer()
-    {
-        return std::make_shared<Writer>(*this);
-    }
+    auto& modelView() const { return modelView_; }
+    const auto& patchPath() const { return patchPath_; }
 
     template<typename Type>
-    auto createDataSet(std::string const& path, size_t size)
+    void createDataSet(std::string const& path, size_t size)
     {
         this->template createDatasetsPerMPI<Type>(path, size);
-        return hi5_.file_.getDataSet(path);
     }
-
-    template<typename Type>
-    void createDatasetsPerMPI(std::string path, size_t dataSetSize);
-
-    template<typename Dataset, typename Array>
-    void writeDataSetPart(Dataset dataSet, size_t start, size_t size, Array const& array)
-    {
-        dataSet.select({start}, {size}).write(array);
-    }
-
     template<typename Array, typename String>
     void writeNewDataSet(String path, Array const* const array, size_t size)
     {
-        createDataSet<Array>(path, size).write(array);
+        createDataSet<Array>(path, size);
+        hi5_.file_.getDataSet(path).write(array);
     }
 
     template<typename String, typename Data>
@@ -123,7 +129,11 @@ private:
             .template createAttribute<Data>(key, HighFive::DataSpace::From(value))
             .write(value);
     }
-
+    template<typename Array>
+    void writeDataSetPart(std::string path, size_t start, size_t size, Array const& array)
+    {
+        hi5_.file_.getDataSet(path).select({start}, {size}).write(array);
+    }
 
     template<typename VecField>
     void writeVecFieldAsDataset(std::string path, VecField& vecField)
@@ -136,6 +146,31 @@ private:
         }
     }
 
+    size_t getMaxOfPerMPI(size_t localSize);
+
+    const auto& patchIDs() const { return patchIDs_; }
+
+private:
+    HighFiveFile hi5_;
+    ModelView& modelView_;
+    std::string patchPath_; // is passed around as "virtual write()" has no parameters
+    std::vector<std::string> patchIDs_;
+
+    std::unordered_map<std::string, std::shared_ptr<Hi5DiagnosticWriter<This>>> writers{
+        {"fluid", make_writer<FluidDiagnosticWriter<This>>()},
+        {"electromag", make_writer<ElectromagDiagnosticWriter<This>>()},
+        {"particles", make_writer<ParticlesDiagnosticWriter<This>>()}};
+
+    template<typename Writer>
+    std::shared_ptr<PHARE::Hi5DiagnosticWriter<This>> make_writer()
+    {
+        return std::make_shared<Writer>(*this);
+    }
+
+    template<typename Type>
+    void createDatasetsPerMPI(std::string path, size_t dataSetSize);
+
+
     template<typename Dict>
     void writeDict(Dict, std::string);
 
@@ -143,11 +178,6 @@ private:
     HighFiveDiagnostic(const HighFiveDiagnostic&&)            = delete;
     HighFiveDiagnostic& operator&(const HighFiveDiagnostic&)  = delete;
     HighFiveDiagnostic& operator&(const HighFiveDiagnostic&&) = delete;
-
-    class Hi5DiagnosticWriter;
-    class ElectromagDiagnosticWriter; /* : public Hi5DiagnosticWriter*/
-    class ParticlesDiagnosticWriter;  /* : public Hi5DiagnosticWriter*/
-    class FluidDiagnosticWriter;      /* : public Hi5DiagnosticWriter*/
 };
 
 /*TO DO
@@ -163,173 +193,34 @@ void HighFiveDiagnostic<ModelView>::dump(std::vector<DiagnosticDAO*> const& diag
     /*TODO
       add time/iterations
     */
+    {
+        Attributes patchAttributes;
+        auto visitPatch = [&](GridLayout& gridLayout, std::string patchID, int iLevel) {
+            patchIDs_.emplace_back(patchID);
+
+            for (auto* diagnostic : diagnostics)
+            {
+                writers.at(diagnostic->type)->getDataSetInfo({patchID}, patchAttributes);
+            }
+        };
+        modelView().visitHierarchy(visitPatch);
+
+        for (auto* diagnostic : diagnostics)
+        {
+            writers.at(diagnostic->type)->initDataSets(patchIDs_, patchAttributes);
+        }
+    }
     auto visitPatch = [&](GridLayout& gridLayout, std::string patchID, int iLevel) {
         patchPath_ = getPatchPath("time", 0, patchID);
+
         for (auto* diagnostic : diagnostics)
         {
             writers.at(diagnostic->type)->write(*diagnostic);
         }
-        writeDict(modelView_.getPatchAttributes(gridLayout), patchPath_);
+        writeDict(modelView().getPatchAttributes(gridLayout), patchPath_);
     };
 
-    modelView_.visitHierarchy(visitPatch);
-}
-
-template<typename ModelView>
-class HighFiveDiagnostic<ModelView>::Hi5DiagnosticWriter : public PHARE::DiagnosticWriter
-{
-public:
-    Hi5DiagnosticWriter(HighFiveDiagnostic& _outer)
-        : outer_(_outer)
-    {
-    }
-
-protected:
-    HighFiveDiagnostic& outer_;
-};
-
-template<typename ModelView>
-class HighFiveDiagnostic<ModelView>::ParticlesDiagnosticWriter : public Hi5DiagnosticWriter
-{
-public:
-    ParticlesDiagnosticWriter(HighFiveDiagnostic& _outer)
-        : Hi5DiagnosticWriter(_outer)
-    {
-    }
-    void write(DiagnosticDAO&) override;
-    void compute(DiagnosticDAO&) override{};
-};
-
-template<typename T, std::size_t dimension>
-inline constexpr auto is_array_dataset
-    = (core::is_std_array_v<T, dimension> || core::is_std_array_v<T, 3>);
-
-template<typename ModelView>
-void HighFiveDiagnostic<ModelView>::ParticlesDiagnosticWriter::write([
-    [maybe_unused]] DiagnosticDAO& diagnostic)
-{
-    auto& outer = this->outer_;
-
-    auto createDataSet = [&outer](auto&& path, auto size, auto const& value) {
-        using ValueType = std::decay_t<decltype(value)>;
-        if constexpr (is_array_dataset<ValueType, dimension>)
-            return outer.template createDataSet<typename ValueType::value_type>(
-                path, size * value.size());
-        else
-            return outer.template createDataSet<ValueType>(path, size);
-    };
-
-    auto writeDatSet = [&outer](auto& dataset, auto& start, auto const& value) {
-        using ValueType = std::decay_t<decltype(value)>;
-        if constexpr (is_array_dataset<ValueType, dimension>)
-            outer.writeDataSetPart(dataset, start * value.size(), value.size(), value);
-        else
-            outer.writeDataSetPart(dataset, start, 1, value); /*not array, write 1 value*/
-    };
-
-    auto writeParticles = [&](auto path, auto& particles) {
-        if (!particles.size())
-            return;
-
-        size_t part_idx = 0;
-        std::vector<HighFive::DataSet> datasets;
-        auto packer = outer.modelView_.getParticlePacker(particles);
-
-        std::apply(
-            [&](auto&... args) {
-                (
-                    [&]() {
-                        datasets.emplace_back(
-                            createDataSet(path + packer.keys()[part_idx], particles.size(), args));
-                        part_idx++;
-                    }(),
-                    ...);
-            },
-            packer.first());
-
-        size_t idx = 0;
-        while (packer.hasNext())
-        {
-            part_idx = 0;
-            std::apply(
-                [&](auto&... args) {
-                    (
-                        [&]() {
-                            writeDatSet(datasets[part_idx], idx, args);
-                            part_idx++;
-                        }(),
-                        ...);
-                },
-                packer.next());
-            idx++;
-        }
-    };
-
-    for (auto& pop : outer.modelView_.getIons())
-    {
-        std::string path(outer.patchPath_ + "/ions/pop/" + pop.name() + "/");
-        writeParticles(path + "domain/", pop.domainParticles());
-        writeParticles(path + "lvlGhost/", pop.levelGhostParticles());
-        writeParticles(path + "patchGhost/", pop.patchGhostParticles());
-    }
-}
-
-template<typename ModelView>
-class HighFiveDiagnostic<ModelView>::ElectromagDiagnosticWriter : public Hi5DiagnosticWriter
-{
-public:
-    ElectromagDiagnosticWriter(HighFiveDiagnostic& _outer)
-        : Hi5DiagnosticWriter(_outer)
-    {
-    }
-    void write(DiagnosticDAO&) override;
-    void compute(DiagnosticDAO&) override{};
-};
-
-
-template<typename ModelView>
-void HighFiveDiagnostic<ModelView>::ElectromagDiagnosticWriter::write([
-    [maybe_unused]] DiagnosticDAO& diagnostic)
-{
-    auto& outer = this->outer_;
-
-    for (auto* vecField : outer.modelView_.getElectromagFields())
-    {
-        outer.writeVecFieldAsDataset(outer.patchPath_ + "/" + vecField->name(), *vecField);
-    }
-}
-
-template<typename ModelView>
-class HighFiveDiagnostic<ModelView>::FluidDiagnosticWriter : public Hi5DiagnosticWriter
-{
-public:
-    FluidDiagnosticWriter(HighFiveDiagnostic& _outer)
-        : Hi5DiagnosticWriter(_outer)
-    {
-    }
-    void write(DiagnosticDAO&) override;
-    void compute(DiagnosticDAO&) override{};
-};
-
-template<typename ModelView>
-void HighFiveDiagnostic<ModelView>::FluidDiagnosticWriter::write([
-    [maybe_unused]] DiagnosticDAO& diagnostic)
-{
-    auto& outer = this->outer_;
-    auto& ions  = outer.modelView_.getIons();
-    std::string path(outer.patchPath_ + "/ions/");
-
-    for (auto& pop : outer.modelView_.getIons())
-    {
-        std::string popPath(path + "pop/" + pop.name() + "/");
-        auto& density = pop.density();
-        outer.writeNewDataSet(popPath + "density", density.data(), density.size());
-        outer.writeVecFieldAsDataset(popPath + "flux", pop.flux());
-    }
-
-    auto& density = ions.density();
-    outer.writeNewDataSet(path + "density", density.data(), density.size());
-    outer.writeVecFieldAsDataset(path + "bulkVelocity", ions.velocity());
+    modelView().visitHierarchy(visitPatch);
 }
 
 /*
@@ -364,10 +255,23 @@ void HighFiveDiagnostic<ModelView>::writeDict(Dict dict, std::string path)
     std::visit(visitor, dict.data);
 }
 
+template<typename ModelView>
+size_t HighFiveDiagnostic<ModelView>::getMaxOfPerMPI(size_t localSize)
+{
+    int mpi_size;
+    MPI_Comm_size(MPI_COMM_WORLD, &mpi_size);
+    uint64_t perMPI[mpi_size];
+    MPI_Allgather(&localSize, 1, MPI_UINT64_T, perMPI, 1, MPI_UINT64_T, MPI_COMM_WORLD);
+    for (const auto size : perMPI)
+        if (size > localSize)
+            localSize = size;
+    return localSize;
+}
+
 
 /*
- * Communicate all dataset paths and sizes to all MPI process to allow each to create all datasets
- * independently.  This is a requirement of HDF5. all paths must be the same length
+ * Communicate all dataset paths and sizes to all MPI process to allow each to create all
+ * datasets independently.  This is a requirement of HDF5. all paths must be the same length
  */
 template<typename ModelView>
 template<typename Type>
@@ -386,6 +290,8 @@ void HighFiveDiagnostic<ModelView>::createDatasetsPerMPI(std::string path, size_
 
     for (uint64_t i = 0; i < mpi_size; i++)
     {
+        if (!datasetSizes[i])
+            continue;
         std::string datasetPath{&chars[pathSize * i], pathSize};
         H5Easy::detail::createGroupsToDataSet(hi5_.file_, datasetPath);
         hi5_.file_.createDataSet<Type>(datasetPath, HighFive::DataSpace(datasetSizes[i]));
