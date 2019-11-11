@@ -1,5 +1,5 @@
 
-#include "kul/log.hpp"
+//#include "kul/log.hpp"
 
 #include <mpi.h>
 
@@ -18,6 +18,10 @@ using namespace PHARE_test::_1d;
 #include "hierarchy.h"
 
 #include "detail/highfive.h"
+
+using namespace PHARE::diagnostic::h5;
+using namespace PHARE::diagnostic;
+
 
 struct Hi5Diagnostic : public ::testing::Test, public AfullHybridBasicHierarchy
 {
@@ -74,13 +78,12 @@ struct Hi5Diagnostic : public ::testing::Test, public AfullHybridBasicHierarchy
         }
     }
 
-    using DiagnosticModelView
-        = PHARE::AMRDiagnosticModelView<PHARE::amr::SAMRAI_Types, HybridModelT>;
-    using DiagnosticWriter = PHARE::HighFiveDiagnostic<DiagnosticModelView>;
+    using DiagnosticModelView = AMRDiagnosticModelView<PHARE::amr::SAMRAI_Types, HybridModelT>;
+    using DiagnosticWriter    = HighFiveDiagnostic<DiagnosticModelView>;
 
     DiagnosticModelView modelView{basicHierarchy->getHierarchy(), *hybridModel};
     DiagnosticWriter writer{modelView, filename()};
-    PHARE::DiagnosticsManager<DiagnosticWriter> dMan{writer};
+    DiagnosticsManager<DiagnosticWriter> dMan{writer};
 };
 
 
@@ -115,7 +118,7 @@ TEST_F(Hi5Diagnostic, particles)
         std::vector<float> deltaV;
         writer.file().getDataSet(path + "delta").read(deltaV);
 
-        PHARE::ParticlePacker packer{particles};
+        ParticlePacker packer{particles};
 
         auto first       = packer.empty();
         size_t iCellSize = std::get<2>(first).size();

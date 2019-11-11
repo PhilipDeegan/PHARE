@@ -18,8 +18,11 @@
 #include "diagnostic_manager.h"
 namespace PHARE
 {
-// global extern for python addition of diagnostics
-IDiagnosticsManager* diagnosticManager = new NoOpDiagnosticManager{};
+namespace diagnostic
+{
+    // global extern for python addition of diagnostics
+    IDiagnosticsManager* diagnosticManager = new NoOpDiagnosticManager{};
+} // namespace diagnostic
 } // namespace PHARE
 
 using namespace PHARE::initializer;

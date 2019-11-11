@@ -15,5 +15,5 @@
 PYBIND11_MODULE(pyphare, m)
 {
     PHARE::pybind::add(m);
-    PHARE::pybind::diagnostic(m);
+    PHARE::diagnostic::pybind::diagnostic(m);
 }
