@@ -3,6 +3,7 @@
 #define PHARE_SIMULATOR_SIMULATOR_H
 
 #include "include.h"
+#include "phare_types.h"
 #include "diagnostic/diagnostic_manager.h"
 #include "diagnostic/detail/highfive.h"
 #include "diagnostic/detail/types/electromag.h"
@@ -223,31 +224,6 @@ getUserRefinementBoxesDatabase(PHARE::initializer::PHAREDict& amr)
 
 namespace PHARE
 {
-template<std::size_t dimension, std::size_t interp_order>
-struct PHARE_Types
-{
-    using Array_t
-        = decltype(PHARE::core::makeNdArray<dimension>(std::array<std::uint32_t, dimension>{}));
-    using VecField_t      = PHARE::core::VecField<Array_t, PHARE::core::HybridQuantity>;
-    using Field_t         = PHARE::core::Field<Array_t, PHARE::core::HybridQuantity::Scalar>;
-    using Electromag_t    = PHARE::core::Electromag<VecField_t>;
-    using YeeLayout_t     = PHARE::core::GridLayoutImplYee<dimension, interp_order>;
-    using GridLayout_t    = PHARE::core::GridLayout<YeeLayout_t>;
-    using ParticleArray_t = PHARE::core::ParticleArray<dimension>;
-    using MaxwellianParticleInitializer_t
-        = PHARE::core::MaxwellianParticleInitializer<ParticleArray_t, GridLayout_t>;
-    using IonPopulation_t = PHARE::core::IonPopulation<ParticleArray_t, VecField_t, GridLayout_t>;
-    using Ions_t          = PHARE::core::Ions<IonPopulation_t, GridLayout_t>;
-    using HybridModel_t
-        = PHARE::solver::HybridModel<GridLayout_t, Electromag_t, Ions_t, PHARE::amr::SAMRAI_Types>;
-    using MHDModel_t  = PHARE::solver::MHDModel<GridLayout_t, VecField_t, PHARE::amr::SAMRAI_Types>;
-    using SolverPPC_t = PHARE::solver::SolverPPC<HybridModel_t, PHARE::amr::SAMRAI_Types>;
-    using SolverMHD_t = PHARE::solver::SolverMHD<MHDModel_t, PHARE::amr::SAMRAI_Types>;
-    using LevelInitializerFactory_t = PHARE::solver::LevelInitializerFactory<HybridModel_t>;
-};
-
-
-
 class ISimulator
 {
 public:
@@ -353,13 +329,6 @@ public:
             db->putInteger("max_integrator_steps", 1000000);
             db->putInteger("regrid_interval", 1);
 
-            if (dict["simulation"].contains("diagnostics"))
-            {
-                modelView = std::make_unique<DiagnosticModelView>(*this, *hybridModel_);
-                writer    = DiagnosticWriter::from(*modelView, dict["simulation"]["diagnostics"]);
-                dMan      = PHARE::diagnostic::DiagnosticsManager<DiagnosticWriter>::from(
-                    *writer, dict["simulation"]["diagnostics"]);
-            }
 
             timeRefIntegrator_ = std::make_shared<SAMRAI::algs::TimeRefinementIntegrator>(
                 "TimeRefinementIntegrator", db, hierarchy_, multiphysInteg_, gridding);
@@ -402,23 +371,9 @@ public:
 
     auto& getMultiPhysicsIntegrator() { return multiphysInteg_; }
 
-    template<typename Action, typename... Args>
-    void visitHierarchy(Action&& action, int minLevel, int maxLevel, Args&&... args)
-    {
-        PHARE::amr::visitHierarchy<typename PHARETypes::GridLayout_t>(
-            *hierarchy_, *hybridModel_->resourcesManager, std::forward<Action>(action), minLevel,
-            maxLevel, std::forward<Args...>(args...));
-    }
-    template<typename Action, typename... Args>
-    void visitHierarchy(Action&& action, Args&&... args)
-    {
-        visitHierarchy(std::forward<Action>(action), 0, hierarchy_->getNumberOfLevels(),
-                       std::forward<Args...>(args...));
-    }
 
     auto getNumberOfLevels() const { return hierarchy_->getNumberOfLevels(); }
 
-    void dumpDiagnostics() { dMan->dump(); }
 
 private:
     auto find_model(std::string name)
@@ -447,10 +402,6 @@ private:
     std::shared_ptr<MultiPhysicsIntegrator> multiphysInteg_;
     std::shared_ptr<SAMRAI::algs::TimeRefinementIntegrator> timeRefIntegrator_;
     std::shared_ptr<SAMRAI::hier::PatchHierarchy> hierarchy_;
-
-    std::unique_ptr<DiagnosticModelView> modelView; //{*this, *hybridModel_};
-    std::unique_ptr<DiagnosticWriter> writer;       //{modelView, "lol.5"};
-    std::unique_ptr<PHARE::diagnostic::DiagnosticsManager<DiagnosticWriter>> dMan;
 };
 
 

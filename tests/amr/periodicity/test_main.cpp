@@ -41,18 +41,24 @@ TYPED_TEST(SimulatorTest, verifyCoarsestPeriodicityOfFields)
     assert(TypeParam::dimension == 1); // only 1d supported for now
 
     TypeParam sim;
+    using HybridModel = typename TypeParam::HybridModel;
+    using Hierarchy   = typename TypeParam::Hierarchy;
+
+    auto& hybridModel = *sim.getHybridModel();
+    auto& hierarchy   = *sim.getPrivateHierarchy();
 
     auto& db    = PHARE::initializer::PHAREDictHandler::INSTANCE().dict();
     auto& simdb = db["simulation"];
     EXPECT_EQ(simdb["boundary_types"].template to<std::string>(), "periodic");
 
-    auto& hybridModel = *sim.getHybridModel();
-    auto& rm          = *hybridModel.resourcesManager;
+    auto& rm = *hybridModel.resourcesManager;
     {
-        Hi5Diagnostic<TypeParam> hi5{sim, "electromag", NEW_HI5_FILE};
+        Hi5Diagnostic<Hierarchy, HybridModel> hi5{hierarchy, hybridModel, "electromag",
+                                                  NEW_HI5_FILE};
         hi5.dMan.addDiagDict(hi5.electromag("/EM_B")).addDiagDict(hi5.electromag("/EM_E")).dump();
     }
-    Hi5Diagnostic<TypeParam> hi5{sim, "electromag", HighFive::File::ReadOnly};
+    Hi5Diagnostic<Hierarchy, HybridModel> hi5{hierarchy, hybridModel, "electromag",
+                                              HighFive::File::ReadOnly};
     auto& hifile = hi5.writer.file();
 
     std::unordered_map<std::string, PatchInfo> patches;

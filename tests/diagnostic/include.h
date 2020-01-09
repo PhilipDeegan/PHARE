@@ -14,15 +14,17 @@ using namespace PHARE::diagnostic::h5;
 constexpr unsigned NEW_HI5_FILE
     = HighFive::File::ReadWrite | HighFive::File::Create | HighFive::File::Truncate;
 
-template<typename Simulator>
+template<typename Hierarchy, typename HybridModel>
 struct Hi5Diagnostic
 {
-    using HybridModelT        = typename Simulator::HybridModel;
-    using DiagnosticModelView = AMRDiagnosticModelView<Simulator, HybridModelT>;
+    // using HybridModelT        = typename Simulator::HybridModel;
+    using DiagnosticModelView = AMRDiagnosticModelView<Hierarchy, HybridModel>;
     using DiagnosticWriter    = HighFiveDiagnostic<DiagnosticModelView>;
 
-    Hi5Diagnostic(Simulator& simulator, std::string fileName, unsigned flags)
-        : simulator_{simulator}
+    Hi5Diagnostic(Hierarchy& hierarchy, HybridModel& hybridModel, std::string fileName,
+                  unsigned flags)
+        : hierarchy_{hierarchy}
+        , model_{hybridModel}
         , file_{fileName}
         , flags_{flags}
     {
@@ -80,10 +82,11 @@ struct Hi5Diagnostic
     }
 
 
-    Simulator& simulator_;
+    Hierarchy& hierarchy_;
+    HybridModel& model_;
     std::string file_;
     unsigned flags_;
-    DiagnosticModelView modelView{simulator_, *simulator_.getHybridModel()};
+    DiagnosticModelView modelView{hierarchy_, model_};
     DiagnosticWriter writer{modelView, filename(), flags_};
     DiagnosticsManager<DiagnosticWriter> dMan{writer};
 };

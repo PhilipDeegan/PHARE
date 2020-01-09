@@ -9,11 +9,11 @@ using namespace PHARE::diagnostic;
 using namespace PHARE::diagnostic::h5;
 
 
-template<typename Simulator>
-struct FluidHi5Diagnostic : public Hi5Diagnostic<Simulator>
+template<typename Hierarchy, typename HybridModel>
+struct FluidHi5Diagnostic : public Hi5Diagnostic<Hierarchy, HybridModel>
 {
-    FluidHi5Diagnostic(Simulator& simulator, unsigned flags)
-        : Hi5Diagnostic<Simulator>{simulator, "fluid", flags}
+    FluidHi5Diagnostic(Hierarchy& hierarchy, HybridModel& model, unsigned flags)
+        : Hi5Diagnostic<Hierarchy, HybridModel>{hierarchy, model, "fluid", flags}
     {
     }
 };
@@ -23,8 +23,15 @@ TYPED_TEST(SimulatorTest, fluid)
     using GridLayout = typename TypeParam::PHARETypes::GridLayout_t;
 
     TypeParam sim;
+    using HybridModel = typename TypeParam::HybridModel;
+    using Hierarchy   = typename TypeParam::Hierarchy;
+
+    auto& hybridModel = *sim.getHybridModel();
+    auto& hierarchy   = *sim.getPrivateHierarchy();
+
     { // Scoped to destruct after dump
-        FluidHi5Diagnostic<TypeParam> hi5{sim, NEW_HI5_FILE};
+        FluidHi5Diagnostic<Hierarchy, HybridModel> hi5{hierarchy, hybridModel, NEW_HI5_FILE};
+
         hi5.dMan.addDiagDict(hi5.fluid("/ions/density"))
             .addDiagDict(hi5.fluid("/ions/bulkVelocity"))
             .addDiagDict(hi5.fluid("/ions/pop/ions_alpha/density"))
@@ -34,9 +41,9 @@ TYPED_TEST(SimulatorTest, fluid)
             .dump();
     }
 
-    FluidHi5Diagnostic<TypeParam> hi5{sim, HighFive::File::ReadOnly};
-    auto& writer      = hi5.writer;
-    auto& hybridModel = *sim.getHybridModel();
+    FluidHi5Diagnostic<Hierarchy, HybridModel> hi5{hierarchy, hybridModel,
+                                                   HighFive::File::ReadOnly};
+    auto& writer = hi5.writer;
 
     auto checkIons = [&](auto& ions, auto patchPath) {
         std::string path(patchPath + "/ions/");
@@ -57,15 +64,17 @@ TYPED_TEST(SimulatorTest, fluid)
         checkIons(hybridModel.state.ions, patchPath);
     };
 
-    sim.visitHierarchy(visit, hybridModel);
+    PHARE::amr::visitHierarchy<GridLayout>(hierarchy, *hybridModel.resourcesManager, visit, 0,
+                                           sim.getNumberOfLevels(), hybridModel);
+    // sim.visitHierarchy(visit, hybridModel);
 }
 
 
-template<typename Simulator>
-struct ElectromagHi5Diagnostic : public Hi5Diagnostic<Simulator>
+template<typename Hierarchy, typename HybridModel>
+struct ElectromagHi5Diagnostic : public Hi5Diagnostic<Hierarchy, HybridModel>
 {
-    ElectromagHi5Diagnostic(Simulator& simulator, unsigned flags)
-        : Hi5Diagnostic<Simulator>{simulator, "electromag", flags}
+    ElectromagHi5Diagnostic(Hierarchy& hierarchy, HybridModel& model, unsigned flags)
+        : Hi5Diagnostic<Hierarchy, HybridModel>{hierarchy, model, "electromag", flags}
     {
     }
 };
@@ -75,14 +84,20 @@ TYPED_TEST(SimulatorTest, electromag)
     using GridLayout = typename TypeParam::PHARETypes::GridLayout_t;
 
     TypeParam sim;
+    using HybridModel = typename TypeParam::HybridModel;
+    using Hierarchy   = typename TypeParam::Hierarchy;
+
+    auto& hybridModel = *sim.getHybridModel();
+    auto& hierarchy   = *sim.getPrivateHierarchy();
+
     { // scoped to destruct after dump
-        ElectromagHi5Diagnostic<TypeParam> hi5{sim, NEW_HI5_FILE};
+        ElectromagHi5Diagnostic<Hierarchy, HybridModel> hi5{hierarchy, hybridModel, NEW_HI5_FILE};
         hi5.dMan.addDiagDict(hi5.electromag("/EM_B")).addDiagDict(hi5.electromag("/EM_E")).dump();
     }
 
-    ElectromagHi5Diagnostic<TypeParam> hi5{sim, HighFive::File::ReadOnly};
-    auto& writer      = hi5.writer;
-    auto& hybridModel = *sim.getHybridModel();
+    ElectromagHi5Diagnostic<Hierarchy, HybridModel> hi5{hierarchy, hybridModel,
+                                                        HighFive::File::ReadOnly};
+    auto& writer = hi5.writer;
 
     auto visit = [&]([[maybe_unused]] GridLayout& gridLayout, std::string patchID, size_t iLevel) {
         auto patchPath = writer.getPatchPath("time", iLevel, patchID) + "/";
@@ -92,15 +107,17 @@ TYPED_TEST(SimulatorTest, electromag)
         hi5.checkVecField(E, patchPath + E.name());
     };
 
-    sim.visitHierarchy(visit, hybridModel);
+    PHARE::amr::visitHierarchy<GridLayout>(hierarchy, *hybridModel.resourcesManager, visit, 0,
+                                           sim.getNumberOfLevels(), hybridModel);
+    // sim.visitHierarchy(visit, hybridModel);
 }
 
 
-template<typename Simulator>
-struct ParticlesHi5Diagnostic : public Hi5Diagnostic<Simulator>
+template<typename Hierarchy, typename HybridModel>
+struct ParticlesHi5Diagnostic : public Hi5Diagnostic<Hierarchy, HybridModel>
 {
-    ParticlesHi5Diagnostic(Simulator& simulator, unsigned flags)
-        : Hi5Diagnostic<Simulator>{simulator, "particles", flags}
+    ParticlesHi5Diagnostic(Hierarchy& hierarchy, HybridModel& model, unsigned flags)
+        : Hi5Diagnostic<Hierarchy, HybridModel>{hierarchy, model, "particles", flags}
     {
     }
 };
@@ -110,8 +127,14 @@ TYPED_TEST(SimulatorTest, particles)
     using GridLayout = typename TypeParam::PHARETypes::GridLayout_t;
 
     TypeParam sim;
+    using HybridModel = typename TypeParam::HybridModel;
+    using Hierarchy   = typename TypeParam::Hierarchy;
+
+    auto& hybridModel = *sim.getHybridModel();
+    auto& hierarchy   = *sim.getPrivateHierarchy();
+
     { // scoped to destruct after dump
-        ParticlesHi5Diagnostic<TypeParam> hi5{sim, NEW_HI5_FILE};
+        ParticlesHi5Diagnostic<Hierarchy, HybridModel> hi5{hierarchy, hybridModel, NEW_HI5_FILE};
         hi5.dMan.addDiagDict(hi5.particles("/ions/pop/ions_alpha/domain"))
             .addDiagDict(hi5.particles("/ions/pop/ions_alpha/levelGhost"))
             .addDiagDict(hi5.particles("/ions/pop/ions_alpha/patchGhost"))
@@ -121,9 +144,9 @@ TYPED_TEST(SimulatorTest, particles)
             .dump();
     }
 
-    ParticlesHi5Diagnostic<TypeParam> hi5{sim, HighFive::File::ReadOnly};
-    auto& writer      = hi5.writer;
-    auto& hybridModel = *sim.getHybridModel();
+    ParticlesHi5Diagnostic<Hierarchy, HybridModel> hi5{hierarchy, hybridModel,
+                                                       HighFive::File::ReadOnly};
+    auto& writer = hi5.writer;
 
     auto checkParticles = [&](auto& particles, auto path) {
         if (!particles.size())
@@ -171,7 +194,10 @@ TYPED_TEST(SimulatorTest, particles)
         }
     };
 
-    sim.visitHierarchy(visit, hybridModel);
+    PHARE::amr::visitHierarchy<GridLayout>(hierarchy, *hybridModel.resourcesManager, visit, 0,
+                                           sim.getNumberOfLevels(), hybridModel);
+
+    // sim.visitHierarchy(visit, hybridModel);
 }
 
 TYPED_TEST(SimulatorTest, attributesRead)
@@ -179,9 +205,15 @@ TYPED_TEST(SimulatorTest, attributesRead)
     using GridLayout = typename TypeParam::PHARETypes::GridLayout_t;
 
     TypeParam sim;
-    ParticlesHi5Diagnostic<TypeParam> hi5{sim, HighFive::File::ReadOnly};
-    auto& writer      = hi5.writer;
+    using HybridModel = typename TypeParam::HybridModel;
+    using Hierarchy   = typename TypeParam::Hierarchy;
+
     auto& hybridModel = *sim.getHybridModel();
+    auto& hierarchy   = *sim.getPrivateHierarchy();
+
+    ParticlesHi5Diagnostic<Hierarchy, HybridModel> hi5{hierarchy, hybridModel,
+                                                       HighFive::File::ReadOnly};
+    auto& writer = hi5.writer;
 
     auto visit = [&](GridLayout& gridLayout, std::string patchID, size_t iLevel) {
         std::string patchPath = writer.getPatchPath("time", iLevel, patchID) + "/", origin;
@@ -189,7 +221,9 @@ TYPED_TEST(SimulatorTest, attributesRead)
         EXPECT_EQ(gridLayout.origin().str(), origin);
     };
 
-    sim.visitHierarchy(visit, hybridModel);
+    PHARE::amr::visitHierarchy<GridLayout>(hierarchy, *hybridModel.resourcesManager, visit, 0,
+                                           sim.getNumberOfLevels(), hybridModel);
+    // sim.visitHierarchy(visit, hybridModel);
 }
 
 int main(int argc, char** argv)

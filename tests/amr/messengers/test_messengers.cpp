@@ -321,6 +321,7 @@ TYPED_TEST(SimulatorTest, initializesFieldsOnRefinedLevels)
 {
     TypeParam sim;
     auto& hybridModel = *sim.getHybridModel();
+    auto& hierarchy   = *sim.getPrivateHierarchy();
     using GridLayout  = typename TypeParam::PHARETypes::GridLayout_t;
 
     auto visit = [&](GridLayout& layout, std::string patchID, size_t iLevel) {
@@ -353,7 +354,9 @@ TYPED_TEST(SimulatorTest, initializesFieldsOnRefinedLevels)
         checkMyField(Bz, bz);
     };
 
-    sim.visitHierarchy(visit, 1, sim.getNumberOfLevels(), hybridModel);
+    PHARE::amr::visitHierarchy<GridLayout>(hierarchy, *hybridModel.resourcesManager, visit, 1,
+                                           sim.getNumberOfLevels(), hybridModel);
+    // sim.visitHierarchy(visit, 1, sim.getNumberOfLevels(), hybridModel);
 }
 
 

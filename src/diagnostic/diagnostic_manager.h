@@ -247,7 +247,7 @@ struct ContiguousParticles
 
 
 // generic subclass of model specialized superclass
-template<typename Simulator, typename Model>
+template<typename Hierarchy, typename Model>
 class AMRDiagnosticModelView : public DiagnosticModelView<Model, typename Model::type_list>
 {
 public:
@@ -257,9 +257,9 @@ public:
     using Super::model_;
     static constexpr auto dimension = Model::dimension;
 
-    AMRDiagnosticModelView(Simulator& simulator, Model& model)
+    AMRDiagnosticModelView(Hierarchy& hierarchy, Model& model)
         : Super{model}
-        , simulator_{simulator}
+        , hierarchy_{hierarchy}
     {
     }
 
@@ -267,7 +267,9 @@ public:
     template<typename Action, typename... Args>
     void visitHierarchy(Action&& action, int minLevel = 0, int maxLevel = 0)
     {
-        simulator_.visitHierarchy(std::forward<Action>(action), minLevel, maxLevel, model_);
+        auto& resMan = *model_.resourcesManager;
+        PHARE::amr::visitHierarchy<GridLayout>(hierarchy_, resMan, std::forward<Action>(action),
+                                               minLevel, maxLevel, model_);
     }
 
 
@@ -275,7 +277,7 @@ public:
 
 
 private:
-    Simulator& simulator_;
+    Hierarchy& hierarchy_;
 
     AMRDiagnosticModelView(const AMRDiagnosticModelView&)             = delete;
     AMRDiagnosticModelView(const AMRDiagnosticModelView&&)            = delete;

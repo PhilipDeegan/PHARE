@@ -1,7 +1,10 @@
 #ifndef PHARE_TEST_SIMULATOR_PER_TEST_H
 #define PHARE_TEST_SIMULATOR_PER_TEST_H
 
+#include "simulator/phare_types.h"
 #include "simulator/simulator.h"
+#include "amr/types/amr_types.h"
+
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
@@ -30,12 +33,27 @@ struct __attribute__((visibility("hidden"))) StaticIntepreter
     }
 };
 
+
+
+
 template<size_t dim, size_t interp>
 struct TestSimulator : public PHARE::Simulator<dim, interp>
 {
     using Simulator                 = PHARE::Simulator<dim, interp>;
     static constexpr size_t dim_    = dim;
     static constexpr size_t interp_ = interp;
+    using PHARETypes                = PHARE::PHARE_Types<dim, interp>;
+    using Hierarchy                 = typename PHARE::amr::SAMRAI_Types::hierarchy_t;
+
+    using HybridModel = typename PHARETypes::HybridModel_t;
+    using MHDModel    = typename PHARETypes::MHDModel_t;
+
+    using DiagnosticModelView = PHARE::diagnostic::AMRDiagnosticModelView<Hierarchy, HybridModel>;
+    using DiagnosticWriter    = PHARE::diagnostic::h5::HighFiveDiagnostic<DiagnosticModelView>;
+
+    std::unique_ptr<DiagnosticModelView> modelView; //{*this, *hybridModel_};
+    std::unique_ptr<DiagnosticWriter> writer;       //{modelView, "lol.5"};
+    std::unique_ptr<PHARE::diagnostic::DiagnosticsManager<DiagnosticWriter>> dMan;
 
     auto& dict()
     {
@@ -47,6 +65,15 @@ struct TestSimulator : public PHARE::Simulator<dim, interp>
         : Simulator{dict()}
     {
         Simulator::initialize();
+
+        if (dict()["simulation"].contains("diagnostics"))
+        {
+            modelView = std::make_unique<DiagnosticModelView>(*this->getPrivateHierarchy(),
+                                                              *this->getHybridModel());
+            writer    = DiagnosticWriter::from(*modelView, dict()["simulation"]["diagnostics"]);
+            dMan      = PHARE::diagnostic::DiagnosticsManager<DiagnosticWriter>::from(
+                *writer, dict()["simulation"]["diagnostics"]);
+        }
     }
 };
 
