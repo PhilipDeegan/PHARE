@@ -20,6 +20,9 @@ if(HighFive)
       LIBRARY_OUTPUT_DIRECTORY "${CMAKE_CURRENT_BINARY_DIR}"
   )
 
-  add_python3_test(sim-refineboxes py/refinement_boxes.py ${CMAKE_CURRENT_BINARY_DIR})
+  add_python3_test(sim-refineboxes  py/refinement_boxes.py ${CMAKE_CURRENT_BINARY_DIR})
+  add_python3_test(sim-overlap-init py/overlap_init.py     ${CMAKE_CURRENT_BINARY_DIR})
+  add_python3_test(sim-fluid-init   py/fluid_init.py       ${CMAKE_CURRENT_BINARY_DIR})
+  add_python3_test(sim-em-init      py/em_init.py          ${CMAKE_CURRENT_BINARY_DIR})
 
 endif()

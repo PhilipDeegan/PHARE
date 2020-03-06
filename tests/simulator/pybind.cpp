@@ -1,6 +1,8 @@
+
 #include "phare/include.h"
 
 #include <pybind11/functional.h>
+#include <pybind11/stl.h>
 #include <pybind11/pybind11.h>
 
 
@@ -48,8 +50,7 @@ public:
         SAMRAI::tbox::SAMRAI_MPI::finalize();
     }
 
-    // the simulator must be destructed before the
-    //  variable database is reset, or segfault.
+    // the simulator must be destructed before the variable database is reset, or segfault.
     void reset()
     {
         PHARE::initializer::PHAREDictHandler::INSTANCE().stop();
@@ -58,9 +59,37 @@ public:
     }
 };
 
+
+template<size_t dim, size_t interp>
+void declareParticlesDim(py::module& m)
+{
+    using T          = ContiguousParticles<dim, interp>;
+    std::string name = "ContiguousParticles_" + std::to_string(dim) + "_" + std::to_string(interp);
+    py::class_<T, std::shared_ptr<T>>(m, name.c_str())
+        .def(py::init<size_t>())
+        .def_readwrite("iCell", &T::iCell)
+        .def_readwrite("delta", &T::delta)
+        .def_readwrite("weight", &T::weight)
+        .def_readwrite("charge", &T::charge)
+        .def_readwrite("v", &T::v)
+        .def("size", &T::size)
+        .def("split", &T::split);
+}
+
+template<size_t interp>
+void declareParticles(py::module& m)
+{
+    declareParticlesDim<1, interp>(m);
+    // declareParticlesDim<2, interp>(m);
+    // declareParticlesDim<3, interp>(m);
+}
+
 PYBIND11_MODULE(test_simulator, m)
 {
     SamraiLifeCycle::INSTANCE(); // init
+    declareParticles<1>(m);
+    declareParticles<2>(m);
+    declareParticles<3>(m);
 
     py::class_<PHARE::amr::Hierarchy, std::shared_ptr<PHARE::amr::Hierarchy>>(m, "AMRHierarchy");
 
@@ -89,10 +118,16 @@ PYBIND11_MODULE(test_simulator, m)
         return std::make_shared<RuntimeDiagnosticInterface>(*sim, *hier);
     });
 
-    m.def("unmake", [](std::shared_ptr<PHARE::amr::Hierarchy>& hier) { hier.reset(); });
-    m.def("unmake", [](std::shared_ptr<ISimulator>& sim) { sim.reset(); });
-    m.def("unmake", [](std::shared_ptr<diagnostic::IDiagnosticsManager>& dman) { dman.reset(); });
-
+    m.def("mpi_size", []() {
+        int mpi_size;
+        MPI_Comm_size(MPI_COMM_WORLD, &mpi_size);
+        return mpi_size;
+    });
+    m.def("mpi_rank", []() {
+        int mpi_rank;
+        MPI_Comm_rank(MPI_COMM_WORLD, &mpi_rank);
+        return mpi_rank;
+    });
     m.def("reset", []() {
         py::gil_scoped_release release;
         SamraiLifeCycle::INSTANCE().reset();
