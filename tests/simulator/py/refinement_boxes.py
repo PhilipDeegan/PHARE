@@ -19,6 +19,7 @@ class SimulatorRefineBoxInputs(unittest.TestCase):
         dic.update(diags.copy())
         dic.update({"diags_fn": lambda model: dump_all_diags(model.populations)})
         return dic
+
     """
       The first set of boxes "B0": [(10,), (14,)]
       Are configured to force there to be a single patch on L0
