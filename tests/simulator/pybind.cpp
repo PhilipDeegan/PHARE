@@ -60,6 +60,86 @@ public:
 };
 
 
+template<size_t dim_, size_t interp_>
+struct ContiguousParticles : public diagnostic::ContiguousParticles<dim_>
+{
+    static const int32_t babies = 2;
+    static const size_t dim     = dim_;
+    static const size_t interp  = interp_;
+    using Super                 = diagnostic::ContiguousParticles<dim>;
+    using Super::charge;
+    using Super::delta;
+    using Super::iCell;
+    using Super::size;
+    using Super::v;
+    using Super::weight;
+
+    ContiguousParticles(size_t s)
+        : diagnostic::ContiguousParticles<dim>{s}
+        , refineFactor{arr()}
+        , splitter{refineFactor, babies}
+    {
+    }
+
+    static constexpr std::array<int32_t, dim> arr()
+    {
+        if constexpr (dim == 1)
+            return std::array<int32_t, dim>{babies};
+        if constexpr (dim == 2)
+            return std::array<int32_t, dim>{babies, babies};
+        if constexpr (dim == 3)
+            return std::array<int32_t, dim>{babies, babies, babies};
+    }
+
+    core::Particle<dim> particle(size_t i) const
+    {
+        core::Particle<dim> p;
+        auto copy = [i](auto& from, auto& to, auto len) {
+            using T = typename std::decay_t<decltype(from)>::value_type;
+            memcpy(to.data(), &from[i * len], sizeof(T) * len);
+        };
+        copy(iCell, p.iCell, dim);
+        copy(delta, p.delta, dim);
+        copy(v, p.v, 3);
+        p.weight = weight[i];
+        p.charge = charge[i];
+        return p;
+    }
+
+    void add(core::Particle<dim>& p, size_t i)
+    {
+        auto copy = [i](auto& from, auto& to, auto len) {
+            using T = typename std::decay_t<decltype(from)>::value_type;
+            memcpy(&to[i * len], from.data(), sizeof(T) * len);
+        };
+        copy(p.iCell, iCell, dim);
+        copy(p.delta, delta, dim);
+        copy(p.v, v, 3);
+        weight[i] = p.weight;
+        charge[i] = p.charge;
+    }
+
+    ContiguousParticles<dim, interp> split() const
+    {
+        ContiguousParticles<dim, interp> kinder(size() * babies);
+        for (size_t i = 0; i < size(); i++)
+        {
+            std::vector<core::Particle<dim>> refinedParticles;
+            auto part = particle(i);
+            auto fine = amr::CoarseParticlePrefiner<dim>::prefine(part, refineFactor);
+            splitter(fine, refinedParticles);
+            for (size_t j = 0; j < babies; j++)
+                kinder.add(refinedParticles[j], (i * babies) + j);
+        }
+        return kinder;
+    }
+
+    std::array<int32_t, dim> refineFactor;
+    PHARE::amr::Split<dim, interp> splitter;
+};
+
+
+
 template<size_t dim, size_t interp>
 void declareParticlesDim(py::module& m)
 {

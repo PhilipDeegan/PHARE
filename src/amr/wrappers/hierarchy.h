@@ -237,9 +237,8 @@ private:
 };
 
 template<typename Dimension, typename InterpOrder>
-std::shared_ptr<Hierarchy> Hierarchy::Maker::
-operator()(std::size_t userDim, std::size_t userInterpOrder, Dimension dimension,
-           InterpOrder interp_order)
+std::shared_ptr<Hierarchy> Hierarchy::Maker::operator()(std::size_t userDim, std::size_t,
+                                                        Dimension dimension, InterpOrder)
 {
     if (userDim == dimension())
     {
