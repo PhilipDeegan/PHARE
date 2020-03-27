@@ -28,7 +28,7 @@ public:
                            std::vector<core::Particle<dimension>>& refinedParticles) const
     {
         auto get = [&](size_t rpIndex, size_t index, auto& icell, auto& delta) {
-            delta[index] += deltas_[rpIndex][index] * refinementFactor;
+            delta[index] += deltas_[rpIndex][index];
             float integra = std::floor(delta[index]);
             delta[index] -= integra;
             icell[index] += static_cast<int32_t>(integra);
@@ -124,27 +124,28 @@ namespace amr
 
         // dimension = 1, refinement factor = 2, nbrOfBabies = 2
         constexpr static std::array<float, 3> tabD1RF2N02Weight_ = {{0.5, 0.5, 0.5}};
-        constexpr static std::array<float, 3> tabD1RF2N02Delta_  = {{0.277f, 0.332f, 0.376f}};
+        constexpr static std::array<float, 3> tabD1RF2N02Delta_
+            = {{0.551569f, 0.663959f, 0.752399f}};
 
 
         // dimension = 1, refinement factor = 2, nbrOfBabies = 3
         constexpr static std::array<std::array<float, 3>, 2> tabD1RF2N03Weight_
-            = {{{{0.5f, 0.468f, 0.474f}}, {{0.25f, 0.266f, 0.263f}}}};
-        constexpr static std::array<float, 3> tabD1RF2N03Delta_ = {{0.5f, 0.556f, 0.638f}};
+            = {{{{0.5f, 0.468137f, 0.473943f}}, {{0.25f, 0.265931f, 0.263028f}}}};
+        constexpr static std::array<float, 3> tabD1RF2N03Delta_ = {{1.0f, 1.112033f, 1.275922f}};
 
 
         // dimension = 1, refinement factor = 2, nbrOfBabies = 4
         constexpr static std::array<std::array<float, 3>, 2> tabD1RF2N04Weight_
-            = {{{{0.0f, 0.125f, 0.135f}}, {{0.0f, 0.375f, 0.365f}}}};
+            = {{{{0.0f, 0.375f, 0.364766f}}, {{0.0f, 0.125f, 0.135234f}}}};
         constexpr static std::array<std::array<float, 3>, 2> tabD1RF2N04Delta_
-            = {{{{0.0f, 0.75f, 0.833f}}, {{0.0f, 0.25f, 0.272f}}}};
+            = {{{{0.0f, 0.5f, 0.542949f}}, {{0.0f, 1.5f, 1.664886f}}}};
 
 
         // dimension = 1, refinement factor = 2, nbrOfBabies = 5
         constexpr static std::array<std::array<float, 3>, 3> tabD1RF2N05Weight_
-            = {{{{0.0f, 0.0f, 0.375f}}, {{0.0f, 0.0f, 0.0625f}}, {{0.0f, 0.0f, 0.25f}}}};
+            = {{{{0.0f, 0.0f, 0.375f}}, {{0.0f, 0.0f, 0.25f}}, {{0.0f, 0.0f, 0.0625f}}}};
         constexpr static std::array<std::array<float, 3>, 2> tabD1RF2N05Delta_
-            = {{{{0.0f, 0.0f, 1.f}}, {{0.0f, 0.0f, 0.5f}}}};
+            = {{{{0.0f, 0.0f, 1.0f}}, {{0.0f, 0.0f, 2.0f}}}};
 
         const std::array<std::vector<int>, 3> tabNbrOfBabies_ = {{{2, 3}, {2, 3, 4}, {2, 3, 4, 5}}};
 
