@@ -56,6 +56,7 @@ def calculate_1d(OverlapType, patch0, patch1, data_name, **kwargs):
     if x_gap < ghost_area_lgth:
 
         cell_gap = safe_round(x_gap, level_cell_width)
+
         return [
             OverlapType(
                 lower, upper, data_name, nGhosts, [int(nGhosts - cell_gap)], **kwargs
