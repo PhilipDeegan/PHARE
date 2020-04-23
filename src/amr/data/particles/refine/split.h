@@ -12,6 +12,60 @@
 #include "core/data/particles/particle.h"
 #include "core/utilities/box/box.h"
 
+#include "kul/log.hpp"
+
+namespace PHARE::amr
+{
+template<size_t _dimension, size_t _refinedParticlesNbr>
+class ASplitter
+{
+public:
+    static constexpr size_t dimension           = _dimension;
+    static constexpr size_t refinedParticlesNbr = _refinedParticlesNbr;
+    static constexpr size_t refinementFactor    = 2;
+
+    inline void operator()(core::Particle<dimension> const& coarsePartOnRefinedGrid,
+                           std::vector<core::Particle<dimension>>& refinedParticles) const
+    {
+        auto get = [&](size_t rpIndex, size_t index, auto& icell, auto& delta) {
+            delta[index] += deltas_[rpIndex][index] * refinementFactor;
+            float integra = std::floor(delta[index]);
+            delta[index] -= integra;
+            icell[index] += static_cast<int32_t>(integra);
+        };
+
+        for (uint32_t refinedParticleIndex = 0; refinedParticleIndex < refinedParticlesNbr;
+             ++refinedParticleIndex)
+        {
+            std::array<int32_t, dimension> icell{coarsePartOnRefinedGrid.iCell};
+            std::array<float, dimension> delta{coarsePartOnRefinedGrid.delta};
+
+            for (size_t i = 0; i < dimension; i++)
+                get(refinedParticleIndex, i, icell, delta);
+
+            float weight = coarsePartOnRefinedGrid.weight * weights_[refinedParticleIndex];
+            refinedParticles.push_back(
+                {weight, coarsePartOnRefinedGrid.charge, icell, delta, coarsePartOnRefinedGrid.v});
+        }
+    }
+
+protected:
+    ASplitter()
+        : weights_(refinedParticlesNbr)
+        , deltas_(refinedParticlesNbr)
+    {
+    }
+
+    std::vector<float> weights_;
+    std::vector<std::array<uint32_t, dimension>> iCells_;
+    std::vector<std::array<float, dimension>> deltas_;
+};
+} // namespace PHARE::amr
+
+#include "split_1d.h"
+#include "split_2d.h"
+#include "split_3d.h"
+
 namespace PHARE
 {
 namespace amr
@@ -24,8 +78,37 @@ namespace amr
 
 #define ISNOTTABULATED(dim, RF) (dim != 1 || RF != 2)
 
+
+    template<std::size_t dim, std::size_t interp, std::size_t nbRefinedPart>
+    using SuperSplitter = typename std::conditional<
+        dim == 1, Splitter_1d<interp, _nbRefinedPart>,
+        typename std::conditional<dim == 2, Splitter_2d<interp, _nbRefinedPart>,
+                                  Splitter_3d<interp, _nbRefinedPart>>::type>::type;
+
     template<std::size_t _dimension, std::size_t _interpOrder, std::size_t _nbRefinedPart>
-    class Split
+    class Splitter : public SuperSplitter<_dimension, _interpOrder, _nbRefinedPart>
+    {
+    public:
+        using Super = SuperSplitter<_dimension, _interpOrder, _nbRefinedPart>;
+
+        static constexpr size_t dimension     = _dimension;
+        static constexpr size_t interpOrder   = _interpOrder;
+        static constexpr size_t nbRefinedPart = _nbRefinedPart;
+
+        // to be removed
+        Splitter(core::Point<int32, dimension>, uint32)
+            : Super{}
+        {
+        }
+
+        static constexpr int maxCellDistanceFromSplit()
+        {
+            return std::ceil((interpOrder + 1) * 0.5);
+        }
+    };
+
+    template<std::size_t dimension, std::size_t interpOrder>
+    class _Split
     {
     public:
         static constexpr size_t dimension     = _dimension;
@@ -69,7 +152,7 @@ namespace amr
 
 
     public:
-        Split(core::Point<int32, dimension> refineFactor)
+        _Split(core::Point<int32, dimension> refineFactor)
             : refinementFactor_{refineFactor}
         {
             deltasX_.assign(nbRefinedPart, 0);
@@ -149,7 +232,7 @@ namespace amr
             }
         }
 
-        ~Split() = default;
+        ~_Split() = default;
 
 
         static constexpr int maxCellDistanceFromSplit()
