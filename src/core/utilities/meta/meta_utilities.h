@@ -68,10 +68,11 @@ namespace core
     static auto constexpr possibleSimulators()
     {
         // inner tuple = dim, interp, list[possible nbrParticles for dim/interp]
-        return std::tuple< // formatting
-            std::tuple<_IC<1>, _IC<1>, _IC<1>, _IC<2>, _IC<3>>,
-            std::tuple<_IC<1>, _IC<2>, _IC<1>, _IC<2>, _IC<3>, _IC<4>>,
-            std::tuple<_IC<1>, _IC<3>, _IC<2>, _IC<3>, _IC<4>, _IC<5>>>{};
+        return std::tuple<                              // formatting
+            std::tuple<_IC<1>, _IC<1>, _IC<2>, _IC<3>>, // formatting
+            std::tuple<_IC<1>, _IC<2>, _IC<2>, _IC<3>>, // formatting
+            std::tuple<_IC<1>, _IC<3>, _IC<2>, _IC<3>>  // formatting
+            >{};
     }
 
 

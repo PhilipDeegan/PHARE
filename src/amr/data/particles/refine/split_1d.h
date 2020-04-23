@@ -2,54 +2,162 @@
 #define PHARE_SPLIT_1D_H
 namespace PHARE::amr
 {
-template<size_t _interpOrder, size_t _refinedParticlesNbr>
-class ASplitter_1d : public ASplitter</*dim=*/1, _refinedParticlesNbr>
+template<>
+struct SplitInnerSetter</*dim=*/1, /*nbrRefineParticles*/ 2>
 {
-protected:
-    static constexpr size_t interpOrder = _interpOrder;
-};
+    template<typename Weights, typename WeightsVal>
+    static void set_weights(Weights& weights, WeightsVal weight_val)
+    {
+        for (auto& weight : weights)
+            weight = weight_val;
+    }
 
-template<size_t _interpOrder, size_t _refinedParticlesNbr>
-class Splitter_1d : public ASplitter_1d<_interpOrder, _refinedParticlesNbr>
-{
-    Splitter_1d() /* This class should never be instantiated */ = delete;
+    template<typename Deltas, typename DeltaVal>
+    static void set_deltas(Deltas& deltas, DeltaVal delta_val)
+    {
+        deltas[0][0] = -delta_val;
+        deltas[1][0] = +delta_val;
+    }
 };
 
 template<>
-class Splitter_1d<1, 2> : public ASplitter_1d<1, 2>
+struct SplitInnerSetter</*dim=*/1, /*nbrRefineParticles*/ 3>
+{
+    template<typename Weights, typename WeightsVals>
+    static void set_weights(Weights& weights, WeightsVals weight_vals)
+    {
+        weights[0] = weight_vals[0];
+        weights[1] = weight_vals[1];
+        weights[2] = weight_vals[1];
+    }
+
+    template<typename Deltas, typename DeltaVal>
+    static void set_deltas(Deltas& deltas, DeltaVal delta_val)
+    {
+        deltas[0][0] = 0.0;
+        deltas[1][0] = -delta_val;
+        deltas[2][0] = +delta_val;
+    }
+};
+
+
+/*************************************************************************************
+  dim = 1
+  interp = 1
+  nbrRefineParticles = 2
+*/
+template<>
+class Splitter<1, 1, 2> : public ASplitter<1, 1, 2>
 {
 public:
-    using Super                                 = ASplitter_1d<1, 2>;
-    static constexpr size_t dimension           = Super::dimension;
-    static constexpr size_t interpOrder         = Super::interpOrder;
-    static constexpr size_t refinedParticlesNbr = Super::refinedParticlesNbr;
-    using Super::deltas_;
-    using Super::weights_;
-
-    Splitter_1d()
+    Splitter()
+        : ASplitter{weight_val_, delta_val_}
     {
-        for (auto& weight : weights_)
-            weight = weight_val_;
-
-        deltas_[0][0] = -delta_val_;
-        deltas_[1][0] = +delta_val_;
     }
 
 protected:
+    constexpr static float delta_val_  = 0.551569;
     constexpr static float weight_val_ = 0.5;
-    constexpr static float delta_val_  = 0.277f;
 };
 
 
+/*************************************************************************
+  dim = 1
+  interp = 1
+  nbrRefineParticles = 3
+*/
 template<>
-class Splitter_1d<2, 2> : public Splitter_1d<1, 2>
+class Splitter<1, 1, 3> : public ASplitter<1, 1, 3>
 {
+public:
+    Splitter()
+        : ASplitter{weight_vals_, delta_val_}
+    {
+    }
+
+protected:
+    constexpr static float delta_val_     = 1;
+    constexpr static float weight_vals_[] = {0.5f, 0.25f};
 };
 
 
+/*************************************************************************
+  dim = 1
+  interp = 2
+  nbrRefineParticles = 2
+*/
 template<>
-class Splitter_1d<3, 2> : public Splitter_1d<1, 2>
+class Splitter<1, 2, 2> : public ASplitter<1, 2, 2>
 {
+public:
+    Splitter()
+        : ASplitter{weight_val_, delta_val_}
+    {
+    }
+
+protected:
+    constexpr static float delta_val_  = 0.663959f;
+    constexpr static float weight_val_ = 0.5;
+};
+
+
+/*************************************************************************
+  dim = 1
+  interp = 2
+  nbrRefineParticles = 3
+*/
+template<>
+class Splitter<1, 2, 3> : public ASplitter<1, 2, 3>
+{
+public:
+    Splitter()
+        : ASplitter{weight_vals_, delta_val_}
+    {
+    }
+
+protected:
+    constexpr static float delta_val_     = 1.112033f;
+    constexpr static float weight_vals_[] = {0.468137, 0.265931};
+};
+
+
+/*************************************************************************
+  dim = 1
+  interp = 3
+  nbrRefineParticles = 2
+*/
+template<>
+class Splitter<1, 3, 2> : public ASplitter<1, 3, 2>
+{
+public:
+    Splitter()
+        : ASplitter{weight_val_, delta_val_}
+    {
+    }
+
+protected:
+    constexpr static float delta_val_  = 0.752399f;
+    constexpr static float weight_val_ = 0.5;
+};
+
+
+/*************************************************************************
+  dim = 1
+  interp = 3
+  nbrRefineParticles = 3
+*/
+template<>
+class Splitter<1, 3, 3> : public ASplitter<1, 3, 3>
+{
+public:
+    Splitter()
+        : ASplitter{weight_vals_, delta_val_}
+    {
+    }
+
+protected:
+    constexpr static float delta_val_     = 1.275922;
+    constexpr static float weight_vals_[] = {0.473943, 0.263028f};
 };
 
 } // namespace PHARE::amr

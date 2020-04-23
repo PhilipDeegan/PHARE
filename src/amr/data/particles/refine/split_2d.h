@@ -2,59 +2,88 @@
 #define PHARE_SPLIT_2D_H
 namespace PHARE::amr
 {
-template<size_t _interpOrder, size_t _refinedParticlesNbr>
-class ASplitter_2d : public ASplitter</*dim=*/2, _refinedParticlesNbr>
-{
-protected:
-    static constexpr size_t interpOrder = _interpOrder;
-};
-
-template<size_t _interpOrder, size_t _refinedParticlesNbr>
-class Splitter_2d : public ASplitter_2d<_interpOrder, _refinedParticlesNbr>
-{
-    Splitter_2d() /* This class should never be instantiated */ = delete;
-};
-
 template<>
-class Splitter_2d<1, 9> : public ASplitter_2d<1, 9>
+struct SplitInnerSetter</*dim=*/2, /*nbrRefineParticles*/ 9>
+{
+    constexpr static size_t root = 3; // 3*3
+
+    template<typename Weights, typename WeightsVal>
+    static void set_weights(Weights& weights, WeightsVal& weight_vals)
+    {
+        weights[4] = weight_vals[0];
+        for (size_t i : {0, 2, 6, 8})
+            weights[i] = weight_vals[2];
+        for (size_t i : {1, 3, 5, 7})
+            weights[i] = weight_vals[1];
+    }
+
+    template<typename Deltas, typename DeltaVal>
+    static void set_deltas(Deltas& deltas, DeltaVal& delta_vals)
+    {
+        for (size_t y = 0; y < root; y++)
+            for (size_t yoff = y * root, x = 0; x < root; x++)
+                deltas[x + yoff] = {delta_vals[x], delta_vals[y]};
+    }
+};
+
+
+/*************************************************************************
+  dim = 2
+  interp = 1
+  nbrRefineParticles = 9
+*/
+template<>
+class Splitter<2, 1, 9> : public ASplitter<2, 1, 9>
 {
 public:
-    using Super                                 = ASplitter_2d<1, 9>;
-    static constexpr size_t dimension           = Super::dimension;
-    static constexpr size_t interpOrder         = Super::interpOrder;
-    static constexpr size_t refinedParticlesNbr = Super::refinedParticlesNbr;
-    using Super::deltas_;
-    using Super::weights_;
-
-    Splitter_2d()
+    Splitter()
+        : ASplitter{weight_vals_, delta_vals_}
     {
-        weights_[4] = weight_vals_[0];
-        for (size_t i : {0, 2, 6, 8})
-            weights_[i] = weight_vals_[2];
-        for (size_t i : {1, 3, 5, 7})
-            weights_[i] = weight_vals_[1];
-
-        constexpr static size_t root = 3; // 3*3 grid
-        for (size_t y = 0; y < root; y++)
-            for (size_t x = 0; x < root; x++)
-                deltas_[x + (y * root)] = {delta_vals_[x], delta_vals_[y]};
     }
 
 protected:
-    constexpr static std::array<float, 3> weight_vals_ = {{0.25, 0.125, 0.01625}};
-    constexpr static std::array<float, 3> delta_vals_  = {{-.25, 0, .25}};
+    constexpr static float delta_vals_[]  = {-.1, 0, .1};
+    constexpr static float weight_vals_[] = {0.25, 0.125, 0.01625};
 };
 
 
+/*************************************************************************
+  dim = 2
+  interp = 2
+  nbrRefineParticles = 9
+*/
 template<>
-class Splitter_2d<2, 9> : public Splitter_2d<1, 9>
+class Splitter<2, 2, 9> : public ASplitter<2, 2, 9>
 {
+public:
+    Splitter()
+    // : ASplitter{weight_vals_, delta_vals_}
+    {
+    }
+
+protected:
+    // constexpr static float delta_vals_[]  = {{-.1, 0, .1}};
+    // constexpr static float weight_vals_[] = {{0.25, 0.125, 0.01625}};
 };
 
 
+/*************************************************************************
+  dim = 2
+  interp = 3
+  nbrRefineParticles = 9
+*/
 template<>
-class Splitter_2d<3, 9> : public Splitter_2d<1, 9>
+class Splitter<2, 3, 9> : public ASplitter<2, 3, 9>
 {
+public:
+    Splitter()
+    // : ASplitter{weight_vals_, delta_vals_}
+    {
+    }
+
+protected:
+    // constexpr static float delta_vals_[]  = {{-.1, 0, .1}};
+    // constexpr static float weight_vals_[] = {{0.25, 0.125, 0.01625}};
 };
 
 } // namespace PHARE::amr

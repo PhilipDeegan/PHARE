@@ -36,7 +36,7 @@ struct PHARE_Types
 
     using ParticleInitializerFactory
         = PHARE::core::ParticleInitializerFactory<ParticleArray_t, GridLayout_t>;
-    using Splitter         = PHARE::amr::Split<dimension, interp_order, nbRefinedPart>;
+    using Splitter         = PHARE::amr::Splitter<dimension, interp_order, nbRefinedPart>;
     using RefinementParams = PHARE::amr::RefinementParams<Splitter>;
     using MessengerFactory
         = PHARE::amr::MessengerFactory<MHDModel_t, HybridModel_t, IPhysicalModel, RefinementParams>;

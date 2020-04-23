@@ -2,44 +2,83 @@
 #define PHARE_SPLIT_3D_H
 namespace PHARE::amr
 {
-template<size_t _interpOrder, size_t _refinedParticlesNbr>
-class ASplitter_3d : public ASplitter</*dim=*/3, _refinedParticlesNbr>
-{
-protected:
-    static constexpr size_t interpOrder = _interpOrder;
-};
-
-template<size_t _interpOrder, size_t _refinedParticlesNbr>
-class Splitter_3d : public ASplitter_3d<_interpOrder, _refinedParticlesNbr>
-{
-    Splitter_3d() /* This class should never be instantiated */ = delete;
-};
-
 template<>
-class Splitter_3d<1, 16> : public ASplitter_3d<1, 16>
+struct SplitInnerSetter</*dim=*/3, /*nbrRefineParticles*/ 27>
+{
+    constexpr static size_t root = 3; // 3*3*3
+
+    template<typename Weights, typename WeightsVal>
+    static void set_weights(Weights& weights, WeightsVal& weight_vals)
+    {
+        // TODO
+    }
+
+    template<typename Deltas, typename DeltaVal>
+    static void set_deltas(Deltas& deltas, DeltaVal& delta_vals)
+    {
+        for (size_t z = 0; z < root; z++)
+            for (size_t zoff = z * root * root, y = 0; y < root; y++)
+                for (size_t yoff = y * root, x = 0; x < root; x++)
+                    deltas[x + yoff + zoff] = {delta_vals[x], delta_vals[y], delta_vals[z]};
+    }
+};
+
+/*************************************************************************
+  dim = 3
+  interp = 1
+  nbrRefineParticles = 27
+*/
+template<>
+class Splitter<3, 1, 27> : public ASplitter<3, 1, 27>
 {
 public:
-    using Super                                 = ASplitter_3d<1, 16>;
-    static constexpr size_t dimension           = Super::dimension;
-    static constexpr size_t interpOrder         = Super::interpOrder;
-    static constexpr size_t refinedParticlesNbr = Super::refinedParticlesNbr;
-    using Super::deltas_;
-    using Super::weights_;
-
-    Splitter_3d() {}
+    Splitter()
+    // : ASplitter{weight_vals_, delta_vals_}
+    {
+    }
 
 protected:
+    // constexpr static float delta_vals_[3]  = {{-.1, 0, .1}};
+    // constexpr static float weight_vals_[3] = {{0.25, 0.125, 0.02725}};
 };
 
+/*************************************************************************
+  dim = 3
+  interp = 3
+  nbrRefineParticles = 27
+*/
 template<>
-class Splitter_3d<2, 16> : public Splitter_3d<1, 16>
+class Splitter<3, 2, 27> : public ASplitter<3, 2, 27>
 {
+public:
+    Splitter()
+    // : ASplitter{weight_vals_, delta_vals_}
+    {
+    }
+
+protected:
+    // constexpr static float delta_vals_[3]  = {{-.1, 0, .1}};
+    // constexpr static float weight_vals_[3] = {{0.25, 0.125, 0.02725}};
 };
 
 
+/*************************************************************************
+  dim = 3
+  interp = 3
+  nbrRefineParticles = 27
+*/
 template<>
-class Splitter_3d<3, 16> : public Splitter_3d<1, 16>
+class Splitter<3, 3, 27> : public ASplitter<3, 3, 27>
 {
+public:
+    Splitter()
+    // : ASplitter{weight_vals_, delta_vals_}
+    {
+    }
+
+protected:
+    // constexpr static float delta_vals_[3]  = {{-.1, 0, .1}};
+    // constexpr static float weight_vals_[3] = {{0.25, 0.125, 0.02725}};
 };
 
 } // namespace PHARE::amr

@@ -12,17 +12,16 @@
 #include "core/data/particles/particle.h"
 #include "core/utilities/box/box.h"
 
-#include "kul/log.hpp"
-
 namespace PHARE::amr
 {
-template<size_t _dimension, size_t _refinedParticlesNbr>
+// see meta_utilities.h for list of declared permutations.
+template<size_t _dimension, size_t _interp_order, size_t _nbRefinedPart>
 class ASplitter
 {
 public:
-    static constexpr size_t dimension           = _dimension;
-    static constexpr size_t refinedParticlesNbr = _refinedParticlesNbr;
-    static constexpr size_t refinementFactor    = 2;
+    static constexpr size_t dimension     = _dimension;
+    static constexpr size_t interp_order  = _interp_order;
+    static constexpr size_t nbRefinedPart = _nbRefinedPart;
 
     inline void operator()(core::Particle<dimension> const& coarsePartOnRefinedGrid,
                            std::vector<core::Particle<dimension>>& refinedParticles) const
@@ -34,7 +33,7 @@ public:
             icell[index] += static_cast<int32_t>(integra);
         };
 
-        for (uint32_t refinedParticleIndex = 0; refinedParticleIndex < refinedParticlesNbr;
+        for (uint32_t refinedParticleIndex = 0; refinedParticleIndex < nbRefinedPart;
              ++refinedParticleIndex)
         {
             std::array<int32_t, dimension> icell{coarsePartOnRefinedGrid.iCell};
@@ -49,22 +48,55 @@ public:
         }
     }
 
+    static constexpr int maxCellDistanceFromSplit() { return std::ceil((interp_order + 1) * 0.5); }
+
 protected:
     ASplitter()
-        : weights_(refinedParticlesNbr)
-        , deltas_(refinedParticlesNbr)
+        : weights_(nbRefinedPart)
+        , deltas_(nbRefinedPart)
     {
     }
 
+
+    template<typename Weights, typename Deltas>
+    inline ASplitter(Weights, Deltas);
+
     std::vector<float> weights_;
-    std::vector<std::array<uint32_t, dimension>> iCells_;
     std::vector<std::array<float, dimension>> deltas_;
 };
+
+template<std::size_t dimension, std::size_t interp_order, size_t nbRefinedPart>
+class Splitter : public ASplitter<dimension, interp_order, nbRefinedPart>
+{
+    // Unspecialized template class, never to be instantiated
+    Splitter() = delete;
+};
+
+template<size_t dim, size_t nbrRefineParts>
+struct SplitInnerSetter
+{
+    // Unspecialized template class, never to be instantiated
+    SplitInnerSetter() = delete;
+};
+
 } // namespace PHARE::amr
 
 #include "split_1d.h"
 #include "split_2d.h"
 #include "split_3d.h"
+
+namespace PHARE::amr
+{
+template<size_t dim, size_t io, size_t nb>
+template<typename Weights, typename Deltas>
+ASplitter<dim, io, nb>::ASplitter(Weights weight_vals, Deltas delta_vals)
+    : ASplitter(/*set vector sizes*/)
+{
+    using Setter = SplitInnerSetter<dimension, nbRefinedPart>;
+    Setter::set_weights(weights_, weight_vals);
+    Setter::set_deltas(deltas_, delta_vals);
+}
+} // namespace PHARE::amr
 
 namespace PHARE
 {
@@ -79,35 +111,8 @@ namespace amr
 #define ISNOTTABULATED(dim, RF) (dim != 1 || RF != 2)
 
 
-    template<std::size_t dim, std::size_t interp, std::size_t nbRefinedPart>
-    using SuperSplitter = typename std::conditional<
-        dim == 1, Splitter_1d<interp, _nbRefinedPart>,
-        typename std::conditional<dim == 2, Splitter_2d<interp, _nbRefinedPart>,
-                                  Splitter_3d<interp, _nbRefinedPart>>::type>::type;
 
     template<std::size_t _dimension, std::size_t _interpOrder, std::size_t _nbRefinedPart>
-    class Splitter : public SuperSplitter<_dimension, _interpOrder, _nbRefinedPart>
-    {
-    public:
-        using Super = SuperSplitter<_dimension, _interpOrder, _nbRefinedPart>;
-
-        static constexpr size_t dimension     = _dimension;
-        static constexpr size_t interpOrder   = _interpOrder;
-        static constexpr size_t nbRefinedPart = _nbRefinedPart;
-
-        // to be removed
-        Splitter(core::Point<int32, dimension>, uint32)
-            : Super{}
-        {
-        }
-
-        static constexpr int maxCellDistanceFromSplit()
-        {
-            return std::ceil((interpOrder + 1) * 0.5);
-        }
-    };
-
-    template<std::size_t dimension, std::size_t interpOrder>
     class _Split
     {
     public:
