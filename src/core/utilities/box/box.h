@@ -7,6 +7,10 @@
 #include "core/utilities/point/point.h"
 #include "core/utilities/meta/meta_utilities.h"
 
+namespace PHARE::core
+{
+}
+
 
 namespace PHARE
 {

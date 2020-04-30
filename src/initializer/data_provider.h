@@ -1,6 +1,7 @@
 #ifndef DATA_PROVIDER_H
 #define DATA_PROVIDER_H
 
+#include "core/data/func.h"
 #include "cppdict/include/dict.hpp"
 
 #include <map>
@@ -11,33 +12,8 @@ namespace PHARE
 {
 namespace initializer
 {
-    template<typename ReturnType, std::size_t dim>
-    struct ScalarFunctionHelper
-    {
-    };
-
-    template<>
-    struct ScalarFunctionHelper<double, 1>
-    {
-        using type = std::function<double(double)>;
-    };
-
-    template<>
-    struct ScalarFunctionHelper<double, 2>
-    {
-        using type = std::function<double(double, double)>;
-    };
-
-    template<>
-    struct ScalarFunctionHelper<double, 3>
-    {
-        using type = std::function<double(double, double, double)>;
-    };
-
-
     template<std::size_t dim>
-    using ScalarFunction = typename ScalarFunctionHelper<double, dim>::type;
-
+    using ScalarFunction = typename core::ScalarFunctionHelper<double, dim, /*smt = */ false>::type;
 
 
     // template<std::size_t dim>

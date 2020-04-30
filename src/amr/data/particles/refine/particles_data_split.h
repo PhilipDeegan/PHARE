@@ -154,17 +154,13 @@ namespace amr
             // in case of interior, this will be just one boxe usually
             for (auto const& destinationBox : destBoxes)
             {
-                std::array<std::remove_reference_t<decltype(srcInteriorParticles)>*, 2>
-                    particlesArrays{{&srcInteriorParticles, &srcGhostParticles}};
+                auto isInDest = [&destinationBox](auto const& particle) {
+                    return isInBox(destinationBox, particle);
+                };
 
-
-                auto isInDest = [&destinationBox](auto const& particle) //
-                { return isInBox(destinationBox, particle); };
-
-
-                for (auto const& sourceParticlesArray : particlesArrays)
+                for (auto const& sourceParticlesArray : {srcInteriorParticles, srcGhostParticles})
                 {
-                    for (auto const& particle : *sourceParticlesArray)
+                    for (auto const& particle : sourceParticlesArray)
                     {
                         std::vector<core::Particle<dim>> refinedParticles;
                         auto particleRefinedPos{particle};

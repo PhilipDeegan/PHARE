@@ -7,7 +7,7 @@
 #include "phare/include.h"
 #include "core/utilities/types.h"
 #include "core/utilities/mpi_utils.h"
-#include "core/data/particles/particle_packer.h"
+#include "core/data/particles/contiguous.h"
 
 
 

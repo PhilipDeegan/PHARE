@@ -1,5 +1,6 @@
 
 
+
 if(testMPI)
   if (NOT DEFINED PHARE_MPI_PROCS)
     set(PHARE_MPI_PROCS 2)
@@ -17,7 +18,7 @@ endif()
 
 # Pybind errors with clang, it is default in GCC
 if ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang")
-  set (CMAKE_CXX_FLAGS -fsized-deallocation)
+  set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -fsized-deallocation")
 endif()
 
 if(coverage AND NOT MSVC)

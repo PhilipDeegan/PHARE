@@ -7,6 +7,8 @@
 #include <memory>
 #include <vector>
 
+#include "core/def.h" // GPU STUFF
+
 #include "core/utilities/types.h"
 #include "core/data/grid/gridlayout.h"
 #include "core/data/particles/particle.h"

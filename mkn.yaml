@@ -1,0 +1,110 @@
+#! clean build -x mpi -dtKOp py
+
+name: phare
+parent: gpu
+scm: https://github.com/dekken/phare
+version: gpu
+
+profile:
+- name: gpu
+  parent: test
+  dep: mkn.gpu[rocm]
+  main: gpu.cpp
+  link: -rdynamic
+  env: PYTHONPATH=${MKN_ROOT}/build/tests/diagnostic:${MKN_ROOT}/build
+
+- name: core
+  inc: src subprojects
+  src: src/core
+  dep: mkn.kul
+  out: phare_core
+
+- name: samrai
+  self: core
+  dep: llnl.samrai(https://github.com/dekken/llnl.samrai)
+  src: src/amr
+  out: phare_amr
+
+- name: solver
+  self: samrai
+  src: src/solver
+  out: phare_solver
+
+- name: diagnostic
+  self: solver
+  dep: hpc.highfive(https://github.com/dekken/hpc.highfive)
+  inc: /usr/include/hdf5/mpich
+  out: phare_diagnostic
+  lib: hdf5_mpich
+
+- name: simulator
+  self: diagnostic
+  src: src/simulator
+  out: phare_simulator
+
+- name: exe
+  self: simulator init
+  main: src/phare/phare.cpp
+  mod: lang.python3
+  env: PYTHONPATH=${MKN_ROOT}/build/tests/diagnostic:${MKN_ROOT}/build
+
+- name: init
+  src: src/initializer/data_provider.cpp
+  self: core
+  out: phare_initializer
+
+- name: pybind
+  mode: shared
+  dep: lang.pybind11
+  mod: lang.pybind11 lang.python3
+
+- name: pyphare
+  parent: pybind
+  self: init
+  src: src/initializer/pyphare.cpp
+  install: build/phare
+  out: pyphare
+
+- name: py_simulator
+  parent: pybind
+  self: simulator
+  src: src/python3/cpp_simulator.cpp
+  install: build/phare
+  out: cpp
+
+- name: py_data_wrangler
+  parent: pybind
+  self: simulator
+  src: src/python3/data_wrangler.cpp
+  install: build/phare/data
+  out: data_wrangler
+
+# - name: py_test_simulator
+#   parent: pybind
+#   self: simulator
+#   src: tests/simulator/test_simulator_pybind.cpp
+#   install: build/tests/simulator
+#   out: test_simulator
+
+- name: py
+  self: pyphare
+        py_simulator
+        py_data_wrangler
+#py_test_simulator
+
+- name: test
+  inc: .
+  self: init simulator
+  dep: lang.pybind11 google.test
+  link: -pthread
+  mod: lang.python3
+
+- name: test_periodicity
+  parent: test
+  main: tests/amr/periodicity/test_main.cpp
+  env: PYTHONPATH=${MKN_ROOT}/build/tests/amr/periodicity:${MKN_ROOT}/build
+
+- name: test_diagnostics
+  parent: test
+  main: tests/diagnostic/test_diagnostics.cpp
+  env: PYTHONPATH=${MKN_ROOT}/build/tests/diagnostic:${MKN_ROOT}/build

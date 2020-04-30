@@ -77,7 +77,17 @@ namespace core
         }
 
 
-
+        ParticleArray& domainParticles() const
+        {
+            if (isUsable())
+            {
+                return *particles_->domainParticles;
+            }
+            else
+            {
+                throw std::runtime_error("Error - cannot provide access to particle buffers");
+            }
+        }
 
         ParticleArray& domainParticles()
         {

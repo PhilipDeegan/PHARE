@@ -11,7 +11,8 @@ target_include_directories(${PROJECT_NAME} PUBLIC
 
 
 target_link_libraries(phare-exe PUBLIC
-    phare_simulator
-    pybind11::embed
+  phare_initializer
+  phare_simulator
+  pybind11::embed
 )
 

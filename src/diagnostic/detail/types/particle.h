@@ -5,7 +5,7 @@
 #include "diagnostic/detail/h5_utils.h"
 #include "diagnostic/detail/h5file.h"
 
-#include "core/data/particles/particle_packer.h"
+#include "core/data/particles/contiguous.h"
 
 #include "amr/data/particles/particles_data.h"
 
@@ -164,15 +164,15 @@ void ParticlesDiagnosticWriter<HighFiveDiagnostic>::write(DiagnosticProperties& 
         if (particles.size() == 0)
             return;
         auto& hfile = fileData.at(diagnostic.quantity)->file();
-        Packer packer(particles);
-        core::ContiguousParticles<dimension> copy{particles.size()};
-        packer.pack(copy);
 
-        hi5.writeDataSet(hfile, path + packer.keys()[0], copy.weight.data());
-        hi5.writeDataSet(hfile, path + packer.keys()[1], copy.charge.data());
-        hi5.writeDataSet(hfile, path + packer.keys()[2], copy.iCell.data());
-        hi5.writeDataSet(hfile, path + packer.keys()[3], copy.delta.data());
-        hi5.writeDataSet(hfile, path + packer.keys()[4], copy.v.data());
+        core::ContiguousParticles<dimension> copy{particles};
+        auto packer_keys = Packer::keys();
+
+        hi5.writeDataSet(hfile, path + packer_keys[0], copy.weight.data());
+        hi5.writeDataSet(hfile, path + packer_keys[1], copy.charge.data());
+        hi5.writeDataSet(hfile, path + packer_keys[2], copy.iCell.data());
+        hi5.writeDataSet(hfile, path + packer_keys[3], copy.delta.data());
+        hi5.writeDataSet(hfile, path + packer_keys[4], copy.v.data());
     };
 
     auto checkWrite = [&](auto& tree, auto pType, auto& ps) {

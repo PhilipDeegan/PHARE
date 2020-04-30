@@ -192,7 +192,7 @@ namespace core
 
         auto cend() const { return std::cend(components_); }
 
-
+        const auto& operator[](size_t i) const { return *components_[i]; }
 
     private:
         std::string name_ = "No Name";

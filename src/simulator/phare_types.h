@@ -46,6 +46,8 @@ struct PHARE_Types
                                                 PHARE::amr::SAMRAI_Types>;
 };
 
+
+
 } // namespace PHARE
 
 #endif // PHARE_TYPES_H
