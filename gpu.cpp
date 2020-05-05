@@ -21,11 +21,13 @@ int main(int argc, char** argv)
     auto topLvl       = hierarchy.getNumberOfLevels() - 1;
 
     std::vector<PHARE::gpu::PatchState> states;
-
     PHARE::amr::visitHierarchy<PHARE_TYPES::GridLayout_t>(
         hierarchy, *hybridModel.resourcesManager,
         [&](auto& gridLayout, std::string, size_t) { states.emplace_back(gridLayout, state); },
         topLvl, topLvl + 1, hybridModel);
+
+    for (auto const& state : states)
+        KLOG(OTH) << state.electromag[0].p[1];
 
     PHARE::gpu::ParticlePatchState packer{states};
 
@@ -33,37 +35,13 @@ int main(int argc, char** argv)
 
     KLOG(NON) << "MAX_PARTICLES: " << MAX_PARTICLES;
     KLOG(NON) << "GPU PARTICLES: " << packer.n_particles;
-    KLOG(NON) << packer.particles->charge()[packer.n_particles - 1];
+    auto charge = packer.particles->charge();
+
+    KLOG(NON) << charge[0];
+    KLOG(NON) << charge.back();
+
+    for (auto const& state : states)
+        KLOG(OTH) << state.electromag[0].p[1];
 
     return 0;
 }
-
-
-/*
-
-__global__ void xyz(uint32_t* in)
-{
-    auto i = kul::gpu::hip::idx();
-    in[i]  = i;
-}
-int main(int argc, char** argv)
-{
-    std::vector<uint32_t> data(X * Y * Z, 123);
-    kul::gpu::DeviceMem<uint32_t> gata{data};
-
-    kul::gpu::Launcher{X, Y, Z, TPB_X, TPB_Y, TPB_Z}(xyz, gata.p);
-
-    auto host = gata();
-
-    KLOG(NON) << host[10];
-    KLOG(NON) << host[100];
-    KLOG(NON) << host[1000];
-    KLOG(NON) << host[10000];
-    KLOG(NON) << host[100000];
-    KLOG(NON) << host[1000000];
-    KLOG(NON) << host[2000000];
-    KLOG(NON) << host.back();
-    KLOG(NON) << host.size();
-
-    return 0;
-}*/
