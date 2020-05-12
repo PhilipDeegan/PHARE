@@ -35,6 +35,7 @@ namespace core
     class MaxwellianParticleInitializer : public ParticleInitializer<ParticleArray, GridLayout>
     {
     public:
+        using Float                     = typename GridLayout::Float;
         static constexpr auto dimension = GridLayout::dimension;
 
         MaxwellianParticleInitializer(
@@ -169,7 +170,7 @@ namespace core
 
                     std::array<float, dimension> delta = {{randPosX(generator)}};
 
-                    Particle<dimension> tmpParticle;
+                    Particle<Float, dimension> tmpParticle;
 
                     // particle iCell is in AMR index
                     auto AMRCellIndex = layout.localToAMR(Point{ix});
@@ -267,7 +268,7 @@ namespace core
                         std::array<float, dimension> delta
                             = {{randPosX(generator), randPosY(generator)}};
 
-                        Particle<dimension> tmpParticle;
+                        Particle<Float, dimension> tmpParticle;
 
                         // particle iCell is in AMR index
                         auto AMRCellIndex = layout.localToAMR(Point{ix, iy});
@@ -375,7 +376,7 @@ namespace core
                                 = {{randPosX(generator), randPosY(generator), randPosZ(generator)}};
 
 
-                            Particle<dimension> tmpParticle;
+                            Particle<Float, dimension> tmpParticle;
 
                             // particle iCell is in AMR index
                             auto AMRCellIndex = layout.localToAMR(Point{ix, iy, iz});

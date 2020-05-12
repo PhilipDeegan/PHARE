@@ -5,21 +5,22 @@
 
 namespace PHARE
 {
-template<std::size_t dimension_, std::size_t interp_order_, std::size_t nbRefinedPart_>
+template<std::size_t dimension_, std::size_t interp_order_, std::size_t nbRefinedPart_,
+         typename Float = double>
 struct PHARE_Types
 {
     static auto constexpr dimension     = dimension_;
     static auto constexpr interp_order  = interp_order_;
     static auto constexpr nbRefinedPart = nbRefinedPart_;
 
-    using Array_t
-        = decltype(PHARE::core::makeNdArray<dimension>(std::array<std::uint32_t, dimension>{}));
+    using Array_t = decltype(
+        PHARE::core::makeNdArray<Float, dimension>(std::array<std::uint32_t, dimension>{}));
     using VecField_t      = PHARE::core::VecField<Array_t, PHARE::core::HybridQuantity>;
     using Field_t         = PHARE::core::Field<Array_t, PHARE::core::HybridQuantity::Scalar>;
     using Electromag_t    = PHARE::core::Electromag<VecField_t>;
-    using YeeLayout_t     = PHARE::core::GridLayoutImplYee<dimension, interp_order>;
+    using YeeLayout_t     = PHARE::core::GridLayoutImplYee<dimension, interp_order, Float>;
     using GridLayout_t    = PHARE::core::GridLayout<YeeLayout_t>;
-    using ParticleArray_t = PHARE::core::ParticleArray<dimension>;
+    using ParticleArray_t = PHARE::core::ParticleArray<Float, dimension>;
     using MaxwellianParticleInitializer_t
         = PHARE::core::MaxwellianParticleInitializer<ParticleArray_t, GridLayout_t>;
     using IonPopulation_t = PHARE::core::IonPopulation<ParticleArray_t, VecField_t, GridLayout_t>;

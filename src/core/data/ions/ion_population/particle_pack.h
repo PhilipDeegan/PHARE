@@ -18,6 +18,8 @@ namespace core
     template<typename ParticleArray>
     struct ParticlesPack
     {
+        using float_type = typename ParticleArray::value_type::float_type;
+
         ParticleArray* domainParticles;
         ParticleArray* patchGhostParticles;
         ParticleArray* levelGhostParticles;

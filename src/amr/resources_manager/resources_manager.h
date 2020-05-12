@@ -98,6 +98,7 @@ namespace amr
     class ResourcesManager
     {
     public:
+        using float_type                          = typename GridLayoutT::Float;
         static constexpr std::size_t interp_order = GridLayoutT::interp_order;
 
         ResourcesManager()

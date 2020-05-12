@@ -26,14 +26,15 @@ namespace amr
         return (interpOrder % 2 == 0 ? interpOrder / 2 + 1 : (interpOrder + 1) / 2);
     }
 
-    template<std::size_t dim>
-    inline bool isInBox(SAMRAI::hier::Box const& box, core::Particle<dim> const& particle)
+    template<typename Particle>
+    inline bool isInBox(SAMRAI::hier::Box const& box, Particle const& particle)
     {
+        constexpr auto dim = Particle::dimension;
+
         auto const& iCell = particle.iCell;
 
         auto const& lower = box.lower();
         auto const& upper = box.upper();
-
 
         if (iCell[0] >= lower(0) && iCell[0] <= upper(0))
         {
@@ -85,7 +86,7 @@ namespace amr
      * particle refinement from a coarser level
      *
      */
-    template<std::size_t dim>
+    template<typename Float, std::size_t dim>
     /**
      * @brief The ParticlesData class
      */
@@ -133,18 +134,24 @@ namespace amr
         {
             TBOX_ASSERT_OBJDIM_EQUALITY2(*this, source);
 
-            // throws if fails
-            auto& pSource = dynamic_cast<ParticlesData const&>(source);
-
-            SAMRAI::hier::Box const& sourceGhostBox = pSource.getGhostBox();
-            SAMRAI::hier::Box const& myGhostBox     = getGhostBox();
-            const SAMRAI::hier::Box intersectionBox{sourceGhostBox * myGhostBox};
-
-            if (!intersectionBox.empty())
+            const ParticlesData* pSource = dynamic_cast<const ParticlesData*>(&source);
+            if (pSource != nullptr)
             {
-                copy_(sourceGhostBox, myGhostBox, intersectionBox, pSource);
+                SAMRAI::hier::Box const& sourceGhostBox = pSource->getGhostBox();
+                SAMRAI::hier::Box const& myGhostBox     = getGhostBox();
+                const SAMRAI::hier::Box intersectionBox{sourceGhostBox * myGhostBox};
+
+                if (!intersectionBox.empty())
+                {
+                    copy_(sourceGhostBox, myGhostBox, intersectionBox, *pSource);
+                }
+            }
+            else
+            {
+                source.copy2(*this);
             }
         }
+
 
 
         /**
@@ -158,6 +165,7 @@ namespace amr
         }
 
 
+
         /**
          * @brief copy with an overlap. Does the copy as the other overload but this time
          * the copy must account for the intersection with the boxes within the overlap
@@ -166,57 +174,68 @@ namespace amr
         virtual void copy(SAMRAI::hier::PatchData const& source,
                           SAMRAI::hier::BoxOverlap const& overlap) override
         {
-            // casts throw on failure
-            auto& pSource  = dynamic_cast<ParticlesData const&>(source);
-            auto& pOverlap = dynamic_cast<SAMRAI::pdat::CellOverlap const&>(overlap);
+            const ParticlesData* pSource = dynamic_cast<const ParticlesData*>(&source);
+            const SAMRAI::pdat::CellOverlap* pOverlap
+                = dynamic_cast<const SAMRAI::pdat::CellOverlap*>(&overlap);
 
-            SAMRAI::hier::Transformation const& transformation = pOverlap.getTransformation();
-            if (transformation.getRotation() == SAMRAI::hier::Transformation::NO_ROTATE)
+
+            if ((pSource != nullptr) && (pOverlap != nullptr))
             {
-                SAMRAI::hier::BoxContainer const& boxList = pOverlap.getDestinationBoxContainer();
-                for (auto const& overlapBox : boxList)
+                SAMRAI::hier::Transformation const& transformation = pOverlap->getTransformation();
+                if (transformation.getRotation() == SAMRAI::hier::Transformation::NO_ROTATE)
                 {
-                    SAMRAI::hier::Box sourceGhostBox = pSource.getGhostBox();
-                    SAMRAI::hier::Box myGhostBox     = this->getGhostBox();
-                    SAMRAI::hier::Box intersectionBox{sourceGhostBox.getDim()};
-
-                    if (isSameBlock(transformation))
+                    SAMRAI::hier::BoxContainer const& boxList
+                        = pOverlap->getDestinationBoxContainer();
+                    for (auto const& overlapBox : boxList)
                     {
-                        if (offsetIsZero(transformation))
-                        {
-                            intersectionBox = overlapBox * sourceGhostBox * myGhostBox;
+                        SAMRAI::hier::Box sourceGhostBox = pSource->getGhostBox();
+                        SAMRAI::hier::Box myGhostBox     = this->getGhostBox();
+                        SAMRAI::hier::Box intersectionBox{sourceGhostBox.getDim()};
 
-                            if (!intersectionBox.empty())
+                        if (isSameBlock(transformation))
+                        {
+                            if (offsetIsZero(transformation))
                             {
-                                copy_(sourceGhostBox, myGhostBox, intersectionBox, pSource);
+                                intersectionBox = overlapBox * sourceGhostBox * myGhostBox;
+
+                                if (!intersectionBox.empty())
+                                {
+                                    copy_(sourceGhostBox, myGhostBox, intersectionBox, *pSource);
+                                }
+                            }
+                            else
+                            {
+                                SAMRAI::hier::Box shiftedSourceBox{sourceGhostBox};
+                                transformation.transform(shiftedSourceBox);
+                                intersectionBox = overlapBox * shiftedSourceBox * myGhostBox;
+
+
+                                if (!intersectionBox.empty())
+                                {
+                                    copyWithTransform_(sourceGhostBox, intersectionBox,
+                                                       transformation, *pSource);
+                                }
                             }
                         }
                         else
                         {
-                            SAMRAI::hier::Box shiftedSourceBox{sourceGhostBox};
-                            transformation.transform(shiftedSourceBox);
-                            intersectionBox = overlapBox * shiftedSourceBox * myGhostBox;
-
-
-                            if (!intersectionBox.empty())
-                            {
-                                copyWithTransform_(sourceGhostBox, intersectionBox, transformation,
-                                                   pSource);
-                            }
+                            std::runtime_error("Error - multiblock hierarchies not handled");
                         }
-                    }
-                    else
-                    {
-                        std::runtime_error("Error - multiblock hierarchies not handled");
-                    }
 
-                } // end loop over boxes
-            }     // end no rotate
+                    } // end loop over boxes
+                }     // end no rotate
+                else
+                {
+                    throw std::runtime_error("copy with rotate not implemented");
+                }
+            }
             else
             {
-                throw std::runtime_error("copy with rotate not implemented");
+                source.copy2(*this, overlap);
             }
         }
+
+
 
 
         virtual void copy2([[maybe_unused]] SAMRAI::hier::PatchData& destination,
@@ -224,6 +243,7 @@ namespace amr
         {
             throw std::runtime_error("Cannot cast");
         }
+
 
 
 
@@ -238,7 +258,7 @@ namespace amr
                 dynamic_cast<SAMRAI::pdat::CellOverlap const*>(&overlap)};
 
             std::size_t numberParticles = countNumberParticlesIn_(*pOverlap);
-            auto size                   = numberParticles * sizeof(core::Particle<dim>);
+            auto size                   = numberParticles * sizeof(core::Particle<Float, dim>);
             return size;
         }
 
@@ -269,7 +289,7 @@ namespace amr
 
             TBOX_ASSERT(pOverlap != nullptr);
 
-            std::vector<core::Particle<dim>> specie;
+            std::vector<core::Particle<Float, dim>> specie;
 
             if (pOverlap->isOverlapEmpty())
             {
@@ -338,12 +358,14 @@ namespace amr
                 = dynamic_cast<SAMRAI::pdat::CellOverlap const*>(&overlap);
             TBOX_ASSERT(pOverlap != nullptr);
 
+            std::vector<core::Particle<Float, dim>> particleArray;
+
             if (!pOverlap->isOverlapEmpty())
             {
                 // unpack particles into a particle array
                 size_t numberParticles = 0;
                 stream >> numberParticles;
-                std::vector<core::Particle<dim>> particleArray(numberParticles);
+                particleArray.resize(numberParticles);
                 stream.unpack(particleArray.data(), numberParticles);
 
                 // ok now our goal is to put the particles we have just unpacked
@@ -391,22 +413,22 @@ namespace amr
 
 
 
-        core::ParticlesPack<core::ParticleArray<dim>>* getPointer() { return &pack; }
+        auto* getPointer() const { return &pack; }
 
 
 
         // Core interface
         // these particles arrays are public because core module is free to use
         // them easily
-        core::ParticleArray<dim> domainParticles;
-        core::ParticleArray<dim> patchGhostParticles;
+        core::ParticleArray<Float, dim> domainParticles;
+        core::ParticleArray<Float, dim> patchGhostParticles;
 
-        core::ParticleArray<dim> levelGhostParticles;
+        core::ParticleArray<Float, dim> levelGhostParticles;
 
-        core::ParticleArray<dim> levelGhostParticlesOld;
-        core::ParticleArray<dim> levelGhostParticlesNew;
+        core::ParticleArray<Float, dim> levelGhostParticlesOld;
+        core::ParticleArray<Float, dim> levelGhostParticlesNew;
 
-        core::ParticlesPack<core::ParticleArray<dim>> pack;
+        core::ParticlesPack<core::ParticleArray<Float, dim>> pack;
 
 
 
@@ -574,7 +596,7 @@ namespace amr
 
 
 
-        void pack_(std::vector<core::Particle<dim>>& buffer,
+        void pack_(std::vector<core::Particle<Float, dim>>& buffer,
                    SAMRAI::hier::Box const& intersectionBox,
                    [[maybe_unused]] SAMRAI::hier::Box const& sourceBox,
                    SAMRAI::hier::Transformation const& transformation) const

@@ -58,14 +58,19 @@ namespace core
      * constants to the GridLayout.
      *
      */
-    template<size_t dim, bool Refs = false>
+    template<typename GridLayoutImpl, bool Refs = false>
     class GridLayoutDAO
     {
-        friend class GridLayoutDAO<dim, !Refs>;
+        friend class GridLayoutDAO<GridLayoutImpl, !Refs>;
+
+        using float_type = typename GridLayoutImpl::float_type;
+        using Float      = float_type;
+
+        static constexpr size_t dim = GridLayoutImpl::dimension;
 
     public:
         template<bool refs = Refs, std::enable_if_t<!refs, bool> = 0>
-        GridLayoutDAO(std::array<double, dim> const& meshSize, Point<double, dim> const& origin,
+        GridLayoutDAO(std::array<Float, dim> const& meshSize, Point<Float, dim> const& origin,
                       std::array<uint32, dim> const& nbrCells, Box<int32_t, dim> AMRBox)
             : meshSize_{meshSize}
             , origin_{origin}
@@ -78,7 +83,7 @@ namespace core
         }
 
         template<bool refs = Refs, std::enable_if_t<refs, bool> = 0>
-        GridLayoutDAO(GridLayoutDAO<dim, false> const& dao)
+        GridLayoutDAO(GridLayoutDAO<GridLayoutImpl, false> const& dao)
             : meshSize_{dao.meshSize_}
             , origin_{dao.origin_}
             , nbrPhysicalCells_{dao.nbrPhysicalCells_}
@@ -91,13 +96,13 @@ namespace core
         }
 
         template<typename Table, bool refs = Refs, std::enable_if_t<refs, bool> = 0>
-        GridLayoutDAO(std::array<double, dim> const& meshSize,        //
-                      Point<double, dim> const& origin,               //
-                      std::array<uint32, dim> const& nbrCells,        //
-                      std::array<double, dim> const& inverseMeshSize, //
-                      Table const& _physicalStartIndexTable,          //
-                      Table const& _physicalEndIndexTable,            //
-                      Table const& _ghostEndIndexTable,               //
+        GridLayoutDAO(std::array<Float, dim> const& meshSize,        //
+                      Point<Float, dim> const& origin,               //
+                      std::array<uint32, dim> const& nbrCells,       //
+                      std::array<Float, dim> const& inverseMeshSize, //
+                      Table const& _physicalStartIndexTable,         //
+                      Table const& _physicalEndIndexTable,           //
+                      Table const& _ghostEndIndexTable,              //
                       Box<int32_t, dim> const& AMRBox)
             : meshSize_{meshSize}
             , origin_{origin}
@@ -120,10 +125,10 @@ namespace core
         template<typename Type>
         using MaybeRef = std::conditional_t<Refs, Type const&, Type>;
 
-        MaybeRef<std::array<double, dim>> meshSize_;
-        MaybeRef<Point<double, dim>> origin_;
+        MaybeRef<std::array<Float, dim>> meshSize_;
+        MaybeRef<Point<Float, dim>> origin_;
         MaybeRef<std::array<uint32, dim>> nbrPhysicalCells_;
-        MaybeRef<std::array<double, dim>> inverseMeshSize_;
+        MaybeRef<std::array<Float, dim>> inverseMeshSize_;
 
         // stores key indices in each direction (3) for primal and dual nodes (2) (dim * 2)
         MaybeRef<std::array<std::array<uint32, dim>, 2>> physicalStartIndexTable_;
@@ -132,7 +137,7 @@ namespace core
         MaybeRef<Box<int32_t, dim>> AMRBox_;
     };
 
-    template<typename GridLayoutImpl, typename DAO = GridLayoutDAO<GridLayoutImpl::dimension>>
+    template<typename GridLayoutImpl, typename DAO = GridLayoutDAO<GridLayoutImpl>>
     class GridLayout : public DAO
     {
         static constexpr bool is_ref = DAO::is_ref;
@@ -148,6 +153,7 @@ namespace core
     public:
         static constexpr std::size_t dimension    = GridLayoutImpl::dimension;
         static constexpr std::size_t interp_order = GridLayoutImpl::interp_order;
+        using Float                               = typename GridLayoutImpl::float_type;
         using implT                               = GridLayoutImpl;
         using Super                               = DAO;
 
@@ -159,9 +165,9 @@ namespace core
          * @param origin is the point of origin in physical units of the origin of the grid
          */
         template<bool refs = is_ref, std::enable_if_t<!refs, bool> = 0>
-        GridLayout(std::array<double, dimension> const& meshSize,
-                   std::array<uint32, dimension> const& nbrPhysicalCells,
-                   Point<double, dimension> const& origin,
+        GridLayout(std::array<Float, dimension> const& meshSize,
+                   std::array<uint32_t, dimension> const& nbrPhysicalCells,
+                   Point<Float, dimension> const& origin,
                    Box<int32_t, dimension> _AMRBox = Box<int32_t, dimension>{})
             : DAO{meshSize, origin, nbrPhysicalCells, _AMRBox}
         {
@@ -410,9 +416,9 @@ namespace core
          * associated with a given Field, in physical coordinates.
          */
         template<typename NdArrayImpl, typename... Indexes>
-        Point<double, dimension>
-        fieldNodeCoordinates(const Field<NdArrayImpl, HybridQuantity::Scalar>& field,
-                             const Point<double, dimension>& origin, Indexes... index) const
+        decltype(auto) fieldNodeCoordinates(const Field<NdArrayImpl, HybridQuantity::Scalar>& field,
+                                            const Point<Float, dimension>& origin,
+                                            Indexes... index) const
         {
             static_assert(sizeof...(Indexes) == dimension,
                           "Error dimension does not match number of arguments");
@@ -426,11 +432,11 @@ namespace core
 
             Point<int32, dimension> coord{static_cast<int32>(index)...};
 
-            Point<double, dimension> position;
+            Point<Float, dimension> position;
 
             for (std::size_t iDir = 0; iDir < dimension; ++iDir)
             {
-                double halfCell = 0.0;
+                Float halfCell = 0.0;
 
                 auto const centering = static_cast<uint32>(hybridQtyCentering[iQuantity][iDir]);
                 int32 const iStart   = physicalStartIndexTable_[centering][iDir];
@@ -450,7 +456,7 @@ namespace core
                 }
 
                 position[iDir]
-                    = (static_cast<double>(coord[iDir] - iStart) + halfCell) * meshSize_[iDir]
+                    = (static_cast<Float>(coord[iDir] - iStart) + halfCell) * meshSize_[iDir]
                       + origin[iDir];
             }
 
@@ -463,28 +469,28 @@ namespace core
          * of a multidimensional index that is cell-centered.
          */
         template<typename... Indexes>
-        Point<double, dimension> cellCenteredCoordinates(Indexes... index) const
+        decltype(auto) cellCenteredCoordinates(Indexes... index) const
         {
             static_assert(sizeof...(Indexes) == dimension,
                           "Error dimension does not match number of arguments");
 
             uint32 constexpr iPrimal = static_cast<uint32>(QtyCentering::primal);
 
-            constexpr double halfCell = 0.5;
+            constexpr Float halfCell = 0.5;
             // A shift of +dx/2, +dy/2, +dz/2 is necessary to get the
             // cell center physical coordinates,
             // because this point is located on the dual mesh
 
             Point<uint32, dimension> coord(index...);
 
-            Point<double, dimension> physicalPosition;
+            Point<Float, dimension> physicalPosition;
 
             for (std::size_t iDir = 0; iDir < dimension; ++iDir)
             {
                 auto iStart = physicalStartIndexTable_[iPrimal][iDir];
 
                 physicalPosition[iDir]
-                    = (static_cast<double>(coord[iDir] - iStart) + halfCell) * meshSize_[iDir]
+                    = (static_cast<Float>(coord[iDir] - iStart) + halfCell) * meshSize_[iDir]
                       + origin_[iDir];
             }
 

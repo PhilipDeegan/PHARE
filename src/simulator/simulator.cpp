@@ -7,7 +7,7 @@ namespace PHARE
     template definitions for library for methods in this file
     useful for minimizing compile times during dev
 */
-
+/*
 template<std::size_t dim, std::size_t io, size_t nb>
 Simulator<dim, io, nb>::Simulator(PHARE::initializer::PHAREDict dict,
                                   std::shared_ptr<PHARE::amr::Hierarchy> const& hierarchy)
@@ -112,6 +112,6 @@ void Simulator<dim, io, nb>::advance()
 template class Simulator<1, 1, 2>;
 template class Simulator<1, 2, 2>;
 template class Simulator<1, 3, 2>;
-
+*/
 
 } /* namespace PHARE */

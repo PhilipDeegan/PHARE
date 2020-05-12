@@ -11,9 +11,9 @@
 
 namespace PHARE::core
 {
-void c_boris_advancePosition(size_t dim, double const* vIn, float const* deltaIn,
-                             int const* iCellIn, float* deltaOut, int* iCellOut,
-                             double const* halfDtOverDl)
+template<typename Float>
+void c_boris_advancePosition(size_t dim, Float const* vIn, float const* deltaIn, int const* iCellIn,
+                             float* deltaOut, int* iCellOut, Float const* halfDtOverDl)
 {
     // push the particle
     for (std::size_t iDim = 0; iDim < dim; ++iDim)
@@ -26,52 +26,53 @@ void c_boris_advancePosition(size_t dim, double const* vIn, float const* deltaIn
     }
 }
 
+template<typename Float>
 // for SIMD this should be split up to a single function per operation - NO LAMBDAS!
-void c_boris_accelerate(double const& chargeIn, double const* vIn, double const* EIn,
-                        double const* const BIn, double* vOut, double dto2m)
+void c_boris_accelerate(Float const& chargeIn, Float const* vIn, Float const* EIn,
+                        Float const* const BIn, Float* vOut, Float dto2m)
 {
-    double coef1 = chargeIn * dto2m;
+    Float coef1 = chargeIn * dto2m;
 
     // We now apply the 3 steps of the BORIS PUSHER
 
     // 1st half push of the electric field
-    double velx1 = vIn[0] + coef1 * EIn[0]; // see Fused Multiple/Add (FMA)
-    double vely1 = vIn[1] + coef1 * EIn[1];
-    double velz1 = vIn[2] + coef1 * EIn[2];
+    Float velx1 = vIn[0] + coef1 * EIn[0]; // see Fused Multiple/Add (FMA)
+    Float vely1 = vIn[1] + coef1 * EIn[1];
+    Float velz1 = vIn[2] + coef1 * EIn[2];
 
 
     // preparing variables for magnetic rotation
-    double const rx = coef1 * BIn[0];
-    double const ry = coef1 * BIn[1];
-    double const rz = coef1 * BIn[2];
+    Float const rx = coef1 * BIn[0];
+    Float const ry = coef1 * BIn[1];
+    Float const rz = coef1 * BIn[2];
 
-    double const rx2  = rx * rx;
-    double const ry2  = ry * ry;
-    double const rz2  = rz * rz;
-    double const rxry = rx * ry;
-    double const rxrz = rx * rz;
-    double const ryrz = ry * rz;
+    Float const rx2  = rx * rx;
+    Float const ry2  = ry * ry;
+    Float const rz2  = rz * rz;
+    Float const rxry = rx * ry;
+    Float const rxrz = rx * rz;
+    Float const ryrz = ry * rz;
 
-    double const invDet = 1. / (1. + rx2 + ry2 + rz2);
+    Float const invDet = 1. / (1. + rx2 + ry2 + rz2);
 
     // preparing rotation matrix due to the magnetic field
     // m = invDet*(I + r*r - r x I) - I where x denotes the cross product
-    double const mxx = 1. + rx2 - ry2 - rz2;
-    double const mxy = 2. * (rxry + rz);
-    double const mxz = 2. * (rxrz - ry);
+    Float const mxx = 1. + rx2 - ry2 - rz2;
+    Float const mxy = 2. * (rxry + rz);
+    Float const mxz = 2. * (rxrz - ry);
 
-    double const myx = 2. * (rxry - rz);
-    double const myy = 1. + ry2 - rx2 - rz2;
-    double const myz = 2. * (ryrz + rx);
+    Float const myx = 2. * (rxry - rz);
+    Float const myy = 1. + ry2 - rx2 - rz2;
+    Float const myz = 2. * (ryrz + rx);
 
-    double const mzx = 2. * (rxrz + ry);
-    double const mzy = 2. * (ryrz - rx);
-    double const mzz = 1. + rz2 - rx2 - ry2;
+    Float const mzx = 2. * (rxrz + ry);
+    Float const mzy = 2. * (ryrz - rx);
+    Float const mzz = 1. + rz2 - rx2 - ry2;
 
     // magnetic rotation
-    double const velx2 = (mxx * velx1 + mxy * vely1 + mxz * velz1) * invDet;
-    double const vely2 = (myx * velx1 + myy * vely1 + myz * velz1) * invDet;
-    double const velz2 = (mzx * velx1 + mzy * vely1 + mzz * velz1) * invDet;
+    Float const velx2 = (mxx * velx1 + mxy * vely1 + mxz * velz1) * invDet;
+    Float const vely2 = (myx * velx1 + myy * vely1 + myz * velz1) * invDet;
+    Float const velz2 = (mzx * velx1 + mzy * vely1 + mzz * velz1) * invDet;
 
 
     // 2nd half push of the electric field
@@ -89,8 +90,9 @@ class BorisPusher : public Pusher<dim, ParticleIterator, Electromag, Interpolato
                                   BoundaryCondition, GridLayout>
 {
 public:
+    using Float         = typename GridLayout::float_type;
     using ParticleRange = Range<ParticleIterator>;
-    using Particles     = EMContiguousParticles<dim>;
+    using Particles     = EMContiguousParticles<Float, dim>;
 
     /** see Pusher::move() domentation*/
     ParticleIterator move(ParticleRange const& rangeIn, ParticleRange& rangeOut,

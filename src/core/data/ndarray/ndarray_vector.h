@@ -15,7 +15,7 @@ namespace core
     /**
      * This base class gathers all code that is common to 1D, 2D and 3D implementations.
      */
-    template<typename DataType = double>
+    template<typename DataType>
     class NdArrayVectorBase
     {
     public:
@@ -58,7 +58,7 @@ namespace core
      *  data representation. It can store any kind of elements although 'double'
      *  is the default type.
      */
-    template<typename DataType = double>
+    template<typename DataType>
     class NdArrayVector1D : public NdArrayVectorBase<DataType>
     {
     public:
@@ -126,7 +126,7 @@ namespace core
      *  Elements are stored following the C order, i.e. in array(i,j), 'i' is the
      *  slower varying index.
      */
-    template<typename DataType = double>
+    template<typename DataType>
     class NdArrayVector2D : public NdArrayVectorBase<DataType>
     {
     public:
@@ -201,7 +201,7 @@ namespace core
     //! NdArrayVector3D is an implementation for a 3-dimensional container
     /** behaves as the 2D version.
      */
-    template<typename DataType = double>
+    template<typename DataType>
     class NdArrayVector3D : public NdArrayVectorBase<DataType>
     {
     public:
@@ -278,15 +278,15 @@ namespace core
 
 
 
-    template<std::size_t dim>
+    template<typename Float, std::size_t dim>
     auto makeNdArray(std::array<std::uint32_t, dim> sizes)
     {
         if constexpr (dim == 1)
-            return NdArrayVector1D{sizes[0]};
+            return NdArrayVector1D<Float>{sizes[0]};
         if constexpr (dim == 2)
-            return NdArrayVector2D{sizes[0], sizes[1]};
+            return NdArrayVector2D<Float>{sizes[0], sizes[1]};
         if constexpr (dim == 3)
-            return NdArrayVector3D{sizes[0], sizes[1], sizes[2]};
+            return NdArrayVector3D<Float>{sizes[0], sizes[1], sizes[2]};
     }
 
 

@@ -12,7 +12,7 @@ namespace amr
     /**
      * @brief The ParticlesVariable class
      */
-    template<std::size_t dim, std::size_t interp>
+    template<std::size_t dim, std::size_t interp, typename Float>
     class ParticlesVariable : public SAMRAI::hier::Variable
     {
     public:
@@ -20,7 +20,7 @@ namespace amr
                           SAMRAI::hier::IntVector ghost
                           = SAMRAI::hier::IntVector{SAMRAI::tbox::Dimension{dim},
                                                     ghostWidthForParticles<interp>()})
-            : SAMRAI::hier::Variable{name, std::make_shared<ParticlesDataFactory<dim>>(
+            : SAMRAI::hier::Variable{name, std::make_shared<ParticlesDataFactory<Float, dim>>(
                                                ghost, fineBoundaryRepresentsVariable)}
             , fineBoundaryRepresentsVariable_{fineBoundaryRepresentsVariable}
         {

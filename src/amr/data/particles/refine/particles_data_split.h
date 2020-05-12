@@ -33,6 +33,7 @@ namespace amr
     class ParticlesRefineOperator : public SAMRAI::hier::RefineOperator
     {
     public:
+        using Float = double; // typename Splitter::float_type; // todo
         static constexpr size_t dim         = Splitter::dimension;
         static constexpr size_t interpOrder = Splitter::interp_order;
 
@@ -70,10 +71,10 @@ namespace amr
 
 
             // We then need to get our ParticlesData from the patch
-            auto destinationParticlesData = std::dynamic_pointer_cast<ParticlesData<dim>>(
+            auto destinationParticlesData = std::dynamic_pointer_cast<ParticlesData<Float, dim>>(
                 destination.getPatchData(destinationComponent));
 
-            auto const sourceParticlesData = std::dynamic_pointer_cast<ParticlesData<dim>>(
+            auto const sourceParticlesData = std::dynamic_pointer_cast<ParticlesData<Float, dim>>(
                 source.getPatchData(sourceComponent));
 
             // Finnaly we need the cartesion geometry of both patch.
@@ -116,8 +117,8 @@ namespace amr
          * an overlap , a ratio and the geometry of both patches, perform the
          * splitting of coarse particules onto the destination patch
          */
-        void refine_(ParticlesData<dim>& destParticlesData,
-                     ParticlesData<dim> const& srcParticlesData,
+        void refine_(ParticlesData<Float, dim>& destParticlesData,
+                     ParticlesData<Float, dim> const& srcParticlesData,
                      SAMRAI::pdat::CellOverlap const& destFieldOverlap,
                      SAMRAI::hier::IntVector const& ratio,
                      SAMRAI::geom::CartesianPatchGeometry const& /*patchGeomDest*/,
@@ -162,7 +163,7 @@ namespace amr
                 {
                     for (auto const& particle : sourceParticlesArray)
                     {
-                        std::vector<core::Particle<dim>> refinedParticles;
+                        std::vector<core::Particle<Float, dim>> refinedParticles;
                         auto particleRefinedPos{particle};
 
                         for (auto iDim = 0u; iDim < dim; ++iDim)

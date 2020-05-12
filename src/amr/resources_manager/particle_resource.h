@@ -17,11 +17,12 @@ namespace amr
     template<class ResourcesUser, size_t interp>
     struct UserParticleType
     {
+        using Float = typename ResourcesUser::particle_resource_type::float_type;
         static constexpr std::size_t dimension    = ResourcesUser::dimension;
         static constexpr std::size_t interp_order = interp;
 
-        using variable_type     = ParticlesVariable<dimension, interp_order>;
-        using patch_data_type   = ParticlesData<dimension>;
+        using variable_type     = ParticlesVariable<dimension, interp_order, Float>;
+        using patch_data_type   = ParticlesData<Float, dimension>;
         using internal_type_ptr = typename ResourcesUser::particle_resource_type*;
     };
 

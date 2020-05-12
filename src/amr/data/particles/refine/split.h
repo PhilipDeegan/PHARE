@@ -25,8 +25,8 @@ public:
     static constexpr size_t interp_order  = _interp_order;
     static constexpr size_t nbRefinedPart = _nbRefinedPart;
 
-    inline void operator()(core::Particle<dimension> const& coarsePartOnRefinedGrid,
-                           std::vector<core::Particle<dimension>>& refinedParticles) const
+    inline void operator()(core::Particle<double, dimension> const& coarsePartOnRefinedGrid,
+                           std::vector<core::Particle<double, dimension>>& refinedParticles) const
     {
         auto get = [&](size_t rpIndex, size_t index, auto& icell, auto& delta) {
             delta[index] += deltas_[rpIndex][index];
@@ -251,8 +251,9 @@ namespace amr
 
 
 
-        inline void operator()(core::Particle<dimension> const& coarsePartOnRefinedGrid,
-                               std::vector<core::Particle<dimension>>& refinedParticles) const
+        inline void
+        operator()(core::Particle<double, dimension> const& coarsePartOnRefinedGrid,
+                   std::vector<core::Particle<double, dimension>>& refinedParticles) const
         {
             for (uint32 refinedParticleIndex = 0; refinedParticleIndex < nbRefinedPart;
                  ++refinedParticleIndex)

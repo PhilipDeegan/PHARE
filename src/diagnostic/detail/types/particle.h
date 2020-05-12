@@ -35,8 +35,9 @@ public:
     using Super::writeGhostsAttr_;
     static constexpr auto dimension   = HighFiveDiagnostic::dimension;
     static constexpr auto interpOrder = HighFiveDiagnostic::interpOrder;
+    using Float                       = typename HighFiveDiagnostic::float_type;
     using Attributes                  = typename Super::Attributes;
-    using Packer                      = core::ParticlePacker<dimension>;
+    using Packer                      = core::ParticlePacker<Float, dimension>;
 
     ParticlesDiagnosticWriter(HighFiveDiagnostic& hi5)
         : H5TypeWriter<HighFiveDiagnostic>(hi5)
@@ -165,7 +166,7 @@ void ParticlesDiagnosticWriter<HighFiveDiagnostic>::write(DiagnosticProperties& 
             return;
         auto& hfile = fileData.at(diagnostic.quantity)->file();
 
-        core::ContiguousParticles<dimension> copy{particles};
+        core::ContiguousParticles<Float, dimension> copy{particles};
         auto packer_keys = Packer::keys();
 
         hi5.writeDataSet(hfile, path + packer_keys[0], copy.weight.data());

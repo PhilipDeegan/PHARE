@@ -23,7 +23,7 @@ namespace core
      *  VecField class is templated by the type of NdArray Field use and which
      *  physical quantities they represent.
      */
-    template<typename NdArrayImpl, typename PhysicalQuantity, typename DataType = double>
+    template<typename NdArrayImpl, typename PhysicalQuantity>
     class VecField
     {
     public:

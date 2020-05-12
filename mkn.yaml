@@ -3,7 +3,7 @@
 name: phare
 parent: gpu
 scm: https://github.com/dekken/phare
-version: gpu
+version: gpu_float32
 
 profile:
 - name: gpu
@@ -11,7 +11,7 @@ profile:
   dep: mkn.gpu[rocm]
   main: gpu.cpp
   link: -rdynamic
-  env: PYTHONPATH=${MKN_ROOT}/build/tests/diagnostic:${MKN_ROOT}/build
+  env: PYTHONPATH=${MKN_ROOT}/build/tests/diagnostic:${MKN_ROOT}/build:${MKN_ROOT}/pyphare
 
 - name: core
   inc: src subprojects
@@ -46,7 +46,7 @@ profile:
   self: simulator init
   main: src/phare/phare.cpp
   mod: lang.python3
-  env: PYTHONPATH=${MKN_ROOT}/build/tests/diagnostic:${MKN_ROOT}/build
+  env: PYTHONPATH=${MKN_ROOT}/build/tests/diagnostic:${MKN_ROOT}/pyphare/pyphare
 
 - name: init
   src: src/initializer/data_provider.cpp
@@ -58,25 +58,25 @@ profile:
   dep: lang.pybind11
   mod: lang.pybind11 lang.python3
 
-- name: pyphare
+- name: dictator
   parent: pybind
   self: init
-  src: src/initializer/pyphare.cpp
-  install: build/phare
-  out: pyphare
+  src: src/initializer/dictator.cpp
+  install: build/pybindlibs
+  out: dictator
 
 - name: py_simulator
   parent: pybind
   self: simulator
   src: src/python3/cpp_simulator.cpp
-  install: build/phare
+  install: build/pybindlibs
   out: cpp
 
 - name: py_data_wrangler
   parent: pybind
   self: simulator
   src: src/python3/data_wrangler.cpp
-  install: build/phare/data
+  install: build/pybindlibs/data
   out: data_wrangler
 
 # - name: py_test_simulator
@@ -87,7 +87,7 @@ profile:
 #   out: test_simulator
 
 - name: py
-  self: pyphare
+  self: dictator
         py_simulator
         py_data_wrangler
 #py_test_simulator
@@ -102,9 +102,9 @@ profile:
 - name: test_periodicity
   parent: test
   main: tests/amr/periodicity/test_main.cpp
-  env: PYTHONPATH=${MKN_ROOT}/build/tests/amr/periodicity:${MKN_ROOT}/build
+  env: PYTHONPATH=${MKN_ROOT}/build/tests/amr/periodicity:${MKN_ROOT}/pyphare/pyphare
 
 - name: test_diagnostics
   parent: test
   main: tests/diagnostic/test_diagnostics.cpp
-  env: PYTHONPATH=${MKN_ROOT}/build/tests/diagnostic:${MKN_ROOT}/build
+  env: PYTHONPATH=${MKN_ROOT}/build/tests/diagnostic:${MKN_ROOT}/pyphare/pyphare

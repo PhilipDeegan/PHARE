@@ -17,6 +17,7 @@ template<typename Writer>
 class H5TypeWriter : public PHARE::diagnostic::TypeWriter
 {
 public:
+    using float_type = typename Writer::float_type;
     using Attributes = typename Writer::Attributes;
     H5TypeWriter(Writer& hi5)
         : hi5_(hi5)

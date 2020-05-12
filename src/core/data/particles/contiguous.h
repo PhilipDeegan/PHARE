@@ -5,16 +5,16 @@
 
 namespace PHARE::core
 {
-template<size_t dim>
+template<typename Float, size_t dim>
 struct ContiguousParticle
 {
-    int* iCell     = nullptr;
-    float* delta   = nullptr;
-    double *weight = nullptr, *charge = nullptr, *v = nullptr;
+    int* iCell    = nullptr;
+    float* delta  = nullptr;
+    Float *weight = nullptr, *charge = nullptr, *v = nullptr;
 };
 
 
-template<std::size_t dim>
+template<typename Float, std::size_t dim>
 struct ContiguousParticles
 {
     static constexpr size_t ONE   = 1;
@@ -29,7 +29,7 @@ struct ContiguousParticles
         , size_(s)
     {
     }
-    inline ContiguousParticles(ParticleArray<dim> const& particles);
+    inline ContiguousParticles(ParticleArray<Float, dim> const& particles);
 
     auto size() const { return size_; }
 
@@ -56,7 +56,7 @@ struct ContiguousParticles
 
     auto particle(size_t i) const
     {
-        return ContiguousParticle<dim>{
+        return ContiguousParticle<Float, dim>{
             iCell.data() + (dim * i), //
             delta.data() + (dim * i), //
             weight.data() + i,        //
@@ -67,20 +67,20 @@ struct ContiguousParticles
 
     std::vector<int> iCell;
     std::vector<float> delta;
-    std::vector<double> weight, charge, v;
+    std::vector<Float> weight, charge, v;
     size_t size_;
 };
 
-template<size_t dim>
-struct EMContiguousParticle : ContiguousParticle<dim>
+template<typename Float, size_t dim>
+struct EMContiguousParticle : ContiguousParticle<Float, dim>
 {
     double *E = nullptr, *B = nullptr;
 };
 
-template<std::size_t dim>
-struct EMContiguousParticles : ContiguousParticles<dim>
+template<typename Float, std::size_t dim>
+struct EMContiguousParticles : ContiguousParticles<Float, dim>
 {
-    using Super                   = ContiguousParticles<dim>;
+    using Super                   = ContiguousParticles<Float, dim>;
     static constexpr size_t THREE = Super::THREE;
 
     EMContiguousParticles(size_t s)
@@ -90,7 +90,7 @@ struct EMContiguousParticles : ContiguousParticles<dim>
     {
     }
 
-    inline EMContiguousParticles(ParticleArray<dim> const& particles);
+    inline EMContiguousParticles(ParticleArray<Float, dim> const& particles);
 
     void swap(size_t idx0, size_t idx1)
     {
@@ -100,7 +100,7 @@ struct EMContiguousParticles : ContiguousParticles<dim>
     }
     auto particle(size_t i) const
     {
-        return EMContiguousParticle<dim>{
+        return EMContiguousParticle<Float, dim>{
             Super::iCell.data() + (dim * i), //
             Super::delta.data() + (dim * i), //
             Super::weight.data() + i,        //
@@ -114,13 +114,13 @@ struct EMContiguousParticles : ContiguousParticles<dim>
     std::vector<double> E, B;
 };
 
-template<size_t dim>
+template<typename Float, size_t dim>
 class ParticlePacker
 {
-    static constexpr size_t THREE = ContiguousParticles<dim>::THREE;
+    static constexpr size_t THREE = ContiguousParticles<Float, dim>::THREE;
 
 public:
-    ParticlePacker(ParticleArray<dim> const& particles)
+    ParticlePacker(ParticleArray<Float, dim> const& particles)
         : particles_{particles}
     {
     }
@@ -130,19 +130,19 @@ public:
         return std::vector<std::string>{"weight", "charge", "iCell", "delta", "v"};
     }
 
-    static auto forward_as_tuple(Particle<dim> const& part)
+    static auto forward_as_tuple(Particle<Float, dim> const& part)
     {
         return std::forward_as_tuple(part.weight, part.charge, part.iCell, part.delta, part.v);
     }
 
     static auto empty()
     {
-        Particle<dim> part;
+        Particle<Float, dim> part;
         return forward_as_tuple(part);
     }
 
 
-    void _pack(ContiguousParticles<dim>& to, size_t idx)
+    void _pack(ContiguousParticles<Float, dim>& to, size_t idx)
     {
         auto tuple     = forward_as_tuple(particles_[idx]);
         to.weight[idx] = std::get<0>(tuple);
@@ -152,13 +152,13 @@ public:
         _copy(std::get<4>(tuple).data(), idx, THREE, to.v);
     }
 
-    void pack(ContiguousParticles<dim>& to)
+    void pack(ContiguousParticles<Float, dim>& to)
     {
         for (size_t idx = 0; idx < particles_.size(); idx++)
             _pack(to, idx);
     }
 
-    void pack(EMContiguousParticles<dim>& to)
+    void pack(EMContiguousParticles<Float, dim>& to)
     {
         for (size_t idx = 0; idx < particles_.size(); idx++)
         {
@@ -169,7 +169,7 @@ public:
     }
 
 private:
-    ParticleArray<dim> const& particles_;
+    ParticleArray<Float, dim> const& particles_;
 
     template<typename Array, typename Vector>
     void _copy(Array* from, size_t idx, size_t size, Vector& to)
@@ -180,18 +180,18 @@ private:
 
 
 
-template<std::size_t dim>
-ContiguousParticles<dim>::ContiguousParticles(ParticleArray<dim> const& particles)
+template<typename Float, std::size_t dim>
+ContiguousParticles<Float, dim>::ContiguousParticles(ParticleArray<Float, dim> const& particles)
     : ContiguousParticles{particles.size()}
 {
-    ParticlePacker<dim>{particles}.pack(*this);
+    ParticlePacker<Float, dim>{particles}.pack(*this);
 }
 
-template<std::size_t dim>
-EMContiguousParticles<dim>::EMContiguousParticles(ParticleArray<dim> const& particles)
+template<typename Float, std::size_t dim>
+EMContiguousParticles<Float, dim>::EMContiguousParticles(ParticleArray<Float, dim> const& particles)
     : EMContiguousParticles{particles.size()}
 {
-    ParticlePacker<dim>{particles}.pack(*this);
+    ParticlePacker<Float, dim>{particles}.pack(*this);
 }
 
 

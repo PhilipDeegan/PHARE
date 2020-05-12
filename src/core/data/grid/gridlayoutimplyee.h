@@ -27,13 +27,14 @@ namespace core
      * - physical coordinate given a field and a primal point (ix, iy, iz)
      * - cell centered coordinate given a primal point (ix, iy, iz)
      */
-    template<std::size_t dim, std::size_t interpOrder>
+    template<std::size_t dim, std::size_t interpOrder, typename Float>
     class GridLayoutImplYee
     {
         // ------------------------------------------------------------------------
         //                              PRIVATE
         // ------------------------------------------------------------------------
     public:
+        using float_type                          = Float;
         static constexpr std::size_t dimension    = dim;
         static constexpr std::size_t interp_order = interpOrder;
         static constexpr std::string_view type    = "yee";

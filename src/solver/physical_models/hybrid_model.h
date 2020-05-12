@@ -36,6 +36,7 @@ namespace solver
         using electromag_type           = Electromag;
         using vecfield_type             = typename Electromag::vecfield_type;
         using field_type                = typename vecfield_type::field_type;
+        using float_type                = typename field_type::type;
         using ions_type                 = Ions;
         using resources_manager_type    = amr::ResourcesManager<gridLayout_type>;
         static constexpr auto dimension = GridLayoutT::dimension;

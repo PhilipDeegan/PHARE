@@ -10,7 +10,6 @@
 #include "core/data/particles/contiguous.h"
 
 
-
 namespace py = pybind11;
 
 namespace PHARE::pydata
@@ -68,7 +67,8 @@ public:
     static constexpr size_t interp_order  = DataWrangler::interp_order;
     static constexpr size_t nbRefinedPart = DataWrangler::nbRefinedPart;
 
-    using PHARETypes  = PHARE_Types<dimension, interp_order, nbRefinedPart>;
+    using Float       = typename DataWrangler::Float;
+    using PHARETypes  = PHARE_Types<dimension, interp_order, nbRefinedPart, Float>;
     using HybridModel = typename PHARETypes::HybridModel_t;
     using GridLayout  = typename HybridModel::gridLayout_type;
 
@@ -81,7 +81,7 @@ public:
 
     auto getDensity()
     {
-        std::vector<PatchData<std::vector<double>>> patch_data;
+        std::vector<PatchData<std::vector<Float>>> patch_data;
         auto& ions = model_.state.ions;
 
         auto visit = [&](GridLayout& grid, std::string patchID, size_t /*iLevel*/) {
@@ -202,7 +202,7 @@ public:
 
     auto getParticles()
     {
-        using Nested = std::vector<PatchData<core::ContiguousParticles<dimension>>>;
+        using Nested = std::vector<PatchData<core::ContiguousParticles<Float, dimension>>>;
         using Inner  = std::unordered_map<std::string, Nested>;
 
         std::unordered_map<std::string, Inner> pop_particles;
@@ -217,7 +217,7 @@ public:
 
             auto& patch_data = inner[key].emplace_back(particles.size());
             setPatchDataFromGrid(patch_data, grid, patchID);
-            core::ParticlePacker<dimension>{particles}.pack(patch_data.data);
+            core::ParticlePacker<Float, dimension>{particles}.pack(patch_data.data);
         };
 
         auto& ions = model_.state.ions;
@@ -248,12 +248,13 @@ private:
     size_t lvl_;
 };
 
-template<std::size_t _dimension, std::size_t _interp_order, size_t _nbRefinedPart>
+template<typename Particle, std::size_t _interp_order, size_t _nbRefinedPart>
 class DataWrangler
 {
 public:
     using This                            = DataWrangler;
-    static constexpr size_t dimension     = _dimension;
+    using Float                           = typename Particle::float_type;
+    static constexpr size_t dimension     = Particle::dimension;
     static constexpr size_t interp_order  = _interp_order;
     static constexpr size_t nbRefinedPart = _nbRefinedPart;
 
@@ -278,14 +279,14 @@ public:
         return PatchLevel<This>{*hierarchy_, *simulator_ptr_->getHybridModel(), lvl};
     }
 
-    auto sort_merge_1d(std::vector<PatchData<std::vector<double>>> const&& input,
+    auto sort_merge_1d(std::vector<PatchData<std::vector<Float>>> const&& input,
                        bool shared_patch_border = false)
     {
-        std::vector<std::pair<double, const PatchData<std::vector<double>>*>> sorted;
+        std::vector<std::pair<Float, const PatchData<std::vector<Float>>*>> sorted;
         for (auto const& data : input)
-            sorted.emplace_back(core::Point<double, 1>::fromString(data.origin)[0], &data);
+            sorted.emplace_back(core::Point<Float, 1>::fromString(data.origin)[0], &data);
         std::sort(sorted.begin(), sorted.end(), [](auto& a, auto& b) { return a.first < b.first; });
-        std::vector<double> ret;
+        std::vector<Float> ret;
         for (size_t i = 0; i < sorted.size(); i++)
         { // skip empty patches in case of unequal patches across MPI domains
             if (!sorted[i].second->data.size())
@@ -301,11 +302,11 @@ public:
         return ret;
     }
 
-    auto sync(std::vector<PatchData<std::vector<double>>> const& input)
+    auto sync(std::vector<PatchData<std::vector<Float>>> const& input)
     {
         int mpi_size = 0;
         MPI_Comm_size(MPI_COMM_WORLD, &mpi_size);
-        std::vector<PatchData<std::vector<double>>> collected;
+        std::vector<PatchData<std::vector<Float>>> collected;
 
         auto collect = [&](auto& patch_data) {
             auto patchIDs = core::mpi::collect(patch_data.patchID, mpi_size);
@@ -325,7 +326,7 @@ public:
 
         auto max = core::mpi::max(input.size(), mpi_size);
 
-        PatchData<std::vector<double>> empty;
+        PatchData<std::vector<Float>> empty;
 
         for (size_t i = 0; i < max; i++)
         {
@@ -337,7 +338,7 @@ public:
         return collected;
     }
 
-    auto sync_merge(std::vector<PatchData<std::vector<double>>> const& input, bool primal)
+    auto sync_merge(std::vector<PatchData<std::vector<Float>>> const& input, bool primal)
     {
         if constexpr (dimension == 1)
             return sort_merge_1d(sync(input), primal);
@@ -381,6 +382,18 @@ private:
     };
 };
 
+template<typename Float>
+constexpr char floatTypeID()
+{
+    if constexpr (std::is_same_v<Float, float>)
+        return 's';
+    if constexpr (std::is_same_v<Float, double>)
+        return 'd';
+    else
+        throw std::runtime_error("Invalid template not handled");
+}
+
+
 template<typename Type>
 void declarePatchData(py::module& m, std::string key)
 {
@@ -393,11 +406,12 @@ void declarePatchData(py::module& m, std::string key)
         .def_readonly("data", &PatchDataType::data);
 }
 
-template<size_t dim>
-void declareDim(py::module& m)
+
+template<size_t dim, typename Float>
+void declareDimFloat(py::module& m)
 {
-    using CP         = core::ContiguousParticles<dim>;
-    std::string name = "ContiguousParticles_" + std::to_string(dim);
+    using CP         = core::ContiguousParticles<Float, dim>;
+    std::string name = "ContiguousParticles_" + std::to_string(dim) + "_" + floatTypeID<Float>();
     py::class_<CP, std::shared_ptr<CP>>(m, name.c_str())
         .def(py::init<size_t>())
         .def_readwrite("iCell", &CP::iCell)
@@ -411,17 +425,25 @@ void declareDim(py::module& m)
     declarePatchData<CP>(m, name.c_str());
 }
 
-template<typename _dim, typename _interp, typename _nbRefinedPart>
+template<size_t dim>
+void declareDim(py::module& m)
+{
+    // declareDimFloat<dim, float>(m);
+    declareDimFloat<dim, double>(m);
+}
+template<typename _dim, typename _interp, typename _nbRefinedPart, typename Float>
 void declare(py::module& m)
 {
     constexpr auto dim           = _dim();
     constexpr auto interp        = _interp();
     constexpr auto nbRefinedPart = _nbRefinedPart();
+    using Particle               = core::Particle<Float, dim>;
 
-    using DW = DataWrangler<dim, interp, nbRefinedPart>;
+    using DW = DataWrangler<Particle, interp, nbRefinedPart>;
 
     std::string type_string = "_" + std::to_string(dim) + "_" + std::to_string(interp) + "_"
-                              + std::to_string(nbRefinedPart);
+                              + std::to_string(nbRefinedPart) + "_" + floatTypeID<Float>();
+
 
     std::string name = "DataWrangler" + type_string;
     py::class_<DW, std::shared_ptr<DW>>(m, name.c_str())
@@ -430,7 +452,7 @@ void declare(py::module& m)
         .def("getPatchLevel", &DW::getPatchLevel);
 
     using PL = PatchLevel<DW>;
-    name     = "PatchLevel_" + type_string;
+    name     = "PatchLevel_" + type_string + "_" + floatTypeID<Float>();
     py::class_<PL, std::shared_ptr<PL>>(m, name.c_str())
         .def("getEM", &PL::getEM)
         .def("getDensity", &PL::getDensity)
@@ -445,7 +467,8 @@ template<typename Dimension, typename InterpOrder, typename... NbRefinedParts>
 void declare(py::module& m, std::tuple<Dimension, InterpOrder, NbRefinedParts...> const&)
 {
     core::apply(std::tuple<NbRefinedParts...>{}, [&](auto& nbRefinedPart) {
-        declare<Dimension, InterpOrder, std::decay_t<decltype(nbRefinedPart)>>(m);
+        // declare<Dimension, InterpOrder, std::decay_t<decltype(nbRefinedPart)>, float>(m);
+        declare<Dimension, InterpOrder, std::decay_t<decltype(nbRefinedPart)>, double>(m);
     });
 }
 
@@ -458,6 +481,7 @@ PYBIND11_MODULE(data_wrangler, m)
 
     core::apply(core::possibleSimulators(), [&](auto const& simType) { declare(m, simType); });
 
+    // declarePatchData<std::vector<float>>(m, "PatchDataVectorSingle");
     declarePatchData<std::vector<double>>(m, "PatchDataVectorDouble");
 }
 
