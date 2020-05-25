@@ -29,11 +29,10 @@ namespace amr
     };
 
 
-    template<ParticlesDataSplitType splitType, typename Splitter>
+    template<ParticlesDataSplitType splitType, typename Splitter, typename Float = double>
     class ParticlesRefineOperator : public SAMRAI::hier::RefineOperator
     {
     public:
-        using Float = double; // typename Splitter::float_type; // todo
         static constexpr size_t dim         = Splitter::dimension;
         static constexpr size_t interpOrder = Splitter::interp_order;
 
@@ -59,7 +58,7 @@ namespace amr
          *
          */
         virtual void refine(SAMRAI::hier::Patch& destination, SAMRAI::hier::Patch const& source,
-                            int const destinationComponent, int const sourceComponent,
+                            const int destinationComponent, const int sourceComponent,
                             SAMRAI::hier::BoxOverlap const& fineOverlap,
                             SAMRAI::hier::IntVector const& ratio) const override
         {
@@ -263,17 +262,17 @@ namespace amr
 
 namespace PHARE::amr
 {
-template<typename Splitter>
+template<typename Splitter, typename Float = double>
 struct RefinementParams
 {
     using InteriorParticleRefineOp
-        = ParticlesRefineOperator<ParticlesDataSplitType::interior, Splitter>;
+        = ParticlesRefineOperator<ParticlesDataSplitType::interior, Splitter, Float>;
 
     using CoarseToFineRefineOpOld
-        = ParticlesRefineOperator<ParticlesDataSplitType::coarseBoundaryOld, Splitter>;
+        = ParticlesRefineOperator<ParticlesDataSplitType::coarseBoundaryOld, Splitter, Float>;
 
     using CoarseToFineRefineOpNew
-        = ParticlesRefineOperator<ParticlesDataSplitType::coarseBoundaryNew, Splitter>;
+        = ParticlesRefineOperator<ParticlesDataSplitType::coarseBoundaryNew, Splitter, Float>;
 };
 
 } // namespace PHARE::amr

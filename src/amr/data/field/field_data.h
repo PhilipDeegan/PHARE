@@ -40,6 +40,7 @@ namespace amr
     public:
         static constexpr std::size_t dimension    = GridLayoutT::dimension;
         static constexpr std::size_t interp_order = GridLayoutT::interp_order;
+        using Float                               = typename GridLayoutT::Float;
 
         /*** \brief Construct a FieldData from information associated to a patch
          *
@@ -193,8 +194,8 @@ namespace amr
                         const SAMRAI::hier::BoxOverlap& overlap) const final
         {
             // getDataStreamSize_<true> mean that we want to apply the transformation
-            size_t expectedSize = getDataStreamSize_<true>(overlap) / sizeof(double);
-            std::vector<typename FieldImpl::type> buffer;
+            size_t expectedSize = getDataStreamSize_<true>(overlap) / sizeof(Float);
+            std::vector<Float> buffer;
             buffer.reserve(expectedSize);
 
             auto& fieldOverlap = dynamic_cast<FieldOverlap<dimension> const&>(overlap);
@@ -240,10 +241,10 @@ namespace amr
         {
             // For unpacking we need to know how much element we will need to
             // extract
-            size_t expectedSize = getDataStreamSize(overlap) / sizeof(double);
+            size_t expectedSize = getDataStreamSize(overlap) / sizeof(Float);
             // Here the seek counter will be used to index buffer
             size_t seek = 0;
-            std::vector<double> buffer;
+            std::vector<Float> buffer;
             buffer.resize(expectedSize, 0.);
 
             auto fieldOverlap = dynamic_cast<FieldOverlap<dimension> const*>(&overlap);
@@ -437,6 +438,8 @@ namespace amr
     template<typename GridLayoutT, typename FieldImpl, typename PhysicalQuantity>
     class FieldDataInternals<GridLayoutT, 1, FieldImpl, PhysicalQuantity>
     {
+        using Float = typename GridLayoutT::Float;
+
     public:
         void copyImpl(SAMRAI::hier::Box const& localSourceBox, FieldImpl const& source,
                       SAMRAI::hier::Box const& localDestinationBox, FieldImpl& destination) const
@@ -457,7 +460,7 @@ namespace amr
 
 
 
-        void packImpl(std::vector<double>& buffer, FieldImpl const& source,
+        void packImpl(std::vector<Float>& buffer, FieldImpl const& source,
                       SAMRAI::hier::Box const& overlap, SAMRAI::hier::Box const& sourceBox) const
         {
             int xStart = overlap.lower(0) - sourceBox.lower(0);
@@ -471,7 +474,7 @@ namespace amr
 
 
 
-        void unpackImpl(size_t& seek, std::vector<double> const& buffer, FieldImpl& source,
+        void unpackImpl(size_t& seek, std::vector<Float> const& buffer, FieldImpl& source,
                         SAMRAI::hier::Box const& overlap,
                         SAMRAI::hier::Box const& destination) const
         {

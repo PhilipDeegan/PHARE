@@ -25,8 +25,9 @@ public:
     static constexpr size_t interp_order  = _interp_order;
     static constexpr size_t nbRefinedPart = _nbRefinedPart;
 
-    inline void operator()(core::Particle<double, dimension> const& coarsePartOnRefinedGrid,
-                           std::vector<core::Particle<double, dimension>>& refinedParticles) const
+    template<typename Float>
+    inline void operator()(core::Particle<Float, dimension> const& coarsePartOnRefinedGrid,
+                           std::vector<core::Particle<Float, dimension>>& refinedParticles) const
     {
         auto get = [&](size_t rpIndex, size_t index, auto& icell, auto& delta) {
             delta[index] += deltas_[rpIndex][index];

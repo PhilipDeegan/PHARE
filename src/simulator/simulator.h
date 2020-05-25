@@ -27,7 +27,8 @@ public:
 
 
 
-template<std::size_t _dimension, std::size_t _interp_order, size_t _nbRefinedPart>
+template<std::size_t _dimension, std::size_t _interp_order, size_t _nbRefinedPart,
+         typename Float = double>
 class Simulator : public ISimulator
 {
 public:
@@ -36,7 +37,7 @@ public:
     static constexpr size_t nbRefinedPart = _nbRefinedPart;
 
     using SAMRAITypes = PHARE::amr::SAMRAI_Types;
-    using PHARETypes  = PHARE_Types<dimension, interp_order, nbRefinedPart>;
+    using PHARETypes  = PHARE_Types<dimension, interp_order, nbRefinedPart, Float>;
 
     using IPhysicalModel = PHARE::solver::IPhysicalModel<SAMRAITypes>;
     using HybridModel    = typename PHARETypes::HybridModel_t;

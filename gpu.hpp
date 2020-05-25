@@ -4,15 +4,14 @@
 #include "kul/gpu/rocm.hpp"
 
 #include "tests/simulator/per_test.h"
-using PHARE_TYPES = PHARE::PHARE_Types<dim, interp, nbRefineParts>;
-
-
 
 namespace PHARE::gpu
 {
+template<typename SimOpts>
 struct PatchState
 {
-    using GridLayout = PHARE_TYPES::GridLayout_t;
+    using Float      = typename SimOpts::Float;
+    using GridLayout = typename SimOpts::GridLayout_t;
 
     template<typename State>
     PatchState(GridLayout const& gridLayout, State const& state)
@@ -30,17 +29,17 @@ struct PatchState
         vecF(state.electromag.B);
     }
 
-    GridLayout::Super gridLayoutDAO;
-    std::vector<kul::Pointers<double, uint32_t>> electromag;
-    std::vector<core::ParticleArray<dim>*> ions;
+    typename GridLayout::Super gridLayoutDAO;
+    std::vector<kul::Pointers<Float, uint32_t>> electromag;
+    std::vector<core::ParticleArray<Float, dim>*> ions;
 };
 
 
-template<uint8_t dim, bool GPU>
+template<typename Float, uint8_t dim, bool GPU>
 struct EMContiguousParticles : kul::gpu::DeviceClass<GPU>
 {
     using Super = kul::gpu::DeviceClass<GPU>;
-    using gpu_t = EMContiguousParticles<dim, true>;
+    using gpu_t = EMContiguousParticles<Float, dim, true>;
 
     template<bool gpu = GPU, std::enable_if_t<!gpu, bool> = 0>
     EMContiguousParticles(uint32_t nbr) // bytes per particle
@@ -57,9 +56,9 @@ struct EMContiguousParticles : kul::gpu::DeviceClass<GPU>
                                         // 3d 113
 
     template<bool gpu = GPU, std::enable_if_t<!gpu, bool> = 0>
-    decltype(auto) add(core::ParticleArray<dim> const& array, uint32_t i)
+    decltype(auto) add(core::ParticleArray<Float, dim> const& array, uint32_t i)
     {
-        PHARE::core::EMContiguousParticles<dim> particles{array};
+        PHARE::core::EMContiguousParticles<Float, dim> particles{array};
         auto size      = array.size();
         auto dim_start = i * dim, _3_start = i * 3;
         auto dim_size = size * dim, _3_size = size * 3;
@@ -87,13 +86,14 @@ struct EMContiguousParticles : kul::gpu::DeviceClass<GPU>
     container_t<bool> leaving;
     container_t<int32_t> iCell;
     container_t<float> delta;
-    container_t<double> weight, charge, v, E, B;
+    container_t<Float> weight, charge, v, E, B;
 };
 
 
+template<typename Float>
 struct FieldInterop
 {
-    using Pointers = kul::Pointers<double, uint32_t>;
+    using Pointers = kul::Pointers<Float, uint32_t>;
 
     decltype(auto) operator()(uint32_t i) { return ptrs[i]; }
     // decltype(auto) operator()(uint32_t, uint32_t) { return 2; }
@@ -102,25 +102,23 @@ struct FieldInterop
     Pointers ptrs;
 };
 
+template<typename Float>
 struct VecFieldInterop
 {
-    using Pointers = FieldInterop::Pointers;
-
     template<typename Electromags>
-    static VecFieldInterop E(Electromags const& em)
+    static decltype(auto) E(Electromags const& em)
     {
         return VecFieldInterop{
             {{{em.Ex, em.info[0]}}, {{em.Ey, em.info[1]}}, {{em.Ez, em.info[2]}}}};
     }
     template<typename Electromags>
-    static VecFieldInterop B(Electromags const& em)
+    static decltype(auto) B(Electromags const& em)
     {
         return VecFieldInterop{
             {{{em.Bx, em.info[3]}}, {{em.By, em.info[4]}}, {{em.Bz, em.info[5]}}}};
     }
 
-
-    FieldInterop& getComponent(PHARE::core::Component XYZ)
+    decltype(auto) getComponent(PHARE::core::Component XYZ)
     {
         if (XYZ == PHARE::core::Component::X)
             return ptrs[0];
@@ -130,31 +128,33 @@ struct VecFieldInterop
         return ptrs[2];
     }
 
-    FieldInterop ptrs[3];
+    FieldInterop<Float> ptrs[3];
 };
 
+
+template<typename Float>
 struct EMInterop
 {
     template<typename Electromags>
     EMInterop(Electromags&& _em)
-        : E{VecFieldInterop::E(_em)}
-        , B{VecFieldInterop::B(_em)}
+        : E{VecFieldInterop<Float>::E(_em)}
+        , B{VecFieldInterop<Float>::B(_em)}
     {
     }
 
-    VecFieldInterop E, B;
+    VecFieldInterop<Float> E, B;
 };
 
 
-template<bool GPU>
+template<typename SimOpts, bool GPU>
 struct Electromags : kul::gpu::DeviceClass<GPU>
 {
-    using Super    = kul::gpu::DeviceClass<GPU>;
-    using Pointers = kul::Pointers<double, uint32_t>;
-    using gpu_t    = Electromags<true>;
+    using Super = kul::gpu::DeviceClass<GPU>;
+    using gpu_t = Electromags<SimOpts, true>;
+    using Float = typename SimOpts::Float;
 
     template<bool gpu = GPU, std::enable_if_t<!gpu, bool> = 0>
-    static decltype(auto) make_shared(std::vector<PatchState> const& states)
+    static decltype(auto) make_shared(std::vector<PatchState<SimOpts>> const& states)
     {
         uint32_t n_states = static_cast<uint32_t>(states.size());
 
@@ -168,11 +168,11 @@ struct Electromags : kul::gpu::DeviceClass<GPU>
                 emXYZ[i] += emInfo[pos];
             }
 
-        return std::make_shared<Electromags<GPU>>(states, emXYZ, emInfo);
+        return std::make_shared<Electromags<SimOpts, GPU>>(states, emXYZ, emInfo);
     }
 
     template<bool gpu = GPU, std::enable_if_t<!gpu, bool> = 0>
-    Electromags(std::vector<PatchState> const& states, std::vector<uint32_t> const& v,
+    Electromags(std::vector<PatchState<SimOpts>> const& states, std::vector<uint32_t> const& v,
                 std::vector<uint32_t> const& _info)
         : Ex{v[0]}
         , Ey{v[1]}
@@ -218,38 +218,40 @@ struct Electromags : kul::gpu::DeviceClass<GPU>
         em.By   = this->By + this->info[pos + 4 + 6];
         em.Bz   = this->Bz + this->info[pos + 5 + 6];
         em.info = this->info + pos;
-        return EMInterop{em};
+        return EMInterop<Float>{em};
     }
 
     template<typename T>
     using container_t = typename Super::template container_t<T>;
 
-    container_t<double> Ex, Ey, Ez, Bx, By, Bz;
+    container_t<Float> Ex, Ey, Ez, Bx, By, Bz;
     container_t<uint32_t> info;
 };
 
 
-template<bool GPU>
+template<typename SimOpts, bool GPU>
 struct GridLayouts : kul::gpu::DeviceClass<GPU>
 {
-    using Super = kul::gpu::DeviceClass<GPU>;
-    using gpu_t = GridLayouts<true>;
-
-    using GridLayoutImpl          = PHARE_TYPES::YeeLayout_t;
-    static constexpr uint8_t dim  = GridLayoutImpl::dimension;
+    static constexpr uint8_t dim  = SimOpts::dimension;
     static constexpr uint8_t dim2 = dim * 2;
-    using GridLayoutDAO           = PHARE::core::GridLayoutDAO<dim, /*Refs=*/true>;
-    using GridLayout              = PHARE::core::GridLayout<GridLayoutImpl, GridLayoutDAO>;
+
+    using Super = kul::gpu::DeviceClass<GPU>;
+    using gpu_t = GridLayouts<SimOpts, true>;
+    using Float = typename SimOpts::Float;
+
+    using GridLayoutImpl = typename SimOpts::YeeLayout_t;
+    using GridLayoutDAO  = PHARE::core::GridLayoutDAO<GridLayoutImpl, /*Refs=*/true>;
+    using GridLayout     = PHARE::core::GridLayout<GridLayoutImpl, GridLayoutDAO>;
 
     template<bool gpu = GPU, std::enable_if_t<!gpu, bool> = 0>
-    static decltype(auto) make_shared(std::vector<PatchState> const& states)
+    static decltype(auto) make_shared(std::vector<PatchState<SimOpts>> const& states)
     {
         uint32_t n_states = static_cast<uint32_t>(states.size());
-        return std::make_shared<GridLayouts<GPU>>(states, n_states);
+        return std::make_shared<GridLayouts<SimOpts, GPU>>(states, n_states);
     }
 
     template<bool gpu = GPU, std::enable_if_t<!gpu, bool> = 0>
-    GridLayouts(std::vector<PatchState> const& states, uint32_t n_states)
+    GridLayouts(std::vector<PatchState<SimOpts>> const& states, uint32_t n_states)
         : meshSize{n_states * dim}
         , origin{n_states * dim}
         , inverseMeshSize{n_states * dim}
@@ -308,7 +310,7 @@ struct GridLayouts : kul::gpu::DeviceClass<GPU>
         uint32_t start = i * dim, start2 = i * dim2;
         return GridLayout{GridLayoutDAO{
             *array_cast(&meshSize[start]),
-            *reinterpret_cast<core::Point<double, dim>*>(array_cast(&origin[start])),
+            *reinterpret_cast<core::Point<Float, dim>*>(array_cast(&origin[start])),
             *array_cast(&nbrPhysicalCells[start]), *array_cast(&inverseMeshSize[start]),
             *array_cast<std::array<std::array<uint32_t, dim>, 2>>(&physicalStartIndices[start2]),
             *array_cast<std::array<std::array<uint32_t, dim>, 2>>(&physicalEndIndices[start2]),
@@ -319,18 +321,19 @@ struct GridLayouts : kul::gpu::DeviceClass<GPU>
     template<typename T>
     using container_t = typename Super::template container_t<T>;
 
-    container_t<double> meshSize, origin, inverseMeshSize;
+    container_t<Float> meshSize, origin, inverseMeshSize;
     container_t<uint32_t> nbrPhysicalCells;
     container_t<uint32_t> physicalStartIndices, physicalEndIndices, ghostEndIndices;
     container_t<int32_t> AMRBox; // <- upper+lower = dim * 2
 };
 
 
-template<bool GPU>
+template<typename SimOpts, bool GPU>
 struct PatchStatePerParticle : kul::gpu::DeviceClass<GPU>
 {
-    using gpu_t = PatchStatePerParticle<true>;
     using Super = kul::gpu::DeviceClass<GPU>;
+    using gpu_t = PatchStatePerParticle<SimOpts, true>;
+    using Float = typename SimOpts::Float;
 
     template<bool gpu = GPU, std::enable_if_t<!gpu, bool> = 0>
     PatchStatePerParticle(uint32_t n_patches, uint32_t n_particles)
@@ -359,20 +362,22 @@ struct PatchStatePerParticle : kul::gpu::DeviceClass<GPU>
     template<typename T>
     using container_t = typename Super::template container_t<T>;
 
-    container_t<EMContiguousParticles<1, true>> particles;
-    container_t<Electromags<true>> electromags;
-    container_t<GridLayouts<true>> gridLayouts;
+    container_t<EMContiguousParticles<Float, 1, true>> particles;
+    container_t<Electromags<SimOpts, true>> electromags;
+    container_t<GridLayouts<SimOpts, true>> gridLayouts;
 
     container_t<uint16_t> patchStatePerParticle;
     container_t<uint32_t> info;
 };
 
+template<typename SimOpts>
 struct ParticlePatchState
 {
     static constexpr bool GPU = false;
-    using GridLayout          = GridLayouts<false>::GridLayout;
+    using Float               = typename SimOpts::Float;
+    using GridLayout          = typename GridLayouts<SimOpts, false>::GridLayout;
 
-    ParticlePatchState(std::vector<PatchState> const& states)
+    ParticlePatchState(std::vector<PatchState<SimOpts>> const& states)
     {
         uint32_t n_states = static_cast<uint32_t>(states.size());
 
@@ -380,9 +385,10 @@ struct ParticlePatchState
             for (auto const& particle_array : data.ions)
                 n_particles += particle_array->size();
 
-        this->particles = std::make_shared<EMContiguousParticles<1, GPU>>(n_particles);
-        this->statePack = std::make_shared<PatchStatePerParticle<GPU>>(n_states, n_particles);
-        auto& pack      = *this->statePack;
+        this->particles = std::make_shared<EMContiguousParticles<Float, 1, GPU>>(n_particles);
+        this->statePack
+            = std::make_shared<PatchStatePerParticle<SimOpts, GPU>>(n_states, n_particles);
+        auto& pack = *this->statePack;
 
         for (uint32_t curr_part = 0, i = 0; i < n_states; i++)
             for (auto const* particle_array : states[i].ions)
@@ -392,21 +398,23 @@ struct ParticlePatchState
             }
 
         pack.particles.send((*particles)());
-        pack.gridLayouts.send((*(this->gridLayouts = GridLayouts<GPU>::make_shared(states)))());
-        pack.electromags.send((*(this->electromags = Electromags<GPU>::make_shared(states)))());
+        pack.gridLayouts.send(
+            (*(this->gridLayouts = GridLayouts<SimOpts, GPU>::make_shared(states)))());
+        pack.electromags.send(
+            (*(this->electromags = Electromags<SimOpts, GPU>::make_shared(states)))());
     }
-
     decltype(auto) operator()() { return (*statePack)(); }
 
     uint32_t n_particles = 0;
-    std::shared_ptr<PatchStatePerParticle<GPU>> statePack;
-    std::shared_ptr<EMContiguousParticles<1, GPU>> particles;
-    std::shared_ptr<GridLayouts<GPU>> gridLayouts;
-    std::shared_ptr<Electromags<GPU>> electromags;
+    std::shared_ptr<PatchStatePerParticle<SimOpts, GPU>> statePack;
+    std::shared_ptr<EMContiguousParticles<Float, 1, GPU>> particles;
+    std::shared_ptr<GridLayouts<SimOpts, GPU>> gridLayouts;
+    std::shared_ptr<Electromags<SimOpts, GPU>> electromags;
 };
 
 
-__global__ void particles_in(PatchStatePerParticle<true>* ppsp)
+template<typename SimOpts>
+__global__ void particles_in(PatchStatePerParticle<SimOpts, true>* ppsp)
 {
     auto i = kul::gpu::hip::idx();
     if (i > ppsp->n_particles())

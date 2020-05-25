@@ -200,7 +200,7 @@ namespace core
             }
         }
 
-        static decltype(auto) inverseMeshSize(std::array<double, dimension> const& meshSize)
+        static decltype(auto) inverseMeshSize(std::array<Float, dimension> const& meshSize)
         {
             auto inverseMeshSize = meshSize;
             for (size_t i = 0; i < dimension; i++)
@@ -227,7 +227,7 @@ namespace core
 
 
 
-        double inverseMeshSize(Direction direction) const noexcept
+        Float inverseMeshSize(Direction direction) const noexcept
         {
             return inverseMeshSize_[static_cast<uint32>(direction)];
         }

@@ -6,6 +6,9 @@ scm: https://github.com/dekken/phare
 version: gpu_float32
 
 profile:
+- name: base
+  arg: -DPHARE_HAS_HIGHFIVE=1
+
 - name: gpu
   parent: test
   dep: mkn.gpu[rocm]
@@ -38,6 +41,7 @@ profile:
   lib: hdf5_mpich
 
 - name: simulator
+  parent: base
   self: diagnostic
   src: src/simulator
   out: phare_simulator
@@ -54,6 +58,7 @@ profile:
   out: phare_initializer
 
 - name: pybind
+  parent: base
   mode: shared
   dep: lang.pybind11
   mod: lang.pybind11 lang.python3
@@ -93,11 +98,12 @@ profile:
 #py_test_simulator
 
 - name: test
-  inc: .
+  parent: base
   self: init simulator
   dep: lang.pybind11 google.test
-  link: -pthread
   mod: lang.python3
+  inc: .
+  link: -pthread
 
 - name: test_periodicity
   parent: test

@@ -74,7 +74,7 @@ struct ContiguousParticles
 template<typename Float, size_t dim>
 struct EMContiguousParticle : ContiguousParticle<Float, dim>
 {
-    double *E = nullptr, *B = nullptr;
+    Float *E = nullptr, *B = nullptr;
 };
 
 template<typename Float, std::size_t dim>
@@ -111,7 +111,7 @@ struct EMContiguousParticles : ContiguousParticles<Float, dim>
         };
     }
 
-    std::vector<double> E, B;
+    std::vector<Float> E, B;
 };
 
 template<typename Float, size_t dim>

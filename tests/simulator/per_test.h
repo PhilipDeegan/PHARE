@@ -39,16 +39,16 @@ struct HierarchyMaker
 
 
 
-template<size_t _dim, size_t _interp, size_t _nbRefinePart = 2>
+template<size_t _dim, size_t _interp, size_t _nbRefinePart = 2, typename Float = double>
 struct TestSimulator : public HierarchyMaker<_dim>,
-                       public PHARE::Simulator<_dim, _interp, _nbRefinePart>
+                       public PHARE::Simulator<_dim, _interp, _nbRefinePart, Float>
 {
     static constexpr size_t dim          = _dim;
     static constexpr size_t interp       = _interp;
     static constexpr size_t nbRefinePart = _nbRefinePart;
 
-    using Simulator   = PHARE::Simulator<dim, interp, nbRefinePart>;
-    using PHARETypes  = PHARE::PHARE_Types<dim, interp, nbRefinePart>;
+    using Simulator   = PHARE::Simulator<dim, interp, nbRefinePart, Float>;
+    using PHARETypes  = PHARE::PHARE_Types<dim, interp, nbRefinePart, Float>;
     using Hierarchy   = PHARE::amr::Hierarchy;
     using HybridModel = typename PHARETypes::HybridModel_t;
     using MHDModel    = typename PHARETypes::MHDModel_t;

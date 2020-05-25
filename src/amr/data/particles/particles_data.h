@@ -413,7 +413,7 @@ namespace amr
 
 
 
-        auto* getPointer() const { return &pack; }
+        auto* getPointer() { return &pack; }
 
 
 

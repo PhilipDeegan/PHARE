@@ -13,150 +13,242 @@
 #include "initializer/data_provider.h"
 #include "core/utilities/point/point.h"
 
-namespace PHARE
+namespace PHARE::core
 {
-namespace core
+template<typename Float>
+void maxwellianVelocity(std::array<Float, 3> V, std::array<Float, 3> Vth,
+                        std::mt19937_64& generator, std::array<Float, 3>& partVelocity);
+
+template<typename Float>
+std::array<Float, 3> basisTransform(std::array<std::array<Float, 3>, 3> const& basis,
+                                    std::array<Float, 3> const& vec);
+
+template<typename Float>
+void localMagneticBasis(std::array<Float, 3> B, std::array<std::array<Float, 3>, 3>& basis);
+
+/** @brief a MaxwellianParticleInitializer is a ParticleInitializer that loads particles from a
+ * local Maxwellian distribution given density, bulk velocity and thermal velocity profiles.
+ */
+template<typename ParticleArray, typename GridLayout>
+class MaxwellianParticleInitializer : public ParticleInitializer<ParticleArray, GridLayout>
 {
-    void maxwellianVelocity(std::array<double, 3> V, std::array<double, 3> Vth,
-                            std::mt19937_64& generator, std::array<double, 3>& partVelocity);
+public:
+    using Float                     = typename GridLayout::Float;
+    static constexpr auto dimension = GridLayout::dimension;
 
-
-    std::array<double, 3> basisTransform(std::array<std::array<double, 3>, 3> const& basis,
-                                         std::array<double, 3> const& vec);
-
-    void localMagneticBasis(std::array<double, 3> B, std::array<std::array<double, 3>, 3>& basis);
-
-
-
-    /** @brief a MaxwellianParticleInitializer is a ParticleInitializer that loads particles from a
-     * local Maxwellian distribution given density, bulk velocity and thermal velocity profiles.
-     */
-    template<typename ParticleArray, typename GridLayout>
-    class MaxwellianParticleInitializer : public ParticleInitializer<ParticleArray, GridLayout>
+    MaxwellianParticleInitializer(
+        PHARE::initializer::ScalarFunction<dimension> density,
+        std::array<PHARE::initializer::ScalarFunction<dimension>, 3> bulkVelocity,
+        std::array<PHARE::initializer::ScalarFunction<dimension>, 3> thermalVelocity,
+        Float particleCharge, uint32 nbrParticlesPerCell, std::optional<size_t> seed = {},
+        Basis basis = Basis::Cartesian,
+        std::array<PHARE::initializer::ScalarFunction<dimension>, 3> magneticField
+        = {nullptr, nullptr, nullptr})
+        : density_{density}
+        , bulkVelocity_{bulkVelocity}
+        , thermalVelocity_{thermalVelocity}
+        , magneticField_{magneticField}
+        , particleCharge_{particleCharge}
+        , nbrParticlePerCell_{nbrParticlesPerCell}
+        , basis_{basis}
+        , rngSeed_{seed}
     {
-    public:
-        using Float                     = typename GridLayout::Float;
-        static constexpr auto dimension = GridLayout::dimension;
+    }
 
-        MaxwellianParticleInitializer(
-            PHARE::initializer::ScalarFunction<dimension> density,
-            std::array<PHARE::initializer::ScalarFunction<dimension>, 3> bulkVelocity,
-            std::array<PHARE::initializer::ScalarFunction<dimension>, 3> thermalVelocity,
-            double particleCharge, uint32 nbrParticlesPerCell, std::optional<size_t> seed = {},
-            Basis basis = Basis::Cartesian,
-            std::array<PHARE::initializer::ScalarFunction<dimension>, 3> magneticField
-            = {nullptr, nullptr, nullptr})
-            : density_{density}
-            , bulkVelocity_{bulkVelocity}
-            , thermalVelocity_{thermalVelocity}
-            , magneticField_{magneticField}
-            , particleCharge_{particleCharge}
-            , nbrParticlePerCell_{nbrParticlesPerCell}
-            , basis_{basis}
-            , rngSeed_{seed}
+
+    /**
+     * @brief load particles in a ParticleArray in a domain defined by the given layout
+     */
+    virtual void loadParticles(ParticleArray& particles, GridLayout const& layout) const override
+    {
+        if constexpr (dimension == 1)
         {
+            loadParticles1D_(particles, layout);
         }
-
-
-        /**
-         * @brief load particles in a ParticleArray in a domain defined by the given layout
-         */
-        virtual void loadParticles(ParticleArray& particles,
-                                   GridLayout const& layout) const override
+        else if constexpr (dimension == 2)
         {
-            if constexpr (dimension == 1)
+            loadParticles2D_(particles, layout);
+        }
+        else if constexpr (dimension == 3)
+        {
+            loadParticles3D_(particles, layout);
+        }
+    }
+
+
+    virtual ~MaxwellianParticleInitializer() = default;
+
+
+private:
+    // can be relocated if needed
+    static std::mt19937_64 getRNG(std::optional<size_t> const& seed)
+    {
+        if (!seed.has_value())
+        {
+            std::random_device randSeed;
+            std::seed_seq seed_seq{randSeed(), randSeed(), randSeed(), randSeed(),
+                                   randSeed(), randSeed(), randSeed(), randSeed()};
+            return std::mt19937_64(seed_seq);
+        }
+        return std::mt19937_64(*seed);
+    }
+
+
+
+    void loadParticles1D_(ParticleArray& particles, GridLayout const& layout) const
+    {
+        auto const meshSize = layout.meshSize();
+        auto const& dx      = meshSize[0];
+
+        /* get indices start and stop. we take primal/primal/primal because
+           that is what GridLayout::cellCenteredCoordinate() requires */
+        uint32 ix0 = layout.physicalStartIndex(QtyCentering::primal, Direction::X);
+        uint32 ix1 = layout.physicalEndIndex(QtyCentering::primal, Direction::X);
+
+        Float cellVolume = dx;
+
+        // random seed and generator needed to load maxwellian velocity
+        // and random position with the cell
+        auto generator = getRNG(rngSeed_);
+
+        // beware: we're looping over the cell but use primal indices because of
+        // GridLayout::cellCenteredCoordinates
+        // therefore i(x,y,z)1 must be excluded.
+
+        // gab references for convenience
+        // auto& density         = *density_;
+        // auto& bulkVelocity    = *bulkVelocity_;
+        // auto& thermalVelocity = *thermalVelocity_;
+
+        for (uint32 ix = ix0; ix < ix1; ++ix)
+        {
+            Float n; // cell centered density
+            std::array<Float, 3> particleVelocity;
+            std::array<std::array<Float, 3>, 3> basis;
+
+            // get the coordinate of the current cell
+            auto coord = layout.cellCenteredCoordinates(ix);
+            auto x     = coord[0];
+
+            // now get density, velocity and thermal speed values
+            n        = density_(x);
+            Float Vx = bulkVelocity_[0](x);
+            Float Vy = bulkVelocity_[1](x);
+            Float Vz = bulkVelocity_[2](x);
+
+            Float Vthx = thermalVelocity_[0](x);
+            Float Vthy = thermalVelocity_[1](x);
+            Float Vthz = thermalVelocity_[2](x);
+
+            // weight for all particles in this cell
+            auto cellWeight = n * cellVolume / nbrParticlePerCell_;
+
+            ParticleDeltaDistribution randPosX;
+
+            if (basis_ == Basis::Magnetic)
             {
-                loadParticles1D_(particles, layout);
+                Float Bx = magneticField_[0](x);
+                Float By = magneticField_[1](x);
+                Float Bz = magneticField_[2](x);
+
+                localMagneticBasis({Bx, By, Bz}, basis);
             }
-            else if constexpr (dimension == 2)
+
+            for (uint32 ipart = 0; ipart < nbrParticlePerCell_; ++ipart)
             {
-                loadParticles2D_(particles, layout);
-            }
-            else if constexpr (dimension == 3)
-            {
-                loadParticles3D_(particles, layout);
+                maxwellianVelocity({Vx, Vy, Vz}, {Vthx, Vthy, Vthz}, generator, particleVelocity);
+
+                if (basis_ == Basis::Magnetic)
+                {
+                    particleVelocity = basisTransform(basis, particleVelocity);
+                }
+
+                std::array<float, dimension> delta = {{randPosX(generator)}};
+
+                Particle<Float, dimension> tmpParticle;
+
+                // particle iCell is in AMR index
+                auto AMRCellIndex = layout.localToAMR(Point{ix});
+
+                tmpParticle.weight = cellWeight;
+                tmpParticle.charge = particleCharge_;
+                tmpParticle.iCell  = AMRCellIndex.template toArray<int>();
+                tmpParticle.delta  = delta;
+                tmpParticle.v      = particleVelocity;
+
+                particles.push_back(std::move(tmpParticle));
             }
         }
+    }
 
 
-        virtual ~MaxwellianParticleInitializer() = default;
 
 
+    void loadParticles2D_(ParticleArray& particles, GridLayout const& layout) const
+    {
+        auto const meshSize = layout.meshSize();
+        auto const& dx      = meshSize[0];
+        auto const& dy      = meshSize[1];
 
-    private:
-        // can be relocated if needed
-        static std::mt19937_64 getRNG(std::optional<size_t> const& seed)
+        /* get indices start and stop. we take primal/primal/primal because
+           that is what GridLayout::cellCenteredCoordinate() requires */
+        auto ix0 = layout.physicalStartIndex(QtyCentering::primal, Direction::X);
+        auto ix1 = layout.physicalEndIndex(QtyCentering::primal, Direction::X);
+        auto iy0 = layout.physicalStartIndex(QtyCentering::primal, Direction::Y);
+        auto iy1 = layout.physicalEndIndex(QtyCentering::primal, Direction::Y);
+
+        auto cellVolume = dx * dy;
+
+        // random seed and generator needed to load maxwellian velocity
+        // and random position with the cell
+        auto generator = getRNG(rngSeed_);
+
+        // beware: we're looping over the cell but use primal indices because of
+        // GridLayout::cellCenteredCoordinates
+        // therefore i(x,y,z)1 must be excluded.
+        // gab references for convenience
+        // auto& density         = *density_;
+        // auto& bulkVelocity    = *bulkVelocity_;
+        // auto& thermalVelocity = *thermalVelocity_;
+
+
+        for (uint32 ix = ix0; ix < ix1; ++ix)
         {
-            if (!seed.has_value())
+            for (uint32 iy = iy0; iy < iy1; ++iy)
             {
-                std::random_device randSeed;
-                std::seed_seq seed_seq{randSeed(), randSeed(), randSeed(), randSeed(),
-                                       randSeed(), randSeed(), randSeed(), randSeed()};
-                return std::mt19937_64(seed_seq);
-            }
-            return std::mt19937_64(*seed);
-        }
-
-
-
-        void loadParticles1D_(ParticleArray& particles, GridLayout const& layout) const
-        {
-            auto const meshSize = layout.meshSize();
-            auto const& dx      = meshSize[0];
-
-            /* get indices start and stop. we take primal/primal/primal because
-               that is what GridLayout::cellCenteredCoordinate() requires */
-            uint32 ix0 = layout.physicalStartIndex(QtyCentering::primal, Direction::X);
-            uint32 ix1 = layout.physicalEndIndex(QtyCentering::primal, Direction::X);
-
-            double cellVolume = dx;
-
-            // random seed and generator needed to load maxwellian velocity
-            // and random position with the cell
-            auto generator = getRNG(rngSeed_);
-
-            // beware: we're looping over the cell but use primal indices because of
-            // GridLayout::cellCenteredCoordinates
-            // therefore i(x,y,z)1 must be excluded.
-
-            // gab references for convenience
-            // auto& density         = *density_;
-            // auto& bulkVelocity    = *bulkVelocity_;
-            // auto& thermalVelocity = *thermalVelocity_;
-
-            for (uint32 ix = ix0; ix < ix1; ++ix)
-            {
-                double n; // cell centered density
-                std::array<double, 3> particleVelocity;
-                std::array<std::array<double, 3>, 3> basis;
+                Float n; // cell centered density
+                std::array<Float, 3> particleVelocity;
+                std::array<std::array<Float, 3>, 3> basis;
 
                 // get the coordinate of the current cell
-                auto coord = layout.cellCenteredCoordinates(ix);
+                auto coord = layout.cellCenteredCoordinates(ix, iy);
                 auto x     = coord[0];
+                auto y     = coord[1];
 
                 // now get density, velocity and thermal speed values
-                n       = density_(x);
-                auto Vx = bulkVelocity_[0](x);
-                auto Vy = bulkVelocity_[1](x);
-                auto Vz = bulkVelocity_[2](x);
-
-                auto Vthx = thermalVelocity_[0](x);
-                auto Vthy = thermalVelocity_[1](x);
-                auto Vthz = thermalVelocity_[2](x);
+                n         = density_(x, y);
+                auto Vx   = bulkVelocity_[0](x, y);
+                auto Vy   = bulkVelocity_[1](x, y);
+                auto Vz   = bulkVelocity_[2](x, y);
+                auto Vthx = thermalVelocity_[0](x, y);
+                auto Vthy = thermalVelocity_[1](x, y);
+                auto Vthz = thermalVelocity_[2](x, y);
 
                 // weight for all particles in this cell
                 auto cellWeight = n * cellVolume / nbrParticlePerCell_;
 
                 ParticleDeltaDistribution randPosX;
+                ParticleDeltaDistribution randPosY;
 
                 if (basis_ == Basis::Magnetic)
                 {
-                    auto Bx = magneticField_[0](x);
-                    auto By = magneticField_[1](x);
-                    auto Bz = magneticField_[2](x);
+                    auto Bx = magneticField_[0](x, y);
+                    auto By = magneticField_[1](x, y);
+                    auto Bz = magneticField_[2](x, y);
 
                     localMagneticBasis({Bx, By, Bz}, basis);
                 }
+
 
                 for (uint32 ipart = 0; ipart < nbrParticlePerCell_; ++ipart)
                 {
@@ -168,12 +260,14 @@ namespace core
                         particleVelocity = basisTransform(basis, particleVelocity);
                     }
 
-                    std::array<float, dimension> delta = {{randPosX(generator)}};
+                    std::array<float, dimension> delta
+                        = {{randPosX(generator), randPosY(generator)}};
 
                     Particle<Float, dimension> tmpParticle;
 
                     // particle iCell is in AMR index
-                    auto AMRCellIndex = layout.localToAMR(Point{ix});
+                    auto AMRCellIndex = layout.localToAMR(Point{ix, iy});
+
 
                     tmpParticle.weight = cellWeight;
                     tmpParticle.charge = particleCharge_;
@@ -185,75 +279,83 @@ namespace core
                 }
             }
         }
+    }
 
 
 
 
-        void loadParticles2D_(ParticleArray& particles, GridLayout const& layout) const
+    void loadParticles3D_(ParticleArray& particles, GridLayout const& layout) const
+    {
+        auto const meshSize = layout.meshSize();
+        auto const& dx      = meshSize[0];
+        auto const& dy      = meshSize[1];
+        auto const& dz      = meshSize[2];
+
+        /* get indices start and stop. we take primal/primal/primal because
+           that is what GridLayout::cellCenteredCoordinate() requires */
+        auto ix0 = layout.physicalStartIndex(QtyCentering::primal, Direction::X);
+        auto ix1 = layout.physicalEndIndex(QtyCentering::primal, Direction::X);
+        auto iy0 = layout.physicalStartIndex(QtyCentering::primal, Direction::Y);
+        auto iy1 = layout.physicalEndIndex(QtyCentering::primal, Direction::Y);
+        auto iz0 = layout.physicalStartIndex(QtyCentering::primal, Direction::Z);
+        auto iz1 = layout.physicalEndIndex(QtyCentering::primal, Direction::Z);
+
+        Float cellVolume = dx * dy * dz;
+
+        // random seed and generator needed to load maxwellian velocity
+        // and random position with the cell
+        auto generator = getRNG(rngSeed_);
+
+        // beware: we're looping over the cell but use primal indices because of
+        // GridLayout::cellCenteredCoordinates
+        // therefore i(x,y,z)1 must be excluded.
+
+        // gab references for convenience
+        // auto& density         = *density_;
+        // auto& bulkVelocity    = *bulkVelocity_;
+        // auto& thermalVelocity = *thermalVelocity_;
+
+
+        for (uint32 ix = ix0; ix < ix1; ++ix)
         {
-            auto const meshSize = layout.meshSize();
-            auto const& dx      = meshSize[0];
-            auto const& dy      = meshSize[1];
-
-            /* get indices start and stop. we take primal/primal/primal because
-               that is what GridLayout::cellCenteredCoordinate() requires */
-            auto ix0 = layout.physicalStartIndex(QtyCentering::primal, Direction::X);
-            auto ix1 = layout.physicalEndIndex(QtyCentering::primal, Direction::X);
-            auto iy0 = layout.physicalStartIndex(QtyCentering::primal, Direction::Y);
-            auto iy1 = layout.physicalEndIndex(QtyCentering::primal, Direction::Y);
-
-            auto cellVolume = dx * dy;
-
-            // random seed and generator needed to load maxwellian velocity
-            // and random position with the cell
-            auto generator = getRNG(rngSeed_);
-
-            // beware: we're looping over the cell but use primal indices because of
-            // GridLayout::cellCenteredCoordinates
-            // therefore i(x,y,z)1 must be excluded.
-            // gab references for convenience
-            // auto& density         = *density_;
-            // auto& bulkVelocity    = *bulkVelocity_;
-            // auto& thermalVelocity = *thermalVelocity_;
-
-
-            for (uint32 ix = ix0; ix < ix1; ++ix)
+            for (uint32 iy = iy0; iy < iy1; ++iy)
             {
-                for (uint32 iy = iy0; iy < iy1; ++iy)
+                for (uint32 iz = iz0; iz < iz1; ++iz)
                 {
-                    double n; // cell centered density
-                    std::array<double, 3> particleVelocity;
-                    std::array<std::array<double, 3>, 3> basis;
+                    Float n; // cell centered density
+                    std::array<Float, 3> particleVelocity;
+                    std::array<std::array<Float, 3>, 3> basis;
 
                     // get the coordinate of the current cell
-                    auto coord = layout.cellCenteredCoordinates(ix, iy);
+                    auto coord = layout.cellCenteredCoordinates(ix, iy, iz);
                     auto x     = coord[0];
                     auto y     = coord[1];
+                    auto z     = coord[2];
 
                     // now get density, velocity and thermal speed values
-                    n         = density_(x, y);
-                    auto Vx   = bulkVelocity_[0](x, y);
-                    auto Vy   = bulkVelocity_[1](x, y);
-                    auto Vz   = bulkVelocity_[2](x, y);
-                    auto Vthx = thermalVelocity_[0](x, y);
-                    auto Vthy = thermalVelocity_[1](x, y);
-                    auto Vthz = thermalVelocity_[2](x, y);
+                    n         = density_(x, y, z);
+                    auto Vx   = bulkVelocity_[0](x, y, z);
+                    auto Vy   = bulkVelocity_[1](x, y, z);
+                    auto Vz   = bulkVelocity_[2](x, y, z);
+                    auto Vthx = thermalVelocity_[0](x, y, z);
+                    auto Vthy = thermalVelocity_[1](x, y, z);
+                    auto Vthz = thermalVelocity_[2](x, y, z);
 
                     // weight for all particles in this cell
                     auto cellWeight = n * cellVolume / nbrParticlePerCell_;
 
                     ParticleDeltaDistribution randPosX;
                     ParticleDeltaDistribution randPosY;
+                    ParticleDeltaDistribution randPosZ;
 
                     if (basis_ == Basis::Magnetic)
                     {
-                        auto Bx = magneticField_[0](x, y);
-                        auto By = magneticField_[1](x, y);
-                        auto Bz = magneticField_[2](x, y);
+                        auto Bx = magneticField_[0](x, y, z);
+                        auto By = magneticField_[0](x, y, z);
+                        auto Bz = magneticField_[0](x, y, z);
 
                         localMagneticBasis({Bx, By, Bz}, basis);
                     }
-
 
                     for (uint32 ipart = 0; ipart < nbrParticlePerCell_; ++ipart)
                     {
@@ -265,14 +367,14 @@ namespace core
                             particleVelocity = basisTransform(basis, particleVelocity);
                         }
 
-                        std::array<float, dimension> delta
-                            = {{randPosX(generator), randPosY(generator)}};
+                        std::array<float, 3> delta
+                            = {{randPosX(generator), randPosY(generator), randPosZ(generator)}};
+
 
                         Particle<Float, dimension> tmpParticle;
 
                         // particle iCell is in AMR index
-                        auto AMRCellIndex = layout.localToAMR(Point{ix, iy});
-
+                        auto AMRCellIndex = layout.localToAMR(Point{ix, iy, iz});
 
                         tmpParticle.weight = cellWeight;
                         tmpParticle.charge = particleCharge_;
@@ -281,133 +383,99 @@ namespace core
                         tmpParticle.v      = particleVelocity;
 
                         particles.push_back(std::move(tmpParticle));
-                    }
-                }
-            }
-        }
+                    } // end particle looop
+                }     // end z
+            }         // end y
+        }             // end x
+    }
 
 
 
+    PHARE::initializer::ScalarFunction<dimension> density_;
+    std::array<PHARE::initializer::ScalarFunction<dimension>, 3> bulkVelocity_;
+    std::array<PHARE::initializer::ScalarFunction<dimension>, 3> thermalVelocity_;
+    std::array<PHARE::initializer::ScalarFunction<dimension>, 3> magneticField_;
 
-        void loadParticles3D_(ParticleArray& particles, GridLayout const& layout) const
-        {
-            auto const meshSize = layout.meshSize();
-            auto const& dx      = meshSize[0];
-            auto const& dy      = meshSize[1];
-            auto const& dz      = meshSize[2];
-
-            /* get indices start and stop. we take primal/primal/primal because
-               that is what GridLayout::cellCenteredCoordinate() requires */
-            auto ix0 = layout.physicalStartIndex(QtyCentering::primal, Direction::X);
-            auto ix1 = layout.physicalEndIndex(QtyCentering::primal, Direction::X);
-            auto iy0 = layout.physicalStartIndex(QtyCentering::primal, Direction::Y);
-            auto iy1 = layout.physicalEndIndex(QtyCentering::primal, Direction::Y);
-            auto iz0 = layout.physicalStartIndex(QtyCentering::primal, Direction::Z);
-            auto iz1 = layout.physicalEndIndex(QtyCentering::primal, Direction::Z);
-
-            double cellVolume = dx * dy * dz;
-
-            // random seed and generator needed to load maxwellian velocity
-            // and random position with the cell
-            auto generator = getRNG(rngSeed_);
-
-            // beware: we're looping over the cell but use primal indices because of
-            // GridLayout::cellCenteredCoordinates
-            // therefore i(x,y,z)1 must be excluded.
-
-            // gab references for convenience
-            // auto& density         = *density_;
-            // auto& bulkVelocity    = *bulkVelocity_;
-            // auto& thermalVelocity = *thermalVelocity_;
+    Float particleCharge_;
+    uint32 nbrParticlePerCell_;
+    Basis basis_;
+    std::optional<size_t> rngSeed_;
+};
 
 
-            for (uint32 ix = ix0; ix < ix1; ++ix)
-            {
-                for (uint32 iy = iy0; iy < iy1; ++iy)
-                {
-                    for (uint32 iz = iz0; iz < iz1; ++iz)
-                    {
-                        double n; // cell centered density
-                        std::array<double, 3> particleVelocity;
-                        std::array<std::array<double, 3>, 3> basis;
+template<typename Float>
+void maxwellianVelocity(std::array<Float, 3> V, std::array<Float, 3> Vth,
+                        std::mt19937_64& generator, std::array<Float, 3>& partVelocity)
+{
+    std::normal_distribution<> maxwellX(V[0], Vth[0]);
+    std::normal_distribution<> maxwellY(V[1], Vth[1]);
+    std::normal_distribution<> maxwellZ(V[2], Vth[2]);
 
-                        // get the coordinate of the current cell
-                        auto coord = layout.cellCenteredCoordinates(ix, iy, iz);
-                        auto x     = coord[0];
-                        auto y     = coord[1];
-                        auto z     = coord[2];
-
-                        // now get density, velocity and thermal speed values
-                        n         = density_(x, y, z);
-                        auto Vx   = bulkVelocity_[0](x, y, z);
-                        auto Vy   = bulkVelocity_[1](x, y, z);
-                        auto Vz   = bulkVelocity_[2](x, y, z);
-                        auto Vthx = thermalVelocity_[0](x, y, z);
-                        auto Vthy = thermalVelocity_[1](x, y, z);
-                        auto Vthz = thermalVelocity_[2](x, y, z);
-
-                        // weight for all particles in this cell
-                        auto cellWeight = n * cellVolume / nbrParticlePerCell_;
-
-                        ParticleDeltaDistribution randPosX;
-                        ParticleDeltaDistribution randPosY;
-                        ParticleDeltaDistribution randPosZ;
-
-                        if (basis_ == Basis::Magnetic)
-                        {
-                            auto Bx = magneticField_[0](x, y, z);
-                            auto By = magneticField_[0](x, y, z);
-                            auto Bz = magneticField_[0](x, y, z);
-
-                            localMagneticBasis({Bx, By, Bz}, basis);
-                        }
-
-                        for (uint32 ipart = 0; ipart < nbrParticlePerCell_; ++ipart)
-                        {
-                            maxwellianVelocity({Vx, Vy, Vz}, {Vthx, Vthy, Vthz}, generator,
-                                               particleVelocity);
-
-                            if (basis_ == Basis::Magnetic)
-                            {
-                                particleVelocity = basisTransform(basis, particleVelocity);
-                            }
-
-                            std::array<float, 3> delta
-                                = {{randPosX(generator), randPosY(generator), randPosZ(generator)}};
-
-
-                            Particle<Float, dimension> tmpParticle;
-
-                            // particle iCell is in AMR index
-                            auto AMRCellIndex = layout.localToAMR(Point{ix, iy, iz});
-
-                            tmpParticle.weight = cellWeight;
-                            tmpParticle.charge = particleCharge_;
-                            tmpParticle.iCell  = AMRCellIndex.template toArray<int>();
-                            tmpParticle.delta  = delta;
-                            tmpParticle.v      = particleVelocity;
-
-                            particles.push_back(std::move(tmpParticle));
-                        } // end particle looop
-                    }     // end z
-                }         // end y
-            }             // end x
-        }
+    partVelocity[0] = maxwellX(generator);
+    partVelocity[1] = maxwellY(generator);
+    partVelocity[2] = maxwellZ(generator);
+}
 
 
 
-        PHARE::initializer::ScalarFunction<dimension> density_;
-        std::array<PHARE::initializer::ScalarFunction<dimension>, 3> bulkVelocity_;
-        std::array<PHARE::initializer::ScalarFunction<dimension>, 3> thermalVelocity_;
-        std::array<PHARE::initializer::ScalarFunction<dimension>, 3> magneticField_;
+template<typename Float>
+std::array<Float, 3> basisTransform(std::array<std::array<Float, 3>, 3> const& basis,
+                                    std::array<Float, 3> const& vec)
+{
+    std::array<Float, 3> newVec;
 
-        double particleCharge_;
-        uint32 nbrParticlePerCell_;
-        Basis basis_;
-        std::optional<size_t> rngSeed_;
-    };
-} // namespace core
-} // namespace PHARE
+    for (uint32 comp = 0; comp < 3; comp++)
+    {
+        newVec[comp] = basis[0][comp] * vec[0] + basis[1][comp] * vec[1] + basis[2][comp] * vec[2];
+    }
 
+    return newVec;
+}
+
+
+template<typename Float>
+void localMagneticBasis(std::array<Float, 3> B, std::array<std::array<Float, 3>, 3>& basis)
+{
+    auto b2 = norm(B);
+
+    if (b2 < 1e-8)
+    {
+        basis[0][0] = 1.0;
+        basis[0][1] = 0.0;
+        basis[0][2] = 0.0;
+
+        basis[1][0] = 0.0;
+        basis[1][1] = 1.0;
+        basis[1][2] = 0.0;
+
+        basis[2][0] = 0.0;
+        basis[2][1] = 0.0;
+        basis[2][2] = 1.0;
+    }
+    else
+    {
+        // first basis vector is aligned with B
+        basis[0][0] = B[0] / b2;
+        basis[0][1] = B[1] / b2;
+        basis[0][2] = B[2] / b2;
+
+        // second vector is (1,1,1) x B
+        basis[1][0] = B[2] - B[1];
+        basis[1][1] = B[0] - B[2];
+        basis[1][2] = B[1] - B[0];
+
+        auto vecNorm = norm(basis[1]);
+        basis[1][0] /= vecNorm;
+        basis[1][1] /= vecNorm;
+        basis[1][2] /= vecNorm;
+
+        // last vector is just the cross product of the first two vectors
+        basis[2][0] = basis[0][1] * basis[1][2] - basis[0][2] * basis[1][1];
+        basis[2][1] = basis[0][2] * basis[1][0] - basis[0][0] * basis[1][2];
+        basis[2][2] = basis[0][0] * basis[1][1] - basis[0][1] * basis[1][0];
+    }
+}
+
+} // namespace PHARE::core
 
 #endif
