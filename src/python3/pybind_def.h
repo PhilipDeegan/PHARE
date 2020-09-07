@@ -5,6 +5,8 @@
 #include <cstdint>
 #include <stdexcept>
 
+#include "core/utilities/span.h"
+
 #include "pybind11/stl.h"
 #include "pybind11/numpy.h"
 
@@ -20,6 +22,46 @@ using pyarray_particles_t = std::tuple<py_array_t<int32_t>, py_array_t<float>, p
 using pyarray_particles_crt
     = std::tuple<py_array_t<int32_t> const&, py_array_t<float> const&, py_array_t<double> const&,
                  py_array_t<double> const&, py_array_t<double> const&>;
+
+template<typename PyArrayInfo>
+std::size_t ndSize(PyArrayInfo const& ar_info)
+{
+    assert(ar_info.ndim >= 1 && ar_info.ndim <= 3);
+
+    std::size_t size = ar_info.shape[0];
+    for (size_t i = 1; i < ar_info.ndim; i++)
+        size *= ar_info.shape[i];
+
+    return size;
+}
+
+
+template<typename T>
+class PyArrayWrapper : public core::Span<T>
+{
+public:
+    PyArrayWrapper(PHARE::pydata::py_array_t<T> const& array)
+        : core::Span<T>{static_cast<T*>(array.request().ptr), pydata::ndSize(array.request())}
+        , _array{array}
+    {
+    }
+
+protected:
+    PHARE::pydata::py_array_t<T> _array;
+};
+
+template<typename T>
+std::shared_ptr<core::Span<T>> makePyArrayWrapper(py_array_t<T> const& array)
+{
+    return std::make_shared<PyArrayWrapper<T>>(array);
+}
+
+template<typename T>
+core::Span<T> makeSpan(py_array_t<T> const& py_array)
+{
+    auto ar_info = py_array.request();
+    return {static_cast<T*>(ar_info.ptr), ndSize(ar_info)};
+}
 
 
 

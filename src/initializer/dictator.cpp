@@ -2,16 +2,18 @@
 #include "cppdict/include/dict.hpp"
 #include "initializer/python_data_provider.h"
 
+#include "python3/pybind_def.h"
+
 #include <pybind11/functional.h>
 #include <pybind11/pybind11.h>
-#include "pybind11/numpy.h"
+#include <pybind11/numpy.h>
 #include <pybind11/stl.h>
 
-using PHARE::initializer::ScalarFunction;
 
 namespace py = pybind11;
-template<typename T>
-using py_array = py::array_t<T, py::array::c_style | py::array::forcecast>;
+
+using PHARE::initializer::ScalarFunction;
+using PHARE::initializer::VectorFunction;
 
 
 template<typename T>
@@ -38,7 +40,7 @@ void add_optional_size_t(std::string path, std::optional<std::size_t>&& value)
 }
 
 template<typename T>
-void add_array_as_vector(std::string path, py_array<T>& array)
+void add_array_as_vector(std::string path, PHARE::pydata::py_array_t<T>& array)
 {
     auto buf = array.request();
 
@@ -63,5 +65,10 @@ PYBIND11_MODULE(dictator, m)
     m.def("addScalarFunction1D", add<ScalarFunction<1>>, "add");
     m.def("addScalarFunction2D", add<ScalarFunction<2>>, "add");
     m.def("addScalarFunction3D", add<ScalarFunction<3>>, "add");
+
+    m.def("addPyArrayFunction1D", add<VectorFunction<1>>, "add");
+    m.def("addPyArrayFunction2D", add<VectorFunction<2>>, "add");
+    m.def("addPyArrayFunction3D", add<VectorFunction<3>>, "add");
+
     m.def("add_array_as_vector", add_array_as_vector<double>, "add_array_as_vector");
 }

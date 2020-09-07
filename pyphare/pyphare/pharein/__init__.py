@@ -42,6 +42,11 @@ def populateDict():
 
     add = pp.add
     addScalarFunction = getattr(pp, 'addScalarFunction{:d}'.format(simulation.dims)+'D')
+    addPyArrayFunction = getattr(pp, 'addPyArrayFunction{:d}'.format(simulation.dims)+'D')
+
+    func_types = {"scalar" : addScalarFunction, "vector" : addPyArrayFunction}
+    assert func_type in func_types
+    initFuncType = func_types[func_type]
 
     add("simulation/name", "simulation_test")
     add("simulation/dimension", simulation.dims)
@@ -126,13 +131,16 @@ def populateDict():
         add(pop_path+"{:d}/name".format(pop_index), pop)
         add(pop_path+"{:d}/mass".format(pop_index), float(d["mass"]))
         add(partinit_path+"name", "maxwellian")
-        addScalarFunction(partinit_path+"density", d["density"])
-        addScalarFunction(partinit_path+"bulk_velocity_x", d["vx"])
-        addScalarFunction(partinit_path+"bulk_velocity_y", d["vy"])
-        addScalarFunction(partinit_path+"bulk_velocity_z", d["vz"])
-        addScalarFunction(partinit_path+"thermal_velocity_x",d["vthx"])
-        addScalarFunction(partinit_path+"thermal_velocity_y",d["vthy"])
-        addScalarFunction(partinit_path+"thermal_velocity_z",d["vthz"])
+
+        add(partinit_path+"fn_type", func_type)
+
+        initFuncType(partinit_path+"density", d["density"])
+        initFuncType(partinit_path+"bulk_velocity_x", d["vx"])
+        initFuncType(partinit_path+"bulk_velocity_y", d["vy"])
+        initFuncType(partinit_path+"bulk_velocity_z", d["vz"])
+        initFuncType(partinit_path+"thermal_velocity_x",d["vthx"])
+        initFuncType(partinit_path+"thermal_velocity_y",d["vthy"])
+        initFuncType(partinit_path+"thermal_velocity_z",d["vthz"])
         add(partinit_path+"nbr_part_per_cell", int(d["nbrParticlesPerCell"]))
         add(partinit_path+"charge", float(d["charge"]))
         add(partinit_path+"basis", "cartesian")
@@ -175,4 +183,3 @@ def populateDict():
     else:
         for item in simulation.electrons.dict_path():
             add("simulation/"+item[0], item[1])
-

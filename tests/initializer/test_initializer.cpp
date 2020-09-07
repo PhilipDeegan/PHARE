@@ -1,7 +1,7 @@
 
-
 #include <memory>
 #include <string>
+#include <stdlib.h>
 
 
 #include "initializer/data_provider.h"
@@ -118,8 +118,10 @@ TEST(APythonDataProvider, providesAValidTree)
 
 
 int main(int argc, char** argv)
-
 {
+    // force python to use scalar functions
+    setenv(/*var=*/"PHARE_INIT_FN", /*val=*/"scalar", /*overwrite=*/1);
+
     ::testing::InitGoogleTest(&argc, argv);
 
     return RUN_ALL_TESTS();

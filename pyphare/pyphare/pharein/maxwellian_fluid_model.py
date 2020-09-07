@@ -1,6 +1,37 @@
 
+import numpy as np
 from ..core import phare_utilities
 from . import global_vars
+
+
+class fn_wrapper:
+    def __init__(self, fn):
+        self.fn = fn
+    def __call__(self, *xyz):
+
+        # C++ vectors become lists via pybind so we check if we have a list
+        #  if not it's a scalar function so do as normal
+        if not isinstance(xyz[-1], list):
+            return self.fn(*xyz)
+
+        args = list(xyz)
+        for i, arg in enumerate(args):
+            if not isinstance(xyz[i], np.ndarray):
+                args[i] = np.asarray(xyz[i]) # copies :(
+
+        ret = self.fn(*args)
+
+        if isinstance(ret, list):
+            ret = np.asarray(ret)
+
+        if not isinstance(ret, np.ndarray): # is scalar
+            ret = np.full(len(xyz[-1]), ret)
+
+        from pybindlibs import cpp
+        # convert numpy array to C++ SubSpan
+        # couples vector init functions to C++
+        return cpp.makePyArrayWrapper(ret)
+
 
 class MaxwellianFluidModel(object):
 
@@ -117,13 +148,13 @@ class MaxwellianFluidModel(object):
         new_population = {name: {
                           "charge": charge,
                           "mass": mass,
-                          "density": density,
-                          "vx": vbulkx,
-                          "vy": vbulky,
-                          "vz": vbulkz,
-                          "vthx": vthx,
-                          "vthy": vthy,
-                          "vthz": vthz,
+                          "density": fn_wrapper(density),
+                          "vx": fn_wrapper(vbulkx),
+                          "vy": fn_wrapper(vbulky),
+                          "vz": fn_wrapper(vbulkz),
+                          "vthx": fn_wrapper(vthx),
+                          "vthy": fn_wrapper(vthy),
+                          "vthz": fn_wrapper(vthz),
                           "nbrParticlesPerCell": nbr_part_per_cell,
                           "init": init}}
 
@@ -156,7 +187,6 @@ class MaxwellianFluidModel(object):
             for pop_index, pop in enumerate(self.populations):
                 for v in ["vth", "v"]:
                     valid &= periodic_function_check(v, model_dict[pop])
-            for em in ["b"]:
-                valid &= periodic_function_check(em, model_dict)
+            valid &= periodic_function_check("b", model_dict)
             if not valid:
                 print("Warning: Simulation is periodic but some functions are not")

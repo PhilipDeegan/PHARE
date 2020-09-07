@@ -3,9 +3,9 @@
 #ifndef PHARE_CORE_UTILITIES_SPAN_H
 #define PHARE_CORE_UTILITIES_SPAN_H
 
-#include <cstddef> // for size_t
-#include <numeric> // for accumulate
-#include <vector>  // for vector
+#include <vector>
+#include <cstddef>
+#include <numeric>
 #include "core/utilities/types.h"
 
 namespace PHARE::core
@@ -15,16 +15,18 @@ struct Span
 {
     using value_type = T;
 
-    T& operator[](SIZE i) const { return ptr[i]; }
+    auto& operator[](SIZE i) { return ptr[i]; }
+    auto& operator[](SIZE i) const { return ptr[i]; }
     T const* const& data() const { return ptr; }
     T const* const& begin() const { return ptr; }
     T* end() const { return ptr + s; }
     SIZE const& size() const { return s; }
 
-
     T const* ptr = nullptr;
     SIZE s       = 0;
 };
+
+
 
 template<typename T, typename SIZE = size_t>
 struct SpanSet

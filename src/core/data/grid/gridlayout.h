@@ -148,6 +148,13 @@ namespace core
          */
         std::array<std::uint32_t, dimension> nbrCells() const { return nbrPhysicalCells_; }
 
+        std::size_t totalCells() const
+        {
+            auto nbrCells = this->nbrCells();
+            return std::accumulate(nbrCells.begin(), nbrCells.end(), 1,
+                                   std::multiplies<std::size_t>());
+        }
+
 
         auto const& AMRBox() const { return AMRBox_; }
 
