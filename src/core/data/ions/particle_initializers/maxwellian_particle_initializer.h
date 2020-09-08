@@ -131,8 +131,7 @@ void MaxwellianParticleInitializer<ParticleArray, GridLayout, InputFunction>::lo
 
     /* get indices start and stop. we take primal/primal/primal because
        that is what GridLayout::cellCenteredCoordinate() requires */
-    std::uint32_t ix0 = layout.physicalStartIndex(QtyCentering::primal, Direction::X);
-    std::uint32_t ix1 = layout.physicalEndIndex(QtyCentering::primal, Direction::X);
+    auto const [ix0, ix1] = layout.physicalStartToEnd(QtyCentering::primal, Direction::X);
 
     double cellVolume = dx;
 
@@ -223,10 +222,8 @@ void MaxwellianParticleInitializer<ParticleArray, GridLayout, InputFunction>::lo
 
     /* get indices start and stop. we take primal/primal/primal because
        that is what GridLayout::cellCenteredCoordinate() requires */
-    auto ix0 = layout.physicalStartIndex(QtyCentering::primal, Direction::X);
-    auto ix1 = layout.physicalEndIndex(QtyCentering::primal, Direction::X);
-    auto iy0 = layout.physicalStartIndex(QtyCentering::primal, Direction::Y);
-    auto iy1 = layout.physicalEndIndex(QtyCentering::primal, Direction::Y);
+    auto const [ix0, ix1] = layout.physicalStartToEnd(QtyCentering::primal, Direction::X);
+    auto const [iy0, iy1] = layout.physicalStartToEnd(QtyCentering::primal, Direction::Y);
 
     auto cellVolume = dx * dy;
 
@@ -323,12 +320,9 @@ void MaxwellianParticleInitializer<ParticleArray, GridLayout, InputFunction>::lo
 
     /* get indices start and stop. we take primal/primal/primal because
        that is what GridLayout::cellCenteredCoordinate() requires */
-    auto ix0 = layout.physicalStartIndex(QtyCentering::primal, Direction::X);
-    auto ix1 = layout.physicalEndIndex(QtyCentering::primal, Direction::X);
-    auto iy0 = layout.physicalStartIndex(QtyCentering::primal, Direction::Y);
-    auto iy1 = layout.physicalEndIndex(QtyCentering::primal, Direction::Y);
-    auto iz0 = layout.physicalStartIndex(QtyCentering::primal, Direction::Z);
-    auto iz1 = layout.physicalEndIndex(QtyCentering::primal, Direction::Z);
+    auto const [ix0, ix1] = layout.physicalStartToEnd(QtyCentering::primal, Direction::X);
+    auto const [iy0, iy1] = layout.physicalStartToEnd(QtyCentering::primal, Direction::Y);
+    auto const [iz0, iz1] = layout.physicalStartToEnd(QtyCentering::primal, Direction::Z);
 
     double cellVolume = dx * dy * dz;
 
@@ -419,8 +413,9 @@ void MaxwellianParticleInitializer<ParticleArray, GridLayout, InputFunction>::lo
     }             // end x
 }
 
+
 namespace
-{
+{ // not strictly maxwellian but some what generic
     class MaxwellianVectorFunctions
     {
     public:
@@ -440,10 +435,9 @@ namespace
                     _B[i] = magneticField[i](args...);
         }
 
-        double const* n() const { return _n->data(); }
         std::array<double const*, 3> B() const { return ptrs(_B); }
-        std::array<double const*, 3> V() const { return ptrs(_V); }
-        std::array<double const*, 3> Vth() const { return ptrs(_Vth); }
+
+        auto operator()() const { return std::make_tuple(_n->data(), ptrs(_V), ptrs(_Vth)); }
 
     private:
         std::array<double const*, 3>
@@ -462,29 +456,22 @@ template<typename Particles>
 void MaxwellianParticleInitializer<ParticleArray, GridLayout, InputFunction>::loadParticlesND(
     initializer::VectorFunction<1> const&, Particles& particles, GridLayout const& layout) const
 {
-    auto const ix0 = layout.physicalStartIndex(QtyCentering::primal, Direction::X);
-    auto const ix1 = layout.physicalEndIndex(QtyCentering::primal, Direction::X);
+    auto const [ix0, ix1] = layout.physicalStartToEnd(QtyCentering::primal, Direction::X);
+    auto const [x]        = layout.domainGridVectors(QtyCentering::primal);
 
-    auto const& cellVolume = layout.meshSize()[0];
-    auto generator         = getRNG(rngSeed_);
-
-    std::size_t totalCells = layout.totalCells();
-    std::vector<double> x(totalCells);
-    particles.resize(totalCells * nbrParticlePerCell_);
-
-    for (std::uint32_t i = 0, ix = ix0; ix < ix1; ++ix, i++)
-        x[i] = layout.cellCenteredCoordinates(ix)[0];
+    particles.reserve(x.size() * nbrParticlePerCell_);
 
     MaxwellianVectorFunctions const fns{density_,       bulkVelocity_, thermalVelocity_,
                                         magneticField_, basis_,        x};
 
-    auto const V    = fns.V();
-    auto const Vth  = fns.Vth();
-    double const* n = fns.n();
+    auto const [n, V, Vth] = fns();
+    auto const cellVolume  = layout.cellVolume();
+    auto generator         = getRNG(rngSeed_);
+    std::size_t cell_idx   = 0;
 
-    for (std::uint32_t i = 0, ix = ix0, particle_idx = 0; ix < ix1; ++ix, i++)
+    for (std::uint32_t ix = ix0; ix < ix1; ++ix)
     {
-        auto const cellWeight   = n[i] * cellVolume / nbrParticlePerCell_;
+        auto const cellWeight   = n[cell_idx] * cellVolume / nbrParticlePerCell_;
         auto const AMRCellIndex = layout.localToAMR(Point{ix});
         ParticleDeltaDistribution randPosX;
         std::array<double, 3> particleVelocity;
@@ -493,25 +480,26 @@ void MaxwellianParticleInitializer<ParticleArray, GridLayout, InputFunction>::lo
         if (basis_ == Basis::Magnetic)
         {
             auto const B = fns.B();
-            localMagneticBasis({B[0][i], B[1][i], B[2][i]}, basis);
+            localMagneticBasis({B[0][cell_idx], B[1][cell_idx], B[2][cell_idx]}, basis);
         }
 
-        for (std::uint32_t ipart = 0; ipart < nbrParticlePerCell_; ++ipart, particle_idx++)
+        for (std::uint32_t ipart = 0; ipart < nbrParticlePerCell_; ++ipart)
         {
-            maxwellianVelocity({V[0][i], V[1][i], V[2][i]},       //
-                               {Vth[0][i], Vth[1][i], Vth[2][i]}, //
+            maxwellianVelocity({V[0][cell_idx], V[1][cell_idx], V[2][cell_idx]},       //
+                               {Vth[0][cell_idx], Vth[1][cell_idx], Vth[2][cell_idx]}, //
                                generator, particleVelocity);
 
             if (basis_ == Basis::Magnetic)
                 particleVelocity = basisTransform(basis, particleVelocity);
 
-            auto& particle  = particles[particle_idx];
-            particle.weight = cellWeight;
-            particle.charge = particleCharge_;
-            particle.iCell  = AMRCellIndex.template toArray<int>();
-            particle.delta  = {{randPosX(generator)}};
-            particle.v      = particleVelocity;
+            particles.emplace_back(
+                typename Particles::value_type{cellWeight,
+                                               particleCharge_,
+                                               AMRCellIndex.template toArray<int>(),
+                                               {{randPosX(generator)}},
+                                               particleVelocity});
         }
+        cell_idx++;
     }
 }
 
@@ -521,37 +509,26 @@ template<typename Particles>
 void MaxwellianParticleInitializer<ParticleArray, GridLayout, InputFunction>::loadParticlesND(
     initializer::VectorFunction<2> const&, Particles& particles, GridLayout const& layout) const
 {
-    auto const ix0 = layout.physicalStartIndex(QtyCentering::primal, Direction::X);
-    auto const ix1 = layout.physicalEndIndex(QtyCentering::primal, Direction::X);
-    auto const iy0 = layout.physicalStartIndex(QtyCentering::primal, Direction::Y);
-    auto const iy1 = layout.physicalEndIndex(QtyCentering::primal, Direction::Y);
+    auto const [ix0, ix1] = layout.physicalStartToEnd(QtyCentering::primal, Direction::X);
+    auto const [iy0, iy1] = layout.physicalStartToEnd(QtyCentering::primal, Direction::Y);
+    auto const [x, y]     = layout.domainGridVectors(QtyCentering::primal);
 
-    double const cellVolume = std::accumulate(layout.meshSize().begin(), layout.meshSize().end(),
-                                              1.0, std::multiplies<double>());
-    auto generator          = getRNG(rngSeed_);
-
-    std::size_t totalCells = layout.totalCells();
-    std::vector<double> x(totalCells), y(totalCells);
-    particles.resize(totalCells * nbrParticlePerCell_);
-
-    for (std::uint32_t i = 0, ix = ix0; ix < ix1; ++ix)
-        for (std::uint32_t iy = iy0; iy < iy1; ++iy, i++)
-        {
-            auto coord = layout.cellCenteredCoordinates(ix, iy);
-            x[i]       = coord[0];
-            y[i]       = coord[1];
-        }
+    assert(x.size() == y.size());
+    particles.reserve(x.size() * nbrParticlePerCell_);
 
     MaxwellianVectorFunctions const fns{
         density_, bulkVelocity_, thermalVelocity_, magneticField_, basis_, x, y};
-    auto const V    = fns.V();
-    auto const Vth  = fns.Vth();
-    double const* n = fns.n();
 
-    for (std::uint32_t i = 0, ix = ix0, particle_idx = 0; ix < ix1; ++ix)
-        for (std::uint32_t iy = iy0; iy < iy1; ++iy, i++)
+    auto const [n, V, Vth] = fns();
+    auto const cellVolume  = layout.cellVolume();
+    auto generator         = getRNG(rngSeed_);
+    std::size_t cell_idx   = 0;
+
+    for (std::uint32_t ix = ix0; ix < ix1; ++ix)
+    {
+        for (std::uint32_t iy = iy0; iy < iy1; ++iy)
         {
-            auto const cellWeight   = n[i] * cellVolume / nbrParticlePerCell_;
+            auto const cellWeight   = n[cell_idx] * cellVolume / nbrParticlePerCell_;
             auto const AMRCellIndex = layout.localToAMR(Point{ix, iy});
             ParticleDeltaDistribution randPosX, randPosY;
             std::array<double, 3> particleVelocity;
@@ -560,26 +537,28 @@ void MaxwellianParticleInitializer<ParticleArray, GridLayout, InputFunction>::lo
             if (basis_ == Basis::Magnetic)
             {
                 auto const B = fns.B();
-                localMagneticBasis({B[0][i], B[1][i], B[2][i]}, basis);
+                localMagneticBasis({B[0][cell_idx], B[1][cell_idx], B[2][cell_idx]}, basis);
             }
 
-            for (std::uint32_t ipart = 0; ipart < nbrParticlePerCell_; ++ipart, particle_idx++)
+            for (std::uint32_t ipart = 0; ipart < nbrParticlePerCell_; ++ipart)
             {
-                maxwellianVelocity({V[0][i], V[1][i], V[2][i]},       //
-                                   {Vth[0][i], Vth[1][i], Vth[2][i]}, //
+                maxwellianVelocity({V[0][cell_idx], V[1][cell_idx], V[2][cell_idx]},       //
+                                   {Vth[0][cell_idx], Vth[1][cell_idx], Vth[2][cell_idx]}, //
                                    generator, particleVelocity);
 
                 if (basis_ == Basis::Magnetic)
                     particleVelocity = basisTransform(basis, particleVelocity);
 
-                auto& particle  = particles[particle_idx];
-                particle.weight = cellWeight;
-                particle.charge = particleCharge_;
-                particle.iCell  = AMRCellIndex.template toArray<int>();
-                particle.delta  = {{randPosX(generator), randPosY(generator)}};
-                particle.v      = particleVelocity;
+                particles.emplace_back(
+                    typename Particles::value_type{cellWeight,
+                                                   particleCharge_,
+                                                   AMRCellIndex.template toArray<int>(),
+                                                   {{randPosX(generator), randPosY(generator)}},
+                                                   particleVelocity});
             }
+            cell_idx++;
         }
+    }
 }
 
 template<typename ParticleArray, typename GridLayout, typename InputFunction>
@@ -587,70 +566,60 @@ template<typename Particles>
 void MaxwellianParticleInitializer<ParticleArray, GridLayout, InputFunction>::loadParticlesND(
     initializer::VectorFunction<3> const&, Particles& particles, GridLayout const& layout) const
 {
-    auto const ix0 = layout.physicalStartIndex(QtyCentering::primal, Direction::X);
-    auto const ix1 = layout.physicalEndIndex(QtyCentering::primal, Direction::X);
-    auto const iy0 = layout.physicalStartIndex(QtyCentering::primal, Direction::Y);
-    auto const iy1 = layout.physicalEndIndex(QtyCentering::primal, Direction::Y);
-    auto const iz0 = layout.physicalStartIndex(QtyCentering::primal, Direction::Z);
-    auto const iz1 = layout.physicalEndIndex(QtyCentering::primal, Direction::Z);
+    auto const [ix0, ix1] = layout.physicalStartToEnd(QtyCentering::primal, Direction::X);
+    auto const [iy0, iy1] = layout.physicalStartToEnd(QtyCentering::primal, Direction::Y);
+    auto const [iz0, iz1] = layout.physicalStartToEnd(QtyCentering::primal, Direction::Z);
+    auto const [x, y, z]  = layout.domainGridVectors(QtyCentering::primal);
 
-    double const cellVolume = std::accumulate(layout.meshSize().begin(), layout.meshSize().end(),
-                                              1.0, std::multiplies<double>());
-    auto generator          = getRNG(rngSeed_);
-
-    std::size_t totalCells = layout.totalCells();
-    std::vector<double> x(totalCells), y(totalCells), z(totalCells);
-    particles.resize(totalCells * nbrParticlePerCell_);
-
-    for (std::uint32_t i = 0, ix = ix0; ix < ix1; ++ix)
-        for (std::uint32_t iy = iy0; iy < iy1; ++iy)
-            for (std::uint32_t iz = iz0; iz < iz1; ++iz, i++)
-            {
-                auto coord = layout.cellCenteredCoordinates(ix, iy, iz);
-                x[i]       = coord[0];
-                y[i]       = coord[1];
-                z[i]       = coord[2];
-            }
+    assert(x.size() == y.size() and y.size() == z.size());
+    particles.reserve(x.size() * nbrParticlePerCell_);
 
     MaxwellianVectorFunctions const fns{
         density_, bulkVelocity_, thermalVelocity_, magneticField_, basis_, x, y, z};
-    auto const V          = fns.V();
-    auto const Vth        = fns.Vth();
-    double const* const n = fns.n();
 
-    for (std::uint32_t i = 0, ix = ix0, particle_idx = 0; ix < ix1; ++ix)
+    auto const [n, V, Vth] = fns();
+    auto const cellVolume  = layout.cellVolume();
+    auto generator         = getRNG(rngSeed_);
+    std::size_t cell_idx   = 0;
+
+    for (std::uint32_t ix = ix0; ix < ix1; ++ix)
+    {
         for (std::uint32_t iy = iy0; iy < iy1; ++iy)
-            for (std::uint32_t iz = iz0; iz < iz1; ++iz, i++)
+        {
+            for (std::uint32_t iz = iz0; iz < iz1; ++iz)
             {
-                auto const cellWeight   = n[i] * cellVolume / nbrParticlePerCell_;
+                auto const cellWeight   = n[cell_idx] * cellVolume / nbrParticlePerCell_;
                 auto const AMRCellIndex = layout.localToAMR(Point{ix, iy, iz});
-                ParticleDeltaDistribution posX, posY, posZ;
+                ParticleDeltaDistribution randPosX, randPosY, randPosZ;
                 std::array<double, 3> particleVelocity;
                 std::array<std::array<double, 3>, 3> basis;
 
                 if (basis_ == Basis::Magnetic)
                 {
                     auto const B = fns.B();
-                    localMagneticBasis({B[0][i], B[1][i], B[2][i]}, basis);
+                    localMagneticBasis({B[0][cell_idx], B[1][cell_idx], B[2][cell_idx]}, basis);
                 }
 
-                for (std::uint32_t ipart = 0; ipart < nbrParticlePerCell_; ++ipart, particle_idx++)
+                for (std::uint32_t ipart = 0; ipart < nbrParticlePerCell_; ++ipart)
                 {
-                    maxwellianVelocity({V[0][i], V[1][i], V[2][i]},       //
-                                       {Vth[0][i], Vth[1][i], Vth[2][i]}, //
+                    maxwellianVelocity({V[0][cell_idx], V[1][cell_idx], V[2][cell_idx]},       //
+                                       {Vth[0][cell_idx], Vth[1][cell_idx], Vth[2][cell_idx]}, //
                                        generator, particleVelocity);
 
                     if (basis_ == Basis::Magnetic)
                         particleVelocity = basisTransform(basis, particleVelocity);
 
-                    auto& particle  = particles[particle_idx];
-                    particle.weight = cellWeight;
-                    particle.charge = particleCharge_;
-                    particle.iCell  = AMRCellIndex.template toArray<int>();
-                    particle.delta  = {{posX(generator), posY(generator), posZ(generator)}};
-                    particle.v      = particleVelocity;
+                    particles.emplace_back(typename Particles::value_type{
+                        cellWeight,
+                        particleCharge_,
+                        AMRCellIndex.template toArray<int>(),
+                        {{randPosX(generator), randPosY(generator), randPosZ(generator)}},
+                        particleVelocity});
                 }
+                cell_idx++;
             }
+        }
+    }
 }
 
 

@@ -14,6 +14,7 @@
 
 #include <array>
 #include <cmath>
+#include <tuple>
 #include <cstddef>
 #include <type_traits>
 
@@ -148,13 +149,6 @@ namespace core
          */
         std::array<std::uint32_t, dimension> nbrCells() const { return nbrPhysicalCells_; }
 
-        std::size_t totalCells() const
-        {
-            auto nbrCells = this->nbrCells();
-            return std::accumulate(nbrCells.begin(), nbrCells.end(), 1,
-                                   std::multiplies<std::size_t>());
-        }
-
 
         auto const& AMRBox() const { return AMRBox_; }
 
@@ -165,8 +159,124 @@ namespace core
             return (interp_order % 2 == 0 ? interp_order / 2 + 1 : (interp_order + 1) / 2);
         }
 
+        template<typename Centering, typename Direction>
+        auto ghostStartToEnd(Centering const& centering, Direction const direction) const
+        {
+            return std::make_tuple(ghostStartIndex(centering, direction),
+                                   ghostEndIndex(centering, direction));
+        }
+
+        template<typename NdArrayImpl>
+        auto ghostStartToEnd(Field<NdArrayImpl, HybridQuantity::Scalar> const& field,
+                             Direction direction) const
+        {
+            return ghostStartToEnd(field.physicalQuantity(), direction);
+        }
+
+        template<typename Centering, typename Direction>
+        auto physicalStartToEnd(Centering const& centering, Direction const direction) const
+        {
+            return std::make_tuple(physicalStartIndex(centering, direction),
+                                   physicalEndIndex(centering, direction));
+        }
+
+        template<typename NdArrayImpl>
+        auto physicalStartToEnd(Field<NdArrayImpl, HybridQuantity::Scalar> const& field,
+                                Direction direction) const
+        {
+            return physicalStartToEnd(field.physicalQuantity(), direction);
+        }
 
 
+        template<typename Centering, typename StartToEnd>
+        auto gridVectors(DimConst<1>, Centering const& centering,
+                         StartToEnd const&& startToEnd) const
+        {
+            auto const [ix0, ix1] = startToEnd(centering, Direction::X);
+
+            std::size_t nCells = (ix1 - ix0);
+            std::vector<double> x(nCells);
+
+            std::size_t cell_idx = 0;
+            for (std::uint32_t ix = ix0; ix < ix1; ++ix)
+                x[cell_idx++] = cellCenteredCoordinates(ix)[0];
+
+            return std::make_tuple(std::move(x));
+        }
+
+        template<typename Centering, typename StartToEnd>
+        auto gridVectors(DimConst<2>, Centering const& centering,
+                         StartToEnd const&& startToEnd) const
+        {
+            auto const [ix0, ix1] = startToEnd(centering, Direction::X);
+            auto const [iy0, iy1] = startToEnd(centering, Direction::Y);
+
+            std::size_t nCells = (ix1 - ix0) * (iy1 - iy0);
+            std::vector<double> x(nCells), y(nCells);
+
+            std::size_t cell_idx = 0;
+            for (std::uint32_t ix = ix0; ix < ix1; ++ix)
+                for (std::uint32_t iy = iy0; iy < iy1; ++iy)
+                {
+                    auto coord  = cellCenteredCoordinates(ix, iy);
+                    x[cell_idx] = coord[0];
+                    y[cell_idx] = coord[1];
+                    cell_idx++;
+                }
+
+            return std::make_tuple(std::move(x), std::move(y));
+        }
+
+        template<typename Centering, typename StartToEnd>
+        auto gridVectors(DimConst<3>, Centering const& centering,
+                         StartToEnd const&& startToEnd) const
+        {
+            auto const [ix0, ix1] = startToEnd(centering, Direction::X);
+            auto const [iy0, iy1] = startToEnd(centering, Direction::Y);
+            auto const [iz0, iz1] = startToEnd(centering, Direction::Z);
+
+            std::size_t nCells = (ix1 - ix0) * (iy1 - iy0) * (iz1 - iz0);
+            std::vector<double> x(nCells), y(nCells), z(nCells);
+
+            std::size_t cell_idx = 0;
+            for (std::uint32_t ix = ix0; ix < ix1; ++ix)
+                for (std::uint32_t iy = iy0; iy < iy1; ++iy)
+                    for (std::uint32_t iz = iz0; iz < iz1; ++iz)
+                    {
+                        auto coord  = cellCenteredCoordinates(ix, iy, iz);
+                        x[cell_idx] = coord[0];
+                        y[cell_idx] = coord[1];
+                        z[cell_idx] = coord[2];
+                        cell_idx++;
+                    }
+
+            return std::make_tuple(std::move(x), std::move(y), std::move(z));
+        }
+
+        template<typename Centering>
+        auto domainGridVectors(Centering const& centering) const
+        {
+            return gridVectors(DimConst<dimension>{}, centering,
+                               [this](auto const& centering_, auto direction) {
+                                   return this->physicalStartToEnd(centering_, direction);
+                               });
+        }
+
+        template<typename Centering>
+        auto ghostGridVectors(Centering const& centering) const
+        {
+            return gridVectors(DimConst<dimension>{}, centering,
+                               [this](auto const& centering_, auto direction) {
+                                   return this->ghostStartToEnd(centering_, direction);
+                               });
+        }
+
+
+        double cellVolume() const
+        {
+            return std::accumulate(meshSize().begin(), meshSize().end(), 1.0,
+                                   std::multiplies<double>());
+        }
 
         /**
          * @brief physicalStartIndex returns the index of the first node of a given

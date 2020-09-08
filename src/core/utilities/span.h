@@ -27,6 +27,27 @@ struct Span
 };
 
 
+template<typename T, typename SIZE = size_t>
+class VectorSpan : public Span<T, SIZE>
+{
+    Span<T, SIZE> super(std::size_t size, T value)
+    {
+        vec = std::vector<T>(size, value);
+        return Span<T, SIZE>{vec.data(), vec.size()};
+    }
+
+public:
+    template<typename... Args>
+    VectorSpan(std::size_t size, T value = 0)
+        : Span<T, SIZE>{super(size, value)}
+    {
+    }
+
+private:
+    std::vector<T> vec;
+};
+
+
 
 template<typename T, typename SIZE = size_t>
 struct SpanSet

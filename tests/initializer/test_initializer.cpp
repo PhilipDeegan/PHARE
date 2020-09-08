@@ -17,6 +17,7 @@
 #include "core/data/particles/particle_array.h"
 
 
+
 using namespace PHARE::initializer;
 
 using GridLayoutT    = PHARE::core::GridLayout<PHARE::core::GridLayoutImplYee<1, 1>>;
@@ -73,13 +74,13 @@ TEST(APythonDataProvider, providesAValidTree)
     auto pop0Mass                    = pop0["mass"].to<double>();
     auto& pop0ParticleInitializer    = pop0["particle_initializer"];
     auto pop0ParticleInitializerName = pop0ParticleInitializer["name"].to<std::string>();
-    auto pop0density                 = pop0ParticleInitializer["density"].to<ScalarFunction<1>>();
-    auto bulk0x             = pop0ParticleInitializer["bulk_velocity_x"].to<ScalarFunction<1>>();
-    auto bulk0y             = pop0ParticleInitializer["bulk_velocity_y"].to<ScalarFunction<1>>();
-    auto bulk0z             = pop0ParticleInitializer["bulk_velocity_z"].to<ScalarFunction<1>>();
-    auto vth0x              = pop0ParticleInitializer["thermal_velocity_x"].to<ScalarFunction<1>>();
-    auto vth0y              = pop0ParticleInitializer["thermal_velocity_y"].to<ScalarFunction<1>>();
-    auto vth0z              = pop0ParticleInitializer["thermal_velocity_z"].to<ScalarFunction<1>>();
+    auto pop0density                 = pop0ParticleInitializer["density"].to<VectorFunction<1>>();
+    auto bulk0x             = pop0ParticleInitializer["bulk_velocity_x"].to<VectorFunction<1>>();
+    auto bulk0y             = pop0ParticleInitializer["bulk_velocity_y"].to<VectorFunction<1>>();
+    auto bulk0z             = pop0ParticleInitializer["bulk_velocity_z"].to<VectorFunction<1>>();
+    auto vth0x              = pop0ParticleInitializer["thermal_velocity_x"].to<VectorFunction<1>>();
+    auto vth0y              = pop0ParticleInitializer["thermal_velocity_y"].to<VectorFunction<1>>();
+    auto vth0z              = pop0ParticleInitializer["thermal_velocity_z"].to<VectorFunction<1>>();
     auto pop0NbrPartPerCell = pop0ParticleInitializer["nbr_part_per_cell"].to<int>();
     auto pop0Charge         = pop0ParticleInitializer["charge"].to<double>();
     auto pop0Basis          = pop0ParticleInitializer["basis"].to<std::string>();
@@ -97,17 +98,19 @@ TEST(APythonDataProvider, providesAValidTree)
 
     EXPECT_EQ("modified_boris", pusherName);
 
+    std::vector<double> input_2 = {2};
+
     EXPECT_EQ(2, nbrPopulations);
     EXPECT_EQ("protons", pop0Name);
     EXPECT_DOUBLE_EQ(1., pop0Mass);
     EXPECT_EQ("maxwellian", pop0ParticleInitializerName);
-    EXPECT_DOUBLE_EQ(2., pop0density(2.));
-    EXPECT_DOUBLE_EQ(1., bulk0x(2.));
-    EXPECT_DOUBLE_EQ(1., bulk0y(2.));
-    EXPECT_DOUBLE_EQ(1., bulk0z(2.));
-    EXPECT_DOUBLE_EQ(1., vth0x(2.));
-    EXPECT_DOUBLE_EQ(1., vth0y(2.));
-    EXPECT_DOUBLE_EQ(1., vth0z(2.));
+    EXPECT_DOUBLE_EQ(2., (*pop0density(input_2))[0]);
+    EXPECT_DOUBLE_EQ(1., (*bulk0x(input_2))[0]);
+    EXPECT_DOUBLE_EQ(1., (*bulk0y(input_2))[0]);
+    EXPECT_DOUBLE_EQ(1., (*bulk0z(input_2))[0]);
+    EXPECT_DOUBLE_EQ(1., (*vth0x(input_2))[0]);
+    EXPECT_DOUBLE_EQ(1., (*vth0y(input_2))[0]);
+    EXPECT_DOUBLE_EQ(1., (*vth0z(input_2))[0]);
     EXPECT_EQ(100, pop0NbrPartPerCell);
     EXPECT_DOUBLE_EQ(1., pop0Charge);
     EXPECT_EQ("cartesian", pop0Basis);

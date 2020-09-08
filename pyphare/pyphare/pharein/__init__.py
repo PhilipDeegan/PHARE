@@ -42,11 +42,7 @@ def populateDict():
 
     add = pp.add
     addScalarFunction = getattr(pp, 'addScalarFunction{:d}'.format(simulation.dims)+'D')
-    addPyArrayFunction = getattr(pp, 'addPyArrayFunction{:d}'.format(simulation.dims)+'D')
-
-    func_types = {"scalar" : addScalarFunction, "vector" : addPyArrayFunction}
-    assert func_type in func_types
-    initFuncType = func_types[func_type]
+    addVectorFunction = getattr(pp, 'addPyArrayFunction{:d}'.format(simulation.dims)+'D')
 
     add("simulation/name", "simulation_test")
     add("simulation/dimension", simulation.dims)
@@ -132,15 +128,15 @@ def populateDict():
         add(pop_path+"{:d}/mass".format(pop_index), float(d["mass"]))
         add(partinit_path+"name", "maxwellian")
 
-        add(partinit_path+"fn_type", func_type)
+        add(partinit_path+"fn_type", "vector")
 
-        initFuncType(partinit_path+"density", d["density"])
-        initFuncType(partinit_path+"bulk_velocity_x", d["vx"])
-        initFuncType(partinit_path+"bulk_velocity_y", d["vy"])
-        initFuncType(partinit_path+"bulk_velocity_z", d["vz"])
-        initFuncType(partinit_path+"thermal_velocity_x",d["vthx"])
-        initFuncType(partinit_path+"thermal_velocity_y",d["vthy"])
-        initFuncType(partinit_path+"thermal_velocity_z",d["vthz"])
+        addVectorFunction(partinit_path+"density", d["density"])
+        addVectorFunction(partinit_path+"bulk_velocity_x", d["vx"])
+        addVectorFunction(partinit_path+"bulk_velocity_y", d["vy"])
+        addVectorFunction(partinit_path+"bulk_velocity_z", d["vz"])
+        addVectorFunction(partinit_path+"thermal_velocity_x",d["vthx"])
+        addVectorFunction(partinit_path+"thermal_velocity_y",d["vthy"])
+        addVectorFunction(partinit_path+"thermal_velocity_z",d["vthz"])
         add(partinit_path+"nbr_part_per_cell", int(d["nbrParticlesPerCell"]))
         add(partinit_path+"charge", float(d["charge"]))
         add(partinit_path+"basis", "cartesian")

@@ -14,10 +14,11 @@ class fn_wrapper:
         if not isinstance(xyz[-1], list):
             return self.fn(*xyz)
 
+
         args = list(xyz)
         for i, arg in enumerate(args):
-            if not isinstance(xyz[i], np.ndarray):
-                args[i] = np.asarray(xyz[i]) # copies :(
+            if not isinstance(args[i], np.ndarray):
+                args[i] = np.asarray(xyz[i])
 
         ret = self.fn(*args)
 
@@ -25,7 +26,7 @@ class fn_wrapper:
             ret = np.asarray(ret)
 
         if not isinstance(ret, np.ndarray): # is scalar
-            ret = np.full(len(xyz[-1]), ret)
+            ret = np.full(len(args[-1]), ret)
 
         from pybindlibs import cpp
         # convert numpy array to C++ SubSpan

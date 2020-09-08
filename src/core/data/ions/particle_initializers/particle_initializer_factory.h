@@ -83,7 +83,7 @@ namespace core
 
         static std::unique_ptr<ParticleInitializerT> create(initializer::PHAREDict& dict)
         {
-            if (dict.contains("fn_type") && dict["fn_type"].template to<std::string>() == "vector")
+            if (dict.contains("fn_type") and dict["fn_type"].template to<std::string>() == "vector")
                 return createType<initializer::VectorFunction<dimension>>(dict);
             return createType<initializer::ScalarFunction<dimension>>(dict);
         }
