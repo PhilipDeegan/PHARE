@@ -44,6 +44,7 @@ public:
         : core::Span<T>{static_cast<T*>(array.request().ptr), pydata::ndSize(array.request())}
         , _array{array}
     {
+        assert(_array.request().ptr == array.request().ptr); // assert no copy
     }
 
 protected:
