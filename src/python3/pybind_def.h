@@ -2,6 +2,7 @@
 #define PHARE_PYTHON_PYBIND_DEF_H
 
 #include <tuple>
+#include <cassert>
 #include <cstdint>
 #include <stdexcept>
 
@@ -28,11 +29,8 @@ std::size_t ndSize(PyArrayInfo const& ar_info)
 {
     assert(ar_info.ndim >= 1 && ar_info.ndim <= 3);
 
-    std::size_t size = ar_info.shape[0];
-    for (size_t i = 1; i < ar_info.ndim; i++)
-        size *= ar_info.shape[i];
-
-    return size;
+    return std::accumulate(ar_info.shape.begin(), ar_info.shape.end(), 1,
+                           std::multiplies<std::size_t>());
 }
 
 
@@ -44,6 +42,7 @@ public:
         : core::Span<T>{static_cast<T*>(array.request().ptr), pydata::ndSize(array.request())}
         , _array{array}
     {
+        assert(_array.request().ptr);
         assert(_array.request().ptr == array.request().ptr); // assert no copy
     }
 
@@ -61,20 +60,8 @@ template<typename T>
 core::Span<T> makeSpan(py_array_t<T> const& py_array)
 {
     auto ar_info = py_array.request();
+    assert(ar_info.ptr);
     return {static_cast<T*>(ar_info.ptr), ndSize(ar_info)};
-}
-
-
-
-template<typename T>
-core::Span<T, int> to_span(py_array_t<T> const& py_array)
-{
-    py::buffer_info info = py_array.request();
-    if (!info.ptr)
-        throw std::runtime_error("to_span received an array with an invalid internal ptr");
-    assert(info.ndim == 1 or info.ndim == 2);
-    int size = info.ndim == 1 ? info.shape[0] : info.shape[0] * info.shape[1];
-    return {static_cast<T*>(info.ptr), size};
 }
 
 

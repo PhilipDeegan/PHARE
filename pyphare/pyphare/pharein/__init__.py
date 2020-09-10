@@ -1,5 +1,6 @@
 
 
+import numpy as np
 import os, sys, subprocess
 
 venv_path = os.environ.get('VIRTUAL_ENV')
@@ -26,13 +27,49 @@ from .diagnostics import FluidDiagnostics, ElectromagDiagnostics, ParticleDiagno
 from .simulation import Simulation
 
 
-
-
-
-
 def getSimulation():
     from .global_vars import sim
     return sim
+
+
+def is_ndarray(x):
+    return isinstance(x, np.ndarray)
+
+
+def is_scalar(x):
+    return not is_ndarray(x) and not isinstance(x, list)
+
+
+# Wrap calls to user init functions to turn C++ vectors to ndarrays,
+#  and returned ndarrays to C++ span
+class fn_wrapper:
+
+    def __init__(self, fn):
+        self.fn = fn
+
+    def __call__(self, *xyz):
+        args = list(xyz)
+
+        if all([is_scalar(arg) for arg in args]):
+            return self.fn(*args)
+
+        for i, arg in enumerate(args):
+            if not isinstance(args[i], np.ndarray):
+                args[i] = np.asarray(args[i])
+
+        ret = self.fn(*args)
+
+        if isinstance(ret, list):
+            ret = np.asarray(ret)
+
+        if is_scalar(ret):
+            ret = np.full(len(args[-1]), ret)
+
+        from pybindlibs import cpp
+        # convert numpy array to C++ SubSpan
+        # couples vector init functions to C++
+        return cpp.makePyArrayWrapper(ret)
+
 
 
 def populateDict():
@@ -41,8 +78,7 @@ def populateDict():
     import pybindlibs.dictator as pp
 
     add = pp.add
-    addScalarFunction = getattr(pp, 'addScalarFunction{:d}'.format(simulation.dims)+'D')
-    addVectorFunction = getattr(pp, 'addPyArrayFunction{:d}'.format(simulation.dims)+'D')
+    addInitFunction = getattr(pp, 'addInitFunction{:d}'.format(simulation.dims)+'D')
 
     add("simulation/name", "simulation_test")
     add("simulation/dimension", simulation.dims)
@@ -128,15 +164,13 @@ def populateDict():
         add(pop_path+"{:d}/mass".format(pop_index), float(d["mass"]))
         add(partinit_path+"name", "maxwellian")
 
-        add(partinit_path+"fn_type", "vector")
-
-        addVectorFunction(partinit_path+"density", d["density"])
-        addVectorFunction(partinit_path+"bulk_velocity_x", d["vx"])
-        addVectorFunction(partinit_path+"bulk_velocity_y", d["vy"])
-        addVectorFunction(partinit_path+"bulk_velocity_z", d["vz"])
-        addVectorFunction(partinit_path+"thermal_velocity_x",d["vthx"])
-        addVectorFunction(partinit_path+"thermal_velocity_y",d["vthy"])
-        addVectorFunction(partinit_path+"thermal_velocity_z",d["vthz"])
+        addInitFunction(partinit_path+"density", fn_wrapper(d["density"]))
+        addInitFunction(partinit_path+"bulk_velocity_x", fn_wrapper(d["vx"]))
+        addInitFunction(partinit_path+"bulk_velocity_y", fn_wrapper(d["vy"]))
+        addInitFunction(partinit_path+"bulk_velocity_z", fn_wrapper(d["vz"]))
+        addInitFunction(partinit_path+"thermal_velocity_x",fn_wrapper(d["vthx"]))
+        addInitFunction(partinit_path+"thermal_velocity_y",fn_wrapper(d["vthy"]))
+        addInitFunction(partinit_path+"thermal_velocity_z",fn_wrapper(d["vthz"]))
         add(partinit_path+"nbr_part_per_cell", int(d["nbrParticlesPerCell"]))
         add(partinit_path+"charge", float(d["charge"]))
         add(partinit_path+"basis", "cartesian")
@@ -149,9 +183,9 @@ def populateDict():
 
     add("simulation/electromag/magnetic/name", "B")
     maginit_path = "simulation/electromag/magnetic/initializer/"
-    addScalarFunction(maginit_path+"x_component", modelDict["bx"])
-    addScalarFunction(maginit_path+"y_component", modelDict["by"])
-    addScalarFunction(maginit_path+"z_component", modelDict["bz"])
+    addInitFunction(maginit_path+"x_component", fn_wrapper(modelDict["bx"]))
+    addInitFunction(maginit_path+"y_component", fn_wrapper(modelDict["by"]))
+    addInitFunction(maginit_path+"z_component", fn_wrapper(modelDict["bz"]))
 
     diag_path = "simulation/diagnostics/"
     for diag in simulation.diagnostics:

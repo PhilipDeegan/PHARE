@@ -21,9 +21,10 @@ namespace core
 
 
     public:
-        template<typename FunctionType>
-        static std::unique_ptr<ParticleInitializerT> createType(initializer::PHAREDict& dict)
+        static std::unique_ptr<ParticleInitializerT> create(initializer::PHAREDict& dict)
         {
+            using FunctionType = initializer::InitFunction<dimension>;
+
             auto initializerName = dict["name"].template to<std::string>();
 
             if (initializerName == "maxwellian")
@@ -59,33 +60,23 @@ namespace core
                 if (basisName == "cartesian")
                 {
                     return std::make_unique<
-                        MaxwellianParticleInitializer<ParticleArray, GridLayout, FunctionType>>(
+                        MaxwellianParticleInitializer<ParticleArray, GridLayout>>(
                         density, v, vth, charge, nbrPartPerCell, seed);
                 }
                 else if (basisName == "magnetic")
                 {
                     [[maybe_unused]] Basis basis = Basis::Magnetic;
-                    [[maybe_unused]] auto& bx
-                        = dict["magnetic_x"].template to<initializer::ScalarFunction<dimension>>();
-                    [[maybe_unused]] auto& by
-                        = dict["magnetic_x"].template to<initializer::ScalarFunction<dimension>>();
-                    [[maybe_unused]] auto& bz
-                        = dict["magnetic_x"].template to<initializer::ScalarFunction<dimension>>();
+                    [[maybe_unused]] auto& bx    = dict["magnetic_x"].template to<FunctionType>();
+                    [[maybe_unused]] auto& by    = dict["magnetic_x"].template to<FunctionType>();
+                    [[maybe_unused]] auto& bz    = dict["magnetic_x"].template to<FunctionType>();
 
                     return std::make_unique<
-                        MaxwellianParticleInitializer<ParticleArray, GridLayout, FunctionType>>(
+                        MaxwellianParticleInitializer<ParticleArray, GridLayout>>(
                         density, v, vth, charge, nbrPartPerCell, seed);
                 }
             }
             // TODO throw?
             return nullptr;
-        }
-
-        static std::unique_ptr<ParticleInitializerT> create(initializer::PHAREDict& dict)
-        {
-            if (dict.contains("fn_type") and dict["fn_type"].template to<std::string>() == "vector")
-                return createType<initializer::VectorFunction<dimension>>(dict);
-            return createType<initializer::ScalarFunction<dimension>>(dict);
         }
     };
 

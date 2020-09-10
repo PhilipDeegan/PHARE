@@ -43,12 +43,12 @@ namespace initializer
 
 
     template<typename ReturnType, std::size_t dim>
-    struct VectorFunctionHelper
+    struct InitFunctionHelper
     {
     };
 
     template<>
-    struct VectorFunctionHelper<double, 1>
+    struct InitFunctionHelper<double, 1>
     {
         using return_type = std::shared_ptr<core::Span<double>>;
         using param_type  = std::vector<double> const&;
@@ -56,7 +56,7 @@ namespace initializer
     };
 
     template<>
-    struct VectorFunctionHelper<double, 2>
+    struct InitFunctionHelper<double, 2>
     {
         using return_type = std::shared_ptr<core::Span<double>>;
         using param_type  = std::vector<double> const&;
@@ -64,7 +64,7 @@ namespace initializer
     };
 
     template<>
-    struct VectorFunctionHelper<double, 3>
+    struct InitFunctionHelper<double, 3>
     {
         using return_type = std::shared_ptr<core::Span<double>>;
         using param_type  = std::vector<double> const&;
@@ -72,14 +72,14 @@ namespace initializer
     };
 
     template<std::size_t dim>
-    using VectorFunction = typename VectorFunctionHelper<double, dim>::type;
+    using InitFunction = typename InitFunctionHelper<double, dim>::type;
 
 
 
     using PHAREDict
         = cppdict::Dict<int, double, std::vector<double>, std::size_t, std::optional<std::size_t>,
-                        std::string, ScalarFunction<1>, ScalarFunction<2>, ScalarFunction<3>,
-                        VectorFunction<1>, VectorFunction<2>, VectorFunction<3>>;
+                        std::string, /*ScalarFunction<1>, ScalarFunction<2>, ScalarFunction<3>,*/
+                        InitFunction<1>, InitFunction<2>, InitFunction<3>>;
 
 
 

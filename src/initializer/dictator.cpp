@@ -12,8 +12,7 @@
 
 namespace py = pybind11;
 
-using PHARE::initializer::ScalarFunction;
-using PHARE::initializer::VectorFunction;
+using PHARE::initializer::InitFunction;
 
 
 template<typename T>
@@ -62,13 +61,10 @@ PYBIND11_MODULE(dictator, m)
     m.def("add", add<int>, "add");
     m.def("add", add<double>, "add");
     m.def("add", add<std::string>, "add");
-    m.def("addScalarFunction1D", add<ScalarFunction<1>>, "add");
-    m.def("addScalarFunction2D", add<ScalarFunction<2>>, "add");
-    m.def("addScalarFunction3D", add<ScalarFunction<3>>, "add");
 
-    m.def("addPyArrayFunction1D", add<VectorFunction<1>>, "add");
-    m.def("addPyArrayFunction2D", add<VectorFunction<2>>, "add");
-    m.def("addPyArrayFunction3D", add<VectorFunction<3>>, "add");
+    m.def("addInitFunction1D", add<InitFunction<1>>, "add");
+    m.def("addInitFunction2D", add<InitFunction<2>>, "add");
+    m.def("addInitFunction3D", add<InitFunction<3>>, "add");
 
     m.def("add_array_as_vector", add_array_as_vector<double>, "add_array_as_vector");
 }

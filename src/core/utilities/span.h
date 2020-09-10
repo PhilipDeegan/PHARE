@@ -28,23 +28,27 @@ struct Span
 
 
 template<typename T, typename SIZE = size_t>
-class VectorSpan : public Span<T, SIZE>
+class VectorSpan : public StackVar<std::vector<T>>, public core::Span<T, SIZE>
 {
-    Span<T, SIZE> super(std::size_t size, T value)
-    {
-        vec = std::vector<T>(size, value);
-        return Span<T, SIZE>{vec.data(), vec.size()};
-    }
+    using Super0 = StackVar<std::vector<T>>;
+    using Super1 = core::Span<T, SIZE>;
 
 public:
-    template<typename... Args>
-    VectorSpan(std::size_t size, T value = 0)
-        : Span<T, SIZE>{super(size, value)}
+    VectorSpan(std::size_t size, T value)
+        : Super0{std::vector<T>(size, value)}
+        , Super1{Super0::var.data(), Super0::var.size()}
     {
     }
-
-private:
-    std::vector<T> vec;
+    VectorSpan(std::vector<T>&& vec_)
+        : Super0{std::move(vec_)}
+        , Super1{Super0::var.data(), Super0::var.size()}
+    {
+    }
+    VectorSpan(std::vector<T> const& vec_)
+        : Super0{vec_}
+        , Super1{Super0::var.data(), Super0::var.size()}
+    {
+    }
 };
 
 

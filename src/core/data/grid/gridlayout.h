@@ -188,88 +188,96 @@ namespace core
         }
 
 
-        template<typename Centering, typename StartToEnd>
-        auto gridVectors(DimConst<1>, Centering const& centering,
-                         StartToEnd const&& startToEnd) const
+        template<typename Centering, typename StartToEnd, typename CoodsFn>
+        auto gridVectors(DimConst<1>, Centering const& centering, StartToEnd const&& startToEnd,
+                         CoodsFn const& coordsFn, std::size_t const plus) const
         {
             auto const [ix0, ix1] = startToEnd(centering, Direction::X);
 
-            std::size_t nCells = (ix1 - ix0);
+            std::size_t nCells = (ix1 - ix0 + plus);
             std::vector<double> x(nCells);
 
             std::size_t cell_idx = 0;
-            for (std::uint32_t ix = ix0; ix < ix1; ++ix)
-                x[cell_idx++] = cellCenteredCoordinates(ix)[0];
+            for (std::uint32_t ix = ix0; ix < ix1 + plus; ++ix)
+                x[cell_idx++] = coordsFn(ix)[0];
 
+            assert(cell_idx == nCells);
             return std::make_tuple(std::move(x));
         }
 
-        template<typename Centering, typename StartToEnd>
-        auto gridVectors(DimConst<2>, Centering const& centering,
-                         StartToEnd const&& startToEnd) const
+        template<typename Centering, typename StartToEnd, typename CoodsFn>
+        auto gridVectors(DimConst<2>, Centering const& centering, StartToEnd const&& startToEnd,
+                         CoodsFn const& coordsFn, std::size_t const plus) const
         {
             auto const [ix0, ix1] = startToEnd(centering, Direction::X);
             auto const [iy0, iy1] = startToEnd(centering, Direction::Y);
 
-            std::size_t nCells = (ix1 - ix0) * (iy1 - iy0);
+            std::size_t nCells = (ix1 - ix0 + plus) * (iy1 - iy0 + plus);
             std::vector<double> x(nCells), y(nCells);
 
             std::size_t cell_idx = 0;
-            for (std::uint32_t ix = ix0; ix < ix1; ++ix)
-                for (std::uint32_t iy = iy0; iy < iy1; ++iy)
+            for (std::uint32_t ix = ix0; ix < ix1 + plus; ++ix)
+                for (std::uint32_t iy = iy0; iy < iy1 + plus; ++iy)
                 {
-                    auto coord  = cellCenteredCoordinates(ix, iy);
+                    auto coord  = coordsFn(ix, iy);
                     x[cell_idx] = coord[0];
                     y[cell_idx] = coord[1];
                     cell_idx++;
                 }
-
+            assert(cell_idx == nCells);
             return std::make_tuple(std::move(x), std::move(y));
         }
 
-        template<typename Centering, typename StartToEnd>
-        auto gridVectors(DimConst<3>, Centering const& centering,
-                         StartToEnd const&& startToEnd) const
+        template<typename Centering, typename StartToEnd, typename CoodsFn>
+        auto gridVectors(DimConst<3>, Centering const& centering, StartToEnd const&& startToEnd,
+                         CoodsFn const& coordsFn, std::size_t const plus) const
         {
             auto const [ix0, ix1] = startToEnd(centering, Direction::X);
             auto const [iy0, iy1] = startToEnd(centering, Direction::Y);
             auto const [iz0, iz1] = startToEnd(centering, Direction::Z);
 
-            std::size_t nCells = (ix1 - ix0) * (iy1 - iy0) * (iz1 - iz0);
+            std::size_t nCells = (ix1 - ix0 + plus) * (iy1 - iy0 + plus) * (iz1 - iz0 + plus);
             std::vector<double> x(nCells), y(nCells), z(nCells);
 
             std::size_t cell_idx = 0;
-            for (std::uint32_t ix = ix0; ix < ix1; ++ix)
-                for (std::uint32_t iy = iy0; iy < iy1; ++iy)
-                    for (std::uint32_t iz = iz0; iz < iz1; ++iz)
+            for (std::uint32_t ix = ix0; ix < ix1 + plus; ++ix)
+                for (std::uint32_t iy = iy0; iy < iy1 + plus; ++iy)
+                    for (std::uint32_t iz = iz0; iz < iz1 + plus; ++iz)
                     {
-                        auto coord  = cellCenteredCoordinates(ix, iy, iz);
+                        auto coord  = coordsFn(ix, iy, iz);
                         x[cell_idx] = coord[0];
                         y[cell_idx] = coord[1];
                         z[cell_idx] = coord[2];
                         cell_idx++;
                     }
-
+            assert(cell_idx == nCells);
             return std::make_tuple(std::move(x), std::move(y), std::move(z));
         }
 
-        template<typename Centering>
-        auto domainGridVectors(Centering const& centering) const
+        template<typename Centering, typename CoodsFn>
+        auto domainGrids(Centering const& centering, CoodsFn const&& coordsFn,
+                         std::size_t const plus = 0) const
         {
-            return gridVectors(DimConst<dimension>{}, centering,
-                               [this](auto const& centering_, auto direction) {
-                                   return this->physicalStartToEnd(centering_, direction);
-                               });
+            return gridVectors(
+                DimConst<dimension>{}, centering,
+                [&](auto const& centering_, auto const direction) {
+                    return this->physicalStartToEnd(centering_, direction);
+                },
+                coordsFn, plus);
         }
 
-        template<typename Centering>
-        auto ghostGridVectors(Centering const& centering) const
+        template<typename Centering, typename CoodsFn>
+        auto ghostGrids(Centering const& centering, CoodsFn const&& coordsFn,
+                        std::size_t const plus = 0) const
         {
-            return gridVectors(DimConst<dimension>{}, centering,
-                               [this](auto const& centering_, auto direction) {
-                                   return this->ghostStartToEnd(centering_, direction);
-                               });
+            return gridVectors(
+                DimConst<dimension>{}, centering,
+                [&](auto const& centering_, auto const direction) {
+                    return this->ghostStartToEnd(centering_, direction);
+                },
+                coordsFn, plus);
         }
+
 
 
         double cellVolume() const
