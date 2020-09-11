@@ -1,9 +1,10 @@
 #ifndef PHARE_TEST_INITIALIZER_INIT_FUNCTIONS_H
 #define PHARE_TEST_INITIALIZER_INIT_FUNCTIONS_H
 
+#include <memory>
+#include <vector>
 
-#include "initializer/data_provider.h"
-
+#include "core/utilities/span.h"
 
 namespace PHARE::initializer::test_fn::func_1d
 {

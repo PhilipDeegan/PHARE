@@ -48,14 +48,10 @@ class fn_wrapper:
         self.fn = fn
 
     def __call__(self, *xyz):
-        args = list(xyz)
+        args = []
 
-        if all([is_scalar(arg) for arg in args]):
-            return self.fn(*args)
-
-        for i, arg in enumerate(args):
-            if not isinstance(args[i], np.ndarray):
-                args[i] = np.asarray(args[i])
+        for i, arg in enumerate(xyz):
+            args.append(np.asarray(arg))
 
         ret = self.fn(*args)
 

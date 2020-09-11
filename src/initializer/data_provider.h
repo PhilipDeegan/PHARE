@@ -15,34 +15,6 @@ namespace PHARE
 namespace initializer
 {
     template<typename ReturnType, std::size_t dim>
-    struct ScalarFunctionHelper
-    {
-    };
-
-    template<>
-    struct ScalarFunctionHelper<double, 1>
-    {
-        using type = std::function<double(double)>;
-    };
-
-    template<>
-    struct ScalarFunctionHelper<double, 2>
-    {
-        using type = std::function<double(double, double)>;
-    };
-
-    template<>
-    struct ScalarFunctionHelper<double, 3>
-    {
-        using type = std::function<double(double, double, double)>;
-    };
-
-
-    template<std::size_t dim>
-    using ScalarFunction = typename ScalarFunctionHelper<double, dim>::type;
-
-
-    template<typename ReturnType, std::size_t dim>
     struct InitFunctionHelper
     {
     };
@@ -78,8 +50,7 @@ namespace initializer
 
     using PHAREDict
         = cppdict::Dict<int, double, std::vector<double>, std::size_t, std::optional<std::size_t>,
-                        std::string, /*ScalarFunction<1>, ScalarFunction<2>, ScalarFunction<3>,*/
-                        InitFunction<1>, InitFunction<2>, InitFunction<3>>;
+                        std::string, InitFunction<1>, InitFunction<2>, InitFunction<3>>;
 
 
 
