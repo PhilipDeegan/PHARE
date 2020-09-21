@@ -42,17 +42,17 @@ namespace core
                                   initializer::InitFunction<1> const& init)
         {
             auto const [ix0, ix1] = layout.ghostStartToEnd(field, Direction::X);
-            auto const [x]        = layout.ghostGrids(
+            auto const [x]        = layout.template ghostGrids</*ByField=*/true>(
                 field,
-                [&](auto const&... args) {
-                    return layout.fieldNodeCoordinates(field, layout.origin(), args...);
+                [](auto& gridLayout, auto& field_, auto const&... args) {
+                    return gridLayout.fieldNodeCoordinates(field_, gridLayout.origin(), args...);
                 },
                 /*plus=*/1);
             assert(x.size() == (ix1 - ix0 + 1));
 
-            auto gridPtr     = init(x);
-            auto& grid       = *gridPtr;
-            std::size_t cell = 0;
+            std::shared_ptr<Span<double>> gridPtr = init(x); // keep grid data alive
+            Span<double>& grid                    = *gridPtr;
+            std::size_t cell                      = 0;
             for (std::uint32_t ix = ix0; ix <= ix1; ++ix)
                 field(ix) = grid[cell++];
         }
@@ -62,17 +62,17 @@ namespace core
         {
             auto const [ix0, ix1] = layout.ghostStartToEnd(field, Direction::X);
             auto const [iy0, iy1] = layout.ghostStartToEnd(field, Direction::Y);
-            auto const [x, y]     = layout.ghostGrids(
+            auto const [x, y]     = layout.template ghostGrids</*ByField=*/true>(
                 field,
-                [&](auto const&... args) {
-                    return layout.fieldNodeCoordinates(field, layout.origin(), args...);
+                [](auto& gridLayout, auto& field_, auto const&... args) {
+                    return gridLayout.fieldNodeCoordinates(field_, gridLayout.origin(), args...);
                 },
                 /*plus=*/1);
             assert(x.size() == (ix1 - ix0 + 1) * (iy1 - iy0 + 1));
 
-            auto gridPtr     = init(x, y);
-            auto& grid       = *gridPtr;
-            std::size_t cell = 0;
+            std::shared_ptr<Span<double>> gridPtr = init(x, y);
+            Span<double>& grid                    = *gridPtr;
+            std::size_t cell                      = 0;
             for (std::uint32_t ix = ix0; ix <= ix1; ++ix)
                 for (std::uint32_t iy = iy0; iy <= iy1; ++iy)
                     field(ix, iy) = grid[cell++];
@@ -84,17 +84,17 @@ namespace core
             auto const [ix0, ix1] = layout.ghostStartToEnd(field, Direction::X);
             auto const [iy0, iy1] = layout.ghostStartToEnd(field, Direction::Y);
             auto const [iz0, iz1] = layout.ghostStartToEnd(field, Direction::Z);
-            auto const [x, y, z]  = layout.ghostGrids(
+            auto const [x, y, z]  = layout.template ghostGrids</*ByField=*/true>(
                 field,
-                [&](auto const&... args) {
-                    return layout.fieldNodeCoordinates(field, layout.origin(), args...);
+                [](auto& gridLayout, auto& field_, auto const&... args) {
+                    return gridLayout.fieldNodeCoordinates(field_, gridLayout.origin(), args...);
                 },
                 /*plus=*/1);
             assert(x.size() == (ix1 - ix0 + 1) * (iy1 - iy0 + 1) * (iz1 - iz0 + 1));
 
-            auto gridPtr     = init(x, y, z);
-            auto& grid       = *gridPtr;
-            std::size_t cell = 0;
+            std::shared_ptr<Span<double>> gridPtr = init(x, y, z);
+            Span<double>& grid                    = *gridPtr;
+            std::size_t cell                      = 0;
             for (std::uint32_t ix = ix0; ix <= ix1; ++ix)
                 for (std::uint32_t iy = iy0; iy <= iy1; ++iy)
                     for (std::uint32_t iz = iz0; iz <= iz1; ++iz)

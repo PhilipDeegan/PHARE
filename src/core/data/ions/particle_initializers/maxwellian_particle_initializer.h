@@ -154,9 +154,10 @@ void MaxwellianParticleInitializer<ParticleArray, GridLayout>::loadParticlesND(
     initializer::InitFunction<1> const&, Particles& particles, GridLayout const& layout) const
 {
     auto const [ix0, ix1] = layout.physicalStartToEnd(QtyCentering::primal, Direction::X);
-    auto const [x]        = layout.domainGrids(QtyCentering::primal, [&](auto const&... args) {
-        return layout.cellCenteredCoordinates(args...);
-    });
+    auto const [x]
+        = layout.domainGrids(QtyCentering::primal, [](auto& gridLayout, auto const&... args) {
+              return gridLayout.cellCenteredCoordinates(args...);
+          });
 
     assert(x.size() == (ix1 - ix0));
 
@@ -212,9 +213,10 @@ void MaxwellianParticleInitializer<ParticleArray, GridLayout>::loadParticlesND(
 {
     auto const [ix0, ix1] = layout.physicalStartToEnd(QtyCentering::primal, Direction::X);
     auto const [iy0, iy1] = layout.physicalStartToEnd(QtyCentering::primal, Direction::Y);
-    auto const [x, y]     = layout.domainGrids(QtyCentering::primal, [&](auto const&... args) {
-        return layout.cellCenteredCoordinates(args...);
-    });
+    auto const [x, y]
+        = layout.domainGrids(QtyCentering::primal, [](auto& gridLayout, auto const&... args) {
+              return gridLayout.cellCenteredCoordinates(args...);
+          });
 
     assert(x.size() == y.size());
     particles.reserve(x.size() * nbrParticlePerCell_);
@@ -272,9 +274,10 @@ void MaxwellianParticleInitializer<ParticleArray, GridLayout>::loadParticlesND(
     auto const [ix0, ix1] = layout.physicalStartToEnd(QtyCentering::primal, Direction::X);
     auto const [iy0, iy1] = layout.physicalStartToEnd(QtyCentering::primal, Direction::Y);
     auto const [iz0, iz1] = layout.physicalStartToEnd(QtyCentering::primal, Direction::Z);
-    auto const [x, y, z]  = layout.domainGrids(QtyCentering::primal, [&](auto const&... args) {
-        return layout.cellCenteredCoordinates(args...);
-    });
+    auto const [x, y, z]
+        = layout.domainGrids(QtyCentering::primal, [](auto& gridLayout, auto const&... args) {
+              return gridLayout.cellCenteredCoordinates(args...);
+          });
 
     assert(x.size() == y.size() and y.size() == z.size());
     particles.reserve(x.size() * nbrParticlePerCell_);
