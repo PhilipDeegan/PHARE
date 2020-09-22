@@ -187,6 +187,77 @@ namespace core
             return physicalStartToEnd(field.physicalQuantity(), direction);
         }
 
+        static constexpr auto _indice_tuple() // type deduction doesn't get used anywhere
+        {
+            using Param = std::uint32_t;
+            if constexpr (dimension == 1)
+                return std::tuple<Param>{};
+            if constexpr (dimension == 2)
+                return std::tuple<Param, Param>{};
+            if constexpr (dimension == 3)
+                return std::tuple<Param, Param, Param>{};
+        }
+
+        template<typename Centering, typename StartToEnd>
+        auto _StartToEndIndices(Centering const& centering, StartToEnd const&& startToEnd,
+                                std::size_t const plus = 0) const
+        {
+            std::vector<decltype(_indice_tuple())> indices;
+
+            auto const [ix0, ix1] = startToEnd(centering, Direction::X);
+
+            for (auto ix = ix0; ix < ix1 + plus; ++ix)
+            {
+                if constexpr (dimension > 1)
+                {
+                    auto const [iy0, iy1] = startToEnd(centering, Direction::Y);
+
+                    for (auto iy = iy0; iy < iy1 + plus; ++iy)
+                    {
+                        if constexpr (dimension > 2)
+                        {
+                            auto const [iz0, iz1] = startToEnd(centering, Direction::Z);
+
+                            for (auto iz = iz0; iz < iz1 + plus; ++iz)
+                                indices.emplace_back(std::make_tuple(ix, iy, iz));
+                        }
+                        else // 2D
+                        {
+                            indices.emplace_back(std::make_tuple(ix, iy));
+                        }
+                    }
+                }
+                else // 1D
+                {
+                    indices.emplace_back(std::make_tuple(ix));
+                }
+            }
+            return indices;
+        }
+
+
+        template<typename Centering>
+        auto physicalStartToEndIndices(Centering const& centering, std::size_t const plus = 0) const
+        {
+            return _StartToEndIndices(
+                centering,
+                [&](auto const& centering_, auto const direction) {
+                    return this->physicalStartToEnd(centering_, direction);
+                },
+                plus);
+        }
+
+        template<typename Centering>
+        auto ghostStartToEndIndices(Centering const& centering, std::size_t const plus = 0) const
+        {
+            return _StartToEndIndices(
+                centering,
+                [&](auto const& centering_, auto const direction) {
+                    return this->ghostStartToEnd(centering_, direction);
+                },
+                plus);
+        }
+
         template<bool ByField, typename Centering, typename CoordsFn, typename... Args>
         auto inline gridCoords([[maybe_unused]] Centering const& centering,
                                CoordsFn const& coordsFn, Args const&... args) const
@@ -197,94 +268,39 @@ namespace core
                 return coordsFn(*this, args...);
         }
 
-        template<bool ByField, typename Centering, typename StartToEnd, typename CoordsFn>
-        auto gridVectors(DimConst<1>, Centering const& centering, StartToEnd const&& startToEnd,
-                         CoordsFn const&& coordsFn, std::size_t const plus) const
+        static constexpr auto _coord_tuple()
         {
-            auto const [ix0, ix1] = startToEnd(centering, Direction::X);
-
-            std::size_t nCells = (ix1 - ix0 + plus);
-            std::vector<double> x(nCells);
-
-            std::size_t cell_idx = 0;
-            for (std::uint32_t ix = ix0; ix < ix1 + plus; ++ix)
-                x[cell_idx++] = gridCoords<ByField>(centering, coordsFn, ix)[0];
-
-            assert(cell_idx == nCells);
-            return std::make_tuple(std::move(x));
+            using Param = std::vector<double>;
+            if constexpr (dimension == 1)
+                return std::tuple<Param>{};
+            if constexpr (dimension == 2)
+                return std::tuple<Param, Param>{};
+            if constexpr (dimension == 3)
+                return std::tuple<Param, Param, Param>{};
         }
 
-        template<bool ByField, typename Centering, typename StartToEnd, typename CoordsFn>
-        auto gridVectors(DimConst<2>, Centering const& centering, StartToEnd const&& startToEnd,
-                         CoordsFn const&& coordsFn, std::size_t const plus) const
+        template<bool ByField = false, typename Indices, typename Centering, typename CoordsFn>
+        auto gridVectors(Indices const& indices, Centering const& centering,
+                         CoordsFn const&& coordsFn) const
         {
-            auto const [ix0, ix1] = startToEnd(centering, Direction::X);
-            auto const [iy0, iy1] = startToEnd(centering, Direction::Y);
+            auto emplace_back = [](auto& vectors, auto const&& point) {
+                std::get<0>(vectors).emplace_back(point[0]);
+                if constexpr (dimension > 1)
+                    std::get<1>(vectors).emplace_back(point[1]);
+                if constexpr (dimension > 2)
+                    std::get<2>(vectors).emplace_back(point[2]);
+            };
 
-            std::size_t nCells = (ix1 - ix0 + plus) * (iy1 - iy0 + plus);
-            std::vector<double> x(nCells), y(nCells);
+            auto xyz = _coord_tuple();
 
-            std::size_t cell_idx = 0;
-            for (std::uint32_t ix = ix0; ix < ix1 + plus; ++ix)
-                for (std::uint32_t iy = iy0; iy < iy1 + plus; ++iy)
-                {
-                    auto coord  = gridCoords<ByField>(centering, coordsFn, ix, iy);
-                    x[cell_idx] = coord[0];
-                    y[cell_idx] = coord[1];
-                    cell_idx++;
-                }
-            assert(cell_idx == nCells);
-            return std::make_tuple(std::move(x), std::move(y));
-        }
+            for (const auto& indiceTuple : indices)
+                std::apply(
+                    [&](auto const&... args) {
+                        emplace_back(xyz, gridCoords<ByField>(centering, coordsFn, args...));
+                    },
+                    indiceTuple);
 
-        template<bool ByField, typename Centering, typename StartToEnd, typename CoordsFn>
-        auto gridVectors(DimConst<3>, Centering const& centering, StartToEnd const&& startToEnd,
-                         CoordsFn const&& coordsFn, std::size_t const plus) const
-        {
-            auto const [ix0, ix1] = startToEnd(centering, Direction::X);
-            auto const [iy0, iy1] = startToEnd(centering, Direction::Y);
-            auto const [iz0, iz1] = startToEnd(centering, Direction::Z);
-
-            std::size_t nCells = (ix1 - ix0 + plus) * (iy1 - iy0 + plus) * (iz1 - iz0 + plus);
-            std::vector<double> x(nCells), y(nCells), z(nCells);
-
-            std::size_t cell_idx = 0;
-            for (std::uint32_t ix = ix0; ix < ix1 + plus; ++ix)
-                for (std::uint32_t iy = iy0; iy < iy1 + plus; ++iy)
-                    for (std::uint32_t iz = iz0; iz < iz1 + plus; ++iz)
-                    {
-                        auto coord  = gridCoords<ByField>(centering, coordsFn, ix, iy, iz);
-                        x[cell_idx] = coord[0];
-                        y[cell_idx] = coord[1];
-                        z[cell_idx] = coord[2];
-                        cell_idx++;
-                    }
-            assert(cell_idx == nCells);
-            return std::make_tuple(std::move(x), std::move(y), std::move(z));
-        }
-
-        template<bool ByField = false, typename Centering, typename CoordsFn>
-        auto domainGrids(Centering const& centering, CoordsFn const&& coordsFn,
-                         std::size_t const plus = 0) const
-        {
-            return gridVectors<ByField>(
-                DimConst<dimension>{}, centering,
-                [&](auto const& centering_, auto const direction) {
-                    return this->physicalStartToEnd(centering_, direction);
-                },
-                std::forward<CoordsFn const>(coordsFn), plus);
-        }
-
-        template<bool ByField = false, typename Centering, typename CoordsFn>
-        auto ghostGrids(Centering const& centering, CoordsFn const&& coordsFn,
-                        std::size_t const plus = 0) const
-        {
-            return gridVectors<ByField>(
-                DimConst<dimension>{}, centering,
-                [&](auto const& centering_, auto const direction) {
-                    return this->ghostStartToEnd(centering_, direction);
-                },
-                std::forward<CoordsFn const>(coordsFn), plus);
+            return xyz;
         }
 
 
