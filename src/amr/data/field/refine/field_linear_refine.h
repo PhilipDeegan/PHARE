@@ -24,7 +24,7 @@ namespace amr
     using core::dirY;
     using core::dirZ;
 
-    template<std::size_t dimension>
+    template<typename Float, std::size_t dimension>
     class FieldRefineIndexesAndWeights
     {
     public:
@@ -37,7 +37,8 @@ namespace amr
         FieldRefineIndexesAndWeights(std::array<core::QtyCentering, dimension> const& centerings,
                                      SAMRAI::hier::IntVector const& ratio)
             : ratio_{ratio}
-            , weighters_{make_weighters(centerings, ratio, std::make_index_sequence<dimension>{})}
+            , weighters_{
+                  make_weighters<Float>(centerings, ratio, std::make_index_sequence<dimension>{})}
 
         {
             // this shift will be use to determine which coarseIndexe we take
@@ -66,21 +67,20 @@ namespace amr
             auto coarseIndex{fineIndex};
 
             // here we perform the floating point division, and then we truncate to integer
-            coarseIndex[dirX]
-                = std::floor(static_cast<double>(fineIndex[dirX] + shifts_[dirX]) / ratio_(dirX)
-                             - shifts_[dirX]);
+            coarseIndex[dirX] = std::floor(
+                static_cast<Float>(fineIndex[dirX] + shifts_[dirX]) / ratio_(dirX) - shifts_[dirX]);
 
             if constexpr (dimension > 1)
             {
                 coarseIndex[dirY]
-                    = std::floor(static_cast<double>(fineIndex[dirY] + shifts_[dirY]) / ratio_(dirY)
+                    = std::floor(static_cast<Float>(fineIndex[dirY] + shifts_[dirY]) / ratio_(dirY)
                                  - shifts_[dirY]);
             }
 
             if constexpr (dimension > 2)
             {
                 coarseIndex[dirZ]
-                    = std::floor(static_cast<double>(fineIndex[dirZ] + shifts_[dirZ]) / ratio_(dirZ)
+                    = std::floor(static_cast<Float>(fineIndex[dirZ] + shifts_[dirZ]) / ratio_(dirZ)
                                  - shifts_[dirZ]);
             }
 
@@ -90,7 +90,7 @@ namespace amr
 
 
 
-        typename LinearWeighter::FineIndexWeights const& weights(core::Direction dir) const
+        typename LinearWeighter<Float>::FineIndexWeights const& weights(core::Direction dir) const
         {
             return weighters_[static_cast<std::size_t>(dir)].weights();
         }
@@ -121,8 +121,8 @@ namespace amr
 
     private:
         SAMRAI::hier::IntVector const ratio_;
-        std::array<LinearWeighter, dimension> weighters_;
-        core::Point<double, dimension> shifts_;
+        std::array<LinearWeighter<Float>, dimension> weighters_;
+        core::Point<Float, dimension> shifts_;
     };
 
 } // namespace amr

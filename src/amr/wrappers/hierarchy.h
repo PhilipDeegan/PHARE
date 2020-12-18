@@ -28,12 +28,13 @@ namespace PHARE::amr
  * @brief The Hierarchy class is a wrapper of the SAMRAI hierarchy
  * so that users do not have to use SAMRAI types
  */
+template<typename Float>
 class Hierarchy : public SAMRAI::hier::PatchHierarchy
 {
 public:
     static auto make();
-    auto const& cellWidth() const { return cellWidth_; }
     auto const& domainBox() const { return domainBox_; }
+    auto const& cellWidth() const { return cellWidth_; }
     auto const& origin() const { return origin_; }
 
 protected:
@@ -41,13 +42,13 @@ protected:
     Hierarchy(std::shared_ptr<SAMRAI::geom::CartesianGridGeometry>&& geo, //
               std::shared_ptr<SAMRAI::tbox::MemoryDatabase>&& db,         //
               std::array<int, dimension> const domainBox,                 //
-              std::array<double, dimension> const origin,                 //
-              std::array<double, dimension> const cellWidth);
+              std::array<Float, dimension> const origin,                  //
+              std::array<Float, dimension> const cellWidth);
 
 private:
-    std::vector<double> const cellWidth_;
     std::vector<int> const domainBox_;
-    std::vector<double> const origin_;
+    std::vector<Float> const cellWidth_;
+    std::vector<Float> const origin_;
 };
 
 
@@ -57,8 +58,8 @@ private:
  * @brief DimHierarchy is the concrete type of Hierarchy
  * that is built from runtime parameters in the dict.
  */
-template<std::size_t _dimension>
-class DimHierarchy : public Hierarchy
+template<typename Float, std::size_t _dimension>
+class DimHierarchy : public Hierarchy<Float>
 {
     auto shapeToBox(std::array<int, _dimension> const domainBoxShape)
     {
@@ -79,11 +80,16 @@ public:
  * @brief HierarchyMaker is te functor used by makeAtRunTime to build
  * a Hierarchy.
  */
+template<typename Float_>
 struct HierarchyMaker
 {
+    using Float = Float_;
+
     HierarchyMaker(PHARE::initializer::PHAREDict& dict_);
+
     template<typename Dimension>
-    std::shared_ptr<Hierarchy> operator()(std::size_t userDim, Dimension dimension);
+    std::shared_ptr<Hierarchy<Float>> operator()(std::size_t userDim, Dimension dimension);
+
     PHARE::initializer::PHAREDict& dict;
 };
 
@@ -94,18 +100,21 @@ struct HierarchyMaker
 //                       HierarchyMaker Definitions
 //-----------------------------------------------------------------------------
 
-inline HierarchyMaker::HierarchyMaker(PHARE::initializer::PHAREDict& dict_)
+template<typename Float>
+inline HierarchyMaker<Float>::HierarchyMaker(PHARE::initializer::PHAREDict& dict_)
     : dict{dict_}
 {
 }
 
 
+template<typename Float>
 template<typename Dimension>
-std::shared_ptr<Hierarchy> HierarchyMaker::operator()(std::size_t userDim, Dimension dimension)
+std::shared_ptr<Hierarchy<Float>> HierarchyMaker<Float>::operator()(std::size_t userDim,
+                                                                    Dimension dimension)
 {
     if (userDim == dimension())
     {
-        return std::make_shared<DimHierarchy<dimension()>>(dict);
+        return std::make_shared<DimHierarchy<Float, dimension()>>(dict);
     }
     return nullptr;
 }
@@ -116,24 +125,26 @@ std::shared_ptr<Hierarchy> HierarchyMaker::operator()(std::size_t userDim, Dimen
 //-----------------------------------------------------------------------------
 
 
-inline auto Hierarchy::make()
+template<typename Float>
+inline auto Hierarchy<Float>::make()
 {
     PHARE::initializer::PHAREDict& theDict
         = PHARE::initializer::PHAREDictHandler::INSTANCE().dict();
     auto dim = theDict["simulation"]["dimension"].template to<int>();
-    return core::makeAtRuntime<HierarchyMaker>(dim, HierarchyMaker{theDict});
+    return core::makeAtRuntime<Float, HierarchyMaker<Float>>(dim, HierarchyMaker<Float>{theDict});
 }
 
 
+template<typename Float>
 template<std::size_t dimension>
-Hierarchy::Hierarchy(std::shared_ptr<SAMRAI::geom::CartesianGridGeometry>&& geo, //
-                     std::shared_ptr<SAMRAI::tbox::MemoryDatabase>&& db,         //
-                     std::array<int, dimension> const domainBox,                 //
-                     std::array<double, dimension> const origin,                 //
-                     std::array<double, dimension> const cellWidth)
+Hierarchy<Float>::Hierarchy(std::shared_ptr<SAMRAI::geom::CartesianGridGeometry>&& geo, //
+                            std::shared_ptr<SAMRAI::tbox::MemoryDatabase>&& db,         //
+                            std::array<int, dimension> const domainBox,                 //
+                            std::array<Float, dimension> const origin,                  //
+                            std::array<Float, dimension> const cellWidth)
     : SAMRAI::hier::PatchHierarchy{"PHARE_hierarchy", geo, db}
-    , cellWidth_(cellWidth.data(), cellWidth.data() + dimension)
     , domainBox_(domainBox.data(), domainBox.data() + dimension)
+    , cellWidth_(cellWidth.data(), cellWidth.data() + dimension)
     , origin_(origin.data(), origin.data() + dimension)
 {
 }
@@ -166,25 +177,25 @@ auto parseDimXYZType(PHARE::initializer::PHAREDict& grid, std::string key)
     return arr;
 }
 
-template<std::size_t dimension>
+template<typename Float, std::size_t dimension>
 void getDomainCoords(PHARE::initializer::PHAREDict& grid, float lower[dimension],
                      float upper[dimension])
 {
     static_assert(dimension > 0 and dimension <= 3, "invalid dimension should be >0 and <=3");
 
     auto nbr_cells = parseDimXYZType<int, dimension>(grid, "nbr_cells");
-    auto mesh_size = parseDimXYZType<double, dimension>(grid, "meshsize");
-    auto origin    = parseDimXYZType<double, dimension>(grid, "origin");
+    auto mesh_size = parseDimXYZType<Float, dimension>(grid, "meshsize");
+    auto origin    = parseDimXYZType<Float, dimension>(grid, "origin");
 
     for (std::size_t i = 0; i < dimension; i++)
     {
         lower[i] = static_cast<float>(origin[i]);
-        upper[i] = static_cast<float>(lower[i] + nbr_cells[i] * mesh_size[i]);
+        upper[i] = static_cast<float>(lower[i] + nbr_cells[i] * static_cast<float>(mesh_size[i]));
     }
 }
 
 
-template<std::size_t dimension>
+template<typename Float, std::size_t dimension>
 auto griddingAlgorithmDatabase(PHARE::initializer::PHAREDict& grid)
 {
     static_assert(dimension > 0 and dimension <= 3, "invalid dimension should be >0 and <=3");
@@ -212,7 +223,7 @@ auto griddingAlgorithmDatabase(PHARE::initializer::PHAREDict& grid)
 
     {
         float lowerCoord[dimension], upperCoord[dimension];
-        getDomainCoords<dimension>(grid, lowerCoord, upperCoord);
+        getDomainCoords<Float, dimension>(grid, lowerCoord, upperCoord);
         db->putFloatArray("x_lo", lowerCoord, dimension);
         db->putFloatArray("x_up", upperCoord, dimension);
     }
@@ -222,6 +233,7 @@ auto griddingAlgorithmDatabase(PHARE::initializer::PHAREDict& grid)
     db->putIntegerArray("periodic_dimension", periodicity, dimension);
     return db;
 }
+
 
 
 /*
@@ -301,7 +313,8 @@ auto patchHierarchyDatabase(PHARE::initializer::PHAREDict& amr)
 }
 
 
-
+/*
+<<<<<<< HEAD
 template<std::size_t _dimension>
 DimHierarchy<_dimension>::DimHierarchy(PHARE::initializer::PHAREDict dict)
     : Hierarchy(
@@ -312,6 +325,18 @@ DimHierarchy<_dimension>::DimHierarchy(PHARE::initializer::PHAREDict dict)
         shapeToBox(parseDimXYZType<int, dimension>(dict["simulation"]["grid"], "nbr_cells")),
         parseDimXYZType<double, dimension>(dict["simulation"]["grid"], "origin"),
         parseDimXYZType<double, dimension>(dict["simulation"]["grid"], "meshsize"))
+=======*/
+template<typename Float, std::size_t _dimension>
+DimHierarchy<Float, _dimension>::DimHierarchy(PHARE::initializer::PHAREDict dict)
+    : Hierarchy<Float>(
+        std::make_shared<SAMRAI::geom::CartesianGridGeometry>(
+            SAMRAI::tbox::Dimension{dimension}, "CartesianGridGeom",
+            griddingAlgorithmDatabase<Float, dimension>(dict["simulation"]["grid"])),
+        patchHierarchyDatabase<dimension>(dict["simulation"]["AMR"]),
+        shapeToBox(parseDimXYZType<int, dimension>(dict["simulation"]["grid"], "nbr_cells")),
+        parseDimXYZType<Float, dimension>(dict["simulation"]["grid"], "origin"),
+        parseDimXYZType<Float, dimension>(dict["simulation"]["grid"], "meshsize"))
+// >>>>>>> b70646f (...)
 {
 }
 

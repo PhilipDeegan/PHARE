@@ -7,14 +7,14 @@ class DataWrangler:
     def __init__(self, simulator):
         from .. import pharein as ph
         from pybindlibs import cpp
+        from pyphare.cpp import cpp_float_id
 
         self.dim = ph.global_vars.sim.ndim
         self.interp = ph.global_vars.sim.interp_order
         self.refined_particle_nbr = ph.global_vars.sim.refined_particle_nbr
-        self.cpp = getattr(
-            cpp,
-            "DataWrangler_" + str(self.dim) + "_" + str(self.interp)+ "_" + str(self.refined_particle_nbr),
-        )(simulator.cpp_sim, simulator.cpp_hier)
+        cpp_float_str = cpp_float_id(simulator.simulation.dtype)
+        cpp_str = "DataWrangler_" + str(self.dim) + "_" + str(self.interp)+ "_" + str(self.refined_particle_nbr) + "_" + cpp_float_str
+        self.cpp = getattr(cpp, cpp_str)(simulator.cpp_sim, simulator.cpp_hier)
 
     def kill(self):
         del self.cpp

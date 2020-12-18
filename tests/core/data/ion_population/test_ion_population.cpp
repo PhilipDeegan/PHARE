@@ -19,14 +19,19 @@ using namespace PHARE::initializer;
 
 struct DummyField
 {
+    using float_type = double;
 };
 
 
 struct DummyVecField
 {
     static constexpr std::size_t dimension = 1;
-    using field_type                       = DummyField;
-    DummyVecField(std::string name, [[maybe_unused]] HybridQuantity::Vector v) { (void)name; }
+
+    using field_type = DummyField;
+    using float_type = double;
+
+    DummyVecField(std::string name, HybridQuantity::Vector /*v*/) { (void)name; }
+
     bool isUsable() const { return false; }
     bool isSettable() const { return true; }
 };
@@ -52,7 +57,7 @@ PHAREDict getDict()
 
 struct AnIonPopulation : public ::testing::Test
 {
-    IonPopulation<ParticleArray<1>, DummyVecField, DummyLayout> protons{getDict()};
+    IonPopulation<ParticleArray<double, 1>, DummyVecField, DummyLayout> protons{getDict()};
     virtual ~AnIonPopulation();
 };
 

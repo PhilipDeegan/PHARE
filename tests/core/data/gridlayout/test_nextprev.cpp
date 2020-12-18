@@ -17,7 +17,8 @@ protected:
 };
 
 using layoutImpls
-    = ::testing::Types<GridLayoutImplYee<1, 1>, GridLayoutImplYee<1, 2>, GridLayoutImplYee<1, 3>>;
+    = ::testing::Types<GridLayoutImplYee<1, 1, double>, GridLayoutImplYee<1, 2, double>,
+                       GridLayoutImplYee<1, 3, double>>;
 
 TYPED_TEST_SUITE(NextPrevTest, layoutImpls);
 

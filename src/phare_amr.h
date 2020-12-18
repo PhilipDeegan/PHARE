@@ -26,20 +26,22 @@
 
 namespace PHARE::amr
 {
-template<std::size_t dimension_, std::size_t interp_order_, std::size_t nbRefinedPart_>
+template<std::size_t dimension_, std::size_t interp_order_, std::size_t nbRefinedPart_,
+         typename Float_ = double>
 struct PHARE_Types
 {
     static auto constexpr dimension     = dimension_;
     static auto constexpr interp_order  = interp_order_;
     static auto constexpr nbRefinedPart = nbRefinedPart_;
+    using Float                         = Float_;
 
-    using hierarchy_t = PHARE::amr::Hierarchy;
+    using hierarchy_t = PHARE::amr::Hierarchy<Float>;
 
     using Splitter = PHARE::amr::Splitter<PHARE::core::DimConst<dimension>,
                                           PHARE::core::InterpConst<interp_order>,
                                           PHARE::core::RefinedParticlesConst<nbRefinedPart>>;
 
-    using core_types = PHARE::core::PHARE_Types<dimension, interp_order>;
+    using core_types = PHARE::core::PHARE_Types<dimension, interp_order, Float>;
 
     using RefinementParams
         = PHARE::amr::RefinementParams<typename core_types::ParticleArray_t, Splitter>;

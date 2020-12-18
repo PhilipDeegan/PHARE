@@ -28,7 +28,7 @@ namespace amr
      * A FieldCoarsener object is created each time the refine() method of the FieldCoarsenOperator
      * is called and its operator() is called for each coarse index.
      */
-    template<std::size_t dimension>
+    template<typename Float, std::size_t dimension>
     class FieldCoarsener
     {
     public:
@@ -60,7 +60,7 @@ namespace amr
             coarseIndex    = AMRToLocal(coarseIndex, destinationBox_);
 
 
-            double coarseValue = 0.;
+            Float coarseValue = 0.;
 
 
 
@@ -92,7 +92,7 @@ namespace amr
 
                 for (std::size_t iShiftX = 0; iShiftX < xWeights.size(); ++iShiftX)
                 {
-                    double Yinterp = 0.;
+                    Float Yinterp = 0.;
                     for (std::size_t iShiftY = 0; iShiftY < yWeights.size(); ++iShiftY)
                     {
                         Yinterp += fineField(xStartIndex + iShiftX, yStartIndex + iShiftY)
@@ -118,11 +118,11 @@ namespace amr
 
                 for (std::size_t iShiftX = 0; iShiftX < xWeights.size(); ++iShiftX)
                 {
-                    double Yinterp = 0.;
+                    Float Yinterp = 0.;
 
                     for (std::size_t iShiftY = 0; iShiftY < yWeights.size(); ++iShiftY)
                     {
-                        double Zinterp = 0.;
+                        Float Zinterp = 0.;
                         for (std::size_t iShiftZ = 0; iShiftZ < zWeights.size(); ++iShiftZ)
                         {
                             Zinterp += fineField(xStartIndex + iShiftX, yStartIndex + iShiftY,
@@ -142,12 +142,13 @@ namespace amr
 
     private:
         //! precompute the indexes and weights to use to coarsen fine values onto a coarse node
-        FieldCoarsenIndexesAndWeights<dimension> indexesAndWeights_;
+        FieldCoarsenIndexesAndWeights<Float, dimension> indexesAndWeights_;
         SAMRAI::hier::Box const sourceBox_;
         SAMRAI::hier::Box const destinationBox_;
     };
 } // namespace amr
 } // namespace PHARE
+
 
 
 #endif

@@ -60,11 +60,17 @@ PYBIND11_MODULE(dictator, m)
 
     m.def("add", add<int>, "add");
     m.def("add", add<double>, "add");
+    m.def("add_s", add<float>, "add");
+    m.def("add_d", add<double>, "add");
     m.def("add", add<std::string>, "add");
 
-    m.def("addInitFunction1D", add<InitFunction<1>>, "add");
-    m.def("addInitFunction2D", add<InitFunction<2>>, "add");
-    m.def("addInitFunction3D", add<InitFunction<3>>, "add");
+    m.def("addInitFunction_d_1D", add<InitFunction<double, 1>>, "add");
+    m.def("addInitFunction_d_2D", add<InitFunction<double, 2>>, "add");
+    m.def("addInitFunction_d_3D", add<InitFunction<double, 3>>, "add");
+
+    m.def("addInitFunction_s_1D", add<InitFunction<float, 1>>, "add");
+    m.def("addInitFunction_s_2D", add<InitFunction<float, 2>>, "add");
+    m.def("addInitFunction_s_3D", add<InitFunction<float, 3>>, "add");
 
     m.def("add_array_as_vector", add_array_as_vector<double>, "add_array_as_vector");
 }

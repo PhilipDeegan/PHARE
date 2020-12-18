@@ -22,7 +22,7 @@ namespace PHARE
 {
 namespace amr
 {
-    template<std::size_t dimension>
+    template<typename Float, std::size_t dimension>
     class FieldCoarsenIndexesAndWeights
     {
     private:
@@ -51,8 +51,8 @@ namespace amr
         FieldCoarsenIndexesAndWeights(std::array<core::QtyCentering, dimension> const& centering,
                                       SAMRAI::hier::IntVector const& ratio)
             : ratio_{ratio}
-            , weighters_{make_weighters(nbrFinePoints_(centering, ratio),
-                                        std::make_index_sequence<dimension>{})}
+            , weighters_{make_weighters<Float>(nbrFinePoints_(centering, ratio),
+                                               std::make_index_sequence<dimension>{})}
         {
             std::array<int, dimension> halfRatio;
 
@@ -95,14 +95,14 @@ namespace amr
         }
 
 
-        std::vector<double> const& weights(core::Direction dir) const
+        std::vector<Float> const& weights(core::Direction dir) const
         {
             return weighters_[static_cast<std::size_t>(dir)].weights();
         }
 
     private:
         SAMRAI::hier::IntVector const ratio_;
-        std::array<CoarsenWeighter, dimension> weighters_;
+        std::array<CoarsenWeighter<Float>, dimension> weighters_;
         core::Point<int, dimension> shifts_;
     };
 

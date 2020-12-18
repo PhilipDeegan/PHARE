@@ -8,3 +8,6 @@ Testing
 .idea
 *.png
 *.jpg
+bin
+build
+.mkn

@@ -44,7 +44,7 @@ RetType step(Param& x)
 }
 
 
-using InitFunctionT = PHARE::initializer::InitFunction<1>;
+using InitFunctionT = PHARE::initializer::InitFunction<double, 1>;
 
 PHARE::initializer::PHAREDict createDict()
 {
@@ -137,11 +137,11 @@ struct TestTagger : public ::testing::Test
     using Ions        = typename phare_types::Ions_t;
     using Electrons   = typename phare_types::Electrons_t;
     using Field       = typename phare_types::Field_t;
-    using GridLayoutT = GridLayout<GridLayoutImplYee<dim, interp_order>>;
+    using GridLayoutT = GridLayout<GridLayoutImplYee<dim, interp_order, double>>;
 
     struct SinglePatchHybridModel
     {
-        using gridlayout_type           = GridLayout<GridLayoutImplYee<dim, interp_order>>;
+        using gridlayout_type           = GridLayout<GridLayoutImplYee<dim, interp_order, double>>;
         static auto constexpr dimension = dim;
         HybridState<Electromag, Ions, Electrons> state;
     };

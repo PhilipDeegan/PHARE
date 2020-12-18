@@ -276,11 +276,14 @@ struct AFieldData1DCenteredOnEy : public ::testing::Test
 
 // Using used later in test
 
-using Field1D = Field<NdArrayVector<1>, HybridQuantity::Scalar>;
+using Field1D = Field<NdArrayVector<1, double>, HybridQuantity::Scalar>;
 
-using FieldDataTest1DOrder1 = FieldDataTestParam<GridLayout<GridLayoutImplYee<1, 1>>, Field1D>;
-using FieldDataTest1DOrder2 = FieldDataTestParam<GridLayout<GridLayoutImplYee<1, 2>>, Field1D>;
-using FieldDataTest1DOrder3 = FieldDataTestParam<GridLayout<GridLayoutImplYee<1, 3>>, Field1D>;
+using FieldDataTest1DOrder1
+    = FieldDataTestParam<GridLayout<GridLayoutImplYee<1, 1, double>>, Field1D>;
+using FieldDataTest1DOrder2
+    = FieldDataTestParam<GridLayout<GridLayoutImplYee<1, 2, double>>, Field1D>;
+using FieldDataTest1DOrder3
+    = FieldDataTestParam<GridLayout<GridLayoutImplYee<1, 3, double>>, Field1D>;
 
 using FieldDataTestList
     = ::testing::Types<FieldDataTest1DOrder1, FieldDataTest1DOrder2, FieldDataTest1DOrder3>;

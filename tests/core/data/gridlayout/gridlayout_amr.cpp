@@ -13,14 +13,15 @@ using namespace PHARE::core;
 
 TEST(GridLayout, isGivenAnAMRIndexBoxAtConstruction)
 {
-    GridLayout<GridLayoutImplYee<1, 1>> layout({0.1}, {50u}, {{0.}}, Box{Point{0}, Point{49}});
+    GridLayout<GridLayoutImplYee<1, 1, double>> layout({0.1}, {50u}, {{0.}},
+                                                       Box{Point{0}, Point{49}});
 }
 
 
 auto badLayout()
 {
     auto nbrCells = 50;
-    return GridLayout<GridLayoutImplYee<1, 1>>{
+    return GridLayout<GridLayoutImplYee<1, 1, double>>{
         {0.1}, {static_cast<std::uint32_t>(nbrCells)}, {{0.}}, Box{Point{0}, Point{nbrCells}}};
 }
 
@@ -28,7 +29,7 @@ auto badLayout()
 auto goodLayout()
 {
     auto nbrCells = 50;
-    return GridLayout<GridLayoutImplYee<1, 1>>{
+    return GridLayout<GridLayoutImplYee<1, 1, double>>{
         {0.1}, {static_cast<std::uint32_t>(nbrCells)}, {{0.}}, Box{Point{0}, Point{nbrCells - 1}}};
 }
 
@@ -43,7 +44,8 @@ TEST(GridLayout, AMRBoxHasNbrCellsCells)
 
 TEST(GridLayout, canTransformALocalIndexIntoAnAMRIndex)
 {
-    GridLayout<GridLayoutImplYee<1, 1>> layout{{0.1}, {50u}, {{0.}}, Box{Point{50}, Point{99}}};
+    GridLayout<GridLayoutImplYee<1, 1, double>> layout{
+        {0.1}, {50u}, {{0.}}, Box{Point{50}, Point{99}}};
     EXPECT_EQ(Point{50}, layout.localToAMR(Point{5}));
     EXPECT_EQ(Point{85}, layout.localToAMR(Point{40}));
 }
@@ -51,7 +53,8 @@ TEST(GridLayout, canTransformALocalIndexIntoAnAMRIndex)
 
 TEST(GridLayout, canTransformALocalBoxIntoAnAMRBox)
 {
-    GridLayout<GridLayoutImplYee<1, 1>> layout{{0.1}, {50u}, {{0.}}, Box{Point{50}, Point{99}}};
+    GridLayout<GridLayoutImplYee<1, 1, double>> layout{
+        {0.1}, {50u}, {{0.}}, Box{Point{50}, Point{99}}};
     auto localBox       = Box{Point{10}, Point{20}};
     auto expectedAMRBox = Box{Point{55}, Point{65}};
 
@@ -62,7 +65,8 @@ TEST(GridLayout, canTransformALocalBoxIntoAnAMRBox)
 
 TEST(GridLayout, canTransformAnAMRIndexIntoALocalIndex)
 {
-    GridLayout<GridLayoutImplYee<1, 1>> layout{{0.1}, {50u}, {{0.}}, Box{Point{50}, Point{99}}};
+    GridLayout<GridLayoutImplYee<1, 1, double>> layout{
+        {0.1}, {50u}, {{0.}}, Box{Point{50}, Point{99}}};
     EXPECT_EQ(Point{5}, layout.AMRToLocal(Point{50}));
     EXPECT_EQ(Point{40}, layout.AMRToLocal(Point{85}));
 }
@@ -72,7 +76,8 @@ TEST(GridLayout, canTransformAnAMRIndexIntoALocalIndex)
 
 TEST(GridLayout, canTransformAnAMRBoxIntoALocalBox)
 {
-    GridLayout<GridLayoutImplYee<1, 1>> layout{{0.1}, {50u}, {{0.}}, Box{Point{50}, Point{99}}};
+    GridLayout<GridLayoutImplYee<1, 1, double>> layout{
+        {0.1}, {50u}, {{0.}}, Box{Point{50}, Point{99}}};
     auto AMRBox           = Box{Point{55}, Point{65}};
     auto expectedLocalBox = Box{Point{10}, Point{20}};
 

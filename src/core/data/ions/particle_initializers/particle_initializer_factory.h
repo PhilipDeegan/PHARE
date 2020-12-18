@@ -18,12 +18,13 @@ namespace core
     {
         using ParticleInitializerT      = ParticleInitializer<ParticleArray, GridLayout>;
         static constexpr auto dimension = GridLayout::dimension;
+        using Float                     = typename ParticleArray::float_type;
 
 
     public:
         static std::unique_ptr<ParticleInitializerT> create(initializer::PHAREDict& dict)
         {
-            using FunctionType = initializer::InitFunction<dimension>;
+            using FunctionType = initializer::InitFunction<Float, dimension>;
 
             auto initializerName = dict["name"].template to<std::string>();
 

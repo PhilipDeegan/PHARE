@@ -21,16 +21,20 @@ namespace PHARE
 namespace solver
 {
     template<typename HybridModel>
-    class HybridLevelInitializer : public LevelInitializer<typename HybridModel::amr_types>
+    class HybridLevelInitializer
+        : public LevelInitializer<typename HybridModel::amr_types, typename HybridModel::Float>
     {
-        using amr_types                    = typename HybridModel::amr_types;
-        using hierarchy_t                  = typename amr_types::hierarchy_t;
-        using level_t                      = typename amr_types::level_t;
-        using patch_t                      = typename amr_types::patch_t;
-        using IPhysicalModelT              = IPhysicalModel<amr_types>;
-        using IMessengerT                  = amr::IMessenger<IPhysicalModelT>;
-        using HybridMessenger              = amr::HybridMessenger<HybridModel>;
-        using GridLayoutT                  = typename HybridModel::gridlayout_type;
+        using Float = typename HybridModel::Float;
+
+        using amr_types       = typename HybridModel::amr_types;
+        using hierarchy_t     = typename amr_types::hierarchy_t;
+        using level_t         = typename amr_types::level_t;
+        using patch_t         = typename amr_types::patch_t;
+        using IPhysicalModelT = IPhysicalModel<amr_types, Float>;
+        using IMessengerT     = amr::IMessenger<IPhysicalModelT>;
+        using HybridMessenger = amr::HybridMessenger<HybridModel>;
+        using GridLayoutT     = typename HybridModel::gridlayout_type;
+
         static constexpr auto dimension    = GridLayoutT::dimension;
         static constexpr auto interp_order = GridLayoutT::interp_order;
 
@@ -44,10 +48,13 @@ namespace solver
     public:
         virtual void initialize(std::shared_ptr<hierarchy_t> const& hierarchy, int levelNumber,
                                 std::shared_ptr<level_t> const& oldLevel, IPhysicalModelT& model,
-                                amr::IMessenger<IPhysicalModelT>& messenger, double initDataTime,
+                                IMessengerT& messenger, Float initDataTime,
                                 bool isRegridding) override
         {
-            core::Interpolator<dimension, interp_order> interpolate_;
+            constexpr Float zero = 0;
+
+            core::Interpolator<dimension, interp_order, Float> interpolate_;
+
             auto& hybridModel = static_cast<HybridModel&>(model);
             auto& level       = amr_types::getLevel(*hierarchy, levelNumber);
 
@@ -111,9 +118,9 @@ namespace solver
                     auto __     = core::SetLayout(&layout, ampere_);
                     ampere_(B, J);
 
-                    hybridModel.resourcesManager->setTime(J, *patch, 0.);
+                    hybridModel.resourcesManager->setTime(J, *patch, zero);
                 }
-                hybMessenger.fillCurrentGhosts(J, levelNumber, 0.);
+                hybMessenger.fillCurrentGhosts(J, levelNumber, zero);
 
 
 
@@ -130,10 +137,10 @@ namespace solver
                     auto& Pe = electrons.pressure();
                     auto __  = core::SetLayout(&layout, ohm_);
                     ohm_(Ne, Ve, Pe, B, J, E);
-                    hybridModel.resourcesManager->setTime(E, *patch, 0.);
+                    hybridModel.resourcesManager->setTime(E, *patch, zero);
                 }
 
-                hybMessenger.fillElectricGhosts(E, levelNumber, 0.);
+                hybMessenger.fillElectricGhosts(E, levelNumber, zero);
             }
         }
     };

@@ -38,6 +38,7 @@ namespace amr
     public:
         static constexpr std::size_t dimension    = GridLayoutT::dimension;
         static constexpr std::size_t interp_order = GridLayoutT::interp_order;
+        using Float                               = typename GridLayoutT::Float;
 
         /*** \brief Construct a FieldData from information associated to a patch
          *
@@ -56,9 +57,9 @@ namespace amr
 
         [[deprecated]] FieldData(SAMRAI::hier::Box const& domain,
                                  SAMRAI::hier::IntVector const& ghost, std::string name,
-                                 std::array<double, dimension> const& dl,
+                                 std::array<Float, dimension> const& dl,
                                  std::array<std::uint32_t, dimension> const& nbrCells,
-                                 core::Point<double, dimension> const& origin, PhysicalQuantity qty)
+                                 core::Point<Float, dimension> const& origin, PhysicalQuantity qty)
 
             : SAMRAI::hier::PatchData(domain, ghost)
             , gridLayout{dl, nbrCells, origin}
@@ -191,9 +192,8 @@ namespace amr
                         const SAMRAI::hier::BoxOverlap& overlap) const final
         {
             // getDataStreamSize_<true> mean that we want to apply the transformation
-            std::size_t expectedSize = getDataStreamSize_<true>(overlap) / sizeof(double);
-            std::vector<typename FieldImpl::type> buffer;
-            buffer.reserve(expectedSize);
+            std::size_t expectedSize = getDataStreamSize_<true>(overlap) / sizeof(Float);
+            std::vector<Float> buffer(expectedSize);
 
             auto& fieldOverlap = dynamic_cast<FieldOverlap const&>(overlap);
 
@@ -236,14 +236,11 @@ namespace amr
         void unpackStream(SAMRAI::tbox::MessageStream& stream,
                           const SAMRAI::hier::BoxOverlap& overlap) final
         {
+            auto& fieldOverlap = dynamic_cast<FieldOverlap const&>(overlap);
             // For unpacking we need to know how much element we will need to
             // extract
-            std::size_t expectedSize = getDataStreamSize(overlap) / sizeof(double);
-
-            std::vector<double> buffer;
-            buffer.resize(expectedSize, 0.);
-
-            auto& fieldOverlap = dynamic_cast<FieldOverlap const&>(overlap);
+            std::size_t expectedSize = getDataStreamSize(overlap) / sizeof(Float);
+            std::vector<Float> buffer(expectedSize, 0);
 
             // We flush a portion of the stream on the buffer.
             stream.unpack(buffer.data(), expectedSize);
@@ -435,6 +432,8 @@ namespace amr
     template<typename GridLayoutT, typename FieldImpl, typename PhysicalQuantity>
     class FieldDataInternals<GridLayoutT, 1, FieldImpl, PhysicalQuantity>
     {
+        using Float = typename GridLayoutT::Float;
+
     public:
         void copyImpl(SAMRAI::hier::Box const& localSourceBox, FieldImpl const& source,
                       SAMRAI::hier::Box const& localDestinationBox, FieldImpl& destination) const
@@ -457,7 +456,7 @@ namespace amr
 
 
 
-        void packImpl(std::vector<double>& buffer, FieldImpl const& source,
+        void packImpl(std::vector<Float>& buffer, FieldImpl const& source,
                       SAMRAI::hier::Box const& overlap, SAMRAI::hier::Box const& sourceBox) const
         {
             int xStart = overlap.lower(0) - sourceBox.lower(0);
@@ -471,7 +470,7 @@ namespace amr
 
 
 
-        void unpackImpl(std::size_t& seek, std::vector<double> const& buffer, FieldImpl& source,
+        void unpackImpl(std::size_t& seek, std::vector<Float> const& buffer, FieldImpl& source,
                         SAMRAI::hier::Box const& overlap,
                         SAMRAI::hier::Box const& destination) const
         {
@@ -492,6 +491,8 @@ namespace amr
     template<typename GridLayoutT, typename FieldImpl, typename PhysicalQuantity>
     class FieldDataInternals<GridLayoutT, 2, FieldImpl, PhysicalQuantity>
     {
+        using Float = typename GridLayoutT::Float;
+
     public:
         void copyImpl(SAMRAI::hier::Box const& localSourceBox, FieldImpl const& source,
                       SAMRAI::hier::Box const& localDestinationBox, FieldImpl& destination) const
@@ -528,7 +529,7 @@ namespace amr
 
 
 
-        void packImpl(std::vector<double>& buffer, FieldImpl const& source,
+        void packImpl(std::vector<Float>& buffer, FieldImpl const& source,
                       SAMRAI::hier::Box const& overlap, SAMRAI::hier::Box const& destination) const
 
         {
@@ -550,7 +551,7 @@ namespace amr
 
 
 
-        void unpackImpl(std::size_t& seek, std::vector<double> const& buffer, FieldImpl& source,
+        void unpackImpl(std::size_t& seek, std::vector<Float> const& buffer, FieldImpl& source,
                         SAMRAI::hier::Box const& overlap,
                         SAMRAI::hier::Box const& destination) const
         {
@@ -577,6 +578,8 @@ namespace amr
     template<typename GridLayoutT, typename FieldImpl, typename PhysicalQuantity>
     class FieldDataInternals<GridLayoutT, 3, FieldImpl, PhysicalQuantity>
     {
+        using Float = typename GridLayoutT::Float;
+
     public:
         void copyImpl(SAMRAI::hier::Box const& localSourceBox, FieldImpl const& source,
                       SAMRAI::hier::Box const& localDestinationBox, FieldImpl& destination) const
@@ -627,7 +630,7 @@ namespace amr
 
 
 
-        void packImpl(std::vector<double>& buffer, FieldImpl const& source,
+        void packImpl(std::vector<Float>& buffer, FieldImpl const& source,
                       SAMRAI::hier::Box const& overlap, SAMRAI::hier::Box const& destination) const
         {
             int xStart = overlap.lower(0) - destination.lower(0);
@@ -654,7 +657,7 @@ namespace amr
 
 
 
-        void unpackImpl(std::size_t& seek, std::vector<double> const& buffer, FieldImpl& source,
+        void unpackImpl(std::size_t& seek, std::vector<Float> const& buffer, FieldImpl& source,
                         SAMRAI::hier::Box const& overlap,
                         SAMRAI::hier::Box const& destination) const
         {

@@ -37,6 +37,7 @@ public:
     using This       = Writer<ModelView>;
     using GridLayout = typename ModelView::GridLayout;
     using Attributes = typename ModelView::PatchProperties;
+    using float_type = typename GridLayout::Float;
 
     static constexpr auto dimension   = GridLayout::dimension;
     static constexpr auto interpOrder = GridLayout::interp_order;

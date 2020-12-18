@@ -32,9 +32,9 @@ using namespace PHARE::initializer::test_fn::func_1d; // density/etc are here
 
 static constexpr std::size_t dim         = 1;
 static constexpr std::size_t interpOrder = 1;
-using VecField1D                         = VecField<NdArrayVector<1>, HybridQuantity>;
-using GridImplYee1D                      = GridLayoutImplYee<dim, interpOrder>;
-using ParticleArray1D                    = ParticleArray<dim>;
+using VecField1D                         = VecField<NdArrayVector<1, double>, HybridQuantity>;
+using GridImplYee1D                      = GridLayoutImplYee<dim, interpOrder, double>;
+using ParticleArray1D                    = ParticleArray<double, dim>;
 using GridYee1D                          = GridLayout<GridImplYee1D>;
 using MaxwellianParticleInitializer1D = MaxwellianParticleInitializer<ParticleArray1D, GridYee1D>;
 using IonsPop1D                       = IonPopulation<ParticleArray1D, VecField1D, GridYee1D>;
@@ -46,7 +46,7 @@ using MHDModelT         = MHDModel<GridYee1D, VecField1D, SAMRAI_Types>;
 using ResourcesManagerT = ResourcesManager<GridYee1D>;
 
 
-using InitFunctionT = PHARE::initializer::InitFunction<1>;
+using InitFunctionT = PHARE::initializer::InitFunction<double, 1>;
 
 PHARE::initializer::PHAREDict createDict()
 {

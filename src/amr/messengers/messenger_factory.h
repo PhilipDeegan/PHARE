@@ -37,6 +37,8 @@ class MessengerFactory
     using HybridHybridMessengerStrategy_t
         = HybridHybridMessengerStrategy<HybridModel, RefinementParams>;
     using IPhysicalModel = typename HybridModel::Interface;
+    using Float          = typename HybridModel::Float;
+
     static_assert(std::is_same_v<typename HybridModel::Interface, typename MHDModel::Interface>,
                   "MHD and Hybrid model need to have the same interface");
 

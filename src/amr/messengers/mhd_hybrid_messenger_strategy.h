@@ -20,6 +20,8 @@ namespace amr
         using IPhysicalModel = typename HybridModel::Interface;
 
     public:
+        using Float = typename HybridModel::float_type;
+
         static const std::string stratName;
 
         MHDHybridMessengerStrategy(
@@ -37,7 +39,7 @@ namespace amr
         /**
          * @brief allocate allocate the internal resources to the hybrid and MHD resourcesManagers
          */
-        void allocate(SAMRAI::hier::Patch& patch, double const allocateTime) const override
+        void allocate(SAMRAI::hier::Patch& patch, Float const allocateTime) const override
         {
             // hybModel.resourcesManager->allocate(EM_old_.E, patch, allocateTime);
             // hybModel.resourcesManager->allocate(EM_old_.B, patch, allocateTime);
@@ -74,7 +76,7 @@ namespace amr
         void regrid(std::shared_ptr<SAMRAI::hier::PatchHierarchy> const& /*hierarchy*/,
                     const int /*levelNumber*/,
                     std::shared_ptr<SAMRAI::hier::PatchLevel> const& /*oldLevel*/,
-                    IPhysicalModel& /*model*/, double const /*initDataTime*/) override
+                    IPhysicalModel& /*model*/, Float const /*initDataTime*/) override
         {
             //
         }
@@ -89,7 +91,7 @@ namespace amr
 
 
         void initLevel(IPhysicalModel& /*model*/, SAMRAI::hier::PatchLevel& /*level*/,
-                       double const /*initDataTime*/) override
+                       Float const /*initDataTime*/) override
         {
         }
 
@@ -97,34 +99,34 @@ namespace amr
 
 
         void fillMagneticGhosts(VecFieldT& /*B*/, int const /*levelNumber*/,
-                                double const /*fillTime*/) override
+                                Float const /*fillTime*/) override
         {
         }
         void fillElectricGhosts(VecFieldT& /*E*/, int const /*levelNumber*/,
-                                double const /*fillTime*/) override
+                                Float const /*fillTime*/) override
         {
         }
 
         void fillCurrentGhosts(VecFieldT& /*J*/, int const /*levelNumber*/,
-                               double const /*fillTime*/) override
+                               Float const /*fillTime*/) override
         {
         }
 
 
         void fillIonGhostParticles(IonsT& /*ions*/, SAMRAI::hier::PatchLevel& /*level*/,
-                                   double const /*fillTime*/) override
+                                   Float const /*fillTime*/) override
         {
         }
         void fillIonMomentGhosts(IonsT& /*ions*/, SAMRAI::hier::PatchLevel& /*level*/,
-                                 double const /*currentTime*/, double const /*fillTime*/) override
+                                 Float const /*currentTime*/, Float const /*fillTime*/) override
         {
         }
 
 
         void firstStep(IPhysicalModel& /*model*/, SAMRAI::hier::PatchLevel& /*level*/,
                        const std::shared_ptr<SAMRAI::hier::PatchHierarchy>& /*hierarchy*/,
-                       double const /*currentTime*/, double const /*prevCoarserTime*/,
-                       double const /*newCoarserTime*/) override
+                       Float const /*currentTime*/, Float const /*prevCoarserTime*/,
+                       Float const /*newCoarserTime*/) override
         {
         }
 
@@ -137,7 +139,7 @@ namespace amr
         }
 
         void fillRootGhosts(IPhysicalModel& /*model*/, SAMRAI::hier::PatchLevel& /*level*/,
-                            double const /*initDataTime*/) final
+                            Float const /*initDataTime*/) final
         {
         }
 

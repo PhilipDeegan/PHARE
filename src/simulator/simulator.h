@@ -13,20 +13,21 @@
 
 namespace PHARE
 {
+template<typename Float>
 class ISimulator
 {
 public:
-    virtual double startTime()   = 0;
-    virtual double endTime()     = 0;
-    virtual double currentTime() = 0;
-    virtual double timeStep()    = 0;
+    virtual Float startTime()   = 0;
+    virtual Float endTime()     = 0;
+    virtual Float currentTime() = 0;
+    virtual Float timeStep()    = 0;
 
-    virtual void initialize()         = 0;
-    virtual double advance(double dt) = 0;
+    virtual void initialize()       = 0;
+    virtual Float advance(Float dt) = 0;
 
-    virtual std::vector<int> const& domainBox() const    = 0;
-    virtual std::vector<double> const& cellWidth() const = 0;
-    virtual std::size_t interporder() const              = 0;
+    virtual std::vector<int> const& domainBox() const   = 0;
+    virtual std::vector<Float> const& cellWidth() const = 0;
+    virtual std::size_t interporder() const             = 0;
 
     virtual std::string to_str() = 0;
 
@@ -34,20 +35,23 @@ public:
     virtual void dump(double timestamp, double timestep) {} // overriding optional
 };
 
-template<std::size_t _dimension, std::size_t _interp_order, std::size_t _nbRefinedPart>
-class Simulator : public ISimulator
+template<std::size_t _dimension, std::size_t _interp_order, std::size_t _nbRefinedPart,
+         typename Float_>
+class Simulator : public ISimulator<Float_>
 {
 public:
-    double startTime() override { return 0.; }
-    double endTime() override { return finalTime_; }
-    double timeStep() override { return dt_; }
-    double currentTime() override { return currentTime_; }
+    using Float = Float_;
+
+    Float startTime() override { return 0.; }
+    Float endTime() override { return finalTime_; }
+    Float timeStep() override { return dt_; }
+    Float currentTime() override { return currentTime_; }
 
     void initialize() override;
-    double advance(double dt) override;
+    Float advance(Float dt) override;
 
     std::vector<int> const& domainBox() const override { return hierarchy_->domainBox(); }
-    std::vector<double> const& cellWidth() const override { return hierarchy_->cellWidth(); }
+    std::vector<Float> const& cellWidth() const override { return hierarchy_->cellWidth(); }
     std::size_t interporder() const override { return interp_order; }
 
     auto& getHybridModel() { return hybridModel_; }
@@ -59,17 +63,16 @@ public:
     void dump(double timestamp, double timestep) override { dMan->dump(timestamp, timestep); }
 
     Simulator(PHARE::initializer::PHAREDict dict,
-              std::shared_ptr<PHARE::amr::Hierarchy> const& hierarchy);
-
+              std::shared_ptr<PHARE::amr::Hierarchy<Float>> const& hierarchy);
 
     static constexpr std::size_t dimension     = _dimension;
     static constexpr std::size_t interp_order  = _interp_order;
     static constexpr std::size_t nbRefinedPart = _nbRefinedPart;
 
     using SAMRAITypes = PHARE::amr::SAMRAI_Types;
-    using PHARETypes  = PHARE_Types<dimension, interp_order, nbRefinedPart>;
+    using PHARETypes  = PHARE_Types<dimension, interp_order, nbRefinedPart, Float>;
 
-    using IPhysicalModel = PHARE::solver::IPhysicalModel<SAMRAITypes>;
+    using IPhysicalModel = PHARE::solver::IPhysicalModel<SAMRAITypes, Float>;
     using HybridModel    = typename PHARETypes::HybridModel_t;
     using MHDModel       = typename PHARETypes::MHDModel_t;
 
@@ -82,13 +85,13 @@ public:
     using SimFunctorParams = typename core::PHARE_Sim_Types::SimFunctorParams;
     using SimFunctors      = typename core::PHARE_Sim_Types::SimulationFunctors;
 
-    using Integrator = PHARE::amr::Integrator<dimension>;
-
+    using Integrator  = PHARE::amr::Integrator<Float, dimension>;
+    using Hierarchy_t = PHARE::amr::Hierarchy<Float>;
 
 private:
     auto find_model(std::string name);
 
-    std::shared_ptr<PHARE::amr::Hierarchy> hierarchy_;
+    std::shared_ptr<Hierarchy_t> hierarchy_;
     std::unique_ptr<Integrator> integrator_;
 
     std::vector<std::string> modelNames_;
@@ -98,10 +101,10 @@ private:
     float x_lo_[dimension];
     float x_up_[dimension];
     int maxLevelNumber_;
-    double dt_;
+    Float dt_;
     int timeStepNbr_           = 0;
-    double finalTime_          = 0;
-    double currentTime_        = 0;
+    Float finalTime_           = 0;
+    Float currentTime_         = 0;
     bool isInitialized         = false;
     std::size_t fineDumpLvlMax = 0;
 
@@ -128,15 +131,16 @@ private:
 
 
 
-template<std::size_t _dimension, std::size_t _interp_order, std::size_t _nbRefinedPart>
-Simulator<_dimension, _interp_order, _nbRefinedPart>::Simulator(
-    PHARE::initializer::PHAREDict dict, std::shared_ptr<PHARE::amr::Hierarchy> const& hierarchy)
+template<std::size_t _dimension, std::size_t _interp_order, std::size_t _nbRefinedPart,
+         typename Float_>
+Simulator<_dimension, _interp_order, _nbRefinedPart, Float_>::Simulator(
+    PHARE::initializer::PHAREDict dict, std::shared_ptr<Hierarchy_t> const& hierarchy)
     : hierarchy_{hierarchy}
     , modelNames_{"HybridModel"}
     , descriptors_{PHARE::amr::makeDescriptors(modelNames_)}
     , messengerFactory_{descriptors_}
     , maxLevelNumber_{dict["simulation"]["AMR"]["max_nbr_levels"].template to<int>()}
-    , dt_{dict["simulation"]["time_step"].template to<double>()}
+    , dt_{dict["simulation"]["time_step"].template to<Float_>()}
     , timeStepNbr_{dict["simulation"]["time_step_nbr"].template to<int>()}
     , finalTime_{dt_ * timeStepNbr_}
     , functors_{functors_setup(dict)}
@@ -174,6 +178,7 @@ Simulator<_dimension, _interp_order, _nbRefinedPart>::Simulator(
                                                    multiphysInteg_, startTime, endTime);
 
         if (dict["simulation"].contains("diagnostics"))
+
         {
             auto& diagDict = dict["simulation"]["diagnostics"];
 
@@ -204,8 +209,9 @@ Simulator<_dimension, _interp_order, _nbRefinedPart>::Simulator(
 
 
 
-template<std::size_t _dimension, std::size_t _interp_order, std::size_t _nbRefinedPart>
-std::string Simulator<_dimension, _interp_order, _nbRefinedPart>::to_str()
+template<std::size_t _dimension, std::size_t _interp_order, std::size_t _nbRefinedPart,
+         typename Float_>
+std::string Simulator<_dimension, _interp_order, _nbRefinedPart, Float_>::to_str()
 {
     std::stringstream ss;
     ss << "PHARE SIMULATOR\n";
@@ -221,8 +227,9 @@ std::string Simulator<_dimension, _interp_order, _nbRefinedPart>::to_str()
 
 
 
-template<std::size_t _dimension, std::size_t _interp_order, std::size_t _nbRefinedPart>
-void Simulator<_dimension, _interp_order, _nbRefinedPart>::initialize()
+template<std::size_t _dimension, std::size_t _interp_order, std::size_t _nbRefinedPart,
+         typename Float_>
+void Simulator<_dimension, _interp_order, _nbRefinedPart, Float_>::initialize()
 {
     try
     {
@@ -249,9 +256,9 @@ void Simulator<_dimension, _interp_order, _nbRefinedPart>::initialize()
 
 
 
-
-template<std::size_t _dimension, std::size_t _interp_order, std::size_t _nbRefinedPart>
-double Simulator<_dimension, _interp_order, _nbRefinedPart>::advance(double dt)
+template<std::size_t _dimension, std::size_t _interp_order, std::size_t _nbRefinedPart,
+         typename Float_>
+Float_ Simulator<_dimension, _interp_order, _nbRefinedPart, Float_>::advance(Float_ dt)
 {
     try
     {
@@ -278,28 +285,31 @@ double Simulator<_dimension, _interp_order, _nbRefinedPart>::advance(double dt)
 
 
 
-
-template<std::size_t _dimension, std::size_t _interp_order, std::size_t _nbRefinedPart>
-auto Simulator<_dimension, _interp_order, _nbRefinedPart>::find_model(std::string name)
+template<std::size_t _dimension, std::size_t _interp_order, std::size_t _nbRefinedPart,
+         typename Float_>
+auto Simulator<_dimension, _interp_order, _nbRefinedPart, Float_>::find_model(std::string name)
 {
     return std::find(std::begin(modelNames_), std::end(modelNames_), name) != std::end(modelNames_);
 }
 
 
 
+template<typename Float>
 struct SimulatorMaker
 {
-    SimulatorMaker(std::shared_ptr<PHARE::amr::Hierarchy>& hierarchy)
+    using Hierarchy_t = PHARE::amr::Hierarchy<Float>;
+
+    SimulatorMaker(std::shared_ptr<Hierarchy_t>& hierarchy)
         : hierarchy_{hierarchy}
     {
     }
 
-    std::shared_ptr<PHARE::amr::Hierarchy>& hierarchy_;
+    std::shared_ptr<Hierarchy_t>& hierarchy_;
 
     template<typename Dimension, typename InterpOrder, typename NbRefinedPart>
-    std::unique_ptr<ISimulator> operator()(std::size_t userDim, std::size_t userInterpOrder,
-                                           std::size_t userNbRefinedPart, Dimension dimension,
-                                           InterpOrder interp_order, NbRefinedPart nbRefinedPart)
+    std::unique_ptr<ISimulator<Float>>
+    operator()(std::size_t userDim, std::size_t userInterpOrder, std::size_t userNbRefinedPart,
+               Dimension dimension, InterpOrder interp_order, NbRefinedPart nbRefinedPart)
     {
         if (userDim == dimension() and userInterpOrder == interp_order()
             and userNbRefinedPart == nbRefinedPart())
@@ -310,7 +320,7 @@ struct SimulatorMaker
 
             PHARE::initializer::PHAREDict& theDict
                 = PHARE::initializer::PHAREDictHandler::INSTANCE().dict();
-            return std::make_unique<Simulator<d, io, nb>>(theDict, hierarchy_);
+            return std::make_unique<Simulator<d, io, nb, Float>>(theDict, hierarchy_);
         }
         else
         {
@@ -320,14 +330,60 @@ struct SimulatorMaker
 };
 
 
-std::unique_ptr<PHARE::ISimulator> getSimulator(std::shared_ptr<PHARE::amr::Hierarchy>& hierarchy);
-
-
-template<std::size_t dim, std::size_t interp, size_t nbRefinedPart>
-std::unique_ptr<Simulator<dim, interp, nbRefinedPart>>
-makeSimulator(std::shared_ptr<amr::Hierarchy> const& hierarchy)
+template<std::size_t dimension, std::size_t interp_order, std::size_t nbRefinedPart, typename Float>
+class SimulatorCaster
 {
-    return std::make_unique<Simulator<dim, interp, nbRefinedPart>>(
+public:
+    using Simulator_t = Simulator<dimension, interp_order, nbRefinedPart, Float>;
+
+    SimulatorCaster(std::shared_ptr<ISimulator<Float>> const& _simulator)
+        : simulator{_simulator}
+    {
+    }
+
+    template<typename Dimension, typename InterpOrder, typename NbRefinedPart>
+    Simulator_t* operator()(std::size_t userDim, std::size_t userInterpOrder,
+                            std::size_t userNbRefinedPart, Dimension dimension_fn,
+                            InterpOrder interp_order_fn, NbRefinedPart nbRefinedPart_fn)
+    {
+        if (userDim == dimension_fn() and userInterpOrder == interp_order_fn()
+            and userNbRefinedPart == nbRefinedPart_fn())
+        {
+            std::size_t constexpr d  = dimension_fn();
+            std::size_t constexpr io = interp_order_fn();
+            std::size_t constexpr nb = nbRefinedPart_fn();
+
+            // extra if constexpr as cast is templated and not generic interface
+            if constexpr (d == dimension and io == interp_order and nb == nbRefinedPart)
+                return dynamic_cast<Simulator_t*>(simulator.get());
+        }
+        return nullptr;
+    }
+
+private:
+    std::shared_ptr<ISimulator<Float>> const& simulator;
+};
+
+template<typename Float>
+std::unique_ptr<PHARE::ISimulator<Float>>
+getSimulator(std::shared_ptr<PHARE::amr::Hierarchy<Float>>& hierarchy)
+{
+    PHARE::initializer::PHAREDict& theDict
+        = PHARE::initializer::PHAREDictHandler::INSTANCE().dict();
+    auto dim           = theDict["simulation"]["dimension"].template to<int>();
+    auto interpOrder   = theDict["simulation"]["interp_order"].template to<int>();
+    auto nbRefinedPart = theDict["simulation"]["refined_particle_nbr"].template to<int>();
+
+    return core::makeAtRuntime<Float, SimulatorMaker<Float>>(dim, interpOrder, nbRefinedPart,
+                                                             SimulatorMaker<Float>{hierarchy});
+}
+
+
+template<std::size_t dim, std::size_t interp, std::size_t nbRefinedPart, typename Float>
+std::unique_ptr<Simulator<dim, interp, nbRefinedPart, Float>>
+makeSimulator(std::shared_ptr<amr::Hierarchy<Float>> const& hierarchy)
+{
+    return std::make_unique<Simulator<dim, interp, nbRefinedPart, Float>>(
         initializer::PHAREDictHandler::INSTANCE().dict(), hierarchy);
 }
 

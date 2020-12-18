@@ -81,11 +81,14 @@ namespace core
                  Field<NdArrayImpl, PhysicalQuantity> const& f2,
                  Field<NdArrayImpl, PhysicalQuantity>& avg)
     {
+        using Float          = typename NdArrayImpl::type;
+        constexpr Float half = .5;
+
         std::transform(std::begin(f1), std::end(f1), std::begin(f2), std::begin(avg),
-                       std::plus<double>());
+                       std::plus<Float>());
 
         std::transform(std::begin(avg), std::end(avg), std::begin(avg),
-                       [](double x) { return x * 0.5; });
+                       [](Float x) { return x * half; });
     }
 
 

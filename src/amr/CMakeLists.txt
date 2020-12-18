@@ -49,9 +49,7 @@ set( SOURCES_INC
      tagging/default_hybrid_tagger_strategy.h
    )
 set( SOURCES_CPP
-     data/field/refine/linear_weighter.cpp
      resources_manager/amr_utils.cpp
-     data/field/coarsening/field_coarsen.cpp
      messengers/messenger_factory.cpp
    )
 

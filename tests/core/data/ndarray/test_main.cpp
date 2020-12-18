@@ -58,9 +58,9 @@ protected:
 };
 
 
-using NdArray1D = ::testing::Types<NdArrayVector<1>>;
-using NdArray2D = ::testing::Types<NdArrayVector<2>>;
-using NdArray3D = ::testing::Types<NdArrayVector<3>>;
+using NdArray1D = ::testing::Types<NdArrayVector<1, double>>;
+using NdArray2D = ::testing::Types<NdArrayVector<2, double>>;
+using NdArray3D = ::testing::Types<NdArrayVector<3, double>>;
 
 
 TYPED_TEST_SUITE(GenericNdArray1D, NdArray1D);
@@ -86,8 +86,8 @@ TYPED_TEST(GenericNdArray1D, IsModifiable)
 TYPED_TEST(GenericNdArray1D, CanBeReadOnly)
 {
     std::uint32_t i{2};
-    this->a(i)                  = 12.;
-    NdArrayVector<1> const& ref = this->a;
+    this->a(i)                          = 12.;
+    NdArrayVector<1, double> const& ref = this->a;
     EXPECT_EQ(12., ref(i));
 }
 
@@ -115,7 +115,7 @@ TYPED_TEST(GenericNdArray1D, HasCopyCtor)
     for (auto& e : this->a)
         e = 12.;
 
-    NdArrayVector<1> other{this->nx};
+    NdArrayVector<1, double> other{this->nx};
     other = this->a;
 
     for (auto const& e : other)
@@ -128,7 +128,7 @@ TYPED_TEST(GenericNdArray1D, HasMoveCtor)
     for (auto& e : this->a)
         e = 12.;
 
-    NdArrayVector<1> other = std::move(this->a);
+    NdArrayVector<1, double> other = std::move(this->a);
 
     for (auto const& e : other)
         EXPECT_DOUBLE_EQ(12., e);
@@ -153,8 +153,8 @@ TYPED_TEST(GenericNdArray2D, IsModifiable)
 TYPED_TEST(GenericNdArray2D, CanBeReadOnly)
 {
     std::uint32_t i{2}, j{3};
-    this->a(i, j)               = 12.;
-    NdArrayVector<2> const& ref = this->a;
+    this->a(i, j)                       = 12.;
+    NdArrayVector<2, double> const& ref = this->a;
     EXPECT_EQ(12., ref(i, j));
 }
 
@@ -186,7 +186,7 @@ TYPED_TEST(GenericNdArray2D, HasCopyCtor)
     for (auto& e : this->a)
         e = 12.;
 
-    NdArrayVector<2> other{this->nx, this->ny};
+    NdArrayVector<2, double> other{this->nx, this->ny};
     other = this->a;
 
     for (auto const& e : other)
@@ -199,7 +199,7 @@ TYPED_TEST(GenericNdArray2D, HasMoveCtor)
     for (auto& e : this->a)
         e = 12.;
 
-    NdArrayVector<2> other = std::move(this->a);
+    NdArrayVector<2, double> other = std::move(this->a);
 
     for (auto const& e : other)
         EXPECT_DOUBLE_EQ(12., e);
@@ -224,8 +224,8 @@ TYPED_TEST(GenericNdArray3D, IsModifiable)
 TYPED_TEST(GenericNdArray3D, CanBeReadOnly)
 {
     std::uint32_t i{2}, j{3}, k{4};
-    this->a(i, j, k)            = 12.;
-    NdArrayVector<3> const& ref = this->a;
+    this->a(i, j, k)                    = 12.;
+    NdArrayVector<3, double> const& ref = this->a;
     EXPECT_EQ(12., ref(i, j, k));
 }
 
@@ -261,7 +261,7 @@ TYPED_TEST(GenericNdArray3D, HasCopyCtor)
     for (auto& e : this->a)
         e = 12.;
 
-    NdArrayVector<3> other{this->nx, this->ny, this->nz};
+    NdArrayVector<3, double> other{this->nx, this->ny, this->nz};
     other = this->a;
 
     for (auto const& e : other)
@@ -274,7 +274,7 @@ TYPED_TEST(GenericNdArray3D, HasMoveCtor)
     for (auto& e : this->a)
         e = 12.;
 
-    NdArrayVector<3> other = std::move(this->a);
+    NdArrayVector<3, double> other = std::move(this->a);
 
     for (auto const& e : other)
         EXPECT_DOUBLE_EQ(12., e);

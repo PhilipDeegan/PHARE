@@ -30,6 +30,7 @@ namespace amr
         using PhysicalQuantity                 = typename FieldT::physical_quantity_type;
         static constexpr std::size_t dimension = GridLayoutT::dimension;
         using FieldDataT                       = FieldData<GridLayoutT, FieldT>;
+        using Float                            = typename GridLayoutT::Float;
 
         FieldRefineOperator()
             : SAMRAI::hier::RefineOperator{"FieldRefineOperator"}
@@ -94,8 +95,8 @@ namespace amr
 
 
 
-            FieldRefiner<dimension> refiner{destinationLayout.centering(qty), destinationFieldBox,
-                                            sourceFieldBox, ratio};
+            FieldRefiner<Float, dimension> refiner{destinationLayout.centering(qty),
+                                                   destinationFieldBox, sourceFieldBox, ratio};
 
 
 

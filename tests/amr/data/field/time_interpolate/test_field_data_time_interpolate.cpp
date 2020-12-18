@@ -45,8 +45,8 @@ struct aFieldLinearTimeInterpolate : public ::testing::Test
     static constexpr auto dim    = typename TypeInfo::first_type{}();
     static constexpr auto interp = typename TypeInfo::second_type{}();
 
-    using GridYee    = GridLayout<GridLayoutImplYee<dim, interp>>;
-    using FieldND    = Field<NdArrayVector<dim>, HybridQuantity::Scalar>;
+    using GridYee    = GridLayout<GridLayoutImplYee<dim, interp, double>>;
+    using FieldND    = Field<NdArrayVector<dim, double>, HybridQuantity::Scalar>;
     using FieldDataT = FieldData<GridYee, FieldND>;
 
     FieldLinearTimeInterpolate<GridYee, FieldND> timeOp{};
@@ -213,7 +213,7 @@ TYPED_TEST(aFieldLinearTimeInterpolate, giveOldSrcForAlphaZero)
     static constexpr auto dim    = typename TypeParam::first_type{}();
     static constexpr auto interp = typename TypeParam::second_type{}();
 
-    using GridYee = GridLayout<GridLayoutImplYee<dim, interp>>;
+    using GridYee = GridLayout<GridLayoutImplYee<dim, interp, double>>;
 
     auto box = FieldGeometry<GridYee, HybridQuantity::Scalar>::toFieldBox(this->domain, this->qty,
                                                                           layout, !withGhost);
@@ -294,7 +294,7 @@ TYPED_TEST(aFieldLinearTimeInterpolate, giveNewSrcForAlphaOne)
     static constexpr auto dim    = typename TypeParam::first_type{}();
     static constexpr auto interp = typename TypeParam::second_type{}();
 
-    using GridYee = GridLayout<GridLayoutImplYee<dim, interp>>;
+    using GridYee = GridLayout<GridLayoutImplYee<dim, interp, double>>;
 
     auto box = FieldGeometry<GridYee, HybridQuantity::Scalar>::toFieldBox(this->domain, this->qty,
                                                                           layout, !withGhost);
@@ -373,7 +373,7 @@ TYPED_TEST(aFieldLinearTimeInterpolate, giveEvaluationOnTheInterpolateTimeForLin
     static constexpr auto dim    = typename TypeParam::first_type{}();
     static constexpr auto interp = typename TypeParam::second_type{}();
 
-    using GridYee = GridLayout<GridLayoutImplYee<dim, interp>>;
+    using GridYee = GridLayout<GridLayoutImplYee<dim, interp, double>>;
 
     auto box = FieldGeometry<GridYee, HybridQuantity::Scalar>::toFieldBox(this->domain, this->qty,
                                                                           layout, !withGhost);

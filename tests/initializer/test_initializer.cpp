@@ -20,8 +20,8 @@
 
 using namespace PHARE::initializer;
 
-using GridLayoutT    = PHARE::core::GridLayout<PHARE::core::GridLayoutImplYee<1, 1>>;
-using ParticleArrayT = PHARE::core::ParticleArray<1>;
+using GridLayoutT    = PHARE::core::GridLayout<PHARE::core::GridLayoutImplYee<1, 1, double>>;
+using ParticleArrayT = PHARE::core::ParticleArray<double, 1>;
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -74,13 +74,13 @@ TEST(APythonDataProvider, providesAValidTree)
     auto pop0Mass                    = pop0["mass"].to<double>();
     auto& pop0ParticleInitializer    = pop0["particle_initializer"];
     auto pop0ParticleInitializerName = pop0ParticleInitializer["name"].to<std::string>();
-    auto pop0density                 = pop0ParticleInitializer["density"].to<InitFunction<1>>();
-    auto bulk0x             = pop0ParticleInitializer["bulk_velocity_x"].to<InitFunction<1>>();
-    auto bulk0y             = pop0ParticleInitializer["bulk_velocity_y"].to<InitFunction<1>>();
-    auto bulk0z             = pop0ParticleInitializer["bulk_velocity_z"].to<InitFunction<1>>();
-    auto vth0x              = pop0ParticleInitializer["thermal_velocity_x"].to<InitFunction<1>>();
-    auto vth0y              = pop0ParticleInitializer["thermal_velocity_y"].to<InitFunction<1>>();
-    auto vth0z              = pop0ParticleInitializer["thermal_velocity_z"].to<InitFunction<1>>();
+    auto pop0density = pop0ParticleInitializer["density"].to<InitFunction<double, 1>>();
+    auto bulk0x      = pop0ParticleInitializer["bulk_velocity_x"].to<InitFunction<double, 1>>();
+    auto bulk0y      = pop0ParticleInitializer["bulk_velocity_y"].to<InitFunction<double, 1>>();
+    auto bulk0z      = pop0ParticleInitializer["bulk_velocity_z"].to<InitFunction<double, 1>>();
+    auto vth0x       = pop0ParticleInitializer["thermal_velocity_x"].to<InitFunction<double, 1>>();
+    auto vth0y       = pop0ParticleInitializer["thermal_velocity_y"].to<InitFunction<double, 1>>();
+    auto vth0z       = pop0ParticleInitializer["thermal_velocity_z"].to<InitFunction<double, 1>>();
     auto pop0NbrPartPerCell = pop0ParticleInitializer["nbr_part_per_cell"].to<int>();
     auto pop0Charge         = pop0ParticleInitializer["charge"].to<double>();
     auto pop0Basis          = pop0ParticleInitializer["basis"].to<std::string>();

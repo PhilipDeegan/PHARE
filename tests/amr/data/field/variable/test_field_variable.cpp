@@ -42,14 +42,13 @@ struct FieldVariableTest : public ::testing::TestWithParam<FieldVariableTestPara
 
 using TestWithQuantityThatLivesOnPatchBoundary1D = FieldVariableTest;
 
-template <std::size_t dim, std::size_t interporder>
-using FV = FieldVariable<GridLayout<GridLayoutImplYee<dim, interporder>>,
-                         Field<NdArrayVector<dim>, HybridQuantity::Scalar>>;
+template<std::size_t dim, std::size_t interporder, typename Float = double>
+using FV = FieldVariable<GridLayout<GridLayoutImplYee<dim, interporder, Float>>,
+                         Field<NdArrayVector<dim, Float>, HybridQuantity::Scalar>>;
 
 TEST_P(TestWithQuantityThatLivesOnPatchBoundary1D, ThatActualDataLivesOnPatchBoundary)
 {
-    auto fieldVariable  = std::make_shared<FV<1,1>>(
-            param.qtyName, param.qty);
+    auto fieldVariable = std::make_shared<FV<1, 1>>(param.qtyName, param.qty);
 
     EXPECT_TRUE(fieldVariable->dataLivesOnPatchBorder());
 }
@@ -58,9 +57,7 @@ using TestWithQuantityThatLivesInsidePatchBoundary1D = FieldVariableTest;
 
 TEST_P(TestWithQuantityThatLivesInsidePatchBoundary1D, ThatActualDataLivesInsidePatchBoundary)
 {
-    auto fieldVariable
-        = std::make_shared<FV<1,1>>(
-            param.qtyName, param.qty);
+    auto fieldVariable = std::make_shared<FV<1, 1>>(param.qtyName, param.qty);
 
     EXPECT_FALSE(fieldVariable->dataLivesOnPatchBorder());
 }

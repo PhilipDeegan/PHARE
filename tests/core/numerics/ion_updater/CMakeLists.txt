@@ -6,6 +6,8 @@ set(SOURCES test_updater.cpp)
 
 add_executable(${PROJECT_NAME} ${SOURCES})
 
+target_compile_options(${PROJECT_NAME} PRIVATE ${PHARE_WERROR_FLAGS} -DPHARE_HAS_HIGHFIVE=${PHARE_HAS_HIGHFIVE})
+
 target_include_directories(${PROJECT_NAME} PRIVATE
   ${GTEST_INCLUDE_DIRS}
   )

@@ -19,6 +19,7 @@
 
 using testing::DoubleNear;
 using testing::Eq;
+using Float = double;
 
 template<std::size_t dimension_, std::size_t interpOrder_, std::size_t refineParticlesNbr_,
          ParticlesDataSplitType SplitType_>
@@ -78,9 +79,9 @@ public:
 
 
 
-    ParticleArray<dimension> getRefinedL0Particles()
+    ParticleArray<double, dimension> getRefinedL0Particles()
     {
-        ParticleArray<dimension> refinedParticles;
+        ParticleArray<double, dimension> refinedParticles;
 
         Splitter split;
 
@@ -139,13 +140,13 @@ class levelOneCoarseBoundaries : public aSimpleBasicHierarchyWithTwoLevels<Type>
 public:
     using BaseType                         = aSimpleBasicHierarchyWithTwoLevels<Type>;
     static constexpr std::size_t dimension = BaseType::dimension;
-    using ParticlesData_t                  = ParticlesData<ParticleArray<dimension>>;
+    using ParticlesData_t                  = ParticlesData<ParticleArray<double, dimension>>;
+    using ParticleArray_t                  = ParticleArray<double, dimension>;
 
-    ParticleArray<dimension>
-    filterLevelGhostParticles(ParticleArray<dimension> const& refinedParticles,
-                              std::shared_ptr<SAMRAI::hier::Patch> const& patch)
+    ParticleArray_t filterLevelGhostParticles(ParticleArray_t const& refinedParticles,
+                                              std::shared_ptr<SAMRAI::hier::Patch> const& patch)
     {
-        ParticleArray<dimension> levelGhosts;
+        ParticleArray_t levelGhosts;
 
         auto pData    = patch->getPatchData(this->dataID);
         auto partData = std::dynamic_pointer_cast<ParticlesData_t>(pData);
@@ -241,16 +242,17 @@ class levelOneInterior : public aSimpleBasicHierarchyWithTwoLevels<Type>
 public:
     using BaseType                         = aSimpleBasicHierarchyWithTwoLevels<Type>;
     static constexpr std::size_t dimension = BaseType::dimension;
-    using ParticlesData_t                  = ParticlesData<ParticleArray<dimension>>;
+    using ParticleArray_t                  = ParticleArray<double, dimension>;
+    using ParticlesData_t                  = ParticlesData<ParticleArray_t>;
 
-    ParticleArray<dimension>
-    filterInteriorParticles(ParticleArray<dimension> const& refinedParticles,
-                            std::shared_ptr<SAMRAI::hier::Patch> const& patch)
+    ParticleArray_t filterInteriorParticles(ParticleArray_t const& refinedParticles,
+                                            std::shared_ptr<SAMRAI::hier::Patch> const& patch)
     {
-        ParticleArray<dimension> interiors;
+        ParticleArray_t interiors;
 
         auto pData    = patch->getPatchData(this->dataID);
         auto partData = std::dynamic_pointer_cast<ParticlesData_t>(pData);
+
 
         auto myBox = partData->getBox();
 

@@ -176,21 +176,21 @@ template<typename InterpolatorT>
 class A1DInterpolator : public ::testing::Test
 {
 public:
-    using VF = VecField<NdArrayVector<1>, HybridQuantity>;
+    using VF = VecField<NdArrayVector<1, double>, HybridQuantity>;
     Electromag<VF> em;
-    ParticleArray<1> particles;
+    ParticleArray<double, 1> particles;
     InterpolatorT interp;
 
     // arbitrary number of cells
     static constexpr std::uint32_t nx = 50;
-    GridLayout<GridLayoutImplYee<1, 1>> layout{{0.1}, {nx}, {0.}};
+    GridLayout<GridLayoutImplYee<1, 1, double>> layout{{0.1}, {nx}, {0.}};
 
-    Field<NdArrayVector<1>, typename HybridQuantity::Scalar> bx1d_;
-    Field<NdArrayVector<1>, typename HybridQuantity::Scalar> by1d_;
-    Field<NdArrayVector<1>, typename HybridQuantity::Scalar> bz1d_;
-    Field<NdArrayVector<1>, typename HybridQuantity::Scalar> ex1d_;
-    Field<NdArrayVector<1>, typename HybridQuantity::Scalar> ey1d_;
-    Field<NdArrayVector<1>, typename HybridQuantity::Scalar> ez1d_;
+    Field<NdArrayVector<1, double>, typename HybridQuantity::Scalar> bx1d_;
+    Field<NdArrayVector<1, double>, typename HybridQuantity::Scalar> by1d_;
+    Field<NdArrayVector<1, double>, typename HybridQuantity::Scalar> bz1d_;
+    Field<NdArrayVector<1, double>, typename HybridQuantity::Scalar> ex1d_;
+    Field<NdArrayVector<1, double>, typename HybridQuantity::Scalar> ey1d_;
+    Field<NdArrayVector<1, double>, typename HybridQuantity::Scalar> ez1d_;
 
     static constexpr double ex0 = 2.25;
     static constexpr double ey0 = 2.50;
@@ -251,27 +251,27 @@ TYPED_TEST(A1DInterpolator, canComputeAllEMfieldsAtParticle)
 
     EXPECT_TRUE(std::all_of(
         std::begin(this->particles), std::end(this->particles),
-        [this](Particle<1> const& part) { return std::abs(part.Ex - this->ex0) < 1e-8; }));
+        [this](Particle<double, 1> const& part) { return std::abs(part.Ex - this->ex0) < 1e-8; }));
 
     EXPECT_TRUE(std::all_of(
         std::begin(this->particles), std::end(this->particles),
-        [this](Particle<1> const& part) { return std::abs(part.Ey - this->ey0) < 1e-8; }));
+        [this](Particle<double, 1> const& part) { return std::abs(part.Ey - this->ey0) < 1e-8; }));
 
     EXPECT_TRUE(std::all_of(
         std::begin(this->particles), std::end(this->particles),
-        [this](Particle<1> const& part) { return std::abs(part.Ez - this->ez0) < 1e-8; }));
+        [this](Particle<double, 1> const& part) { return std::abs(part.Ez - this->ez0) < 1e-8; }));
 
     EXPECT_TRUE(std::all_of(
         std::begin(this->particles), std::end(this->particles),
-        [this](Particle<1> const& part) { return std::abs(part.Bx - this->bx0) < 1e-8; }));
+        [this](Particle<double, 1> const& part) { return std::abs(part.Bx - this->bx0) < 1e-8; }));
 
     EXPECT_TRUE(std::all_of(
         std::begin(this->particles), std::end(this->particles),
-        [this](Particle<1> const& part) { return std::abs(part.By - this->by0) < 1e-8; }));
+        [this](Particle<double, 1> const& part) { return std::abs(part.By - this->by0) < 1e-8; }));
 
     EXPECT_TRUE(std::all_of(
         std::begin(this->particles), std::end(this->particles),
-        [this](Particle<1> const& part) { return std::abs(part.Bz - this->bz0) < 1e-8; }));
+        [this](Particle<double, 1> const& part) { return std::abs(part.Bz - this->bz0) < 1e-8; }));
 
 
     this->em.E.setBuffer("EM_E_x", nullptr);
@@ -288,22 +288,22 @@ template<typename InterpolatorT>
 class A2DInterpolator : public ::testing::Test
 {
 public:
-    using VF = VecField<NdArrayVector<2>, HybridQuantity>;
+    using VF = VecField<NdArrayVector<2, double>, HybridQuantity>;
     Electromag<VF> em;
-    ParticleArray<2> particles;
+    ParticleArray<double, 2> particles;
     InterpolatorT interp;
 
     // arbitrary number of cells
     static constexpr std::uint32_t nx = 50;
     static constexpr std::uint32_t ny = 50;
-    GridLayout<GridLayoutImplYee<2, 1>> layout{{0.1, 0.1}, {nx, ny}, {0., 0.}};
+    GridLayout<GridLayoutImplYee<2, 1, double>> layout{{0.1, 0.1}, {nx, ny}, {0., 0.}};
 
-    Field<NdArrayVector<2>, typename HybridQuantity::Scalar> bx_;
-    Field<NdArrayVector<2>, typename HybridQuantity::Scalar> by_;
-    Field<NdArrayVector<2>, typename HybridQuantity::Scalar> bz_;
-    Field<NdArrayVector<2>, typename HybridQuantity::Scalar> ex_;
-    Field<NdArrayVector<2>, typename HybridQuantity::Scalar> ey_;
-    Field<NdArrayVector<2>, typename HybridQuantity::Scalar> ez_;
+    Field<NdArrayVector<2, double>, typename HybridQuantity::Scalar> bx_;
+    Field<NdArrayVector<2, double>, typename HybridQuantity::Scalar> by_;
+    Field<NdArrayVector<2, double>, typename HybridQuantity::Scalar> bz_;
+    Field<NdArrayVector<2, double>, typename HybridQuantity::Scalar> ex_;
+    Field<NdArrayVector<2, double>, typename HybridQuantity::Scalar> ey_;
+    Field<NdArrayVector<2, double>, typename HybridQuantity::Scalar> ez_;
 
     static constexpr double ex0 = 2.25;
     static constexpr double ey0 = 2.50;
@@ -366,27 +366,27 @@ TYPED_TEST(A2DInterpolator, canComputeAllEMfieldsAtParticle)
 
     EXPECT_TRUE(std::all_of(
         std::begin(this->particles), std::end(this->particles),
-        [this](Particle<2> const& part) { return std::abs(part.Ex - this->ex0) < 1e-8; }));
+        [this](Particle<double, 2> const& part) { return std::abs(part.Ex - this->ex0) < 1e-8; }));
 
     EXPECT_TRUE(std::all_of(
         std::begin(this->particles), std::end(this->particles),
-        [this](Particle<2> const& part) { return std::abs(part.Ey - this->ey0) < 1e-8; }));
+        [this](Particle<double, 2> const& part) { return std::abs(part.Ey - this->ey0) < 1e-8; }));
 
     EXPECT_TRUE(std::all_of(
         std::begin(this->particles), std::end(this->particles),
-        [this](Particle<2> const& part) { return std::abs(part.Ez - this->ez0) < 1e-8; }));
+        [this](Particle<double, 2> const& part) { return std::abs(part.Ez - this->ez0) < 1e-8; }));
 
     EXPECT_TRUE(std::all_of(
         std::begin(this->particles), std::end(this->particles),
-        [this](Particle<2> const& part) { return std::abs(part.Bx - this->bx0) < 1e-8; }));
+        [this](Particle<double, 2> const& part) { return std::abs(part.Bx - this->bx0) < 1e-8; }));
 
     EXPECT_TRUE(std::all_of(
         std::begin(this->particles), std::end(this->particles),
-        [this](Particle<2> const& part) { return std::abs(part.By - this->by0) < 1e-8; }));
+        [this](Particle<double, 2> const& part) { return std::abs(part.By - this->by0) < 1e-8; }));
 
     EXPECT_TRUE(std::all_of(
         std::begin(this->particles), std::end(this->particles),
-        [this](Particle<2> const& part) { return std::abs(part.Bz - this->bz0) < 1e-8; }));
+        [this](Particle<double, 2> const& part) { return std::abs(part.Bz - this->bz0) < 1e-8; }));
 
 
     this->em.E.setBuffer("EM_E_x", nullptr);
@@ -404,23 +404,23 @@ template<typename InterpolatorT>
 class A3DInterpolator : public ::testing::Test
 {
 public:
-    using VF = VecField<NdArrayVector<3>, HybridQuantity>;
+    using VF = VecField<NdArrayVector<3, double>, HybridQuantity>;
     Electromag<VF> em;
-    ParticleArray<3> particles;
+    ParticleArray<double, 3> particles;
     InterpolatorT interp;
 
     // arbitrary number of cells
     static constexpr std::uint32_t nx = 50;
     static constexpr std::uint32_t ny = 50;
     static constexpr std::uint32_t nz = 50;
-    GridLayout<GridLayoutImplYee<3, 1>> layout{{0.1, 0.1, 0.1}, {nx, ny, nz}, {0., 0., 0.}};
+    GridLayout<GridLayoutImplYee<3, 1, double>> layout{{0.1, 0.1, 0.1}, {nx, ny, nz}, {0., 0., 0.}};
 
-    Field<NdArrayVector<3>, typename HybridQuantity::Scalar> bx_;
-    Field<NdArrayVector<3>, typename HybridQuantity::Scalar> by_;
-    Field<NdArrayVector<3>, typename HybridQuantity::Scalar> bz_;
-    Field<NdArrayVector<3>, typename HybridQuantity::Scalar> ex_;
-    Field<NdArrayVector<3>, typename HybridQuantity::Scalar> ey_;
-    Field<NdArrayVector<3>, typename HybridQuantity::Scalar> ez_;
+    Field<NdArrayVector<3, double>, typename HybridQuantity::Scalar> bx_;
+    Field<NdArrayVector<3, double>, typename HybridQuantity::Scalar> by_;
+    Field<NdArrayVector<3, double>, typename HybridQuantity::Scalar> bz_;
+    Field<NdArrayVector<3, double>, typename HybridQuantity::Scalar> ex_;
+    Field<NdArrayVector<3, double>, typename HybridQuantity::Scalar> ey_;
+    Field<NdArrayVector<3, double>, typename HybridQuantity::Scalar> ez_;
 
     static constexpr double ex0 = 2.25;
     static constexpr double ey0 = 2.50;
@@ -486,27 +486,27 @@ TYPED_TEST(A3DInterpolator, canComputeAllEMfieldsAtParticle)
 
     EXPECT_TRUE(std::all_of(
         std::begin(this->particles), std::end(this->particles),
-        [this](Particle<3> const& part) { return std::abs(part.Ex - this->ex0) < 1e-8; }));
+        [this](Particle<double, 3> const& part) { return std::abs(part.Ex - this->ex0) < 1e-8; }));
 
     EXPECT_TRUE(std::all_of(
         std::begin(this->particles), std::end(this->particles),
-        [this](Particle<3> const& part) { return std::abs(part.Ey - this->ey0) < 1e-8; }));
+        [this](Particle<double, 3> const& part) { return std::abs(part.Ey - this->ey0) < 1e-8; }));
 
     EXPECT_TRUE(std::all_of(
         std::begin(this->particles), std::end(this->particles),
-        [this](Particle<3> const& part) { return std::abs(part.Ez - this->ez0) < 1e-8; }));
+        [this](Particle<double, 3> const& part) { return std::abs(part.Ez - this->ez0) < 1e-8; }));
 
     EXPECT_TRUE(std::all_of(
         std::begin(this->particles), std::end(this->particles),
-        [this](Particle<3> const& part) { return std::abs(part.Bx - this->bx0) < 1e-8; }));
+        [this](Particle<double, 3> const& part) { return std::abs(part.Bx - this->bx0) < 1e-8; }));
 
     EXPECT_TRUE(std::all_of(
         std::begin(this->particles), std::end(this->particles),
-        [this](Particle<3> const& part) { return std::abs(part.By - this->by0) < 1e-8; }));
+        [this](Particle<double, 3> const& part) { return std::abs(part.By - this->by0) < 1e-8; }));
 
     EXPECT_TRUE(std::all_of(
         std::begin(this->particles), std::end(this->particles),
-        [this](Particle<3> const& part) { return std::abs(part.Bz - this->bz0) < 1e-8; }));
+        [this](Particle<double, 3> const& part) { return std::abs(part.Bz - this->bz0) < 1e-8; }));
 
 
     this->em.E.setBuffer("EM_E_x", nullptr);
@@ -531,16 +531,16 @@ class ACollectionOfParticles_1d : public ::testing::Test
 {
 public:
     static constexpr std::uint32_t nx = 40;
-    GridLayout<GridLayoutImplYee<1, Interpolator::interp_order>> layout{{0.1}, {nx}, {0.}};
+    GridLayout<GridLayoutImplYee<1, Interpolator::interp_order, double>> layout{{0.1}, {nx}, {0.}};
     static constexpr std::uint32_t nbrPoints = nbrPointsSupport(Interpolator::interp_order);
     static constexpr std::uint32_t numOfPart = Interpolator::interp_order + 2;
-    Particle<1> part;
-    ParticleArray<1> particles;
-    Field<NdArrayVector<1>, typename HybridQuantity::Scalar> rho;
-    Field<NdArrayVector<1>, typename HybridQuantity::Scalar> vx;
-    Field<NdArrayVector<1>, typename HybridQuantity::Scalar> vy;
-    Field<NdArrayVector<1>, typename HybridQuantity::Scalar> vz;
-    VecField<NdArrayVector<1>, HybridQuantity> v;
+    Particle<double, 1> part;
+    ParticleArray<double, 1> particles;
+    Field<NdArrayVector<1, double>, typename HybridQuantity::Scalar> rho;
+    Field<NdArrayVector<1, double>, typename HybridQuantity::Scalar> vx;
+    Field<NdArrayVector<1, double>, typename HybridQuantity::Scalar> vy;
+    Field<NdArrayVector<1, double>, typename HybridQuantity::Scalar> vz;
+    VecField<NdArrayVector<1, double>, HybridQuantity> v;
     std::array<double, nbrPointsSupport(Interpolator::interp_order)> weights;
 
 
@@ -724,12 +724,12 @@ struct ACollectionOfParticles_2d : public ::testing::Test
         interpolator(std::begin(particles), std::end(particles), rho, v, layout);
     }
 
-    GridLayout<GridLayoutImplYee<dim, Interpolator::interp_order>> layout{
+    GridLayout<GridLayoutImplYee<dim, Interpolator::interp_order, double>> layout{
         ConstArray<double, dim>(.1), {nx, ny}, ConstArray<double, dim>(0)};
 
-    ParticleArray<dim> particles;
+    ParticleArray<double, dim> particles;
     Field<NdArrayVector<dim>, typename HybridQuantity::Scalar> rho, vx, vy, vz;
-    VecField<NdArrayVector<dim>, HybridQuantity> v;
+    VecField<NdArrayVector<dim, double>, HybridQuantity> v;
     Interpolator interpolator;
 };
 TYPED_TEST_SUITE_P(ACollectionOfParticles_2d);

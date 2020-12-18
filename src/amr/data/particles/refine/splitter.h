@@ -59,12 +59,14 @@ private:
         assert(particles.size() >= idx + nbRefinedParts);
 
         using FineParticle = decltype(particles[0]); // may be a reference
+        using Float        = typename Particle::float_type;
 
         core::apply(patterns, [&](auto const& pattern) {
+            Float weight = static_cast<Float>(pattern.weight_);
             for (size_t rpIndex = 0; rpIndex < pattern.deltas_.size(); rpIndex++)
             {
                 FineParticle fineParticle = particles[idx++];
-                fineParticle.weight       = particle.weight * pattern.weight_;
+                fineParticle.weight       = particle.weight * weight;
                 fineParticle.charge       = particle.charge;
                 fineParticle.iCell        = particle.iCell;
                 fineParticle.delta        = particle.delta;

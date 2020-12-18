@@ -16,15 +16,17 @@
 
 namespace PHARE::solver
 {
-template<std::size_t dimension_, std::size_t interp_order_, std::size_t nbRefinedPart_>
+template<std::size_t dimension_, std::size_t interp_order_, std::size_t nbRefinedPart_,
+         typename Float_ = double>
 struct PHARE_Types
 {
     static auto constexpr dimension     = dimension_;
     static auto constexpr interp_order  = interp_order_;
     static auto constexpr nbRefinedPart = nbRefinedPart_;
+    using Float                         = Float_;
 
     // core deps
-    using core_types   = PHARE::core::PHARE_Types<dimension, interp_order>;
+    using core_types   = PHARE::core::PHARE_Types<dimension, interp_order, Float>;
     using VecField_t   = typename core_types::VecField_t;
     using Electromag_t = typename core_types::Electromag_t;
     using Ions_t       = typename core_types::Ions_t;
@@ -32,7 +34,7 @@ struct PHARE_Types
     using Electrons_t  = typename core_types::Electrons_t;
     // core deps
 
-    using IPhysicalModel = PHARE::solver::IPhysicalModel<PHARE::amr::SAMRAI_Types>;
+    using IPhysicalModel = PHARE::solver::IPhysicalModel<PHARE::amr::SAMRAI_Types, Float>;
     using HybridModel_t  = PHARE::solver::HybridModel<GridLayout_t, Electromag_t, Ions_t,
                                                      Electrons_t, PHARE::amr::SAMRAI_Types>;
     using MHDModel_t  = PHARE::solver::MHDModel<GridLayout_t, VecField_t, PHARE::amr::SAMRAI_Types>;
@@ -41,7 +43,7 @@ struct PHARE_Types
     using LevelInitializerFactory_t = PHARE::solver::LevelInitializerFactory<HybridModel_t>;
 
     // amr deps
-    using amr_types        = PHARE::amr::PHARE_Types<dimension, interp_order, nbRefinedPart>;
+    using amr_types        = PHARE::amr::PHARE_Types<dimension, interp_order, nbRefinedPart, Float>;
     using RefinementParams = typename amr_types::RefinementParams;
 
     using MessengerFactory // = amr/solver bidirectional dependency
@@ -50,7 +52,7 @@ struct PHARE_Types
 
     using MultiPhysicsIntegrator
         = PHARE::solver::MultiPhysicsIntegrator<MessengerFactory, LevelInitializerFactory_t,
-                                                PHARE::amr::SAMRAI_Types>;
+                                                PHARE::amr::SAMRAI_Types, Float>;
 };
 
 } // namespace PHARE::solver

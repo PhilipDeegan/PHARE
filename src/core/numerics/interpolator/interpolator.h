@@ -23,10 +23,12 @@ namespace core
 
 
     //! return the number of points on which to interpolate at order InterpOrder
-    template<std::size_t interpOrder>
-    int computeStartIndex(double normalizedPos)
+    template<std::size_t interpOrder, typename Float>
+    int computeStartIndex(Float normalizedPos)
     {
-        return static_cast<int>(normalizedPos - (static_cast<double>(interpOrder) - 1.) / 2.);
+        constexpr Float one = 1;
+        constexpr Float two = 2;
+        return static_cast<int>(normalizedPos - (static_cast<Float>(interpOrder) - one) / two);
     }
 
 
@@ -59,14 +61,17 @@ namespace core
     class Weighter<1>
     {
     public:
-        inline void computeWeight(double normalizedPos, int startIndex,
-                                  std::array<double, nbrPointsSupport(1)>& weights)
-        {
-            weights[1] = normalizedPos - static_cast<double>(startIndex);
-            weights[0] = 1. - weights[1];
-        }
+        static constexpr size_t interp_order = 1;
 
-        static const int interp_order = 1;
+        template<typename Float>
+        static void computeWeight(Float normalizedPos, int startIndex,
+                                  std::array<Float, nbrPointsSupport(1)>& weights)
+        {
+            constexpr Float one = 1;
+
+            weights[1] = normalizedPos - static_cast<Float>(startIndex);
+            weights[0] = one - weights[1];
+        }
     };
 
 
@@ -76,22 +81,26 @@ namespace core
     class Weighter<2>
     {
     public:
-        inline void computeWeight(double normalizedPos, int startIndex,
-                                  std::array<double, nbrPointsSupport(2)>& weights)
+        static constexpr size_t interp_order = 2;
+
+        template<typename Float>
+        static void computeWeight(Float normalizedPos, int startIndex,
+                                  std::array<Float, nbrPointsSupport(2)>& weights)
         {
+            constexpr Float half           = .5;
+            constexpr Float three_quarters = .75;
+
             auto index = startIndex + 1;
-            auto delta = static_cast<double>(index) - normalizedPos;
-            double coef1, coef2, coef3;
-            coef1 = 0.5 + delta;
+            auto delta = static_cast<Float>(index) - normalizedPos;
+            Float coef1, coef2, coef3;
+            coef1 = half + delta;
             coef2 = delta;
-            coef3 = 0.5 - delta;
+            coef3 = half - delta;
 
-            weights[0] = 0.5 * coef1 * coef1;
-            weights[1] = 0.75 - coef2 * coef2;
-            weights[2] = 0.5 * coef3 * coef3;
+            weights[0] = half * coef1 * coef1;
+            weights[1] = three_quarters - coef2 * coef2;
+            weights[2] = half * coef3 * coef3;
         }
-
-        static const int interp_order = 2;
     };
 
 
@@ -102,28 +111,35 @@ namespace core
     class Weighter<3>
     {
     public:
-        inline void computeWeight(double normalizedPos, int startIndex,
-                                  std::array<double, nbrPointsSupport(3)>& weights)
+        static constexpr size_t interp_order = 3;
+
+        template<typename Float>
+        static void computeWeight(Float normalizedPos, int startIndex,
+                                  std::array<Float, nbrPointsSupport(3)>& weights)
         {
-            double coef1, coef2, coef3, coef4;
-            auto index = static_cast<double>(startIndex) - normalizedPos;
-            coef1      = 1. + 0.5 * index;
+            constexpr Float half  = .5;
+            constexpr Float one   = 1;
+            constexpr Float two   = 2;
+            constexpr Float three = 3;
+            constexpr Float four  = 4;
+
+            Float coef1, coef2, coef3, coef4;
+            auto index = static_cast<Float>(startIndex) - normalizedPos;
+            coef1      = one + half * index;
             coef2      = index + 1;
             coef3      = index + 2;
-            coef4      = 1. - 0.5 * (index + 3);
+            coef4      = one - half * (index + 3);
 
-            double coef2_sq  = coef2 * coef2;
-            double coef2_cub = coef2_sq * coef2;
-            double coef3_sq  = coef3 * coef3;
-            double coef3_cub = coef3_sq * coef3;
+            Float coef2_sq  = coef2 * coef2;
+            Float coef2_cub = coef2_sq * coef2;
+            Float coef3_sq  = coef3 * coef3;
+            Float coef3_cub = coef3_sq * coef3;
 
-            weights[0] = (4. / 3.) * coef1 * coef1 * coef1;
-            weights[1] = 2. / 3. - coef2_sq - 0.5 * coef2_cub;
-            weights[2] = 2. / 3. - coef3_sq + 0.5 * coef3_cub;
-            weights[3] = (4. / 3.) * coef4 * coef4 * coef4;
+            weights[0] = (four / three) * coef1 * coef1 * coef1;
+            weights[1] = two / three - coef2_sq - half * coef2_cub;
+            weights[2] = two / three - coef3_sq + half * coef3_cub;
+            weights[3] = (four / three) * coef4 * coef4 * coef4;
         }
-
-        static const int interp_order = 3;
     };
 
 
@@ -132,7 +148,7 @@ namespace core
     //! Interpol performs the interpolation of a field using precomputed weights at
     //! indices starting at startIndex. The class is templated by the Dimensionality
     template<std::size_t dim>
-    class MeshToParticle
+    class MeshTo
     {
     };
 
@@ -141,7 +157,7 @@ namespace core
     /** \brief specialization of Interpol for 1D interpolation
      */
     template<>
-    class MeshToParticle<1>
+    class MeshTo<1>
     {
     public:
         /** Performs the 1D interpolation
@@ -151,11 +167,13 @@ namespace core
          * the field \param[in] weights are the nbrPointsSupport weights used for the interpolation
          */
         template<typename Field, typename Array1, typename Array2>
-        inline double operator()(Field const& field,
-                                 std::array<QtyCentering, 1> const& fieldCentering,
-                                 Array1 const& startIndex, Array2 const& weights)
+        static auto particle(Field const& field, std::array<QtyCentering, 1> const& fieldCentering,
+                             Array1 const& startIndex, Array2 const& weights)
         {
-            auto fieldAtParticle    = 0.;
+            using Float          = typename Field::type;
+            constexpr Float zero = 0;
+
+            auto fieldAtParticle    = zero;
             auto const& xStartIndex = startIndex[static_cast<int>(fieldCentering[0])][0];
             auto const& xWeights    = weights[static_cast<int>(fieldCentering[0])][0];
             auto order_size         = xWeights.size();
@@ -172,7 +190,7 @@ namespace core
     /**\brief Specialization of Interpol for 2D interpolation
      */
     template<>
-    class MeshToParticle<2>
+    class MeshTo<2>
     {
     public:
         /** Performs the 2D interpolation
@@ -184,20 +202,22 @@ namespace core
          */
 
         template<typename Field, typename Array1, typename Array2>
-        inline double operator()(Field const& field,
-                                 std::array<QtyCentering, 2> const& fieldCentering,
-                                 Array1 const& startIndex, Array2 const& weights)
+        static auto particle(Field const& field, std::array<QtyCentering, 2> const& fieldCentering,
+                             Array1 const& startIndex, Array2 const& weights)
         {
+            using Float          = typename Field::type;
+            constexpr Float zero = 0;
+
             auto const& xStartIndex = startIndex[static_cast<int>(fieldCentering[0])][0];
             auto const& yStartIndex = startIndex[static_cast<int>(fieldCentering[1])][1];
             auto const& xWeights    = weights[static_cast<int>(fieldCentering[0])][0];
             auto const& yWeights    = weights[static_cast<int>(fieldCentering[1])][1];
 
-            auto order_size        = xWeights.size();
-            double fieldAtParticle = 0.;
+            auto order_size       = xWeights.size();
+            Float fieldAtParticle = zero;
             for (auto ix = 0u; ix < order_size; ++ix)
             {
-                double Yinterp = 0.;
+                Float Yinterp = zero;
                 for (auto iy = 0u; iy < order_size; ++iy)
                 {
                     Yinterp += field(xStartIndex + ix, yStartIndex + iy) * yWeights[iy];
@@ -214,7 +234,7 @@ namespace core
     /** \brief Specialization of Interpol for 3D interpolation
      */
     template<>
-    class MeshToParticle<3>
+    class MeshTo<3>
     {
     public:
         /** Performs the 3D interpolation
@@ -225,10 +245,12 @@ namespace core
          * weights used for the interpolation in the 3 directions
          */
         template<typename Field, typename Array1, typename Array2>
-        inline double operator()(Field const& field,
-                                 std::array<QtyCentering, 3> const& fieldCentering,
-                                 Array1 const& startIndex, Array2 const& weights)
+        static auto particle(Field const& field, std::array<QtyCentering, 3> const& fieldCentering,
+                             Array1 const& startIndex, Array2 const& weights)
         {
+            using Float          = typename Field::type;
+            constexpr Float zero = 0;
+
             auto const& xStartIndex = startIndex[static_cast<std::size_t>(fieldCentering[0])][0];
             auto const& yStartIndex = startIndex[static_cast<std::size_t>(fieldCentering[1])][1];
             auto const& zStartIndex = startIndex[static_cast<std::size_t>(fieldCentering[2])][2];
@@ -236,14 +258,14 @@ namespace core
             auto const& yWeights    = weights[static_cast<std::size_t>(fieldCentering[1])][1];
             auto const& zWeights    = weights[static_cast<std::size_t>(fieldCentering[2])][2];
 
-            auto order_size        = xWeights.size();
-            double fieldAtParticle = 0.;
+            auto order_size       = xWeights.size();
+            Float fieldAtParticle = zero;
             for (auto ix = 0u; ix < order_size; ++ix)
             {
-                double Yinterp = 0.;
+                Float Yinterp = zero;
                 for (auto iy = 0u; iy < order_size; ++iy)
                 {
-                    double Zinterp = 0.;
+                    Float Zinterp = zero;
                     for (auto iz = 0u; iz < order_size; ++iz)
                     {
                         Zinterp += field(xStartIndex + ix, yStartIndex + iy, zStartIndex + iz)
@@ -260,18 +282,18 @@ namespace core
 
 
 
-    //! ParticleToMesh projects a particle density and flux to given grids
+    //! ParticleTo projects a particle density and flux to given grids
     template<std::size_t dim>
-    class ParticleToMesh
+    class ParticleTo
     {
     };
 
 
 
-    /** \brief specialization of ParticleToMesh for 1D interpolation
+    /** \brief specialization of ParticleTo for 1D interpolation
      */
     template<>
-    class ParticleToMesh<1>
+    class ParticleTo<1>
     {
     public: /** Performs the 1D interpolation
              * \param[in] density is the field that will be interpolated from the particle Particle
@@ -284,12 +306,12 @@ namespace core
              * contribute \param[in] weights is the arrays of weights for the associated index
              */
         template<typename Field, typename Array1, typename Array2, typename Particle,
-                 typename VectorCenteringArray>
-        inline void operator()(Field& density, Field& xFlux, Field& yFlux, Field& zFlux,
-                               std::array<QtyCentering, 1> const& densityCentering,
-                               VectorCenteringArray const& fluxCentering, Particle const& particle,
-                               Array1 const& startIndex, Array2 const& weights, double cellVolume,
-                               double coef = 1.)
+                 typename VectorCenteringArray, typename Float = typename Field::type>
+        static void mesh(Field& density, Field& xFlux, Field& yFlux, Field& zFlux,
+                         std::array<QtyCentering, 1> const& densityCentering,
+                         VectorCenteringArray const& fluxCentering, Particle const& particle,
+                         Array1 const& startIndex, Array2 const& weights, Float cellVolume,
+                         Float coef = 1.)
         {
             auto const& xDenStartIndex = startIndex[static_cast<int>(densityCentering[0])][0];
             auto const& xDenWeights    = weights[static_cast<int>(densityCentering[0])][0];
@@ -324,10 +346,10 @@ namespace core
 
 
 
-    /** \brief specialization of ParticleToMesh for 2D interpolation
+    /** \brief specialization of ParticleTo for 2D interpolation
      */
     template<>
-    class ParticleToMesh<2>
+    class ParticleTo<2>
     {
     public: /** Performs the 2D interpolation
              * \param[in] density is the field that will be interpolated from the particle Particle
@@ -340,12 +362,12 @@ namespace core
              * contribute \param[in] weights is the arrays of weights for the associated index
              */
         template<typename Field, typename Array1, typename Array2, typename Particle,
-                 typename VectorCenteringArray>
-        inline void operator()(Field& density, Field& xFlux, Field& yFlux, Field& zFlux,
-                               std::array<QtyCentering, 2> const& densityCentering,
-                               VectorCenteringArray const& fluxCentering, Particle const& particle,
-                               Array1 const& startIndex, Array2 const& weights, double cellVolume,
-                               double coef = 1.)
+                 typename VectorCenteringArray, typename Float = typename Field::type>
+        static void mesh(Field& density, Field& xFlux, Field& yFlux, Field& zFlux,
+                         std::array<QtyCentering, 2> const& densityCentering,
+                         VectorCenteringArray const& fluxCentering, Particle const& particle,
+                         Array1 const& startIndex, Array2 const& weights, Float cellVolume,
+                         Float coef = 1.)
         {
             auto const& xDenStartIndex = startIndex[static_cast<int>(densityCentering[0])][0];
             auto const& xDenWeights    = weights[static_cast<int>(densityCentering[0])][0];
@@ -405,28 +427,27 @@ namespace core
 
 
 
-    /** \brief specialization of ParticleToMesh for 3D interpolation
+    /** \brief specialization of ParticleTo for 3D interpolation
      */
     template<>
-    class ParticleToMesh<3>
-    {
-    public: /** Performs the 3D interpolation
-             * \param[in] density is the field that will be interpolated from the particle Particle
-             * \param[in] xFlux is the field that will be interpolated from the particle Particle
-             * \param[in] yFlux is the field that will be interpolated from the particle Particle
-             * \param[in] zFlux is the field that will be interpolated from the particle Particle
-             * \param[in] fieldCentering is the centering (dual or primal) of the field in each
-             * direction \param[in] particle is the single particle used for the interpolation of
-             * density and flux \param[in] startIndex is the first index for which a particle will
-             * contribute \param[in] weights is the arrays of weights for the associated index
-             */
+    struct ParticleTo<3>
+    { /** Performs the 3D interpolation
+       * \param[in] density is the field that will be interpolated from the particle Particle
+       * \param[in] xFlux is the field that will be interpolated from the particle Particle
+       * \param[in] yFlux is the field that will be interpolated from the particle Particle
+       * \param[in] zFlux is the field that will be interpolated from the particle Particle
+       * \param[in] fieldCentering is the centering (dual or primal) of the field in each
+       * direction \param[in] particle is the single particle used for the interpolation of
+       * density and flux \param[in] startIndex is the first index for which a particle will
+       * contribute \param[in] weights is the arrays of weights for the associated index
+       */
         template<typename Field, typename Array1, typename Array2, typename Particle,
-                 typename VectorCenteringArray>
-        inline void operator()(Field& density, Field& xFlux, Field& yFlux, Field& zFlux,
-                               std::array<QtyCentering, 3> const& densityCentering,
-                               VectorCenteringArray const& fluxCentering, Particle const& particle,
-                               Array1 const& startIndex, Array2 const& weights, double cellVolume,
-                               double coef = 1.)
+                 typename VectorCenteringArray, typename Float = typename Field::type>
+        static void mesh(Field& density, Field& xFlux, Field& yFlux, Field& zFlux,
+                         std::array<QtyCentering, 3> const& densityCentering,
+                         VectorCenteringArray const& fluxCentering, Particle const& particle,
+                         Array1 const& startIndex, Array2 const& weights, Float cellVolume,
+                         Float coef = 1.)
         {
             auto const& xDenStartIndex = startIndex[static_cast<int>(densityCentering[0])][0];
             auto const& xDenWeights    = weights[static_cast<int>(densityCentering[0])][0];
@@ -508,12 +529,21 @@ namespace core
     /** \brief Interpolator is used to perform particle-mesh interpolations using
      * 1st, 2nd or 3rd order interpolation in 1D, 2D or 3D, on a given layout.
      */
-    template<std::size_t dim, std::size_t interpOrder>
+    template<std::size_t dim, std::size_t interpOrder, typename Float = double>
     class Interpolator : private Weighter<interpOrder>
     {
     public:
-        auto static constexpr interp_order = interpOrder;
-        auto static constexpr dimension    = dim;
+        static constexpr size_t interp_order = interpOrder;
+        static constexpr size_t dimension    = dim;
+        using Weighter_t                     = Weighter<interpOrder>;
+        using MeshTo_t                       = MeshTo<dimension>;
+        using ParticleTo_t                   = ParticleTo<dimension>;
+        // array[dual/primal][dim]
+        using StartIndex = std::array<std::array<int, dimension>, 2>;
+        using Weights
+            = std::array<std::array<std::array<Float, nbrPointsSupport(interpOrder)>, dimension>,
+                         2>;
+
         /**\brief interpolate electromagnetic fields on all particles in the range
          *
          * For each particle :
@@ -526,38 +556,50 @@ namespace core
         inline void operator()(PartIterator begin, PartIterator end, Electromag const& Em,
                                GridLayout const& layout)
         {
+            interpolate(begin, end, Em, layout);
+        }
+
+        template<typename PartIterator, typename Electromag, typename GridLayout>
+        static void interpolate(PartIterator begin, PartIterator end, Electromag const& Em,
+                                GridLayout const& layout)
+        {
+            StartIndex startIndex; // do these need to be class members?
+            Weights weights;       // do these need to be class members?
+
             // this lambda calculates the startIndex and the nbrPointsSupport() weights for
             // dual field interpolation and puts this at the corresponding location
             // in 'startIndex' and 'weights'. For dual fields, the normalizedPosition
             // is offseted compared to primal ones.
-            auto indexAndWeightDual = [this, &layout](auto const& part) {
+            auto indexAndWeightDual = [&startIndex, &weights, &layout](auto const& part) {
                 for (auto iDim = 0u; iDim < dimension; ++iDim)
                 {
-                    auto iCell           = layout.AMRToLocal(Point{part.iCell});
-                    double normalizedPos = iCell[iDim] + part.delta[iDim] + dualOffset(interpOrder);
+                    auto delta          = static_cast<Float>(part.delta[iDim]);
+                    auto iCell          = layout.AMRToLocal(Point<int, dimension>{part.iCell});
+                    Float normalizedPos = iCell[iDim] + delta + dualOffset(interpOrder);
 
-                    startIndex_[centering2int(QtyCentering::dual)][iDim]
+                    startIndex[centering2int(QtyCentering::dual)][iDim]
                         = computeStartIndex<interpOrder>(normalizedPos);
 
-                    weightComputer_.computeWeight(
-                        normalizedPos, startIndex_[centering2int(QtyCentering::dual)][iDim],
-                        weights_[centering2int(QtyCentering::dual)][iDim]);
+                    Weighter_t::computeWeight(normalizedPos,
+                                              startIndex[centering2int(QtyCentering::dual)][iDim],
+                                              weights[centering2int(QtyCentering::dual)][iDim]);
                 }
             };
 
             // does the same as above but for a primal field
-            auto indexAndWeightPrimal = [this, &layout](auto const& part) {
+            auto indexAndWeightPrimal = [&startIndex, &weights, &layout](auto const& part) {
                 for (auto iDim = 0u; iDim < dimension; ++iDim)
                 {
-                    auto iCell           = layout.AMRToLocal(Point{part.iCell});
-                    double normalizedPos = iCell[iDim] + part.delta[iDim];
+                    auto delta          = static_cast<Float>(part.delta[iDim]);
+                    auto iCell          = layout.AMRToLocal(Point<int, dimension>{part.iCell});
+                    Float normalizedPos = iCell[iDim] + delta;
 
-                    startIndex_[centering2int(QtyCentering::primal)][iDim]
+                    startIndex[centering2int(QtyCentering::primal)][iDim]
                         = computeStartIndex<interpOrder>(normalizedPos);
 
-                    weightComputer_.computeWeight(
-                        normalizedPos, startIndex_[centering2int(QtyCentering::primal)][iDim],
-                        weights_[centering2int(QtyCentering::primal)][iDim]);
+                    Weighter_t::computeWeight(normalizedPos,
+                                              startIndex[centering2int(QtyCentering::primal)][iDim],
+                                              weights[centering2int(QtyCentering::primal)][iDim]);
                 }
             };
 
@@ -587,12 +629,12 @@ namespace core
                 indexAndWeightPrimal(*currPart);
                 indexAndWeightDual(*currPart);
 
-                currPart->Ex = meshToParticle_(Ex, ExCentering, startIndex_, weights_);
-                currPart->Ey = meshToParticle_(Ey, EyCentering, startIndex_, weights_);
-                currPart->Ez = meshToParticle_(Ez, EzCentering, startIndex_, weights_);
-                currPart->Bx = meshToParticle_(Bx, BxCentering, startIndex_, weights_);
-                currPart->By = meshToParticle_(By, ByCentering, startIndex_, weights_);
-                currPart->Bz = meshToParticle_(Bz, BzCentering, startIndex_, weights_);
+                currPart->Ex = MeshTo_t::particle(Ex, ExCentering, startIndex, weights);
+                currPart->Ey = MeshTo_t::particle(Ey, EyCentering, startIndex, weights);
+                currPart->Ez = MeshTo_t::particle(Ez, EzCentering, startIndex, weights);
+                currPart->Bx = MeshTo_t::particle(Bx, BxCentering, startIndex, weights);
+                currPart->By = MeshTo_t::particle(By, ByCentering, startIndex, weights);
+                currPart->Bz = MeshTo_t::particle(Bz, BzCentering, startIndex, weights);
             }
         }
 
@@ -607,43 +649,57 @@ namespace core
          *  - then it uses Interpol<> to calculate the interpolation of E and B components
          * onto the particle.
          */
+
         template<typename PartIterator, typename VecField, typename GridLayout,
                  typename Field = typename VecField::field_type>
         inline void operator()(PartIterator begin, PartIterator end, Field& density, VecField& flux,
-                               GridLayout const& layout, double coef = 1.)
+                               GridLayout const& layout, Float coef = 1.)
         {
+            interpolate(begin, end, density, flux, layout, coef);
+        }
+
+        template<typename PartIterator, typename VecField, typename GridLayout,
+                 typename Field = typename VecField::field_type>
+        static void interpolate(PartIterator begin, PartIterator end, Field& density,
+                                VecField& flux, GridLayout const& layout, Float coef = 1.)
+        {
+            StartIndex startIndex; // do these need to be class members?
+            Weights weights;       // do these need to be class members?
+
             // this lambda calculates the startIndex and the order+1 weights for
             // dual field interpolation and puts this at the corresponding location
             // in 'startIndex' and 'weights'. For dual fields, the normalizedPosition
             // is offseted compared to primal ones.
-            auto indexAndWeightDual = [this, &layout](auto const& part) {
+            auto indexAndWeightDual = [&startIndex, &weights, &layout](auto const& part) {
                 for (auto iDim = 0u; iDim < dimension; ++iDim)
                 {
-                    auto iCell           = layout.AMRToLocal(Point{part.iCell});
-                    double normalizedPos = iCell[iDim] + part.delta[iDim] + dualOffset(interpOrder);
+                    auto delta          = static_cast<Float>(part.delta[iDim]);
+                    auto iCell          = layout.AMRToLocal(Point<int, dimension>{part.iCell});
+                    Float normalizedPos = iCell[iDim] + delta + dualOffset(interpOrder);
 
-                    startIndex_[centering2int(QtyCentering::dual)][iDim]
+                    startIndex[centering2int(QtyCentering::dual)][iDim]
                         = computeStartIndex<interpOrder>(normalizedPos);
 
-                    weightComputer_.computeWeight(
-                        normalizedPos, startIndex_[centering2int(QtyCentering::dual)][iDim],
-                        weights_[centering2int(QtyCentering::dual)][iDim]);
+                    Weighter_t::computeWeight(normalizedPos,
+                                              startIndex[centering2int(QtyCentering::dual)][iDim],
+                                              weights[centering2int(QtyCentering::dual)][iDim]);
                 }
             };
 
             // does the same as above but for a primal field
-            auto indexAndWeightPrimal = [this, &layout](auto const& part) {
+            auto indexAndWeightPrimal = [&startIndex, &weights, &layout](auto const& part) {
                 for (auto iDim = 0u; iDim < dimension; ++iDim)
                 {
-                    auto iCell           = layout.AMRToLocal(Point{part.iCell});
-                    double normalizedPos = iCell[iDim] + part.delta[iDim];
+                    auto delta          = static_cast<Float>(part.delta[iDim]);
+                    auto iCell          = layout.AMRToLocal(Point<int, dimension>{part.iCell});
+                    Float normalizedPos = iCell[iDim] + delta;
 
-                    startIndex_[centering2int(QtyCentering::primal)][iDim]
+                    startIndex[centering2int(QtyCentering::primal)][iDim]
                         = computeStartIndex<interpOrder>(normalizedPos);
 
-                    weightComputer_.computeWeight(
-                        normalizedPos, startIndex_[centering2int(QtyCentering::primal)][iDim],
-                        weights_[centering2int(QtyCentering::primal)][iDim]);
+                    Weighter_t::computeWeight(normalizedPos,
+                                              startIndex[centering2int(QtyCentering::primal)][iDim],
+                                              weights[centering2int(QtyCentering::primal)][iDim]);
                 }
             };
 
@@ -662,7 +718,7 @@ namespace core
             // the trick here is that the StartIndex and weights have only been calculated
             // twice, and not for each E,B component.
             auto dl         = layout.meshSize();
-            auto cellVolume = std::accumulate(std::begin(dl), std::end(dl), 1.,
+            auto cellVolume = std::accumulate(std::begin(dl), std::end(dl), Float{1},
                                               std::multiplies<typename decltype(dl)::value_type>());
 
             for (auto currPart = begin; currPart != end; ++currPart)
@@ -671,37 +727,26 @@ namespace core
                 indexAndWeightPrimal(*currPart);
                 indexAndWeightDual(*currPart);
 
-                particleToMesh_(density, xFlux, yFlux, zFlux, densityCentering, fluxCentering,
-                                *currPart, startIndex_, weights_, cellVolume, coef);
+                ParticleTo_t::mesh(density, xFlux, yFlux, zFlux, densityCentering, fluxCentering,
+                                   *currPart, startIndex, weights, cellVolume, coef);
             }
         }
 
-
-
-
     private:
-        static_assert(dimension <= 3 && dimension > 0 && interpOrder >= 1 && interpOrder <= 3,
+        static_assert(dimension >= 0 && dimension <= 3 && interpOrder >= 0 && interpOrder <= 3,
                       "error");
-
-        Weighter<interpOrder> weightComputer_;
-        MeshToParticle<dimension> meshToParticle_;
-        ParticleToMesh<dimension> particleToMesh_;
-
-        // array[dual/primal][dim]
-        std::array<std::array<int, dimension>, 2> startIndex_;
-        std::array<std::array<std::array<double, nbrPointsSupport(interpOrder)>, dimension>, 2>
-            weights_;
 
         /**
          * @brief dualOffset returns the offset by which changing the
          * startIndex for dual node interpolation. This offset depends on
          * interpolation order. */
-        inline constexpr double dualOffset(int order)
+        static constexpr Float dualOffset(int order)
         {
-            std::array<double, 3> offsets = {{-0.5, -0.5, 0.5}};
-            return offsets[static_cast<std::array<double, 3>::size_type>(order - 1)];
+            constexpr Float half                   = .5;
+            constexpr std::array<Float, 3> offsets = {{-half, -half, half}};
+            return offsets[static_cast<typename std::array<Float, 3>::size_type>(order - 1)];
         }
-    };
+    }; // namespace core
 
 
 } // namespace core

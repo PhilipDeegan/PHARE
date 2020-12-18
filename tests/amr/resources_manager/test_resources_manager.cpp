@@ -27,19 +27,20 @@ using namespace PHARE::initializer::test_fn::func_1d; // density/etc are here
 
 static constexpr std::size_t dim         = 1;
 static constexpr std::size_t interpOrder = 1;
-using GridImplYee1D                      = GridLayoutImplYee<dim, interpOrder>;
+using GridImplYee1D                      = GridLayoutImplYee<dim, interpOrder, double>;
 using GridYee1D                          = GridLayout<GridImplYee1D>;
 
-using VecField1D                      = VecField<NdArrayVector<1>, HybridQuantity>;
-using IonPopulation1D                 = IonPopulation<ParticleArray<1>, VecField1D, GridYee1D>;
-using Ions1D                          = Ions<IonPopulation1D, GridYee1D>;
-using Electromag1D                    = Electromag<VecField1D>;
-using Electrons1D                     = Electrons<Ions1D>;
-using MaxwellianParticleInitializer1D = MaxwellianParticleInitializer<ParticleArray<1>, GridYee1D>;
-using HybridState1D                   = HybridState<Electromag1D, Ions1D, Electrons1D>;
+using VecField1D      = VecField<NdArrayVector<1, double>, HybridQuantity>;
+using IonPopulation1D = IonPopulation<ParticleArray<double, 1>, VecField1D, GridYee1D>;
+using Ions1D          = Ions<IonPopulation1D, GridYee1D>;
+using Electromag1D    = Electromag<VecField1D>;
+using Electrons1D     = Electrons<Ions1D>;
+using MaxwellianParticleInitializer1D
+    = MaxwellianParticleInitializer<ParticleArray<double, 1>, GridYee1D>;
+using HybridState1D = HybridState<Electromag1D, Ions1D, Electrons1D>;
 
 
-using InitFunctionT = PHARE::initializer::InitFunction<1>;
+using InitFunctionT = PHARE::initializer::InitFunction<double, 1>;
 
 PHARE::initializer::PHAREDict createInitDict()
 {
@@ -202,7 +203,7 @@ TYPED_TEST_P(aResourceUserCollection, hasPointersValidOnlyWithGuard)
 TEST(usingResourcesManager, toGetTimeOfAResourcesUser)
 {
     std::unique_ptr<BasicHierarchy> hierarchy;
-    ResourcesManager<GridLayout<GridLayoutImplYee<1, 1>>> resourcesManager;
+    ResourcesManager<GridLayout<GridLayoutImplYee<1, 1, double>>> resourcesManager;
     IonPopulation1D_P pop;
     auto s    = inputBase + std::string("/input/input_db_1d");
     hierarchy = std::make_unique<BasicHierarchy>(inputBase + std::string("/input/input_db_1d"));

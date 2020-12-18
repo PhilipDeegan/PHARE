@@ -27,7 +27,7 @@ using testing::Eq;
 TEST(UniformIntervalPartition, givesCorrectPartitionsForPrimalEven)
 {
     std::size_t refinementRatio = 2;
-    LinearWeighter uipw{QtyCentering::primal, refinementRatio};
+    LinearWeighter<double> uipw{QtyCentering::primal, refinementRatio};
 
     std::array<double, 2> expectedDistances{0, 0.5};
     auto const& actualDistances = uipw.getUniformDistances();
@@ -44,7 +44,7 @@ TEST(UniformIntervalPartition, givesCorrectPartitionsForPrimalOdd)
 {
     auto ratio     = 5u;
     auto nbrPoints = ratio;
-    LinearWeighter uipw{QtyCentering::primal, ratio};
+    LinearWeighter<double> uipw{QtyCentering::primal, ratio};
 
     std::array<double, 5> expectedDistances{0., 1. / 5., 2. / 5., 3. / 5., 4. / 5.};
     auto const& actualDistances = uipw.getUniformDistances();
@@ -61,7 +61,7 @@ TEST(UniformIntervalPartition, givesCorrectPartitionsForDualEven)
     auto const ratio = 4u;
     auto nbrPoints   = ratio;
 
-    LinearWeighter uipw{QtyCentering::dual, ratio};
+    LinearWeighter<double> uipw{QtyCentering::dual, ratio};
 
     auto smallCellSize = 1. / ratio;
     std::array<double, 4> expectedDistances{5. / 2. * smallCellSize, 7. / 2. * smallCellSize,
@@ -82,7 +82,7 @@ TEST(UniformIntervalPartition, givesCorrectPartitionsForDualOdd)
     auto const ratio = 5u;
     auto nbrPoints   = ratio;
 
-    LinearWeighter uipw{QtyCentering::dual, ratio};
+    LinearWeighter<double> uipw{QtyCentering::dual, ratio};
     auto smallCellSize = 1. / ratio;
 
     std::array<double, 5> expectedDistances{smallCellSize * 3, smallCellSize * 4, 0,
@@ -98,25 +98,25 @@ TEST(UniformIntervalPartition, givesCorrectPartitionsForDualOdd)
 
 
 
-template <std::size_t dim, std::size_t interporder>
-using GridYee = GridLayout<GridLayoutImplYee<dim, interporder>>;
+template<std::size_t dim, std::size_t interporder>
+using GridYee = GridLayout<GridLayoutImplYee<dim, interporder, double>>;
 
-template <std::size_t dim>
-using FieldT     = Field<NdArrayVector<dim>, HybridQuantity::Scalar>;
+template<std::size_t dim>
+using FieldT = Field<NdArrayVector<dim>, HybridQuantity::Scalar>;
 
 TEST(FieldRefineOperator, CanBeCreated)
 {
-    FieldRefineOperator<GridYee<1,1>, FieldT<1>> linearRefine11{};
-    FieldRefineOperator<GridYee<1,2>, FieldT<1>> linearRefine12{};
-    FieldRefineOperator<GridYee<1,3>, FieldT<1>> linearRefine13{};
+    FieldRefineOperator<GridYee<1, 1>, FieldT<1>> linearRefine11{};
+    FieldRefineOperator<GridYee<1, 2>, FieldT<1>> linearRefine12{};
+    FieldRefineOperator<GridYee<1, 3>, FieldT<1>> linearRefine13{};
 
-    FieldRefineOperator<GridYee<2,1>, FieldT<2>> linearRefine21{};
-    FieldRefineOperator<GridYee<2,2>, FieldT<2>> linearRefine22{};
-    FieldRefineOperator<GridYee<2,3>, FieldT<2>> linearRefine23{};
+    FieldRefineOperator<GridYee<2, 1>, FieldT<2>> linearRefine21{};
+    FieldRefineOperator<GridYee<2, 2>, FieldT<2>> linearRefine22{};
+    FieldRefineOperator<GridYee<2, 3>, FieldT<2>> linearRefine23{};
 
-    FieldRefineOperator<GridYee<3,1>, FieldT<3>> linearRefine31{};
-    FieldRefineOperator<GridYee<3,2>, FieldT<3>> linearRefine32{};
-    FieldRefineOperator<GridYee<3,3>, FieldT<3>> linearRefine33{};
+    FieldRefineOperator<GridYee<3, 1>, FieldT<3>> linearRefine31{};
+    FieldRefineOperator<GridYee<3, 2>, FieldT<3>> linearRefine32{};
+    FieldRefineOperator<GridYee<3, 3>, FieldT<3>> linearRefine33{};
 }
 
 
@@ -131,7 +131,8 @@ TEST(FieldRefine, CanBeCreated)
         SAMRAI::hier::Box destinationGhostBox{dim};
         SAMRAI::hier::Box sourceGhostBox{dim};
         SAMRAI::hier::IntVector ratio{dim, 2};
-        FieldRefiner<1> fieldLinearRefine{centering, destinationGhostBox, sourceGhostBox, ratio};
+        FieldRefiner<double, 1> fieldLinearRefine{centering, destinationGhostBox, sourceGhostBox,
+                                                  ratio};
     }
     {
         constexpr std::size_t dimension{2};
@@ -140,7 +141,8 @@ TEST(FieldRefine, CanBeCreated)
         SAMRAI::hier::Box destinationGhostBox{dim};
         SAMRAI::hier::Box sourceGhostBox{dim};
         SAMRAI::hier::IntVector ratio{dim, 2};
-        FieldRefiner<2> fieldLinearRefine{centering, destinationGhostBox, sourceGhostBox, ratio};
+        FieldRefiner<double, 2> fieldLinearRefine{centering, destinationGhostBox, sourceGhostBox,
+                                                  ratio};
     }
     {
         constexpr std::size_t dimension{3};
@@ -149,7 +151,8 @@ TEST(FieldRefine, CanBeCreated)
         SAMRAI::hier::Box destinationGhostBox{dim};
         SAMRAI::hier::Box sourceGhostBox{dim};
         SAMRAI::hier::IntVector ratio{dim, 2};
-        FieldRefiner<3> fieldLinearRefine{centering, destinationGhostBox, sourceGhostBox, ratio};
+        FieldRefiner<double, 3> fieldLinearRefine{centering, destinationGhostBox, sourceGhostBox,
+                                                  ratio};
     }
 }
 
@@ -161,7 +164,7 @@ TEST(AFieldLinearRefineIndexesAndWeights1D, giveACorrectStartIndexForPrimalEvenR
     std::size_t constexpr dimension{1};
     std::array<QtyCentering, dimension> centering{{QtyCentering::primal}};
     SAMRAI::hier::IntVector ratio{SAMRAI::tbox::Dimension{dimension}, 6};
-    FieldRefineIndexesAndWeights<dimension> indexesAndWeights{centering, ratio};
+    FieldRefineIndexesAndWeights<double, dimension> indexesAndWeights{centering, ratio};
 
     std::array<Point<int, dimension>, 2> fineIndexes{Point<int, dimension>{12},
                                                      Point<int, dimension>{18}};
@@ -193,7 +196,7 @@ TEST(AFieldLinearRefineIndexesAndWeights1D, giveACorrectStartIndexForPrimalOddRa
     std::size_t constexpr dimension{1};
     std::array<QtyCentering, dimension> centering{{QtyCentering::primal}};
     SAMRAI::hier::IntVector ratio{SAMRAI::tbox::Dimension{dimension}, 9};
-    FieldRefineIndexesAndWeights<dimension> indexesAndWeights{centering, ratio};
+    FieldRefineIndexesAndWeights<double, dimension> indexesAndWeights{centering, ratio};
 
     std::array<Point<int, dimension>, 2> fineIndexes{Point<int, dimension>{18},
                                                      Point<int, dimension>{27}};
@@ -225,7 +228,7 @@ TEST(AFieldLinearRefineIndexesAndWeights1D, giveACorrectStartIndexForDualEvenRat
     std::size_t constexpr dimension{1};
     std::array<QtyCentering, dimension> centering{{QtyCentering::dual}};
     SAMRAI::hier::IntVector ratio{SAMRAI::tbox::Dimension{dimension}, 4};
-    FieldRefineIndexesAndWeights<dimension> indexesAndWeights{centering, ratio};
+    FieldRefineIndexesAndWeights<double, dimension> indexesAndWeights{centering, ratio};
 
     std::array<Point<int, dimension>, 2> fineIndexes{Point<int, dimension>{12},
                                                      Point<int, dimension>{16}};
@@ -269,7 +272,7 @@ TEST(AFieldLinearRefineIndexesAndWeights1D, giveACorrectStartIndexForDualOddRati
     std::size_t constexpr dimension{1};
     std::array<QtyCentering, dimension> centering{{QtyCentering::dual}};
     SAMRAI::hier::IntVector ratio{SAMRAI::tbox::Dimension{dimension}, 7};
-    FieldRefineIndexesAndWeights<dimension> indexesAndWeights{centering, ratio};
+    FieldRefineIndexesAndWeights<double, dimension> indexesAndWeights{centering, ratio};
 
     std::array<Point<int, dimension>, 2> fineIndexes{Point<int, dimension>{21},
                                                      Point<int, dimension>{28}};
@@ -315,7 +318,7 @@ TEST(AFieldLinearRefineIndexesAndWeights1D, giveACorrectWeightsForDualOddRatio)
     std::size_t constexpr dimension{1};
     std::array<QtyCentering, dimension> centering{{QtyCentering::dual}};
     SAMRAI::hier::IntVector ratio{SAMRAI::tbox::Dimension{dimension}, 5};
-    FieldRefineIndexesAndWeights<dimension> indexesAndWeights{centering, ratio};
+    FieldRefineIndexesAndWeights<double, dimension> indexesAndWeights{centering, ratio};
 
     auto const& xWeights = indexesAndWeights.weights(Direction::X);
     // auto const& xWeights = weights[dirX];
@@ -343,7 +346,7 @@ TEST(AFieldLinearRefineIndexesAndWeights1D, giveACorrectWeightsForPrimalOddRatio
     std::size_t constexpr dimension{1};
     std::array<QtyCentering, dimension> centering{{QtyCentering::primal}};
     SAMRAI::hier::IntVector ratio{SAMRAI::tbox::Dimension{dimension}, 5};
-    FieldRefineIndexesAndWeights<dimension> indexesAndWeights{centering, ratio};
+    FieldRefineIndexesAndWeights<double, dimension> indexesAndWeights{centering, ratio};
 
     auto xWeights      = indexesAndWeights.weights(Direction::X);
     auto smallCellSize = 1. / 5.;
@@ -371,7 +374,7 @@ TEST(AFieldLinearRefineIndexesAndWeights1D, giveACorrectWeightsForDualEvenRatio)
     std::size_t constexpr dimension{1};
     std::array<QtyCentering, dimension> centering{{QtyCentering::dual}};
     SAMRAI::hier::IntVector ratio{SAMRAI::tbox::Dimension{dimension}, 4};
-    FieldRefineIndexesAndWeights<dimension> indexesAndWeights{centering, ratio};
+    FieldRefineIndexesAndWeights<double, dimension> indexesAndWeights{centering, ratio};
 
     auto smallCellSize = 1. / ratio(dirX);
     auto xWeights      = indexesAndWeights.weights(Direction::X);
@@ -398,7 +401,7 @@ TEST(AFieldLinearRefineIndexesAndWeights1D, giveACorrectWeightsForPrimalEvenRati
     std::size_t constexpr dimension{1};
     std::array<QtyCentering, dimension> centering{{QtyCentering::primal}};
     SAMRAI::hier::IntVector ratio{SAMRAI::tbox::Dimension{dimension}, 6};
-    FieldRefineIndexesAndWeights<dimension> indexesAndWeights{centering, ratio};
+    FieldRefineIndexesAndWeights<double, dimension> indexesAndWeights{centering, ratio};
 
     auto xWeights      = indexesAndWeights.weights(Direction::X);
     auto smallCellSize = 1. / ratio(dirX);
@@ -433,7 +436,7 @@ TEST(AFieldLinearIndexesAndWeights1D, giveACorrectiWeightForPrimalEvenRatio)
 
     SAMRAI::hier::IntVector ratio{SAMRAI::tbox::Dimension{dimension}, 6};
 
-    FieldRefineIndexesAndWeights<dimension> indexesAndWeights{centering, ratio};
+    FieldRefineIndexesAndWeights<double, dimension> indexesAndWeights{centering, ratio};
 
     Point<int, dimension> fineIndex{12};
 
@@ -467,7 +470,7 @@ TEST(AFieldLinearIndexesAndWeights1D, giveACorrectiWeightForPrimalOddRatio)
 
     SAMRAI::hier::IntVector ratio{SAMRAI::tbox::Dimension{dimension}, 5};
 
-    FieldRefineIndexesAndWeights<dimension> indexesAndWeights{centering, ratio};
+    FieldRefineIndexesAndWeights<double, dimension> indexesAndWeights{centering, ratio};
 
     Point<int, dimension> fineIndex{10};
 
@@ -501,7 +504,7 @@ TEST(AFieldLinearIndexesAndWeights1D, giveACorrectiWeightForDualEvenRatio)
 
     SAMRAI::hier::IntVector ratio{SAMRAI::tbox::Dimension{dimension}, 6};
 
-    FieldRefineIndexesAndWeights<dimension> indexesAndWeights{centering, ratio};
+    FieldRefineIndexesAndWeights<double, dimension> indexesAndWeights{centering, ratio};
 
     Point<int, dimension> fineIndex{12};
 
@@ -535,7 +538,7 @@ TEST(AFieldLinearIndexesAndWeights1D, giveACorrectiWeightForDualOddRatio)
 
     SAMRAI::hier::IntVector ratio{SAMRAI::tbox::Dimension{dimension}, 7};
 
-    FieldRefineIndexesAndWeights<dimension> indexesAndWeights{centering, ratio};
+    FieldRefineIndexesAndWeights<double, dimension> indexesAndWeights{centering, ratio};
 
     Point<int, dimension> fineIndex{14};
 

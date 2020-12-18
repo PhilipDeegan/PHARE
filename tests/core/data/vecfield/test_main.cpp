@@ -29,7 +29,8 @@ protected:
     VecField<NdArrayImpl, HybridQuantity::Scalar> vf2;
 };
 
-using NdArrays = ::testing::Types<NdArrayVector<1>, NdArrayVector<2>, NdArrayVector<3>>;
+using NdArrays = ::testing::Types<NdArrayVector<1, double>, NdArrayVector<2, double>,
+                                  NdArrayVector<3, double>>;
 
 
 TYPED_TEST_SUITE(VecFieldGeneric, NdArrays);
@@ -88,21 +89,21 @@ protected:
     static const std::uint32_t nx;
     static const std::uint32_t ny;
     static const std::uint32_t nz;
-    Field<NdArrayVector<1>, typename HybridQuantity::Scalar> bx1d_;
-    Field<NdArrayVector<1>, typename HybridQuantity::Scalar> by1d_;
-    Field<NdArrayVector<1>, typename HybridQuantity::Scalar> bz1d_;
+    Field<NdArrayVector<1, double>, typename HybridQuantity::Scalar> bx1d_;
+    Field<NdArrayVector<1, double>, typename HybridQuantity::Scalar> by1d_;
+    Field<NdArrayVector<1, double>, typename HybridQuantity::Scalar> bz1d_;
 
-    Field<NdArrayVector<2>, typename HybridQuantity::Scalar> bx2d_;
-    Field<NdArrayVector<2>, typename HybridQuantity::Scalar> by2d_;
-    Field<NdArrayVector<2>, typename HybridQuantity::Scalar> bz2d_;
+    Field<NdArrayVector<2, double>, typename HybridQuantity::Scalar> bx2d_;
+    Field<NdArrayVector<2, double>, typename HybridQuantity::Scalar> by2d_;
+    Field<NdArrayVector<2, double>, typename HybridQuantity::Scalar> bz2d_;
 
-    Field<NdArrayVector<3>, typename HybridQuantity::Scalar> bx3d_;
-    Field<NdArrayVector<3>, typename HybridQuantity::Scalar> by3d_;
-    Field<NdArrayVector<3>, typename HybridQuantity::Scalar> bz3d_;
+    Field<NdArrayVector<3, double>, typename HybridQuantity::Scalar> bx3d_;
+    Field<NdArrayVector<3, double>, typename HybridQuantity::Scalar> by3d_;
+    Field<NdArrayVector<3, double>, typename HybridQuantity::Scalar> bz3d_;
 
-    VecField<NdArrayVector<1>, HybridQuantity> B1D_;
-    VecField<NdArrayVector<2>, HybridQuantity> B2D_;
-    VecField<NdArrayVector<3>, HybridQuantity> B3D_;
+    VecField<NdArrayVector<1, double>, HybridQuantity> B1D_;
+    VecField<NdArrayVector<2, double>, HybridQuantity> B2D_;
+    VecField<NdArrayVector<3, double>, HybridQuantity> B3D_;
 };
 
 const std::uint32_t VecFieldTest::nx = 10;
@@ -299,10 +300,10 @@ TEST(aVecField, dataCanBeCopiedIntoAnother)
 {
     using Scalar = typename HybridQuantity::Scalar;
 
-    Field<NdArrayVector<3>, Scalar> bx1{"B1_bx1", Scalar::Bx, 2u, 3u, 4u};
-    Field<NdArrayVector<3>, Scalar> by1{"B1_by1", Scalar::By, 2u, 3u, 4u};
-    Field<NdArrayVector<3>, Scalar> bz1{"B1_bz1", Scalar::Bz, 2u, 3u, 4u};
-    VecField<NdArrayVector<3>, HybridQuantity> B1{"B1", HybridQuantity::Vector::B};
+    Field<NdArrayVector<3, double>, Scalar> bx1{"B1_bx1", Scalar::Bx, 2u, 3u, 4u};
+    Field<NdArrayVector<3, double>, Scalar> by1{"B1_by1", Scalar::By, 2u, 3u, 4u};
+    Field<NdArrayVector<3, double>, Scalar> bz1{"B1_bz1", Scalar::Bz, 2u, 3u, 4u};
+    VecField<NdArrayVector<3, double>, HybridQuantity> B1{"B1", HybridQuantity::Vector::B};
     B1.setBuffer("B1_x", &bx1);
     B1.setBuffer("B1_y", &by1);
     B1.setBuffer("B1_z", &bz1);
@@ -311,10 +312,10 @@ TEST(aVecField, dataCanBeCopiedIntoAnother)
     by1(1, 1, 1) = 13;
     bz1(1, 1, 1) = 14;
 
-    Field<NdArrayVector<3>, Scalar> bx2{"B2_bx2", Scalar::Bx, 2u, 3u, 4u};
-    Field<NdArrayVector<3>, Scalar> by2{"B2_by2", Scalar::By, 2u, 3u, 4u};
-    Field<NdArrayVector<3>, Scalar> bz2{"B2_bz2", Scalar::Bz, 2u, 3u, 4u};
-    VecField<NdArrayVector<3>, HybridQuantity> B2{"B2", HybridQuantity::Vector::B};
+    Field<NdArrayVector<3, double>, Scalar> bx2{"B2_bx2", Scalar::Bx, 2u, 3u, 4u};
+    Field<NdArrayVector<3, double>, Scalar> by2{"B2_by2", Scalar::By, 2u, 3u, 4u};
+    Field<NdArrayVector<3, double>, Scalar> bz2{"B2_bz2", Scalar::Bz, 2u, 3u, 4u};
+    VecField<NdArrayVector<3, double>, HybridQuantity> B2{"B2", HybridQuantity::Vector::B};
     B2.setBuffer("B2_x", &bx2);
     B2.setBuffer("B2_y", &by2);
     B2.setBuffer("B2_z", &bz2);

@@ -18,15 +18,11 @@
 using namespace PHARE::core;
 using namespace PHARE::initializer;
 
-using namespace PHARE::core;
-using namespace PHARE::initializer;
-
 #include "tests/initializer/init_functions.h"
 using namespace PHARE::initializer::test_fn::func_1d; // density/etc are here
 
-
-using GridLayoutT    = GridLayout<GridLayoutImplYee<1, 1>>;
-using ParticleArrayT = ParticleArray<1>;
+using GridLayoutT    = GridLayout<GridLayoutImplYee<1, 1, double>>;
+using ParticleArrayT = ParticleArray<double, 1>;
 
 
 TEST(AParticleIinitializerFactory, takesAPHAREDictToCreateAParticleVectorInitializer)
@@ -34,14 +30,14 @@ TEST(AParticleIinitializerFactory, takesAPHAREDictToCreateAParticleVectorInitial
     PHARE::initializer::PHAREDict dict;
     dict["name"]            = std::string{"MaxwellianParticleInitializer"};
     dict["fn_type"]         = std::string{"vector"};
-    dict["density"]         = static_cast<PHARE::initializer::InitFunction<1>>(density);
-    dict["bulk_velocity_x"] = static_cast<PHARE::initializer::InitFunction<1>>(vx);
-    dict["bulk_velocity_y"] = static_cast<PHARE::initializer::InitFunction<1>>(vx);
-    dict["bulk_velocity_z"] = static_cast<PHARE::initializer::InitFunction<1>>(vx);
+    dict["density"]         = static_cast<PHARE::initializer::InitFunction<double, 1>>(density);
+    dict["bulk_velocity_x"] = static_cast<PHARE::initializer::InitFunction<double, 1>>(vx);
+    dict["bulk_velocity_y"] = static_cast<PHARE::initializer::InitFunction<double, 1>>(vx);
+    dict["bulk_velocity_z"] = static_cast<PHARE::initializer::InitFunction<double, 1>>(vx);
 
-    dict["thermal_velocity_x"] = static_cast<PHARE::initializer::InitFunction<1>>(vthx);
-    dict["thermal_velocity_y"] = static_cast<PHARE::initializer::InitFunction<1>>(vthy);
-    dict["thermal_velocity_z"] = static_cast<PHARE::initializer::InitFunction<1>>(vthz);
+    dict["thermal_velocity_x"] = static_cast<PHARE::initializer::InitFunction<double, 1>>(vthx);
+    dict["thermal_velocity_y"] = static_cast<PHARE::initializer::InitFunction<double, 1>>(vthy);
+    dict["thermal_velocity_z"] = static_cast<PHARE::initializer::InitFunction<double, 1>>(vthz);
 
     dict["charge"]         = 1.;
     dict["nbrPartPerCell"] = int{100};

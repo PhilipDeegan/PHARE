@@ -2,13 +2,14 @@
 #include "benchmark/benchmark.h"
 
 #include "core/data/particles/particle.h"
+#include "core/data/particles/contiguous.h"
 
 constexpr std::size_t dim  = 3;
 constexpr std::size_t size = 100000;
 
 auto makeContiguous()
 {
-    PHARE::core::ContiguousParticles<dim> contiguous{size};
+    PHARE::core::ContiguousParticles<double, dim> contiguous{size};
     for (std::size_t i = 0; i < size; i++)
     {
         auto view   = contiguous[i];

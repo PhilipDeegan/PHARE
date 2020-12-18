@@ -3,7 +3,7 @@
 #include "core/utilities/types.h"
 #include "core/data/particles/particle.h"
 #include "core/data/particles/particle_array.h"
-#include "core/data/particles/particle_packer.h"
+#include "core/data/particles/contiguous.h"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -15,7 +15,7 @@ struct ParticleListTest : public ::testing::Test
 {
 };
 
-using ParticleList = testing::Types<Particle<1>, Particle<2>, Particle<3>>;
+using ParticleList = testing::Types<Particle<double, 1>, Particle<double, 2>, Particle<double, 3>>;
 
 TYPED_TEST_SUITE(ParticleListTest, ParticleList);
 
@@ -25,7 +25,7 @@ TYPED_TEST(ParticleListTest, SoAandAoSInterop)
     constexpr auto dim         = Particle::dimension;
     constexpr std::size_t size = 10;
 
-    ContiguousParticles<dim> contiguous{size};
+    ContiguousParticles<double, dim> contiguous{size};
     for (std::size_t i = 0; i < size; i++)
     {
         auto view   = contiguous[i];
@@ -45,7 +45,7 @@ TYPED_TEST(ParticleListTest, SoAandAoSInterop)
         EXPECT_EQ(contiguous[i], std::copy(contiguous[i]));
     }
 
-    ParticleArray<dim> particleArray;
+    ParticleArray<double, dim> particleArray;
     for (auto const& view : contiguous)
     {
         auto i = particleArray.size();
@@ -55,8 +55,8 @@ TYPED_TEST(ParticleListTest, SoAandAoSInterop)
     EXPECT_EQ(particleArray.size(), size);
     EXPECT_EQ(contiguous.size(), particleArray.size());
 
-    ContiguousParticles<dim> AoSFromSoA{particleArray.size()};
-    ParticlePacker<dim>{particleArray}.pack(AoSFromSoA);
+    ContiguousParticles<double, dim> AoSFromSoA{particleArray.size()};
+    ParticlePacker<double, dim>{particleArray}.pack(AoSFromSoA);
 
     std::size_t i = 0;
     for (auto const& particle : AoSFromSoA)

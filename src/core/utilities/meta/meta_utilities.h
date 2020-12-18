@@ -62,30 +62,33 @@ namespace core
     }
 
 
-    template<typename DimConstant, typename InterpConstant, std::size_t... ValidNbrParticles>
-    using SimulatorOption = std::tuple<DimConstant, InterpConstant,
+    template<typename DimConstant, typename InterpConstant, typename Float,
+             std::size_t... ValidNbrParticles>
+    using SimulatorOption = std::tuple<DimConstant, InterpConstant, Float,
                                        std::integral_constant<std::size_t, ValidNbrParticles>...>;
 
-    constexpr decltype(auto) possibleSimulators()
+
+    template<typename Float = double>
+    constexpr auto possibleSimulators()
     {
         // inner tuple = dim, interp, list[possible nbrParticles for dim/interp]
-        return std::tuple<SimulatorOption<DimConst<1>, InterpConst<1>, 2, 3>,
-                          SimulatorOption<DimConst<1>, InterpConst<2>, 2, 3, 4>,
-                          SimulatorOption<DimConst<1>, InterpConst<3>, 2, 3, 4, 5>,
+        return std::tuple<SimulatorOption<DimConst<1>, InterpConst<1>, Float, 2, 3>,
+                          SimulatorOption<DimConst<1>, InterpConst<2>, Float, 2, 3, 4>,
+                          SimulatorOption<DimConst<1>, InterpConst<3>, Float, 2, 3, 4, 5>,
 
-                          SimulatorOption<DimConst<2>, InterpConst<1>, 4, 5, 8, 9>,
-                          SimulatorOption<DimConst<2>, InterpConst<2>, 4, 5, 8, 9, 16>,
-                          SimulatorOption<DimConst<2>, InterpConst<3>, 4, 5, 8, 9, 25>>{};
+                          SimulatorOption<DimConst<2>, InterpConst<1>, Float, 4, 5, 8, 9>,
+                          SimulatorOption<DimConst<2>, InterpConst<2>, Float, 4, 5, 8, 9, 16>,
+                          SimulatorOption<DimConst<2>, InterpConst<3>, Float, 4, 5, 8, 9, 25>>{};
     }
 
 
-    template<typename Maker> // used from PHARE::amr::Hierarchy
+    template<typename Float, typename Maker> // used from PHARE::amr::Hierarchy
     auto makeAtRuntime(std::size_t dim, Maker&& maker)
     {
         using Ptr_t = decltype(maker(dim, 1));
         Ptr_t p{};
 
-        core::apply(possibleSimulators(), [&](auto const& simType) {
+        core::apply(possibleSimulators<Float>(), [&](auto const& simType) {
             using SimuType = std::decay_t<decltype(simType)>;
             using _dim     = typename std::tuple_element<0, SimuType>::type;
 
@@ -96,11 +99,11 @@ namespace core
         return p;
     }
 
-    template<typename Maker, typename Pointer, typename Dimension, typename InterpOrder,
-             typename... NbRefinedParts>
+    template<typename Float, typename Maker, typename Pointer, typename Dimension,
+             typename InterpOrder, typename... NbRefinedParts>
     void _makeAtRuntime(Maker& maker, Pointer& p, std::size_t userDim, std::size_t userInterpOrder,
                         std::size_t userNbRefinedPart,
-                        std::tuple<Dimension, InterpOrder, NbRefinedParts...> const&)
+                        std::tuple<Dimension, InterpOrder, Float, NbRefinedParts...> const&)
     {
         core::apply(std::tuple<NbRefinedParts...>{}, [&](auto const& nbRefinedPart) {
             if (!p)
@@ -109,15 +112,15 @@ namespace core
         });
     }
 
-    template<typename Maker>
+    template<typename Float, typename Maker>
     auto makeAtRuntime(std::size_t dim, std::size_t interpOrder, std::size_t nbRefinedPart,
                        Maker&& maker)
     {
         using Ptr_t = decltype(maker(dim, interpOrder, nbRefinedPart, 1, 1, 1));
         Ptr_t p     = nullptr;
 
-        core::apply(possibleSimulators(), [&](auto const& simType) {
-            _makeAtRuntime(maker, p, dim, interpOrder, nbRefinedPart, simType);
+        core::apply(possibleSimulators<Float>(), [&](auto const& simType) {
+            _makeAtRuntime<Float>(maker, p, dim, interpOrder, nbRefinedPart, simType);
         });
 
         return p;

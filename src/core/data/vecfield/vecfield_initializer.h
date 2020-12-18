@@ -11,16 +11,18 @@ namespace PHARE
 {
 namespace core
 {
-    template<std::size_t dimension>
+    template<typename Float, std::size_t dimension>
     class VecFieldInitializer
     {
     public:
+        using InitializerFunction = initializer::InitFunction<Float, dimension>;
+
         VecFieldInitializer() = default;
 
         VecFieldInitializer(initializer::PHAREDict dict)
-            : x_{dict["x_component"].template to<initializer::InitFunction<dimension>>()}
-            , y_{dict["y_component"].template to<initializer::InitFunction<dimension>>()}
-            , z_{dict["z_component"].template to<initializer::InitFunction<dimension>>()}
+            : x_{dict["x_component"].template to<InitializerFunction>()}
+            , y_{dict["y_component"].template to<InitializerFunction>()}
+            , z_{dict["z_component"].template to<InitializerFunction>()}
         {
         }
 
@@ -39,7 +41,7 @@ namespace core
     private:
         template<typename Field, typename GridLayout>
         void initializeComponent_(Field& field, GridLayout const& layout,
-                                  initializer::InitFunction<dimension> const& init)
+                                  InitializerFunction const& init)
         {
             auto indices      = layout.ghostStartToEndIndices(field, /*includeEnd=*/true);
             auto const coords = layout.template indexesToCoordVectors</*WithField=*/true>(
@@ -48,9 +50,9 @@ namespace core
                 });
 
             // keep grid data alive
-            std::shared_ptr<Span<double>> gridPtr
+            std::shared_ptr<Span<Float>> gridPtr
                 = std::apply([&](auto&... args) { return init(args...); }, coords);
-            Span<double>& grid = *gridPtr;
+            Span<Float>& grid = *gridPtr;
 
             for (std::size_t cell_idx = 0; cell_idx < indices.size(); cell_idx++)
                 std::apply([&](auto&... args) { field(args...) = grid[cell_idx]; },
@@ -59,9 +61,9 @@ namespace core
 
 
 
-        initializer::InitFunction<dimension> x_;
-        initializer::InitFunction<dimension> y_;
-        initializer::InitFunction<dimension> z_;
+        InitializerFunction x_;
+        InitializerFunction y_;
+        InitializerFunction z_;
     };
 
 } // namespace core

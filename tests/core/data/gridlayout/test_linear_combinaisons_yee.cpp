@@ -1,17 +1,17 @@
 
 #include "test_linear_combinaisons_yee.h"
 
-using GridLayout1DO1 = GridLayout<GridLayoutImplYee<1, 1>>;
-using GridLayout1DO2 = GridLayout<GridLayoutImplYee<1, 2>>;
-using GridLayout1DO3 = GridLayout<GridLayoutImplYee<1, 3>>;
+using GridLayout1DO1 = GridLayout<GridLayoutImplYee<1, 1, double>>;
+using GridLayout1DO2 = GridLayout<GridLayoutImplYee<1, 2, double>>;
+using GridLayout1DO3 = GridLayout<GridLayoutImplYee<1, 3, double>>;
 
-using GridLayout2DO1 = GridLayout<GridLayoutImplYee<2, 1>>;
-using GridLayout2DO2 = GridLayout<GridLayoutImplYee<2, 2>>;
-using GridLayout2DO3 = GridLayout<GridLayoutImplYee<2, 3>>;
+using GridLayout2DO1 = GridLayout<GridLayoutImplYee<2, 1, double>>;
+using GridLayout2DO2 = GridLayout<GridLayoutImplYee<2, 2, double>>;
+using GridLayout2DO3 = GridLayout<GridLayoutImplYee<2, 3, double>>;
 
-using GridLayout3DO1 = GridLayout<GridLayoutImplYee<3, 1>>;
-using GridLayout3DO2 = GridLayout<GridLayoutImplYee<3, 2>>;
-using GridLayout3DO3 = GridLayout<GridLayoutImplYee<3, 3>>;
+using GridLayout3DO1 = GridLayout<GridLayoutImplYee<3, 1, double>>;
+using GridLayout3DO2 = GridLayout<GridLayoutImplYee<3, 2, double>>;
+using GridLayout3DO3 = GridLayout<GridLayoutImplYee<3, 3, double>>;
 
 
 

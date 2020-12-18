@@ -71,9 +71,9 @@ void _collect(Data const* const sendbuf, std::vector<Data>& rcvBuff,
 
 template<typename Data, typename SendBuff, typename RcvBuff>
 void _collect_vector(SendBuff const& sendBuff, RcvBuff& rcvBuff, std::vector<int> const& recvcounts,
-                     std::vector<int> const& displs, int const mpi_size)
+                     std::vector<int> const& displs)
 {
-    assert(recvcounts.size() == displs.size() and static_cast<int>(displs.size()) == mpi_size);
+    assert(recvcounts.size() == displs.size());
 
     _gather<Data>([&](auto const mpi_type) {
         MPI_Allgatherv(        // MPI_Allgatherv
@@ -100,7 +100,7 @@ std::vector<Vector> collectVector(Vector const& sendBuff, int mpi_size = 0)
     std::vector<int> const perMPISize = collect(static_cast<int>(sendBuff.size()), mpi_size);
     std::vector<int> const displs     = core::displacementFrom(perMPISize);
     std::vector<Data> rcvBuff(std::accumulate(perMPISize.begin(), perMPISize.end(), 0));
-    _collect_vector<Data>(sendBuff, rcvBuff, perMPISize, displs, mpi_size);
+    _collect_vector<Data>(sendBuff, rcvBuff, perMPISize, displs);
 
     std::size_t offset = 0;
     std::vector<Vector> collected;
@@ -119,7 +119,7 @@ SpanSet<T, int> collectSpanSet(Vector const& sendBuff, int mpi_size = 0)
         MPI_Comm_size(MPI_COMM_WORLD, &mpi_size);
 
     SpanSet<T, int> rcvBuff{collect(static_cast<int>(sendBuff.size()), mpi_size)};
-    _collect_vector<T>(sendBuff, rcvBuff, rcvBuff.sizes, rcvBuff.displs, mpi_size);
+    _collect_vector<T>(sendBuff, rcvBuff, rcvBuff.sizes, rcvBuff.displs);
 
     return rcvBuff;
 }

@@ -23,9 +23,9 @@ using namespace PHARE::initializer;
 class AMaxwellianParticleInitializer1D : public ::testing::Test
 {
 private:
-    using GridLayoutT       = GridLayout<GridLayoutImplYee<1, 1>>;
-    using ParticleArrayT    = ParticleArray<1>;
-    using InitFunctionArray = std::array<InitFunction<1>, 3>;
+    using GridLayoutT       = GridLayout<GridLayoutImplYee<1, 1, double>>;
+    using ParticleArrayT    = ParticleArray<double, 1>;
+    using InitFunctionArray = std::array<InitFunction<double, 1>, 3>;
 
 public:
     AMaxwellianParticleInitializer1D()

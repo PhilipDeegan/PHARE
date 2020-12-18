@@ -6,6 +6,7 @@ from . import global_vars
 from ..core import box as boxm
 from ..core.box import Box
 
+import numpy as np # for np.dtype - C++ Float type control mechanism
 
 def compute_dimension(cells):
     return len(cells)
@@ -414,7 +415,7 @@ def checker(func):
                              'time_step', 'time_step_nbr', 'layout', 'interp_order', 'origin',
                              'boundary_types', 'refined_particle_nbr', 'path', 'nesting_buffer',
                              'diag_export_format', 'refinement_boxes', 'refinement', 'init_time',
-                             'smallest_patch_size', 'largest_patch_size', "diag_options" ]
+                             'smallest_patch_size', 'largest_patch_size', "diag_options", "dtype" ]
 
         accepted_keywords += check_optional_keywords(**kwargs)
 
@@ -468,7 +469,15 @@ def checker(func):
             assert kwargs["max_nbr_levels"] != None # this needs setting otherwise
             kwargs["refinement_boxes"] = None
 
+        kwargs["dtype"] = kwargs.get('dtype', np.float64)
+        dtype = kwargs["dtype"]
+
+        kwargs["origin"] = np.asarray(kwargs["origin"], dtype=dtype)
+        kwargs["dl"] = np.asarray(kwargs["dl"], dtype=dtype)
+
         return func(simulation_object, **kwargs)
+
+
 
     return wrapper
 
@@ -504,6 +513,7 @@ class Simulation(object):
     largest_patch_size   :
     max_nbr_levels       : [default=1] max number of levels in the hierarchy if refinement_boxes != "boxes"
     init_time            : unused for now, will be time for restarts someday
+    dtype                : underlying float type in C++, supports [ float32, float64 ] default: float64
 
     """
 

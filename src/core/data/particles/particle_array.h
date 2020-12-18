@@ -9,13 +9,14 @@
 
 namespace PHARE::core
 {
-template<std::size_t dim>
+template<typename Float, std::size_t dim>
 class ParticleArray
 {
 public:
     static constexpr bool is_contiguous = false;
     static constexpr auto dimension     = dim;
-    using Particle_t                    = Particle<dim>;
+    using float_type                    = Float;
+    using Particle_t                    = Particle<Float, dim>;
     using Vector                        = std::vector<Particle_t>;
     using iterator                      = typename Vector::iterator;
     using value_type                    = Particle_t;
@@ -64,7 +65,7 @@ public:
     void push_back(Particle_t const& p) { particles.push_back(p); }
     void push_back(Particle_t&& p) { particles.push_back(p); }
 
-    void swap(ParticleArray<dim>& that) { std::swap(this->particles, that.particles); }
+    void swap(ParticleArray<Float, dim>& that) { std::swap(this->particles, that.particles); }
 
 private:
     Vector particles;
@@ -77,14 +78,14 @@ namespace PHARE
 {
 namespace core
 {
-    template<std::size_t dim>
-    void empty(ParticleArray<dim>& array)
+    template<typename Float, std::size_t dim>
+    void empty(ParticleArray<Float, dim>& array)
     {
         array.clear();
     }
 
-    template<std::size_t dim>
-    void swap(ParticleArray<dim>& array1, ParticleArray<dim>& array2)
+    template<typename Float, std::size_t dim>
+    void swap(ParticleArray<Float, dim>& array1, ParticleArray<Float, dim>& array2)
     {
         array1.swap(array2);
     }

@@ -9,7 +9,10 @@
 
 #include "core/utilities/mpi_utils.h"
 #include "core/data/particles/particle.h"
+#include "core/data/particles/contiguous.h"
 #include "core/utilities/meta/meta_utilities.h"
+#include "core/utilities/types.h"
+#include "core/utilities/mpi_utils.h"
 #include "amr/wrappers/hierarchy.h"
 #include "phare/phare.h"
 #include "simulator/simulator.h"
@@ -43,11 +46,22 @@ void declarePatchData(py::module& m, std::string key)
         .def_readonly("data", &PatchDataType::data);
 }
 
-template<std::size_t dim>
+template<typename Float>
+std::string float_id()
+{
+    if constexpr (std::is_same_v<Float, double>)
+        return "d";
+    else if constexpr (std::is_same_v<Float, float>)
+        return "s";
+    else
+        throw std::runtime_error("Unhandled data type");
+}
+
+template<typename Float, std::size_t dim>
 void declareDim(py::module& m)
 {
-    using CP         = core::ContiguousParticles<dim>;
-    std::string name = "ContiguousParticles_" + std::to_string(dim);
+    using CP         = core::ContiguousParticles<Float, dim>;
+    std::string name = "ContiguousParticles_" + std::to_string(dim) + "_" + float_id<Float>();
     py::class_<CP, std::shared_ptr<CP>>(m, name.c_str())
         .def(py::init<std::size_t>())
         .def_readwrite("iCell", &CP::iCell)
@@ -76,18 +90,19 @@ void declareSimulator(PyClass&& sim)
         .def("dump", &Simulator::dump, py::arg("timestamp"), py::arg("timestep"));
 }
 
-template<typename _dim, typename _interp, typename _nbRefinedPart>
-void declare(py::module& m)
+template<typename _dim, typename _interp, typename _nbRefinedPart, typename Float>
+void declare_sim(py::module& m)
 {
     constexpr auto dim           = _dim{}();
     constexpr auto interp        = _interp{}();
     constexpr auto nbRefinedPart = _nbRefinedPart{}();
 
 
-    std::string type_string = "_" + std::to_string(dim) + "_" + std::to_string(interp) + "_"
-                              + std::to_string(nbRefinedPart);
+    std::string type_str = "_" + std::to_string(dim) + "_" + std::to_string(interp) + "_"
+                           + std::to_string(nbRefinedPart);
+    std::string type_string = type_str + "_" + float_id<Float>();
 
-    using Sim        = Simulator<dim, interp, nbRefinedPart>;
+    using Sim        = Simulator<dim, interp, nbRefinedPart, Float>;
     std::string name = "Simulator" + type_string;
     declareSimulator<Sim>(
         py::class_<Sim, std::shared_ptr<Sim>>(m, name.c_str())
@@ -99,21 +114,23 @@ void declare(py::module& m)
 
 
     name = "make_simulator" + type_string;
-    m.def(name.c_str(), [](std::shared_ptr<PHARE::amr::Hierarchy> const& hier) {
-        return std::shared_ptr<Sim>{std::move(makeSimulator<dim, interp, nbRefinedPart>(hier))};
+    m.def(name.c_str(), [](std::shared_ptr<PHARE::amr::Hierarchy<Float>> const& hier) {
+        return std::shared_ptr<Sim>{
+            std::move(makeSimulator<dim, interp, nbRefinedPart, Float>(hier))};
     });
 
 
-    using DW = DataWrangler<dim, interp, nbRefinedPart>;
+    using DW = DataWrangler<dim, interp, nbRefinedPart, Float>;
     name     = "DataWrangler" + type_string;
     py::class_<DW, std::shared_ptr<DW>>(m, name.c_str())
-        .def(py::init<std::shared_ptr<Sim> const&, std::shared_ptr<amr::Hierarchy> const&>())
-        .def(py::init<std::shared_ptr<ISimulator> const&, std::shared_ptr<amr::Hierarchy> const&>())
+        .def(py::init<std::shared_ptr<Sim> const&, std::shared_ptr<amr::Hierarchy<Float>> const&>())
+        .def(py::init<std::shared_ptr<ISimulator<Float>> const&,
+                      std::shared_ptr<amr::Hierarchy<Float>> const&>())
         .def("sync_merge", &DW::sync_merge)
         .def("getPatchLevel", &DW::getPatchLevel)
         .def("getNumberOfLevels", &DW::getNumberOfLevels);
 
-    using PL = PatchLevel<dim, interp, nbRefinedPart>;
+    using PL = PatchLevel<dim, interp, nbRefinedPart, Float>;
     name     = "PatchLevel_" + type_string;
 
     py::class_<PL, std::shared_ptr<PL>>(m, name.c_str())
@@ -140,22 +157,25 @@ void declare(py::module& m)
 
     using _Splitter
         = PHARE::amr::Splitter<_dim, _interp, core::RefinedParticlesConst<nbRefinedPart>>;
-    name = "Splitter" + type_string;
-    py::class_<_Splitter, std::shared_ptr<_Splitter>>(m, name.c_str())
-        .def(py::init<>())
-        .def_property_readonly_static("weight", [](py::object) { return _Splitter::weight; })
-        .def_property_readonly_static("delta", [](py::object) { return _Splitter::delta; });
+    if constexpr (std::is_same_v<Float, double>) // only needs one declarion for both double/float
+    {
+        name = "Splitter" + type_str;
+        py::class_<_Splitter, std::shared_ptr<_Splitter>>(m, name.c_str())
+            .def(py::init<>())
+            .def_property_readonly_static("weight", [](py::object) { return _Splitter::weight; })
+            .def_property_readonly_static("delta", [](py::object) { return _Splitter::delta; });
+    }
 
     name = "split_pyarray_particles" + type_string;
-    m.def(name.c_str(), splitPyArrayParticles<_Splitter>);
+    m.def(name.c_str(), splitPyArrayParticles<_Splitter, Float>);
 }
 
 
-template<typename Dimension, typename InterpOrder, typename... NbRefinedParts>
-void declare(py::module& m, std::tuple<Dimension, InterpOrder, NbRefinedParts...> const&)
+template<typename Dimension, typename InterpOrder, typename Float, typename... NbRefinedParts>
+void declare(py::module& m, std::tuple<Dimension, InterpOrder, Float, NbRefinedParts...> const&)
 {
     core::apply(std::tuple<NbRefinedParts...>{}, [&](auto& nbRefinedPart) {
-        declare<Dimension, InterpOrder, std::decay_t<decltype(nbRefinedPart)>>(m);
+        declare_sim<Dimension, InterpOrder, std::decay_t<decltype(nbRefinedPart)>, Float>(m);
     });
 }
 
@@ -166,36 +186,71 @@ PYBIND11_MODULE(cpp, m)
         .def(py::init<>())
         .def("reset", &SamraiLifeCycle::reset);
 
-    py::class_<PHARE::amr::Hierarchy, std::shared_ptr<PHARE::amr::Hierarchy>>(m, "AMRHierarchy");
+    py::class_<PHARE::amr::Hierarchy<double>, std::shared_ptr<PHARE::amr::Hierarchy<double>>>(
+        m, "AMRHierarchy_d");
+    py::class_<PHARE::amr::Hierarchy<float>, std::shared_ptr<PHARE::amr::Hierarchy<float>>>(
+        m, "AMRHierarchy_s");
 
-    declareSimulator<ISimulator>(
-        py::class_<ISimulator, std::shared_ptr<ISimulator>>(m, "ISimulator")
-            .def("interp_order", &ISimulator::interporder)
-            .def("dump", &ISimulator::dump, py::arg("timestamp"), py::arg("timestep")));
+    declareSimulator<ISimulator<double>>(
+        py::class_<ISimulator<double>, std::shared_ptr<ISimulator<double>>>(m, "ISimulator_d")
+            .def("interp_order", &ISimulator<double>::interporder)
+            .def("dump", &ISimulator<double>::dump, py::arg("timestamp"), py::arg("timestep")));
 
-    m.def("make_hierarchy", []() { return PHARE::amr::Hierarchy::make(); });
-    m.def("make_simulator", [](std::shared_ptr<PHARE::amr::Hierarchy>& hier) {
-        return std::shared_ptr<ISimulator>{std::move(PHARE::getSimulator(hier))};
-    });
+    declareSimulator<ISimulator<float>>(
+        py::class_<ISimulator<float>, std::shared_ptr<ISimulator<float>>>(m, "ISimulator_s")
+            .def("interp_order", &ISimulator<float>::interporder)
+            .def("dump", &ISimulator<float>::dump, py::arg("timestamp"), py::arg("timestep")));
+
+    m.def("make_hierarchy_d", []() { return PHARE::amr::Hierarchy<double>::make(); });
+    m.def("make_hierarchy_s", []() { return PHARE::amr::Hierarchy<float>::make(); });
+    // m.def("make_simulator", [](std::shared_ptr<PHARE::amr::Hierarchy>& hier) {
+    //     return std::shared_ptr<ISimulator<Float>>{std::move(PHARE::getSimulator(hier))};
+    // });
+    // m.def("make_simulator_s", [](std::shared_ptr<PHARE::amr::Hierarchy<float>>& hier) {
+    //     return std::shared_ptr<ISimulator<Float>>{std::move(PHARE::getSimulator<float>(hier))};
+    // });
+
+    // py::class_<SimulatorDiagnostics<double>, std::shared_ptr<SimulatorDiagnostics<double>>>(
+    //     m, "SimulatorDiagnostics_d")
+    //     .def("dump", &SimulatorDiagnostics<double>::dump, py::arg("timestamp"),
+    //          py::arg("timestep"));
+
+    // py::class_<SimulatorDiagnostics<float>, std::shared_ptr<SimulatorDiagnostics<float>>>(
+    //     m, "SimulatorDiagnostics_f")
+    //     .def("dump", &SimulatorDiagnostics<float>::dump, py::arg("timestamp"),
+    //     py::arg("timestep"));
+
 
     m.def("mpi_size", []() { return core::mpi::size(); });
     m.def("mpi_rank", []() { return core::mpi::rank(); });
 
-    declareDim<1>(m);
-    declareDim<2>(m);
-    declareDim<3>(m);
+    declareDim<double, 1>(m);
+    declareDim<double, 2>(m);
+    declareDim<double, 3>(m);
 
-    core::apply(core::possibleSimulators(), [&](auto const& simType) { declare(m, simType); });
+    declareDim<float, 1>(m);
+    declareDim<float, 2>(m);
+    declareDim<float, 3>(m);
+
+    core::apply(core::possibleSimulators<double>(),
+                [&](auto const& simType) { declare(m, simType); });
+    core::apply(core::possibleSimulators<float>(),
+                [&](auto const& simType) { declare(m, simType); });
 
     declarePatchData<std::vector<double>, 1>(m, "PatchDataVectorDouble_1D");
     declarePatchData<std::vector<double>, 2>(m, "PatchDataVectorDouble_2D");
     declarePatchData<std::vector<double>, 3>(m, "PatchDataVectorDouble_3D");
 
-    py::class_<core::Span<double>, std::shared_ptr<core::Span<double>>>(m, "Span");
-    py::class_<PyArrayWrapper<double>, std::shared_ptr<PyArrayWrapper<double>>, core::Span<double>>(
-        m, "PyWrapper");
+    py::class_<core::Span<double>, std::shared_ptr<core::Span<double>>>(m, "Span_d");
+    py::class_<core::Span<float>, std::shared_ptr<core::Span<float>>>(m, "Span_s");
 
-    m.def("makePyArrayWrapper", makePyArrayWrapper<double>);
+    py::class_<PyArrayWrapper<double>, std::shared_ptr<PyArrayWrapper<double>>, core::Span<double>>(
+        m, "PyWrapper_d");
+    py::class_<PyArrayWrapper<float>, std::shared_ptr<PyArrayWrapper<float>>, core::Span<float>>(
+        m, "PyWrapper_s");
+
+    m.def("makePyArrayWrapper_d", makePyArrayWrapper<double>);
+    m.def("makePyArrayWrapper_s", makePyArrayWrapper<float>);
 }
 
 } // namespace PHARE::pydata

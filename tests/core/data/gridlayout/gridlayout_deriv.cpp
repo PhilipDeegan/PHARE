@@ -22,7 +22,8 @@ std::vector<double> read(std::string filename)
 // -----------------------------------------------------------------------------
 
 using layoutImpls1D
-    = ::testing::Types<GridLayoutImplYee<1, 1>, GridLayoutImplYee<1, 2>, GridLayoutImplYee<1, 3>>;
+    = ::testing::Types<GridLayoutImplYee<1, 1, double>, GridLayoutImplYee<1, 2, double>,
+                       GridLayoutImplYee<1, 3, double>>;
 
 TYPED_TEST_SUITE(a1DDerivative, layoutImpls1D);
 
@@ -86,7 +87,8 @@ TYPED_TEST(a1DDerivative, DXEZ1D)
 // -----------------------------------------------------------------------------
 
 using layoutImpls2D
-    = ::testing::Types<GridLayoutImplYee<2, 1>, GridLayoutImplYee<2, 2>, GridLayoutImplYee<2, 3>>;
+    = ::testing::Types<GridLayoutImplYee<2, 1, double>, GridLayoutImplYee<2, 2, double>,
+                       GridLayoutImplYee<2, 3, double>>;
 
 TYPED_TEST_SUITE(a2DDerivative, layoutImpls2D);
 
@@ -253,7 +255,8 @@ TYPED_TEST(a2DDerivative, DYEZ2D)
 // -----------------------------------------------------------------------------
 
 using layoutImpls3D
-    = ::testing::Types<GridLayoutImplYee<3, 1>, GridLayoutImplYee<3, 2>, GridLayoutImplYee<3, 3>>;
+    = ::testing::Types<GridLayoutImplYee<3, 1, double>, GridLayoutImplYee<3, 2, double>,
+                       GridLayoutImplYee<3, 3, double>>;
 
 TYPED_TEST_SUITE(a3DDerivative, layoutImpls3D);
 

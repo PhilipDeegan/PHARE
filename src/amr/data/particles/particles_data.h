@@ -36,7 +36,6 @@ namespace amr
         auto const& lower = box.lower();
         auto const& upper = box.upper();
 
-
         if (iCell[0] >= lower(0) && iCell[0] <= upper(0))
         {
             if constexpr (dim > 1)
@@ -139,18 +138,24 @@ namespace amr
         {
             TBOX_ASSERT_OBJDIM_EQUALITY2(*this, source);
 
-            // throws if fails
-            auto& pSource = dynamic_cast<ParticlesData const&>(source);
-
-            SAMRAI::hier::Box const& sourceGhostBox = pSource.getGhostBox();
-            SAMRAI::hier::Box const& myGhostBox     = getGhostBox();
-            const SAMRAI::hier::Box intersectionBox{sourceGhostBox * myGhostBox};
-
-            if (!intersectionBox.empty())
+            const ParticlesData* pSource = dynamic_cast<const ParticlesData*>(&source);
+            if (pSource != nullptr)
             {
-                copy_(sourceGhostBox, myGhostBox, intersectionBox, pSource);
+                SAMRAI::hier::Box const& sourceGhostBox = pSource->getGhostBox();
+                SAMRAI::hier::Box const& myGhostBox     = getGhostBox();
+                const SAMRAI::hier::Box intersectionBox{sourceGhostBox * myGhostBox};
+
+                if (!intersectionBox.empty())
+                {
+                    copy_(sourceGhostBox, myGhostBox, intersectionBox, *pSource);
+                }
+            }
+            else
+            {
+                source.copy2(*this);
             }
         }
+
 
 
         /**
@@ -164,6 +169,7 @@ namespace amr
         }
 
 
+
         /**
          * @brief copy with an overlap. Does the copy as the other overload but this time
          * the copy must account for the intersection with the boxes within the overlap
@@ -172,54 +178,64 @@ namespace amr
         void copy(SAMRAI::hier::PatchData const& source,
                   SAMRAI::hier::BoxOverlap const& overlap) override
         {
-            // casts throw on failure
-            auto& pSource  = dynamic_cast<ParticlesData const&>(source);
-            auto& pOverlap = dynamic_cast<SAMRAI::pdat::CellOverlap const&>(overlap);
+            const ParticlesData* pSource = dynamic_cast<const ParticlesData*>(&source);
+            const SAMRAI::pdat::CellOverlap* pOverlap
+                = dynamic_cast<const SAMRAI::pdat::CellOverlap*>(&overlap);
 
-            SAMRAI::hier::Transformation const& transformation = pOverlap.getTransformation();
-            if (transformation.getRotation() == SAMRAI::hier::Transformation::NO_ROTATE)
+
+            if ((pSource != nullptr) && (pOverlap != nullptr))
             {
-                SAMRAI::hier::BoxContainer const& boxList = pOverlap.getDestinationBoxContainer();
-                for (auto const& overlapBox : boxList)
+                SAMRAI::hier::Transformation const& transformation = pOverlap->getTransformation();
+                if (transformation.getRotation() == SAMRAI::hier::Transformation::NO_ROTATE)
                 {
-                    SAMRAI::hier::Box sourceGhostBox = pSource.getGhostBox();
-                    SAMRAI::hier::Box myGhostBox     = this->getGhostBox();
-                    SAMRAI::hier::Box intersectionBox{sourceGhostBox.getDim()};
-
-                    if (isSameBlock(transformation))
+                    SAMRAI::hier::BoxContainer const& boxList
+                        = pOverlap->getDestinationBoxContainer();
+                    for (auto const& overlapBox : boxList)
                     {
-                        if (offsetIsZero(transformation))
-                        {
-                            intersectionBox = overlapBox * sourceGhostBox * myGhostBox;
+                        SAMRAI::hier::Box sourceGhostBox = pSource->getGhostBox();
+                        SAMRAI::hier::Box myGhostBox     = this->getGhostBox();
+                        SAMRAI::hier::Box intersectionBox{sourceGhostBox.getDim()};
 
-                            if (!intersectionBox.empty())
+                        if (isSameBlock(transformation))
+                        {
+                            if (offsetIsZero(transformation))
                             {
-                                copy_(sourceGhostBox, myGhostBox, intersectionBox, pSource);
+                                intersectionBox = overlapBox * sourceGhostBox * myGhostBox;
+
+                                if (!intersectionBox.empty())
+                                {
+                                    copy_(sourceGhostBox, myGhostBox, intersectionBox, *pSource);
+                                }
+                            }
+                            else
+                            {
+                                SAMRAI::hier::Box shiftedSourceBox{sourceGhostBox};
+                                transformation.transform(shiftedSourceBox);
+                                intersectionBox = overlapBox * shiftedSourceBox * myGhostBox;
+
+
+                                if (!intersectionBox.empty())
+                                {
+                                    copyWithTransform_(sourceGhostBox, intersectionBox,
+                                                       transformation, *pSource);
+                                }
                             }
                         }
                         else
                         {
-                            SAMRAI::hier::Box shiftedSourceBox{sourceGhostBox};
-                            transformation.transform(shiftedSourceBox);
-                            intersectionBox = overlapBox * shiftedSourceBox * myGhostBox;
-
-
-                            if (!intersectionBox.empty())
-                            {
-                                copyWithTransform_(sourceGhostBox, intersectionBox, transformation,
-                                                   pSource);
-                            }
+                            std::runtime_error("Error - multiblock hierarchies not handled");
                         }
-                    }
-                    else
-                    {
-                        std::runtime_error("Error - multiblock hierarchies not handled");
-                    }
-                } // end loop over boxes
-            }     // end no rotate
+
+                    } // end loop over boxes
+                }     // end no rotate
+                else
+                {
+                    throw std::runtime_error("copy with rotate not implemented");
+                }
+            }
             else
             {
-                throw std::runtime_error("copy with rotate not implemented");
+                source.copy2(*this, overlap);
             }
         }
 
@@ -404,8 +420,6 @@ namespace amr
         ParticleArray levelGhostParticlesNew;
 
         core::ParticlesPack<ParticleArray> pack;
-
-
 
     private:
         //! interiorLocalBox_ is the box, in local index space, that goes from the first to the last

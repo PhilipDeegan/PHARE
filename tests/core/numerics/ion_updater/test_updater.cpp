@@ -66,7 +66,7 @@ Return bz(Param x)
 
 int nbrPartPerCell = 1000;
 
-using InitFunctionT = PHARE::initializer::InitFunction<1>;
+using InitFunctionT = PHARE::initializer::InitFunction<double, 1>;
 
 PHARE::initializer::PHAREDict createDict()
 {
@@ -388,13 +388,14 @@ struct IonUpdaterTest : public ::testing::Test
 {
     static constexpr auto dim          = DimInterpT::dimension;
     static constexpr auto interp_order = DimInterpT::interp_order;
-    using PHARETypes                   = PHARE::core::PHARE_Types<dim, interp_order>;
-    using Ions                         = typename PHARETypes::Ions_t;
-    using Electromag                   = typename PHARETypes::Electromag_t;
-    using GridLayout    = typename PHARE::core::GridLayout<GridLayoutImplYee<dim, interp_order>>;
-    using ParticleArray = typename PHARETypes::ParticleArray_t;
-    using ParticleInitializerFactory = typename PHARETypes::ParticleInitializerFactory;
 
+    using PHARETypes = PHARE::core::PHARE_Types<dim, interp_order>;
+    using Ions       = typename PHARETypes::Ions_t;
+    using Electromag = typename PHARETypes::Electromag_t;
+    using GridLayout =
+        typename PHARE::core::GridLayout<GridLayoutImplYee<dim, interp_order, double>>;
+    using ParticleArray              = typename PHARETypes::ParticleArray_t;
+    using ParticleInitializerFactory = typename PHARETypes::ParticleInitializerFactory;
     using IonUpdater = typename PHARE::core::IonUpdater<Ions, Electromag, GridLayout>;
 
 
@@ -565,13 +566,15 @@ struct IonUpdaterTest : public ::testing::Test
 
             } // end 1D
         }     // end pop loop
-        PHARE::core::depositParticles(ions, layout, Interpolator<dim, interp_order>{},
-                                      PHARE::core::DomainDeposit{});
 
-        PHARE::core::depositParticles(ions, layout, Interpolator<dim, interp_order>{},
+        using Interpolator_t = Interpolator<dim, interp_order, double>;
+
+        PHARE::core::depositParticles(ions, layout, Interpolator_t{}, PHARE::core::DomainDeposit{});
+
+        PHARE::core::depositParticles(ions, layout, Interpolator_t{},
                                       PHARE::core::PatchGhostDeposit{});
 
-        PHARE::core::depositParticles(ions, layout, Interpolator<dim, interp_order>{},
+        PHARE::core::depositParticles(ions, layout, Interpolator_t{},
                                       PHARE::core::LevelGhostDeposit{});
 
 
