@@ -197,15 +197,15 @@ class AdvanceTest(unittest.TestCase):
                 coarsePatches = datahier.level(coarseLevelNbr, checkTime).patches
                 finePatches = datahier.level(coarseLevelNbr + 1, checkTime).patches
 
-                for coarsePatch in coarsePatches:
-                    for finePatch in finePatches:
-                        lvlOverlap = boxm.refine(coarsePatch.box, 2) * finePatch.box
-                        if lvlOverlap is not None:
-                            for EM in ["E", "B"]:
-                                for xyz in ["x", "y", "z"]:
-                                    qty = f"{EM}{xyz}"
+                for EM in ["E", "B"]:
+                    for xyz in ["x", "y", "z"]:
+                        qty = f"{EM}{xyz}"
+                        for coarsePatch in coarsePatches:
+                            for finePatch in finePatches:
+                                fine_pd  = finePatch.patch_datas[qty]
+                                lvlOverlap = boxm.refine(coarsePatch.box, 2) * fine_pd.ghost_box
+                                if lvlOverlap is not None:
                                     coarse_pd = coarsePatch.patch_datas[qty]
-                                    fine_pd  = finePatch.patch_datas[qty]
                                     coarseBox = boxm.coarsen(lvlOverlap, 2)
 
                                     nGhosts = coarse_pd.layout.nbrGhostFor(qty)
