@@ -264,6 +264,7 @@ double Simulator<_dimension, _interp_order, _nbRefinedPart>::advance(double dt)
         {
             PHARE_LOG_SCOPE("Simulator::advance");
             auto dt_new  = integrator_->advance(dt);
+            assert(dt_new > 0);
             currentTime_ = ((*timeStamper) += dt);
             return dt_new;
         }
