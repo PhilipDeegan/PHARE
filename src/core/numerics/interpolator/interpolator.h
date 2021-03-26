@@ -10,6 +10,8 @@
 #include "core/data/vecfield/vecfield_component.h"
 #include "core/utilities/point/point.h"
 
+#include "core/logger.h"
+
 namespace PHARE
 {
 namespace core
@@ -526,6 +528,8 @@ namespace core
         inline void operator()(PartIterator begin, PartIterator end, Electromag const& Em,
                                GridLayout const& layout)
         {
+            PHARE_LOG_SCOPE("Interpolator::operator()");
+
             // this lambda calculates the startIndex and the nbrPointsSupport() weights for
             // dual field interpolation and puts this at the corresponding location
             // in 'startIndex' and 'weights'. For dual fields, the normalizedPosition
@@ -582,6 +586,8 @@ namespace core
             // component, we use Interpol to actually perform the interpolation.
             // the trick here is that the StartIndex and weights have only been calculated
             // twice, and not for each E,B component.
+
+            PHARE_LOG_START("MeshToParticle::operator()");
             for (auto currPart = begin; currPart != end; ++currPart)
             {
                 indexAndWeightPrimal(*currPart);
@@ -594,6 +600,7 @@ namespace core
                 currPart->By = meshToParticle_(By, ByCentering, startIndex_, weights_);
                 currPart->Bz = meshToParticle_(Bz, BzCentering, startIndex_, weights_);
             }
+            PHARE_LOG_STOP();
         }
 
 
@@ -665,6 +672,8 @@ namespace core
             auto cellVolume = std::accumulate(std::begin(dl), std::end(dl), 1.,
                                               std::multiplies<typename decltype(dl)::value_type>());
 
+
+            PHARE_LOG_START("ParticleToMesh::operator()");
             for (auto currPart = begin; currPart != end; ++currPart)
             {
                 // TODO #3375
@@ -674,6 +683,7 @@ namespace core
                 particleToMesh_(density, xFlux, yFlux, zFlux, densityCentering, fluxCentering,
                                 *currPart, startIndex_, weights_, cellVolume, coef);
             }
+            PHARE_LOG_STOP();
         }
 
 

@@ -6,6 +6,7 @@
 #include <tuple>
 #include <chrono>
 #include <cstdint>
+#include <cassert>
 #include <fstream>
 #include <iostream>
 #include <unordered_map>
@@ -30,10 +31,63 @@ inline auto now_in_nanos()
                                         .count());
 }
 
+struct Logbject
+{
+    Logbject() = delete;
+
+    unsigned line;    //    = __LINE__;
+    char const* file; // = __FILE__;
+    std::string stuff;
+};
+
+class LogWriter
+{
+public:
+    virtual void operator<<(std::string const& str) = 0;
+};
+
+class StdOutLogWriter : public LogWriter
+{
+public:
+    void operator<<(std::string const& str) override { std::cout << str << std::endl; }
+};
+
+class FileStringLogWriter : public LogWriter
+{
+public:
+    FileStringLogWriter(std::string filePath)
+        : fileWriter{filePath + "/Logger." + get_thread_id() + ".txt"}
+    {
+    }
+
+    void operator<<(std::string const& str) override { fileWriter << str << std::endl; }
+
+private:
+    std::ofstream fileWriter;
+};
+
+class NanoLogWriter : public LogWriter
+{
+public:
+    NanoLogWriter() {}
+
+    void operator<<(std::string const& str) override
+    { /*fileWriter << str << std::endl;*/
+    }
+
+private:
+    // std::ofstream fileWriter;
+};
+
+
 class Logger
 {
 public:
-    Logger() = default;
+    // Logger() = default;
+    Logger(std::unique_ptr<LogWriter>&& logWriter)
+        : logWriter_{std::move(logWriter)}
+    {
+    }
 
     struct StartStopLogger
     {
@@ -68,6 +122,7 @@ public:
 
     auto scope(std::string const& key) { return ScopeLogger{*this, key}; }
 
+
 private:
     Logger(Logger const&) = delete;
     Logger(Logger&&)      = delete;
@@ -77,60 +132,65 @@ private:
 
     void log(std::string const& s0)
     {
-        queue.enqueue([this](std::string s1) { this->writer << s1 << std::endl; }, s0);
+        queue.enqueue([this](std::string s1) { (*this->logWriter_) << s1; }, s0);
     }
     void log(std::string&& s) { log(s); }
 
-    ThreadQueue queue; // overkill but useful for the moment
-    std::ofstream writer{std::string{"Logger."} + get_thread_id() + ".txt"};
+    std::unique_ptr<LogWriter> logWriter_;
+    ThreadQueue queue;
     std::vector<StartStopLogger> nestings;
 };
+
+
+struct LogWriterFactory
+{
+    static auto make(PHARE::initializer::PHAREDict const& dict)
+    {
+        return std::make_unique<FileStringLogWriter>(".");
+    }
+};
+
+
 
 class LogMan
 {
 public: // static
-    static LogMan& start()
-    {
-        if (!self)
-            self = std::make_unique<LogMan>("data");
-        return *self;
-    }
     static LogMan& start(PHARE::initializer::PHAREDict const& dict)
     {
-        if (!self)
-            self = std::make_unique<LogMan>("data");
-        return *self;
+        assert(!self);
+
+        return *(self = std::make_unique<LogMan>(LogWriterFactory::make(dict)));
     }
     static void kill() { self.release(); }
 
     static LogMan& get() { return *self; }
 
 public:
-    LogMan(std::string base_path)
-        : base_path_{base_path}
+    LogMan(std::unique_ptr<LogWriter>&& logWriter)
+        : logger{std::move(logWriter)}
     {
     }
 
-    void start(std::string&& key) { logger.start(key); }
+    void start(Logbject&& lob) { logger.start(lob.stuff); }
     void stop() { logger.stop(); }
-    auto scope(std::string&& key) { return logger.scope(key); }
+    auto scope(Logbject&& lob) { return logger.scope(lob.stuff); }
 
 private:
     Logger logger;
-    std::string base_path_;
 
     static std::unique_ptr<LogMan> self;
 };
 
 } // namespace PHARE::core
 
-#define PHARE_LOG_STR() std::string{__FILE__} + " " + std::to_string(__LINE__) + " "
-#define PHARE_LOG_START(str) PHARE::core::LogMan::get().start(PHARE_LOG_STR() + str)
+#define PHARE_LOBJECT(str)                                                                         \
+    PHARE::core::Logbject { __LINE__, __FILE__, str }
+
+#define PHARE_LOG_START(str) PHARE::core::LogMan::get().start(PHARE_LOBJECT(str))
 #define PHARE_LOG_STOP() PHARE::core::LogMan::get().stop()
-#define PHARE_LOG_SCOPE(str)                                                                       \
-    auto _scopeLog = PHARE::core::LogMan::get().scope(PHARE_LOG_STR() + str)
+#define PHARE_LOG_SCOPE(str) auto _scopeLog = PHARE::core::LogMan::get().scope(PHARE_LOBJECT(str))
 #define PHARE_LOG_NAMED_SCOPE(name, str)                                                           \
-    auto name = PHARE::core::LogMan::get().scope(PHARE_LOG_STR() + str)
+    auto name = PHARE::core::LogMan::get().scope(PHARE_LOBJECT(str))
 
 
 #endif /* PHARE_CORE_LOGGER_H */
