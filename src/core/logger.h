@@ -2,6 +2,12 @@
 #ifndef PHARE_CORE_LOGGER_H
 #define PHARE_CORE_LOGGER_H
 
+#include "initializer/data_provider.h"
+
+#if PHARE_WITH_CALIPER
+#include "caliper/cali.h"
+
+#elif PHARE_WITH_LOGGER
 
 #include <tuple>
 #include <chrono>
@@ -13,7 +19,6 @@
 
 
 #include "thread_queue.h"
-#include "initializer/data_provider.h"
 
 namespace PHARE::core
 {
@@ -150,20 +155,30 @@ struct LogWriterFactory
     }
 };
 
+} // namespace PHARE::core
 
+#endif
 
+namespace PHARE::core
+{
 class LogMan
 {
-public: // static
-    static LogMan& start(PHARE::initializer::PHAREDict const& dict)
+public:
+    static void start(PHARE::initializer::PHAREDict const& dict)
     {
+#if PHARE_WITH_LOGGER
         assert(!self);
-
         return *(self = std::make_unique<LogMan>(LogWriterFactory::make(dict)));
+#endif
     }
+#if PHARE_WITH_LOGGER
     static void kill() { self.release(); }
 
-    static LogMan& get() { return *self; }
+    static LogMan& get()
+    {
+        assert(self);
+        return *self;
+    }
 
 public:
     LogMan(std::unique_ptr<LogWriter>&& logWriter)
@@ -179,9 +194,21 @@ private:
     Logger logger;
 
     static std::unique_ptr<LogMan> self;
+#endif
 };
 
 } // namespace PHARE::core
+
+
+
+#if PHARE_WITH_CALIPER
+
+#define PHARE_LOG_START(str) CALI_MARK_BEGIN(str);
+#define PHARE_LOG_STOP(str) CALI_MARK_END(str);
+#define PHARE_LOG_SCOPE(str) CALI_CXX_MARK_FUNCTION
+#define PHARE_LOG_NAMED_SCOPE(name, str)
+
+#elif PHARE_WITH_LOGGER
 
 #define PHARE_LOBJECT(str)                                                                         \
     PHARE::core::Logbject { __LINE__, __FILE__, str }
@@ -192,5 +219,13 @@ private:
 #define PHARE_LOG_NAMED_SCOPE(name, str)                                                           \
     auto name = PHARE::core::LogMan::get().scope(PHARE_LOBJECT(str))
 
+#else
+
+#define PHARE_LOG_START(str)
+#define PHARE_LOG_STOP()
+#define PHARE_LOG_SCOPE(str)
+#define PHARE_LOG_NAMED_SCOPE(name, str)
+
+#endif
 
 #endif /* PHARE_CORE_LOGGER_H */

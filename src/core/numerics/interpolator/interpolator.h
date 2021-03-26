@@ -600,7 +600,7 @@ namespace core
                 currPart->By = meshToParticle_(By, ByCentering, startIndex_, weights_);
                 currPart->Bz = meshToParticle_(Bz, BzCentering, startIndex_, weights_);
             }
-            PHARE_LOG_STOP();
+            PHARE_LOG_STOP("MeshToParticle::operator()");
         }
 
 
@@ -683,7 +683,7 @@ namespace core
                 particleToMesh_(density, xFlux, yFlux, zFlux, densityCentering, fluxCentering,
                                 *currPart, startIndex_, weights_, cellVolume, coef);
             }
-            PHARE_LOG_STOP();
+            PHARE_LOG_STOP("ParticleToMesh::operator()");
         }
 
 

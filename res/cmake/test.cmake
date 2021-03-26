@@ -107,7 +107,6 @@ if (test AND ${PHARE_EXEC_LEVEL_MIN} GREATER 0) # 0 = no tests
       $<BUILD_INTERFACE:${gtest_SOURCE_DIR}/include>
       $<BUILD_INTERFACE:${gmock_SOURCE_DIR}/include>)
     set(GTEST_LIBS gtest gmock)
-
   endif()
 
   function(phare_exec level target exe directory)

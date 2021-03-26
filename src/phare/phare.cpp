@@ -7,6 +7,8 @@
 
 #include "core/logger.h"
 
+#include <algorithm>
+
 
 std::unique_ptr<PHARE::initializer::DataProvider> fromCommandLine(int argc, char** argv)
 {
@@ -20,6 +22,7 @@ std::unique_ptr<PHARE::initializer::DataProvider> fromCommandLine(int argc, char
             auto moduleName = arg.substr(0, arg.find_last_of("."));
             if (arg.substr(arg.find_last_of(".") + 1) == "py")
             {
+                std::replace(moduleName.begin(), moduleName.end(), '/', '.');
                 std::cout << "python input detected, building with python provider...\n";
                 return std::make_unique<PHARE::initializer::PythonDataProvider>(moduleName);
             }
@@ -53,7 +56,7 @@ int main(int argc, char** argv)
 
     auto& dictHandler = PHARE::initializer::PHAREDictHandler::INSTANCE();
 
-    auto& logman = PHARE::core::LogMan::start(dictHandler.dict());
+    PHARE::core::LogMan::start(dictHandler.dict());
 
     auto hierarchy = PHARE::amr::Hierarchy::make();
 
@@ -73,7 +76,7 @@ int main(int argc, char** argv)
     {
         PHARE_LOG_SCOPE("inner");
     }
-    PHARE_LOG_STOP();
+    PHARE_LOG_STOP("outer");
 
     while (simulator->currentTime() < simulator->endTime())
     {

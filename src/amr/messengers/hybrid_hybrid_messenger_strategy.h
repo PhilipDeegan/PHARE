@@ -402,7 +402,7 @@ namespace amr
             {
                 PHARE_LOG_START("HybridHybridMessengerStrategy::firstStep.fill");
                 levelGhostParticlesNew_.fill(levelNumber, currentTime);
-                PHARE_LOG_STOP();
+                PHARE_LOG_STOP("HybridHybridMessengerStrategy::firstStep.fill");
 
                 // during firstStep() coarser level and current level are at the same time
                 // so 'time' is also the beforePushCoarseTime_
