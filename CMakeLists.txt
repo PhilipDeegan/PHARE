@@ -1,5 +1,5 @@
 cmake_minimum_required (VERSION 3.9)
-
+awd
 project(PHARE VERSION 0.1)
 set(CMAKE_CXX_STANDARD 17)
 
