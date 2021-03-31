@@ -2,7 +2,7 @@ cmake_minimum_required (VERSION 3.9)
 
 project(PHARE VERSION 0.1)
 set(CMAKE_CXX_STANDARD 17)
-
+ 
 if(NOT CMAKE_BUILD_TYPE)
   set(CMAKE_BUILD_TYPE "Debug" CACHE STRING "" FORCE)
 endif()
