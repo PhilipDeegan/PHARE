@@ -6,7 +6,7 @@ set(CMAKE_CXX_STANDARD 17)
 if(NOT CMAKE_BUILD_TYPE)
   set(CMAKE_BUILD_TYPE "Debug" CACHE STRING "" FORCE)
 endif()
-
+     
 if (POLICY CMP0074) # hides warning about ${PACKAGE}_ROOT variables
   cmake_policy(SET CMP0074 NEW)
 endif()
