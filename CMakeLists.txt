@@ -25,7 +25,7 @@ set(PHARE_PROJECT_DIR ${CMAKE_CURRENT_SOURCE_DIR})
 set(CMAKE_EXPORT_COMPILE_COMMANDS 1)
 
 include_directories(${PHARE_PROJECT_DIR}/src)
-
+ 
 include("${PHARE_PROJECT_DIR}/res/cmake/options.cmake")
 include("${PHARE_PROJECT_DIR}/res/cmake/def.cmake")
 include("${PHARE_PROJECT_DIR}/res/cmake/coverage.cmake")
