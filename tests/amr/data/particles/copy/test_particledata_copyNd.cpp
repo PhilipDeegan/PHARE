@@ -37,9 +37,9 @@ struct AParticlesDataND : public testing::Test
 
     SAMRAI::hier::IntVector ghost{SAMRAI::hier::IntVector::getOne(dimension)};
 
-    ParticlesData<ParticleArray<dim>> destData{destDomain, ghost};
-    ParticlesData<ParticleArray<dim>> sourceData{sourceDomain, ghost};
-    Particle<dim> particle;
+    ParticlesData<ParticleArray<double, dim>> destData{destDomain, ghost};
+    ParticlesData<ParticleArray<double, dim>> sourceData{sourceDomain, ghost};
+    Particle<double, dim> particle;
 
 
     AParticlesDataND()

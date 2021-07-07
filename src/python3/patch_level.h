@@ -11,20 +11,23 @@
 
 namespace PHARE::pydata
 {
-template<std::size_t dim, std::size_t interpOrder, std::size_t nbrRefPart>
-class PatchLevel
+template<std::size_t dim, std::size_t interpOrder, std::size_t nbrRefPart, typename Float_>
+class __attribute__((visibility("hidden"))) PatchLevel
 {
 public:
+    using Float                                = Float_;
+    using float_type                           = Float;
     static constexpr std::size_t dimension     = dim;
     static constexpr std::size_t interp_order  = interpOrder;
     static constexpr std::size_t nbRefinedPart = nbrRefPart;
 
-    using PHARESolverTypes = solver::PHARE_Types<dimension, interp_order, nbRefinedPart>;
+    using PHARESolverTypes = solver::PHARE_Types<dimension, interp_order, nbRefinedPart, Float>;
     using HybridModel      = typename PHARESolverTypes::HybridModel_t;
 
-    using GridLayout = typename HybridModel::gridlayout_type;
+    using GridLayout  = typename HybridModel::gridlayout_type;
+    using Hierarchy_t = amr::Hierarchy<Float>;
 
-    PatchLevel(amr::Hierarchy& hierarchy, HybridModel& model, std::size_t lvl)
+    PatchLevel(Hierarchy_t& hierarchy, HybridModel& model, std::size_t lvl)
         : lvl_(lvl)
         , hierarchy_{hierarchy}
         , model_{model}
@@ -33,7 +36,7 @@ public:
 
     auto getDensity()
     {
-        std::vector<PatchData<std::vector<double>, dimension>> patchDatas;
+        std::vector<PatchData<std::vector<Float>, dimension>> patchDatas;
         auto& ions = model_.state.ions;
 
         auto visit = [&](GridLayout& grid, std::string patchID, std::size_t /*iLevel*/) {
@@ -157,7 +160,7 @@ public:
 
     auto getB(std::string componentName)
     {
-        std::vector<PatchData<std::vector<double>, dimension>> patchDatas;
+        std::vector<PatchData<std::vector<Float>, dimension>> patchDatas;
 
         auto& B = model_.state.electromag.B;
 
@@ -175,7 +178,7 @@ public:
 
     auto getE(std::string componentName)
     {
-        std::vector<PatchData<std::vector<double>, dimension>> patchDatas;
+        std::vector<PatchData<std::vector<Float>, dimension>> patchDatas;
 
         auto& E = model_.state.electromag.E;
 
@@ -194,7 +197,7 @@ public:
 
     auto getVi(std::string componentName)
     {
-        std::vector<PatchData<std::vector<double>, dimension>> patchDatas;
+        std::vector<PatchData<std::vector<Float>, dimension>> patchDatas;
 
         auto& V = model_.state.ions.velocity();
 
@@ -213,7 +216,7 @@ public:
 
     auto getPopFluxCompo(std::string component, std::string popName)
     {
-        std::vector<PatchData<std::vector<double>, dimension>> patchDatas;
+        std::vector<PatchData<std::vector<Float>, dimension>> patchDatas;
 
         auto& ions = model_.state.ions;
 
@@ -255,8 +258,9 @@ public:
 
     auto getParticles(std::string userPopName)
     {
-        using Nested = std::vector<PatchData<core::ContiguousParticles<dimension>, dimension>>;
-        using Inner  = std::unordered_map<std::string, Nested>;
+        using Nested
+            = std::vector<PatchData<core::ContiguousParticles<Float, dimension>, dimension>>;
+        using Inner = std::unordered_map<std::string, Nested>;
 
         std::unordered_map<std::string, Inner> pop_particles;
 
@@ -270,7 +274,7 @@ public:
 
             auto& patch_data = inner[key].emplace_back(particles.size());
             setPatchDataFromGrid(patch_data, grid, patchID);
-            core::ParticlePacker<dimension>{particles}.pack(patch_data.data);
+            core::ParticlePacker<Float, dimension>{particles}.pack(patch_data.data);
         };
 
         auto& ions = model_.state.ions;
@@ -300,7 +304,7 @@ public:
 
 private:
     std::size_t lvl_;
-    amr::Hierarchy& hierarchy_;
+    Hierarchy_t& hierarchy_;
     HybridModel& model_;
 };
 

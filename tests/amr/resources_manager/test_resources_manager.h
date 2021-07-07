@@ -30,7 +30,7 @@ class aResourceUserCollection : public ::testing::Test
 {
 public:
     std::unique_ptr<BasicHierarchy> hierarchy;
-    ResourcesManager<GridLayout<GridLayoutImplYee<1, 1>>> resourcesManager;
+    ResourcesManager<GridLayout<GridLayoutImplYee<1, 1, double>>> resourcesManager;
 
     ResourcesUsers users;
 

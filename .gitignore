@@ -13,3 +13,7 @@ data_out
 compile_commands.json
 .clangd
 phare_outputs*
+
+bin
+build
+.mkn

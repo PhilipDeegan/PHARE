@@ -21,11 +21,11 @@ namespace solver
          * and one for the coarser level. Once filled, these two structures are given to the
          * IMessenger which now knows quantities that will need messages.
          */
-        template<typename AMR_Types>
-        static void registerQuantities(amr::IMessenger<IPhysicalModel<AMR_Types>>& messenger,
-                                       IPhysicalModel<AMR_Types> const& coarseModel,
-                                       IPhysicalModel<AMR_Types> const& fineModel,
-                                       ISolver<AMR_Types> const& solver)
+        template<typename AMR_Types, typename Float>
+        static void registerQuantities(amr::IMessenger<IPhysicalModel<AMR_Types, Float>>& messenger,
+                                       IPhysicalModel<AMR_Types, Float> const& coarseModel,
+                                       IPhysicalModel<AMR_Types, Float> const& fineModel,
+                                       ISolver<AMR_Types, Float> const& solver)
         {
             if (messenger.fineModelName() == fineModel.name()
                 && messenger.coarseModelName() == coarseModel.name())

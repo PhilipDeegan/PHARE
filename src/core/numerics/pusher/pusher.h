@@ -19,7 +19,8 @@ namespace core
     protected:
         using ParticleRange             = Range<ParticleIterator>;
         static auto constexpr dimension = GridLayout::dimension;
-        using ParticleSelector          = std::function<bool(Particle<dimension> const&)>;
+        using Float                     = typename GridLayout::Float;
+        using ParticleSelector          = std::function<bool(Particle<Float, dimension> const&)>;
 
     public:
         /** Move all particles in rangeIn from t=n to t=n+1 and store their new
@@ -48,7 +49,7 @@ namespace core
          */
         virtual ParticleIterator
         move(ParticleRange const& rangeIn, ParticleRange& rangeOut, Electromag const& emFields,
-             double mass, Interpolator& interpolator, ParticleSelector const& particleIsNotLeaving,
+             Float mass, Interpolator& interpolator, ParticleSelector const& particleIsNotLeaving,
              BoundaryCondition& bc, GridLayout const& layout)
             = 0;
 
@@ -62,7 +63,7 @@ namespace core
          */
         virtual ParticleIterator // decltype(std::declval<ParticleRange>().end())
         move(ParticleRange const& rangeIn, ParticleRange& rangeOut, Electromag const& emFields,
-             double mass, Interpolator& interpolator, ParticleSelector const& particleIsNotLeaving,
+             Float mass, Interpolator& interpolator, ParticleSelector const& particleIsNotLeaving,
              GridLayout const& layout)
             = 0;
 
@@ -71,7 +72,7 @@ namespace core
          * @brief setMeshAndTimeStep allows to let the pusher know what is the mesh
          * size and time step in the domain where particles are to be pushed.
          */
-        virtual void setMeshAndTimeStep(std::array<double, dim> ms, double ts) = 0;
+        virtual void setMeshAndTimeStep(std::array<Float, dim> ms, Float ts) = 0;
 
         virtual ~Pusher() {}
     };

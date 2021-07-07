@@ -21,11 +21,14 @@ namespace PHARE::solver
  */
 template<typename GridLayoutT, typename Electromag, typename Ions, typename Electrons,
          typename AMR_Types>
-class HybridModel : public IPhysicalModel<AMR_Types>
+class HybridModel : public IPhysicalModel<AMR_Types, typename GridLayoutT::Float>
 {
 public:
+    using Float      = typename GridLayoutT::Float;
+    using float_type = Float;
+
     using type_list = PHARE::core::type_list<GridLayoutT, Electromag, Ions, Electrons, AMR_Types>;
-    using Interface = IPhysicalModel<AMR_Types>;
+    using Interface = IPhysicalModel<AMR_Types, Float>;
     using amr_types = AMR_Types;
     using patch_t   = typename AMR_Types::patch_t;
     using level_t   = typename AMR_Types::level_t;
@@ -53,7 +56,7 @@ public:
      * @brief allocate uses the ResourcesManager to allocate HybridState physical quantities on
      * the given Patch at the given allocateTime
      */
-    virtual void allocate(patch_t& patch, double const allocateTime) override
+    virtual void allocate(patch_t& patch, Float const allocateTime) override
     {
         resourcesManager->allocate(state, patch, allocateTime);
     }
@@ -71,7 +74,7 @@ public:
 
     HybridModel(PHARE::initializer::PHAREDict const& dict,
                 std::shared_ptr<resources_manager_type> const& _resourcesManager)
-        : IPhysicalModel<AMR_Types>{model_name}
+        : IPhysicalModel<AMR_Types, Float>{model_name}
         , state{dict}
         , resourcesManager{std::move(_resourcesManager)}
     {

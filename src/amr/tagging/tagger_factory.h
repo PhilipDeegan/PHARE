@@ -17,11 +17,13 @@ class TaggerFactory
 {
 public:
     TaggerFactory() = delete;
-    static std::unique_ptr<Tagger> make(std::string modelName, std::string methodName);
+    static std::unique_ptr<Tagger<typename PHARE_T::Float>> make(std::string modelName,
+                                                                 std::string methodName);
 };
 
 template<typename PHARE_T>
-std::unique_ptr<Tagger> TaggerFactory<PHARE_T>::make(std::string modelName, std::string methodName)
+std::unique_ptr<Tagger<typename PHARE_T::Float>>
+TaggerFactory<PHARE_T>::make(std::string modelName, std::string methodName)
 {
     if (modelName == "HybridModel")
     {

@@ -18,6 +18,8 @@ namespace core
     template<typename VecFieldT>
     class Electromag
     {
+        using Float = typename VecFieldT::float_type;
+
     public:
         static constexpr std::size_t dimension = VecFieldT::dimension;
 
@@ -76,7 +78,7 @@ namespace core
         VecFieldT B;
 
     private:
-        VecFieldInitializer<dimension> Binit_;
+        VecFieldInitializer<Float, dimension> Binit_;
     };
 } // namespace core
 } // namespace PHARE

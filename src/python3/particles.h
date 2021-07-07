@@ -5,32 +5,41 @@
 #include <cstddef>
 #include <tuple>
 #include "amr/data/particles/refine/particles_data_split.h"
-#include "core/data/particles/particle_packer.h"
 #include "core/data/particles/particle.h"
+
+#include "core/data/particles/contiguous.h"
 #include "core/utilities/types.h"
+#include "core/utilities/span.h"
 
 #include "python3/pybind_def.h"
 
 namespace PHARE::pydata
 {
-template<std::size_t dim, typename PyArrayTuple>
-core::ContiguousParticlesView<dim> contiguousViewFrom(PyArrayTuple const& py_particles)
+template<typename T, typename PyArray>
+core::Span<T> makeSpan(PyArray const& py_array)
 {
-    return {makeSpan<int>(std::get<0>(py_particles)),     // iCell
-            makeSpan<double>(std::get<1>(py_particles)),  // delta
-            makeSpan<double>(std::get<2>(py_particles)),  // weight
-            makeSpan<double>(std::get<3>(py_particles)),  // charge
-            makeSpan<double>(std::get<4>(py_particles))}; // v
+    auto ar_info = py_array.request();
+    return {static_cast<T*>(ar_info.ptr), static_cast<std::size_t>(ar_info.shape[0])};
 }
 
-template<std::size_t dim>
-pyarray_particles_t makePyArrayTuple(std::size_t const size)
+template<typename Float, std::size_t dim, typename PyArrayTuple>
+core::ContiguousParticlesView<Float, dim> contiguousViewFrom(PyArrayTuple const& py_particles)
 {
-    return std::make_tuple(py_array_t<int>(size * dim),    // iCell
-                           py_array_t<double>(size * dim), // delta
-                           py_array_t<double>(size),       // weight
-                           py_array_t<double>(size),       // charge
-                           py_array_t<double>(size * 3));  // v
+    return {makeSpan<int>(std::get<0>(py_particles)),    // iCell
+            makeSpan<Float>(std::get<1>(py_particles)),  // delta
+            makeSpan<Float>(std::get<2>(py_particles)),  // weight
+            makeSpan<Float>(std::get<3>(py_particles)),  // charge
+            makeSpan<Float>(std::get<4>(py_particles))}; // v
+}
+
+template<typename Float, std::size_t dim>
+pyarray_particles_t<Float> makePyArrayTuple(std::size_t const size)
+{
+    return std::make_tuple(py_array_t<int>(size * dim),   // iCell
+                           py_array_t<Float>(size * dim), // delta
+                           py_array_t<Float>(size),       // weight
+                           py_array_t<Float>(size),       // charge
+                           py_array_t<Float>(size * 3));  // v
 }
 
 
@@ -58,8 +67,8 @@ void assertParticlePyArraySizes(PyArrayTuple const& py_particles)
            or (vDims == 2 and shape_nd(v) * shape_nd(v, 1) == n_weight * 3));
 }
 
-template<typename Splitter>
-pyarray_particles_t splitPyArrayParticles(pyarray_particles_crt const& py_particles)
+template<typename Splitter, typename Float>
+pyarray_particles_t<Float> splitPyArrayParticles(pyarray_particles_crt<Float> const& py_particles)
 {
     constexpr auto dim           = Splitter::dimension;
     constexpr auto interp_order  = Splitter::interp_order;
@@ -67,9 +76,9 @@ pyarray_particles_t splitPyArrayParticles(pyarray_particles_crt const& py_partic
 
     PHARE_DEBUG_DO(assertParticlePyArraySizes<dim>(py_particles));
 
-    auto particlesInView  = contiguousViewFrom<dim>(py_particles);
-    auto particlesOut     = makePyArrayTuple<dim>(particlesInView.size() * nbRefinedPart);
-    auto particlesOutView = contiguousViewFrom<dim>(particlesOut);
+    auto particlesInView  = contiguousViewFrom<Float, dim>(py_particles);
+    auto particlesOut     = makePyArrayTuple<Float, dim>(particlesInView.size() * nbRefinedPart);
+    auto particlesOutView = contiguousViewFrom<Float, dim>(particlesOut);
 
     Splitter splitter;
 

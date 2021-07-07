@@ -54,6 +54,7 @@ namespace amr
         static constexpr auto dim           = Splitter::dimension;
         static constexpr auto interpOrder   = Splitter::interp_order;
         static constexpr auto nbRefinedPart = Splitter::nbRefinedPart;
+        using Float                         = typename ParticleArray::float_type;
 
         ParticlesRefineOperator()
             : SAMRAI::hier::RefineOperator{"ParticlesDataSplit_" + splitName_(splitType)}
@@ -77,7 +78,7 @@ namespace amr
          *
          */
         virtual void refine(SAMRAI::hier::Patch& destination, SAMRAI::hier::Patch const& source,
-                            int const destinationComponent, int const sourceComponent,
+                            const int destinationComponent, const int sourceComponent,
                             SAMRAI::hier::BoxOverlap const& fineOverlap,
                             SAMRAI::hier::IntVector const& /*ratio*/) const override
         {
@@ -170,17 +171,13 @@ namespace amr
             // in case of interior, this will be just one boxe usually
             for (auto const& destinationBox : destBoxes)
             {
-                std::array<std::remove_reference_t<decltype(srcInteriorParticles)>*, 2>
-                    particlesArrays{{&srcInteriorParticles, &srcGhostParticles}};
+                auto isInDest = [&destinationBox](auto const& particle) {
+                    return isInBox(destinationBox, particle);
+                };
 
-
-                auto isInDest = [&destinationBox](auto const& particle) //
-                { return isInBox(destinationBox, particle); };
-
-
-                for (auto const& sourceParticlesArray : particlesArrays)
+                for (auto const& sourceParticlesArray : {srcInteriorParticles, srcGhostParticles})
                 {
-                    for (auto const& particle : *sourceParticlesArray)
+                    for (auto const& particle : sourceParticlesArray)
                     {
                         ParticleArray refinedParticles{nbRefinedPart};
                         auto particleRefinedPos = toFineGrid<interpOrder>(particle);
@@ -279,6 +276,8 @@ namespace PHARE::amr
 template<typename ParticleArray, typename Splitter>
 struct RefinementParams
 {
+    // using Float = typename ParticleArray::float_type;
+
     using InteriorParticleRefineOp
         = ParticlesRefineOperator<ParticleArray, ParticlesDataSplitType::interior, Splitter>;
 

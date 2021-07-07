@@ -18,12 +18,15 @@ namespace PHARE::core
 template<typename T = float>
 struct ParticleDeltaDistribution
 {
+    constexpr static T epsilon = std::numeric_limits<T>::epsilon();
+    constexpr static T one     = 1;
+
     template<typename Generator>
     T operator()(Generator& generator)
     {
         return dist(generator);
     }
-    std::uniform_real_distribution<T> dist{0, 1. - std::numeric_limits<T>::epsilon()};
+    std::uniform_real_distribution<T> dist{0, one - epsilon};
 };
 
 
@@ -35,23 +38,25 @@ auto cellAsPoint(Particle const& particle)
 
 
 
-template<size_t dim>
+template<typename Float, size_t dim>
 struct Particle
 {
     static_assert(dim > 0 and dim < 4, "Only dimensions 1,2,3 are supported.");
+
+    using float_type              = Float;
     static const size_t dimension = dim;
 
-    double weight;
-    double charge;
+    Float weight;
+    Float charge;
 
-    std::array<int, dim> iCell    = ConstArray<int, dim>();
-    std::array<double, dim> delta = ConstArray<double, dim>();
-    std::array<double, 3> v       = ConstArray<double, 3>();
+    std::array<int, dim> iCell   = ConstArray<int, dim>();
+    std::array<Float, dim> delta = ConstArray<Float, dim>();
+    std::array<Float, 3> v       = ConstArray<Float, 3>();
 
-    double Ex = 0, Ey = 0, Ez = 0;
-    double Bx = 0, By = 0, Bz = 0;
+    Float Ex = 0, Ey = 0, Ez = 0;
+    Float Bx = 0, By = 0, Bz = 0;
 
-    bool operator==(Particle<dim> const& that) const
+    bool operator==(Particle<Float, dim> const& that) const
     {
         return (this->weight == that.weight) && //
                (this->charge == that.charge) && //
@@ -68,21 +73,26 @@ struct Particle
 };
 
 
-template<std::size_t dim>
+
+
+template<typename Float, std::size_t dim>
 struct ParticleView
 {
     static_assert(dim > 0 and dim < 4, "Only dimensions 1,2,3 are supported.");
+
+    using float_type                       = Float;
     static constexpr std::size_t dimension = dim;
 
-    double& weight;
-    double& charge;
+    Float& weight;
+    Float& charge;
     std::array<int, dim>& iCell;
-    std::array<double, dim>& delta;
-    std::array<double, 3>& v;
+    std::array<Float, dim>& delta;
+    std::array<Float, 3>& v;
 };
 
 
 
+/*
 template<std::size_t dim, bool OwnedState = true>
 struct ContiguousParticles
 {
@@ -173,24 +183,27 @@ struct ContiguousParticles
     container_t<double> delta;
     container_t<double> weight, charge, v;
 };
+*/
+
+// template<std::size_t dim>
+// using ContiguousParticlesView = ContiguousParticles<dim, /*OwnedState=*/
+//                                                     false>;
 
 
-template<std::size_t dim>
-using ContiguousParticlesView = ContiguousParticles<dim, /*OwnedState=*/false>;
 
 
-
-template<std::size_t dim, typename T>
+template<typename Float, std::size_t dim, typename T>
 inline constexpr auto is_phare_particle_type
-    = std::is_same_v<Particle<dim>, T> or std::is_same_v<ParticleView<dim>, T>;
+    = std::is_same_v<Particle<Float, dim>, T> or std::is_same_v<ParticleView<Float, dim>, T>;
 
 
-template<std::size_t dim, template<std::size_t> typename ParticleA,
-         template<std::size_t> typename ParticleB>
-typename std::enable_if_t<
-    is_phare_particle_type<dim, ParticleA<dim>> and is_phare_particle_type<dim, ParticleB<dim>>,
+template<typename Float, std::size_t dim, template<typename, std::size_t> typename ParticleA,
+         template<typename, std::size_t> typename ParticleB>
+typename std::enable_if_t<                                    //
+    is_phare_particle_type<Float, dim, ParticleA<Float, dim>> //
+        and is_phare_particle_type<Float, dim, ParticleB<Float, dim>>,
     bool>
-operator==(ParticleA<dim> const& particleA, ParticleB<dim> const& particleB)
+operator==(ParticleA<Float, dim> const& particleA, ParticleB<Float, dim> const& particleB)
 {
     return particleA.weight == particleB.weight and //
            particleA.charge == particleB.charge and //
@@ -204,10 +217,10 @@ operator==(ParticleA<dim> const& particleA, ParticleB<dim> const& particleB)
 
 namespace std
 {
-template<size_t dim, template<std::size_t> typename Particle_t>
-typename std::enable_if_t<PHARE::core::is_phare_particle_type<dim, Particle_t<dim>>,
-                          PHARE::core::Particle<dim>>
-copy(Particle_t<dim> const& from)
+template<typename Float, size_t dim, template<typename, std::size_t> typename Particle_t>
+typename std::enable_if_t<PHARE::core::is_phare_particle_type<Float, dim, Particle_t<Float, dim>>,
+                          PHARE::core::Particle<Float, dim>>
+copy(Particle_t<Float, dim> const& from)
 {
     return {from.weight, from.charge, from.iCell, from.delta, from.v};
 }

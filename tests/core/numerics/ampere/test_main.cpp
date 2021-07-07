@@ -164,19 +164,19 @@ std::vector<double> read(std::string filename)
 class Ampere1DTest : public ::testing::Test
 {
 protected:
-    using GridLayoutImpl = GridLayoutImplYee<1, 1>;
+    using GridLayoutImpl = GridLayoutImplYee<1, 1, double>;
     GridLayout<GridLayoutImpl> layout;
     static constexpr auto interp_order = GridLayoutImpl::interp_order;
 
-    Field<NdArrayVector<1>, HybridQuantity::Scalar> Bx;
-    Field<NdArrayVector<1>, HybridQuantity::Scalar> By;
-    Field<NdArrayVector<1>, HybridQuantity::Scalar> Bz;
-    Field<NdArrayVector<1>, HybridQuantity::Scalar> Jx;
-    Field<NdArrayVector<1>, HybridQuantity::Scalar> Jy;
-    Field<NdArrayVector<1>, HybridQuantity::Scalar> Jz;
+    Field<NdArrayVector<1, double>, HybridQuantity::Scalar> Bx;
+    Field<NdArrayVector<1, double>, HybridQuantity::Scalar> By;
+    Field<NdArrayVector<1, double>, HybridQuantity::Scalar> Bz;
+    Field<NdArrayVector<1, double>, HybridQuantity::Scalar> Jx;
+    Field<NdArrayVector<1, double>, HybridQuantity::Scalar> Jy;
+    Field<NdArrayVector<1, double>, HybridQuantity::Scalar> Jz;
 
-    VecField<NdArrayVector<1>, HybridQuantity> B;
-    VecField<NdArrayVector<1>, HybridQuantity> J;
+    VecField<NdArrayVector<1, double>, HybridQuantity> B;
+    VecField<NdArrayVector<1, double>, HybridQuantity> J;
 
     Ampere<GridLayout<GridLayoutImpl>> ampere;
 
@@ -205,19 +205,19 @@ public:
 class Ampere2DTest : public ::testing::Test
 {
 protected:
-    using GridLayoutImpl = GridLayoutImplYee<2, 1>;
+    using GridLayoutImpl = GridLayoutImplYee<2, 1, double>;
     GridLayout<GridLayoutImpl> layout;
     static constexpr auto interp_order = GridLayoutImpl::interp_order;
 
-    Field<NdArrayVector<2>, HybridQuantity::Scalar> Bx;
-    Field<NdArrayVector<2>, HybridQuantity::Scalar> By;
-    Field<NdArrayVector<2>, HybridQuantity::Scalar> Bz;
-    Field<NdArrayVector<2>, HybridQuantity::Scalar> Jx;
-    Field<NdArrayVector<2>, HybridQuantity::Scalar> Jy;
-    Field<NdArrayVector<2>, HybridQuantity::Scalar> Jz;
+    Field<NdArrayVector<2, double>, HybridQuantity::Scalar> Bx;
+    Field<NdArrayVector<2, double>, HybridQuantity::Scalar> By;
+    Field<NdArrayVector<2, double>, HybridQuantity::Scalar> Bz;
+    Field<NdArrayVector<2, double>, HybridQuantity::Scalar> Jx;
+    Field<NdArrayVector<2, double>, HybridQuantity::Scalar> Jy;
+    Field<NdArrayVector<2, double>, HybridQuantity::Scalar> Jz;
 
-    VecField<NdArrayVector<2>, HybridQuantity> B;
-    VecField<NdArrayVector<2>, HybridQuantity> J;
+    VecField<NdArrayVector<2, double>, HybridQuantity> B;
+    VecField<NdArrayVector<2, double>, HybridQuantity> J;
 
     Ampere<GridLayout<GridLayoutImpl>> ampere;
 
@@ -246,19 +246,19 @@ public:
 class Ampere3DTest : public ::testing::Test
 {
 protected:
-    using GridLayoutImpl = GridLayoutImplYee<3, 1>;
+    using GridLayoutImpl = GridLayoutImplYee<3, 1, double>;
     GridLayout<GridLayoutImpl> layout;
     static constexpr auto interp_order = GridLayoutImpl::interp_order;
 
-    Field<NdArrayVector<3>, HybridQuantity::Scalar> Bx;
-    Field<NdArrayVector<3>, HybridQuantity::Scalar> By;
-    Field<NdArrayVector<3>, HybridQuantity::Scalar> Bz;
-    Field<NdArrayVector<3>, HybridQuantity::Scalar> Jx;
-    Field<NdArrayVector<3>, HybridQuantity::Scalar> Jy;
-    Field<NdArrayVector<3>, HybridQuantity::Scalar> Jz;
+    Field<NdArrayVector<3, double>, HybridQuantity::Scalar> Bx;
+    Field<NdArrayVector<3, double>, HybridQuantity::Scalar> By;
+    Field<NdArrayVector<3, double>, HybridQuantity::Scalar> Bz;
+    Field<NdArrayVector<3, double>, HybridQuantity::Scalar> Jx;
+    Field<NdArrayVector<3, double>, HybridQuantity::Scalar> Jy;
+    Field<NdArrayVector<3, double>, HybridQuantity::Scalar> Jz;
 
-    VecField<NdArrayVector<3>, HybridQuantity> B;
-    VecField<NdArrayVector<3>, HybridQuantity> J;
+    VecField<NdArrayVector<3, double>, HybridQuantity> B;
+    VecField<NdArrayVector<3, double>, HybridQuantity> J;
 
     Ampere<GridLayout<GridLayoutImpl>> ampere;
 

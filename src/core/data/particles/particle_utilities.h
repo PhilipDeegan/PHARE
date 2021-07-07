@@ -10,14 +10,19 @@
 
 namespace PHARE::core
 {
-template<typename GridLayout>
 /**
  * @brief positionAsPoint returns a point holding the physical position of the macroparticle.
  * The function assumes the iCell of the particle is in AMR index space.
  */
-auto positionAsPoint(Particle<GridLayout::dimension> const& particle, GridLayout const& layout)
+template<typename Particle, typename GridLayout>
+auto positionAsPoint(Particle const& particle, GridLayout const& layout)
 {
-    Point<double, GridLayout::dimension> position;
+    static_assert(Particle::dimension == GridLayout::dimension,
+                  "Invalid use of function, dimension template mismatch");
+
+    using Float = typename Particle::float_type;
+
+    Point<Float, GridLayout::dimension> position;
     auto origin       = layout.origin();
     auto startIndexes = layout.physicalStartIndex(QtyCentering::primal);
     auto meshSize     = layout.meshSize();
@@ -25,12 +30,13 @@ auto positionAsPoint(Particle<GridLayout::dimension> const& particle, GridLayout
 
     for (auto iDim = 0u; iDim < GridLayout::dimension; ++iDim)
     {
+        auto delta     = static_cast<Float>(particle.delta[iDim]);
         position[iDim] = origin[iDim];
-        position[iDim]
-            += (iCell[iDim] - startIndexes[iDim] + particle.delta[iDim]) * meshSize[iDim];
+        position[iDim] += (iCell[iDim] - startIndexes[iDim] + delta) * meshSize[iDim];
     }
     return position;
 }
+
 
 
 // this function is for debugging purposes
@@ -84,6 +90,7 @@ void checkDeltas(ParticleRange const& prange)
     else
         std::cout << "no duplicate found\n";
 }
+
 
 
 

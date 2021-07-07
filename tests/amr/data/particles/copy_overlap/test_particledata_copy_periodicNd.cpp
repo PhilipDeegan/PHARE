@@ -39,8 +39,8 @@ struct twoParticlesDataNDTouchingPeriodicBorders : public testing::Test
     SAMRAI::hier::Patch destPatch{destDomain, patchDescriptor};
     SAMRAI::hier::Patch sourcePatch{sourceDomain, patchDescriptor};
 
-    ParticlesData<ParticleArray<dim>> destPdat{destDomain, ghost};
-    ParticlesData<ParticleArray<dim>> sourcePdat{sourceDomain, ghost};
+    ParticlesData<ParticleArray<double, dim>> destPdat{destDomain, ghost};
+    ParticlesData<ParticleArray<double, dim>> sourcePdat{sourceDomain, ghost};
 
     std::shared_ptr<SAMRAI::hier::BoxGeometry> destGeom{
         std::make_shared<SAMRAI::pdat::CellGeometry>(destPatch.getBox(), ghost)};
@@ -60,7 +60,7 @@ struct twoParticlesDataNDTouchingPeriodicBorders : public testing::Test
         std::dynamic_pointer_cast<SAMRAI::pdat::CellOverlap>(destGeom->calculateOverlap(
             *sourceGeom, srcMask, fillBox, overwriteInterior, transformation))};
 
-    Particle<dim> particle;
+    Particle<double, dim> particle;
 
     twoParticlesDataNDTouchingPeriodicBorders()
     {

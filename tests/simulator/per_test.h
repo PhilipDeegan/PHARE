@@ -21,32 +21,33 @@ struct __attribute__((visibility("hidden"))) StaticIntepreter
 std::shared_ptr<PHARE::initializer::PythonDataProvider> StaticIntepreter::input{nullptr};
 
 
-template<std::size_t _dim>
+template<typename Float, std::size_t dim>
 struct HierarchyMaker
 {
     HierarchyMaker(PHARE::initializer::PHAREDict& dict)
-        : hierarchy{std::make_shared<PHARE::amr::DimHierarchy<_dim>>(dict)}
+        : hierarchy{std::make_shared<PHARE::amr::DimHierarchy<Float, dim>>(dict)}
     {
     }
-    std::shared_ptr<PHARE::amr::Hierarchy> hierarchy;
+    std::shared_ptr<PHARE::amr::Hierarchy<Float>> hierarchy;
 };
 
 
 
-template<std::size_t _dim, std::size_t _interp, std::size_t _nbRefinePart>
-struct SimulatorTestParam : private HierarchyMaker<_dim>,
-                            public PHARE::Simulator<_dim, _interp, _nbRefinePart>
+
+template<std::size_t _dim, std::size_t _interp, std::size_t _nbRefinePart, typename Float = double>
+struct SimulatorTestParam : public HierarchyMaker<Float, _dim>,
+                            public PHARE::Simulator<_dim, _interp, _nbRefinePart, Float>
 {
     static constexpr std::size_t dim          = _dim;
     static constexpr std::size_t interp       = _interp;
     static constexpr std::size_t nbRefinePart = _nbRefinePart;
 
-    using Simulator   = PHARE::Simulator<dim, interp, nbRefinePart>;
-    using PHARETypes  = PHARE::PHARE_Types<dim, interp, nbRefinePart>;
-    using Hierarchy   = PHARE::amr::Hierarchy;
+    using Simulator   = PHARE::Simulator<dim, interp, nbRefinePart, Float>;
+    using PHARETypes  = PHARE::PHARE_Types<dim, interp, nbRefinePart, Float>;
+    using Hierarchy   = PHARE::amr::Hierarchy<Float>;
     using HybridModel = typename PHARETypes::HybridModel_t;
     using MHDModel    = typename PHARETypes::MHDModel_t;
-    using HierarchyMaker<dim>::hierarchy;
+    using HierarchyMaker<Float, dim>::hierarchy;
 
     std::unique_ptr<PHARE::diagnostic::IDiagnosticsManager> dMan;
 
@@ -63,7 +64,7 @@ struct SimulatorTestParam : private HierarchyMaker<_dim>,
     }
 
     SimulatorTestParam(std::string job_py = "job")
-        : HierarchyMaker<_dim>{dict(job_py)}
+        : HierarchyMaker<Float, _dim>{dict(job_py)}
         , Simulator{dict(job_py), this->hierarchy}
     {
         Simulator::initialize();

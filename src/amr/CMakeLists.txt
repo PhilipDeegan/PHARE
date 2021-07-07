@@ -61,9 +61,7 @@ set( SOURCES_INC
      data/field/field_variable_fill_pattern.h
    )
 set( SOURCES_CPP
-     data/field/refine/linear_weighter.cpp
      resources_manager/amr_utils.cpp
-     data/field/coarsening/field_coarsen.cpp
      messengers/messenger_factory.cpp
      data/field/field_variable_fill_pattern.cpp
    )

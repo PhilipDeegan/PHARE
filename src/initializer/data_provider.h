@@ -1,6 +1,7 @@
 #ifndef DATA_PROVIDER_H
 #define DATA_PROVIDER_H
 
+
 #include <string>
 #include <vector>
 #include <cstdint>
@@ -14,7 +15,7 @@ namespace PHARE
 {
 namespace initializer
 {
-    template<typename ReturnType, std::size_t dim>
+    template<typename Float, std::size_t dim>
     struct InitFunctionHelper
     {
     };
@@ -43,13 +44,41 @@ namespace initializer
         using type        = std::function<return_type(param_type, param_type, param_type)>;
     };
 
-    template<std::size_t dim>
-    using InitFunction = typename InitFunctionHelper<double, dim>::type;
 
 
-    using PHAREDict = cppdict::Dict<int, std::vector<int>, double, std::vector<double>, std::size_t,
-                                    std::optional<std::size_t>, std::string, InitFunction<1>,
-                                    InitFunction<2>, InitFunction<3>>;
+    template<>
+    struct InitFunctionHelper<float, 1>
+    {
+        using return_type = std::shared_ptr<core::Span<float>>;
+        using param_type  = std::vector<float> const&;
+        using type        = std::function<return_type(param_type)>;
+    };
+
+    template<>
+    struct InitFunctionHelper<float, 2>
+    {
+        using return_type = std::shared_ptr<core::Span<float>>;
+        using param_type  = std::vector<float> const&;
+        using type        = std::function<return_type(param_type, param_type)>;
+    };
+
+    template<>
+    struct InitFunctionHelper<float, 3>
+    {
+        using return_type = std::shared_ptr<core::Span<float>>;
+        using param_type  = std::vector<float> const&;
+        using type        = std::function<return_type(param_type, param_type, param_type)>;
+    };
+
+    template<typename Float, std::size_t dim>
+    using InitFunction = typename InitFunctionHelper<Float, dim>::type;
+
+
+    using PHAREDict
+        = cppdict::Dict<int, std::vector<int>, float, double, std::vector<double>, std::size_t,
+                        std::optional<std::size_t>, std::string, InitFunction<float, 1>,
+                        InitFunction<float, 2>, InitFunction<float, 3>, InitFunction<double, 1>,
+                        InitFunction<double, 2>, InitFunction<double, 3>>;
 
 
     class PHAREDictHandler

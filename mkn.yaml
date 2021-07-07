@@ -1,0 +1,122 @@
+#! clean build -x mpi -dtKOp py
+
+name: phare
+parent: gpu
+scm: https://github.com/dekken/phare
+version: gpu
+
+property:
+  MPI_INC: /usr/include/hdf5/mpich #/usr/include/hdf5/openmpi #/usr/local/netcdf/include
+  MPI_LIB: hdf5
+  MPI_PTH: /usr/lib/x86_64-linux-gnu/hdf5/mpich
+
+profile:
+- name: base
+  arg: -DPHARE_HAS_HIGHFIVE=1 -DPHARE_DIAG_DOUBLES=1
+
+- name: gpu
+  parent: test
+  dep: mkn.gpu
+  test: |
+    tests/gpu/gpu.cpp
+# tests/gpu/gpu_float32.cpp
+  env: PYTHONPATH=${MKN_ROOT}:${MKN_ROOT}/tests/diagnostic:${MKN_ROOT}/build:${MKN_ROOT}/pyphare
+
+- name: core
+  inc: src subprojects
+  src: src/core
+  dep: mkn.kul
+  out: phare_core
+
+- name: samrai
+  self: core
+  dep: llnl.samrai(https://github.com/dekken/llnl.samrai)
+  src: src/amr
+  out: phare_amr
+
+- name: diagnostic
+  self: samrai
+  dep: hpc.highfive(https://github.com/dekken/hpc.highfive)
+  inc: build/subprojects/highfive/include
+       ${MPI_INC}
+  lib: ${MPI_LIB}
+  path: ${MPI_PTH}
+
+- name: simulator
+  parent: base
+  self: diagnostic
+
+- name: exe
+  self: simulator init
+  main: src/phare/phare.cpp
+  mod: lang.python3
+  env: PYTHONPATH=${MKN_ROOT}:${MKN_ROOT}/tests/diagnostic:${MKN_ROOT}/build:${MKN_ROOT}/pyphare
+
+- name: init
+  src: src/initializer/data_provider.cpp
+  self: core
+  out: phare_initializer
+  mode: shared # static singleton dict lives here
+
+- name: pybind
+  parent: base
+  mode: shared
+  dep: lang.pybind11
+  mod: lang.pybind11 lang.python3
+
+- name: dictator
+  parent: pybind
+  self: init
+  src: src/initializer/dictator.cpp
+  install: build/pybindlibs
+  out: dictator
+
+- name: py_simulator
+  parent: pybind
+  self: simulator
+  src: src/python3/cpp_simulator.cpp
+  install: build/pybindlibs
+  out: cpp
+
+- name: py
+  self: dictator py_simulator
+
+- name: test
+  parent: base
+  self: init simulator
+  dep: lang.pybind11 google.test
+  mod: lang.python3
+  inc: .
+  link: -pthread
+
+- name: test_diagnostics
+  parent: test
+  mode: none
+  mod: lang.python3
+  test:
+    tests/diagnostic/test-diagnostics_1d.cpp
+    tests/diagnostic/test-diagnostics_2d.cpp
+  env: PYTHONPATH=${MKN_ROOT}:${MKN_ROOT}/tests/diagnostic:${MKN_ROOT}/build:${MKN_ROOT}/pyphare
+
+- name: bench
+  self: core
+  dep: google.benchmark
+  main: tools/bench/core/data/particles/interop.cpp
+  link: -pthread
+
+
+- name: c_depositor
+  test: tools/hw/gpu/bench/depositor.cpp
+
+- name: mkn.gpu_depositor
+  dep: mkn.gpu
+  test: tools/hw/gpu/bench/depositor.mkn.gpu.cpp
+
+# mkn clean build test run -p mkn.sheath.hip -x res/mkn/hcc.yaml -O
+- name: mkn.sheath.hip
+  dep: mkn.gpu
+  test: tools/hw/gpu/bench/sheath-gpu.hip.cpp
+
+- name: mkn.sheath.cuda
+  dep: mkn.gpu
+  test: tools/hw/gpu/bench/sheath-gpu.cuda.cpp

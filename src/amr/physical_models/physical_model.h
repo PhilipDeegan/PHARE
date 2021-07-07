@@ -17,7 +17,7 @@ namespace solver
      * @brief The IPhysicalModel class represents an interface for manipulating physical quantities
      * governed by a set of equations on an AMR patch hierarchy.
      */
-    template<typename AMR_Types>
+    template<typename AMR_Types, typename Float_>
     class IPhysicalModel
     {
     protected:
@@ -30,6 +30,8 @@ namespace solver
         std::string name_;
 
     public:
+        using Float = Float_;
+
         using patch_t = typename AMR_Types::patch_t;
         using level_t = typename AMR_Types::level_t;
 
@@ -54,7 +56,7 @@ namespace solver
          * This method is typically called in the MultiPhysicsIntegrator when initializing level
          * data
          */
-        virtual void allocate(patch_t& patch, double const allocateTime) = 0;
+        virtual void allocate(patch_t& patch, Float const allocateTime) = 0;
 
 
 

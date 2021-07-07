@@ -18,7 +18,7 @@ using namespace PHARE::amr;
 using namespace PHARE::solver;
 
 template<uint8_t dim>
-using InitFunctionT = PHARE::initializer::InitFunction<dim>;
+using InitFunctionT = PHARE::initializer::InitFunction<double, dim>;
 
 
 
@@ -202,7 +202,7 @@ static constexpr std::size_t dim          = 1;
 static constexpr std::size_t interpOrder  = 1;
 static constexpr std::size_t nbRefinePart = 2;
 
-using Simulator         = PHARE::Simulator<dim, interpOrder, nbRefinePart>;
+using Simulator         = PHARE::Simulator<dim, interpOrder, nbRefinePart, double>;
 using HybridModelT      = Simulator::HybridModel;
 using MHDModelT         = Simulator::MHDModel;
 using ResourcesManagerT = typename HybridModelT::resources_manager_type;
@@ -249,8 +249,8 @@ class HybridMessengers : public ::testing::Test
 
 
 public:
-    std::vector<std::unique_ptr<IMessenger<IPhysicalModel<SAMRAI_Types>>>> messengers;
-    std::vector<std::unique_ptr<IPhysicalModel<SAMRAI_Types>>> models;
+    std::vector<std::unique_ptr<IMessenger<IPhysicalModel<SAMRAI_Types, double>>>> messengers;
+    std::vector<std::unique_ptr<IPhysicalModel<SAMRAI_Types, double>>> models;
 
     HybridMessengers()
     {
@@ -448,11 +448,11 @@ struct AfullHybridBasicHierarchy
 {
     static constexpr std::size_t interpOrder = 1;
 
-    using Simulator         = typename PHARE::Simulator<dimension, interpOrder, nbRefinePart>;
-    using HybridModelT      = typename Simulator::HybridModel;
-    using MHDModelT         = typename Simulator::MHDModel;
+    using Simulator    = typename PHARE::Simulator<dimension, interpOrder, nbRefinePart, double>;
+    using HybridModelT = typename Simulator::HybridModel;
+    using MHDModelT    = typename Simulator::MHDModel;
     using ResourcesManagerT = typename HybridModelT::resources_manager_type;
-    using Phare_Types       = PHARE::PHARE_Types<dimension, interpOrder, nbRefinePart>;
+    using Phare_Types       = PHARE::PHARE_Types<dimension, interpOrder, nbRefinePart, double>;
 
     int const firstHybLevel{0};
     int const ratio{2};

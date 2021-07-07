@@ -22,7 +22,9 @@ namespace amr
     class MHDMessenger : public IMessenger<typename MHDModel::Interface>
     {
     public:
+        using Float          = typename MHDModel::Float;
         using IPhysicalModel = typename MHDModel::Interface;
+
         MHDMessenger(std::shared_ptr<typename MHDModel::resources_manager_type> resourcesManager,
                      int const firstLevel)
             : resourcesManager_{std::move(resourcesManager)}
@@ -52,12 +54,12 @@ namespace amr
 
         std::string coarseModelName() const override { return MHDModel::model_name; }
 
-        void allocate(SAMRAI::hier::Patch& /*patch*/, double const /*allocateTime*/) const override
+        void allocate(SAMRAI::hier::Patch& /*patch*/, Float const /*allocateTime*/) const override
         {
         }
 
         void initLevel(IPhysicalModel& /*model*/, SAMRAI::hier::PatchLevel& /*level*/,
-                       double const /*initDataTime*/) override
+                       Float const /*initDataTime*/) override
         {
         }
 
@@ -77,15 +79,15 @@ namespace amr
         void regrid(std::shared_ptr<SAMRAI::hier::PatchHierarchy> const& /*hierarchy*/,
                     const int /*levelNumber*/,
                     std::shared_ptr<SAMRAI::hier::PatchLevel> const& /*oldLevel*/,
-                    IPhysicalModel& /*model*/, double const /*initDataTime*/) override
+                    IPhysicalModel& /*model*/, Float const /*initDataTime*/) override
         {
         }
 
 
         void firstStep(IPhysicalModel& /*model*/, SAMRAI::hier::PatchLevel& /*level*/,
                        const std::shared_ptr<SAMRAI::hier::PatchHierarchy>& /*hierarchy*/,
-                       double const /*currentTime*/, double const /*prevCoarserTIme*/,
-                       double const /*newCoarserTime*/) final
+                       Float const /*currentTime*/, Float const /*prevCoarserTIme*/,
+                       Float const /*newCoarserTime*/) final
         {
         }
 
@@ -99,7 +101,7 @@ namespace amr
         }
 
         void fillRootGhosts(IPhysicalModel& /*model*/, SAMRAI::hier::PatchLevel& /*level*/,
-                            double const /*initDataTime*/) final
+                            Float const /*initDataTime*/) final
         {
         }
 

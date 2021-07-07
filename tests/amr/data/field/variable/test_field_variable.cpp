@@ -44,9 +44,9 @@ struct FieldVariableTest : public ::testing::TestWithParam<FieldVariableTestPara
 
 
 
-template<std::size_t dim, std::size_t interporder>
-using FieldVar = FieldVariable<GridLayout<GridLayoutImplYee<dim, interporder>>,
-                               Field<NdArrayVector<dim>, HybridQuantity::Scalar>>;
+template<std::size_t dim, std::size_t interporder, typename Float = double>
+using FieldVar = FieldVariable<GridLayout<GridLayoutImplYee<dim, interporder, Float>>,
+                               Field<NdArrayVector<dim, Float>, HybridQuantity::Scalar>>;
 
 
 // The interp order is of no importance to know if a quantity

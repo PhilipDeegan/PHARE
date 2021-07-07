@@ -6,6 +6,7 @@ from . import global_vars
 from ..core import box as boxm
 from ..core.box import Box
 
+import numpy as np # for np.dtype - C++ Float type control mechanism
 
 def supported_dimensions():
     return [1, 2]
@@ -450,7 +451,7 @@ def checker(func):
                              'boundary_types', 'refined_particle_nbr', 'path', 'nesting_buffer',
                              'diag_export_format', 'refinement_boxes', 'refinement', 'init_time',
                              'smallest_patch_size', 'largest_patch_size', "diag_options",
-                             'resistivity', 'hyper_resistivity', 'strict' ]
+                             'resistivity', 'hyper_resistivity', 'strict', "dtype" ]
 
         accepted_keywords += check_optional_keywords(**kwargs)
 
@@ -505,10 +506,17 @@ def checker(func):
             kwargs["refinement_boxes"] = None
 
         kwargs["resistivity"] = check_resistivity(**kwargs)
-
         kwargs["hyper_resistivity"] = check_hyper_resistivity(**kwargs)
 
+        kwargs["dtype"] = kwargs.get('dtype', np.float64)
+        dtype = kwargs["dtype"]
+
+        kwargs["origin"] = np.asarray(kwargs["origin"], dtype=dtype)
+        kwargs["dl"] = np.asarray(kwargs["dl"], dtype=dtype)
+
         return func(simulation_object, **kwargs)
+
+
 
     return wrapper
 
@@ -545,6 +553,7 @@ class Simulation(object):
     max_nbr_levels       : [default=1] max number of levels in the hierarchy if refinement_boxes != "boxes"
     init_time            : unused for now, will be time for restarts someday
     strict               : bool, turns warnings into errors (default False)
+    dtype                : underlying float type in C++, supports [ float32, float64 ] default: float64
 
     """
 

@@ -13,6 +13,7 @@ configure_file(${CMAKE_CURRENT_SOURCE_DIR}/phare_init.py ${CMAKE_CURRENT_BINARY_
 
 target_link_libraries(phare-exe PUBLIC
     ${PHARE_BASE_LIBS}
+    phare_initializer
     phare_simulator
     pybind11::embed
 )

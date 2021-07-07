@@ -25,7 +25,7 @@ const double Te = 0.12;
 template<int dim>
 PHARE::initializer::PHAREDict createDict()
 {
-    using InitFunctionT = PHARE::initializer::InitFunction<dim>;
+    using InitFunctionT = PHARE::initializer::InitFunction<double, dim>;
 
     auto density = makeSharedPtr<dim>();
     auto vx      = makeSharedPtr<dim>();
@@ -96,7 +96,7 @@ class NDlayout
 {
     NDlayout() {}
 
-    using nDL = GridLayout<GridLayoutImplYee<dim, interp>>;
+    using nDL = GridLayout<GridLayoutImplYee<dim, interp, double>>;
 
 public:
     static nDL create()
@@ -124,12 +124,12 @@ struct ElectronsTest : public ::testing::Test
     static constexpr auto dim    = typename TypeInfo::first_type{}();
     static constexpr auto interp = typename TypeInfo::second_type{}();
 
-    using GridYee = GridLayout<GridLayoutImplYee<dim, interp>>;
+    using GridYee = GridLayout<GridLayoutImplYee<dim, interp, double>>;
 
     using VecFieldND = VecField<NdArrayVector<dim>, HybridQuantity>;
     using FieldND    = typename VecFieldND::field_type;
 
-    using IonPopulationND = IonPopulation<ParticleArray<dim>, VecFieldND, GridYee>;
+    using IonPopulationND = IonPopulation<ParticleArray<double, dim>, VecFieldND, GridYee>;
     using IonsT           = Ions<IonPopulationND, GridYee>;
     using PartPackND      = ParticlesPack<typename IonPopulationND::particle_array_type>;
     using StandardHybridElectronFluxComputerT = StandardHybridElectronFluxComputer<IonsT>;
@@ -454,7 +454,7 @@ TYPED_TEST(ElectronsTest, ThatElectronsVelocityEqualIonVelocityMinusJ)
 
     using VecFieldND = VecField<NdArrayVector<dim>, HybridQuantity>;
     using FieldND    = typename VecFieldND::field_type;
-    using GridYee    = GridLayout<GridLayoutImplYee<dim, interp>>;
+    using GridYee    = GridLayout<GridLayoutImplYee<dim, interp, double>>;
 
 
     electrons.update(layout);

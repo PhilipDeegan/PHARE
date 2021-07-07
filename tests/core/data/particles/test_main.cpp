@@ -19,7 +19,7 @@ using namespace PHARE::core;
 class AParticle : public ::testing::Test
 {
 protected:
-    Particle<3> part;
+    Particle<double, 3> part;
 
 public:
     AParticle()
@@ -86,21 +86,22 @@ TEST_F(AParticle, CanBeReducedToAnIntegerPoint)
 
 TEST_F(AParticle, CanBeReducedToAnAbsolutePositionPoint)
 {
-    Point<double, 3> origin;
-    std::array<double, 3> meshSize{{0.2, 0.05, 0.4}};
+    using Float = double;
+
+    Point<Float, 3> origin;
+    std::array<Float, 3> meshSize{{0.2, 0.05, 0.4}};
     std::array<std::uint32_t, 3> nbrCells{{20, 30, 40}};
-    GridLayout<GridLayoutImplYee<3, 1>> layout{meshSize, nbrCells, origin,
-                                               Box{Point{40, 60, 80}, Point{59, 89, 119}}};
+    GridLayout<GridLayoutImplYee<3, 1, Float>> layout{meshSize, nbrCells, origin,
+                                                      Box{Point{40, 60, 80}, Point{59, 89, 119}}};
 
     auto iCell            = layout.AMRToLocal(Point{part.iCell});
     auto p                = positionAsPoint(part, layout);
     auto startIndexes     = layout.physicalStartIndex(QtyCentering::primal);
-    auto expectedPosition = Point<double, 3>{};
+    auto expectedPosition = Point<Float, 3>{};
     for (auto i = 0u; i < 3; ++i)
     {
-        expectedPosition[i]
-            = origin[i] + meshSize[i] * (iCell[i] - startIndexes[i] + part.delta[i]),
-            p[i];
+        auto delta          = static_cast<Float>(part.delta[i]);
+        expectedPosition[i] = origin[i] + meshSize[i] * (iCell[i] - startIndexes[i] + delta), p[i];
         EXPECT_DOUBLE_EQ(expectedPosition[i], p[i]);
     }
 }

@@ -23,13 +23,13 @@
 
 namespace PHARE::amr
 {
-template<std::size_t _dimension>
+template<typename Float, std::size_t _dimension>
 class Integrator
 {
 public:
     static constexpr std::size_t dimension = _dimension;
 
-    double advance(double dt) { return timeRefIntegrator_->advanceHierarchy(dt); }
+    Float advance(Float dt) { return timeRefIntegrator_->advanceHierarchy(dt); }
 
     void initialize() { timeRefIntegrator_->initializeHierarchy(); }
 
@@ -38,18 +38,12 @@ public:
                std::shared_ptr<SAMRAI::hier::PatchHierarchy> hierarchy,
                std::shared_ptr<SAMRAI::algs::TimeRefinementLevelStrategy> timeRefLevelStrategy,
                std::shared_ptr<SAMRAI::mesh::StandardTagAndInitStrategy> tagAndInitStrategy,
-               double startTime, double endTime);
+               Float startTime, Float endTime);
 
 private:
     std::shared_ptr<SAMRAI::algs::TimeRefinementIntegrator> timeRefIntegrator_;
 };
 
-
-
-
-//-----------------------------------------------------------------------------
-//                           Definitions
-//-----------------------------------------------------------------------------
 
 
 template<std::size_t dimension>
@@ -58,14 +52,13 @@ getUserRefinementBoxesDatabase(PHARE::initializer::PHAREDict const& amr);
 
 
 
-
-template<std::size_t _dimension>
-Integrator<_dimension>::Integrator(
+template<typename Float, std::size_t _dimension>
+Integrator<Float, _dimension>::Integrator(
     PHARE::initializer::PHAREDict const& dict,
     std::shared_ptr<SAMRAI::hier::PatchHierarchy> hierarchy,
     std::shared_ptr<SAMRAI::algs::TimeRefinementLevelStrategy> timeRefLevelStrategy,
-    std::shared_ptr<SAMRAI::mesh::StandardTagAndInitStrategy> tagAndInitStrategy, double startTime,
-    double endTime)
+    std::shared_ptr<SAMRAI::mesh::StandardTagAndInitStrategy> tagAndInitStrategy, Float startTime,
+    Float endTime)
 {
     auto loadBalancer = std::make_shared<SAMRAI::mesh::TreeLoadBalancer>(
         SAMRAI::tbox::Dimension{dimension}, "LoadBalancer");

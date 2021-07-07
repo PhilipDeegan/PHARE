@@ -34,6 +34,8 @@ std::unique_ptr<PHARE::initializer::DataProvider> fromCommandLine(int argc, char
 
 int main(int argc, char** argv)
 {
+    using Float = double;
+
     std::string const welcome = R"~(
                   _____   _    _            _____   ______
                  |  __ \ | |  | |    /\    |  __ \ |  ____|
@@ -56,9 +58,9 @@ int main(int argc, char** argv)
 
     auto& dictHandler = PHARE::initializer::PHAREDictHandler::INSTANCE();
 
-    auto hierarchy = PHARE::amr::Hierarchy::make();
+    auto hierarchy = PHARE::amr::Hierarchy<Float>::make();
 
-    auto simulator = PHARE::getSimulator(hierarchy);
+    auto simulator = PHARE::getSimulator<Float>(hierarchy);
 
     std::cout << PHARE::core::to_str(*simulator) << "\n";
 

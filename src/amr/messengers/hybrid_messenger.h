@@ -62,6 +62,7 @@ namespace amr
         using IonsT          = decltype(std::declval<HybridModel>().state.ions);
         using VecFieldT      = decltype(std::declval<HybridModel>().state.electromag.E);
         using IPhysicalModel = typename HybridModel::Interface;
+        using Float          = typename HybridModel::float_type;
 
 
         using stratT = HybridMessengerStrategy<HybridModel>;
@@ -83,7 +84,7 @@ namespace amr
          * @brief see IMessenger::allocate. Allocate calls the abstract HybridMessengerStrategy to
          * perform the allocation of its internal resources
          */
-        void allocate(SAMRAI::hier::Patch& patch, double const allocateTime) const override
+        void allocate(SAMRAI::hier::Patch& patch, Float const allocateTime) const override
         {
             strat_->allocate(patch, allocateTime);
         }
@@ -125,7 +126,7 @@ namespace amr
         void regrid(std::shared_ptr<SAMRAI::hier::PatchHierarchy> const& hierarchy,
                     int const levelNumber,
                     std::shared_ptr<SAMRAI::hier::PatchLevel> const& oldLevel,
-                    IPhysicalModel& model, double const initDataTime) final
+                    IPhysicalModel& model, Float const initDataTime) final
         {
             strat_->regrid(hierarchy, levelNumber, oldLevel, model, initDataTime);
         }
@@ -139,7 +140,7 @@ namespace amr
          * @param initDataTime
          */
         void initLevel(IPhysicalModel& model, SAMRAI::hier::PatchLevel& level,
-                       double const initDataTime) override
+                       Float const initDataTime) override
         {
             strat_->initLevel(model, level, initDataTime);
         }
@@ -151,8 +152,8 @@ namespace amr
          */
         void firstStep(IPhysicalModel& model, SAMRAI::hier::PatchLevel& level,
                        std::shared_ptr<SAMRAI::hier::PatchHierarchy> const& hierarchy,
-                       double const currentTime, double const prevCoarserTime,
-                       double const newCoarserTime) final
+                       Float const currentTime, Float const prevCoarserTime,
+                       Float const newCoarserTime) final
         {
             strat_->firstStep(model, level, hierarchy, currentTime, prevCoarserTime,
                               newCoarserTime);
@@ -183,7 +184,7 @@ namespace amr
 
 
         void fillRootGhosts(IPhysicalModel& model, SAMRAI::hier::PatchLevel& level,
-                            double const initDataTime) override
+                            Float const initDataTime) override
         {
             strat_->fillRootGhosts(model, level, initDataTime);
         }
@@ -270,7 +271,7 @@ namespace amr
          * @param levelNumber
          * @param fillTime
          */
-        void fillMagneticGhosts(VecFieldT& B, int const levelNumber, double const fillTime)
+        void fillMagneticGhosts(VecFieldT& B, int const levelNumber, Float const fillTime)
         {
             strat_->fillMagneticGhosts(B, levelNumber, fillTime);
         }
@@ -283,7 +284,7 @@ namespace amr
          * @param levelNumber
          * @param fillTime
          */
-        void fillElectricGhosts(VecFieldT& E, int const levelNumber, double const fillTime)
+        void fillElectricGhosts(VecFieldT& E, int const levelNumber, Float const fillTime)
         {
             strat_->fillElectricGhosts(E, levelNumber, fillTime);
         }
@@ -297,7 +298,7 @@ namespace amr
          * @param levelNumber
          * @param fillTime
          */
-        void fillCurrentGhosts(VecFieldT& J, int const levelNumber, double const fillTime)
+        void fillCurrentGhosts(VecFieldT& J, int const levelNumber, Float const fillTime)
         {
             strat_->fillCurrentGhosts(J, levelNumber, fillTime);
         }
@@ -313,7 +314,7 @@ namespace amr
          * @param fillTime
          */
         void fillIonGhostParticles(IonsT& ions, SAMRAI::hier::PatchLevel& level,
-                                   double const fillTime)
+                                   Float const fillTime)
         {
             strat_->fillIonGhostParticles(ions, level, fillTime);
         }
@@ -328,7 +329,7 @@ namespace amr
          * @param fillTime
          */
         void fillIonMomentGhosts(IonsT& ions, SAMRAI::hier::PatchLevel& level,
-                                 double const currentTime, double const fillTime)
+                                 Float const currentTime, Float const fillTime)
         {
             strat_->fillIonMomentGhosts(ions, level, currentTime, fillTime);
         }

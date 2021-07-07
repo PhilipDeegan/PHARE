@@ -9,6 +9,7 @@
 
 namespace PHARE::amr
 {
+template<typename Float>
 class Tagger
 {
 protected:
@@ -22,7 +23,8 @@ public:
     {
     }
     std::string name() { return name_; }
-    virtual void tag(PHARE::solver::IPhysicalModel<amr_t>& model, patch_t& patch, int tag_index)
+    virtual void tag(PHARE::solver::IPhysicalModel<amr_t, Float>& model, patch_t& patch,
+                     int tag_index)
         = 0;
     virtual ~Tagger(){};
 };

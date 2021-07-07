@@ -26,7 +26,7 @@ using testing::Eq;
 
 TEST(UniformIntervalPartition, givesCorrectPartitionsForPrimal)
 {
-    LinearWeighter linearWeighter{QtyCentering::primal, 2};
+    LinearWeighter<double> linearWeighter{QtyCentering::primal, 2};
     std::array<double, 2> expectedDistances{0, 0.5};
 
     auto const& actualDistances = linearWeighter.getUniformDistances();
@@ -40,7 +40,7 @@ TEST(UniformIntervalPartition, givesCorrectPartitionsForPrimal)
 
 TEST(UniformIntervalPartition, givesCorrectPartitionsForDual)
 {
-    LinearWeighter linearWeighter{QtyCentering::dual, 2};
+    LinearWeighter<double> linearWeighter{QtyCentering::dual, 2};
     std::array<double, 2> expectedDistances{0.75, 0.25};
 
     auto const& actualDistances = linearWeighter.getUniformDistances();
@@ -73,13 +73,13 @@ TYPED_TEST(aFieldRefineOperator, canBeCreated)
 {
     static constexpr auto dim    = typename TypeParam::first_type{}();
     static constexpr auto interp = typename TypeParam::second_type{}();
+    using Float                  = double;
 
-    using GridYee = GridLayout<GridLayoutImplYee<dim, interp>>;
-    using FieldT  = Field<NdArrayVector<dim>, HybridQuantity::Scalar>;
+    using GridYee = GridLayout<GridLayoutImplYee<dim, interp, Float>>;
+    using FieldT  = Field<NdArrayVector<dim, Float>, HybridQuantity::Scalar>;
 
     FieldRefineOperator<GridYee, FieldT> linearRefine{};
 }
-
 
 
 
@@ -96,6 +96,7 @@ TYPED_TEST_SUITE(aFieldRefine, WithAllDim);
 TYPED_TEST(aFieldRefine, canBeCreated)
 {
     static constexpr auto dim = TypeParam{}();
+    using Float               = double;
 
     SAMRAI::tbox::Dimension dimension{dim};
     std::array<QtyCentering, dim> centering = {{QtyCentering::primal}};
@@ -103,7 +104,8 @@ TYPED_TEST(aFieldRefine, canBeCreated)
     SAMRAI::hier::Box sourceGhostBox{dimension};
     SAMRAI::hier::IntVector ratio{dimension, 2};
 
-    FieldRefiner<dim> fieldLinearRefine{centering, destinationGhostBox, sourceGhostBox, ratio};
+    FieldRefiner<Float, dim> fieldLinearRefine{centering, destinationGhostBox, sourceGhostBox,
+                                               ratio};
 }
 
 
@@ -140,10 +142,11 @@ makeArrayOfPoints(std::array<int, numOfIndexes> indexVal)
 TYPED_TEST(aFieldLinearRefineIndexesAndWeights, giveACorrectStartIndexForPrimalQty)
 {
     static constexpr auto dim = TypeParam{}();
+    using Float               = double;
 
     auto constexpr centering = ConstArray<QtyCentering, dim>(QtyCentering::primal);
     SAMRAI::hier::IntVector ratio{SAMRAI::tbox::Dimension{dim}, 2};
-    FieldRefineIndexesAndWeights<dim> indexesAndWeights{centering, ratio};
+    FieldRefineIndexesAndWeights<Float, dim> indexesAndWeights{centering, ratio};
 
     constexpr std::array<Point<int, dim>, 4> fineIndexes = makeArrayOfPoints<dim, 4>({-1, 0, 1, 2});
     constexpr std::array<Point<int, dim>, 4> expectedStartIndexes
@@ -183,10 +186,11 @@ TYPED_TEST(aFieldLinearRefineIndexesAndWeights, giveACorrectStartIndexForPrimalQ
 TYPED_TEST(aFieldLinearRefineIndexesAndWeights, giveACorrectStartIndexForDualQty)
 {
     static constexpr auto dim = TypeParam{}();
+    using Float               = double;
 
     auto constexpr centering = ConstArray<QtyCentering, dim>(QtyCentering::dual);
     SAMRAI::hier::IntVector ratio{SAMRAI::tbox::Dimension{dim}, 2};
-    FieldRefineIndexesAndWeights<dim> indexesAndWeights{centering, ratio};
+    FieldRefineIndexesAndWeights<Float, dim> indexesAndWeights{centering, ratio};
 
     constexpr std::array<Point<int, dim>, 4> fineIndexes = makeArrayOfPoints<dim, 4>({-1, 0, 1, 2});
     constexpr std::array<Point<int, dim>, 4> expectedStartIndexes
@@ -218,10 +222,11 @@ TYPED_TEST(aFieldLinearRefineIndexesAndWeights, giveACorrectStartIndexForDualQty
 TYPED_TEST(aFieldLinearRefineIndexesAndWeights, giveACorrectWeightsForPrimalQty)
 {
     static constexpr auto dim = TypeParam{}();
+    using Float               = double;
 
     auto constexpr centering = ConstArray<QtyCentering, dim>(QtyCentering::primal);
     SAMRAI::hier::IntVector ratio{SAMRAI::tbox::Dimension{dim}, 2};
-    FieldRefineIndexesAndWeights<dim> indexesAndWeights{centering, ratio};
+    FieldRefineIndexesAndWeights<Float, dim> indexesAndWeights{centering, ratio};
 
     std::size_t constexpr primal = 0;
     std::size_t constexpr dual   = 1;
@@ -261,10 +266,11 @@ TYPED_TEST(aFieldLinearRefineIndexesAndWeights, giveACorrectWeightsForPrimalQty)
 TYPED_TEST(aFieldLinearRefineIndexesAndWeights, giveACorrectWeightsForDualQty)
 {
     static constexpr auto dim = TypeParam{}();
+    using Float               = double;
 
     auto constexpr centering = ConstArray<QtyCentering, dim>(QtyCentering::dual);
     SAMRAI::hier::IntVector ratio{SAMRAI::tbox::Dimension{dim}, 2};
-    FieldRefineIndexesAndWeights<dim> indexesAndWeights{centering, ratio};
+    FieldRefineIndexesAndWeights<Float, dim> indexesAndWeights{centering, ratio};
 
     std::size_t constexpr primal = 0;
     std::size_t constexpr dual   = 1;
@@ -304,10 +310,11 @@ TYPED_TEST(aFieldLinearRefineIndexesAndWeights, giveACorrectWeightsForDualQty)
 TYPED_TEST(aFieldLinearRefineIndexesAndWeights, giveACorrectWeightIndexesForPrimalQty)
 {
     static constexpr auto dim = TypeParam{}();
+    using Float               = double;
 
     auto constexpr centering = ConstArray<QtyCentering, dim>(QtyCentering::primal);
     SAMRAI::hier::IntVector ratio{SAMRAI::tbox::Dimension{dim}, 2};
-    FieldRefineIndexesAndWeights<dim> indexesAndWeights{centering, ratio};
+    FieldRefineIndexesAndWeights<Float, dim> indexesAndWeights{centering, ratio};
 
     constexpr std::array<Point<int, dim>, 4> fineIndexes = makeArrayOfPoints<dim, 4>({-1, 0, 1, 2});
     constexpr std::array<int, 4> expectedWeightIndexes{1, 0, 1, 0};
@@ -342,10 +349,11 @@ TYPED_TEST(aFieldLinearRefineIndexesAndWeights, giveACorrectWeightIndexesForPrim
 TYPED_TEST(aFieldLinearRefineIndexesAndWeights, giveACorrectWeightIndexesForDualQty)
 {
     static constexpr auto dim = TypeParam{}();
+    using Float               = double;
 
     auto constexpr centering = ConstArray<QtyCentering, dim>(QtyCentering::dual);
     SAMRAI::hier::IntVector ratio{SAMRAI::tbox::Dimension{dim}, 2};
-    FieldRefineIndexesAndWeights<dim> indexesAndWeights{centering, ratio};
+    FieldRefineIndexesAndWeights<Float, dim> indexesAndWeights{centering, ratio};
 
     constexpr std::array<Point<int, dim>, 4> fineIndexes = makeArrayOfPoints<dim, 4>({-1, 0, 1, 2});
     constexpr std::array<int, 4> expectedWeightIndexes{1, 0, 1, 0};

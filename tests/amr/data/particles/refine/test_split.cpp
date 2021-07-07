@@ -7,6 +7,7 @@
 #include "gtest/gtest.h"
 
 
+
 namespace
 {
 template<std::size_t dimension, std::size_t interpOrder, std::size_t refineParticlesNbr>

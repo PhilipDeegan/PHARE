@@ -37,19 +37,20 @@ namespace PHARE::solver
 // -----------------------------------------------------------------------------
 
 template<typename HybridModel, typename AMR_Types>
-class SolverPPC : public ISolver<AMR_Types>
+class SolverPPC : public ISolver<AMR_Types, typename HybridModel::Float>
 {
 private:
     static constexpr auto dimension    = HybridModel::dimension;
     static constexpr auto interp_order = HybridModel::gridlayout_type::interp_order;
 
+    using Float            = typename HybridModel::Float;
     using Electromag       = typename HybridModel::electromag_type;
     using Ions             = typename HybridModel::ions_type;
     using ParticleArray    = typename Ions::particle_array_type;
     using VecFieldT        = typename HybridModel::vecfield_type;
     using GridLayout       = typename HybridModel::gridlayout_type;
     using ResourcesManager = typename HybridModel::resources_manager_type;
-    using IPhysicalModel_t = IPhysicalModel<AMR_Types>;
+    using IPhysicalModel_t = IPhysicalModel<AMR_Types, Float>;
     using IMessenger       = amr::IMessenger<IPhysicalModel_t>;
     using HybridMessenger  = amr::HybridMessenger<HybridModel>;
 
@@ -73,7 +74,7 @@ public:
 
 
     explicit SolverPPC(PHARE::initializer::PHAREDict const& dict)
-        : ISolver<AMR_Types>{"PPC"}
+        : ISolver<AMR_Types, Float>{"PPC"}
         , ohm_{dict["ohm"]}
         , ionUpdater_{dict["ion_updater"]}
 
@@ -92,13 +93,13 @@ public:
 
 
     virtual void allocate(IPhysicalModel_t& model, SAMRAI::hier::Patch& patch,
-                          double const allocateTime) const override;
+                          Float const allocateTime) const override;
 
 
 
     virtual void advanceLevel(std::shared_ptr<hierarchy_t> const& hierarchy, int const levelNumber,
                               IPhysicalModel_t& model, IMessenger& fromCoarserMessenger,
-                              double const currentTime, double const newTime) override;
+                              Float const currentTime, Float const newTime) override;
 
 
 
@@ -107,22 +108,22 @@ private:
 
 
     void predictor1_(level_t& level, HybridModel& model, Messenger& fromCoarser,
-                     double const currentTime, double const newTime);
+                     Float const currentTime, Float const newTime);
 
 
     void predictor2_(level_t& level, HybridModel& model, Messenger& fromCoarser,
-                     double const currentTime, double const newTime);
+                     Float const currentTime, Float const newTime);
 
 
     void corrector_(level_t& level, HybridModel& model, Messenger& fromCoarser,
-                    double const currentTime, double const newTime);
+                    Float const currentTime, Float const newTime);
 
 
     void average_(level_t& level, HybridModel& model);
 
 
     void moveIons_(level_t& level, Ions& ions, Electromag& electromag, ResourcesManager& rm,
-                   Messenger& fromCoarser, double const currentTime, double const newTime,
+                   Messenger& fromCoarser, Float const currentTime, Float const newTime,
                    core::UpdaterMode mode);
 
 
@@ -164,7 +165,7 @@ void SolverPPC<HybridModel, AMR_Types>::registerResources(IPhysicalModel_t& mode
 template<typename HybridModel, typename AMR_Types>
 void SolverPPC<HybridModel, AMR_Types>::allocate(IPhysicalModel_t& model,
                                                  SAMRAI::hier::Patch& patch,
-                                                 double const allocateTime) const
+                                                 Float const allocateTime) const
 {
     auto& hmodel = dynamic_cast<HybridModel&>(model);
     hmodel.resourcesManager->allocate(electromagPred_, patch, allocateTime);
@@ -229,7 +230,7 @@ template<typename HybridModel, typename AMR_Types>
 void SolverPPC<HybridModel, AMR_Types>::advanceLevel(std::shared_ptr<hierarchy_t> const& hierarchy,
                                                      int const levelNumber, IPhysicalModel_t& model,
                                                      IMessenger& fromCoarserMessenger,
-                                                     double const currentTime, double const newTime)
+                                                     Float const currentTime, Float const newTime)
 {
     PHARE_LOG_SCOPE("SolverPPC::advanceLevel");
 
@@ -269,8 +270,8 @@ void SolverPPC<HybridModel, AMR_Types>::advanceLevel(std::shared_ptr<hierarchy_t
 
 template<typename HybridModel, typename AMR_Types>
 void SolverPPC<HybridModel, AMR_Types>::predictor1_(level_t& level, HybridModel& model,
-                                                    Messenger& fromCoarser,
-                                                    double const currentTime, double const newTime)
+                                                    Messenger& fromCoarser, Float const currentTime,
+                                                    Float const newTime)
 {
     PHARE_LOG_SCOPE("SolverPPC::predictor1_");
 
@@ -353,8 +354,8 @@ void SolverPPC<HybridModel, AMR_Types>::predictor1_(level_t& level, HybridModel&
 
 template<typename HybridModel, typename AMR_Types>
 void SolverPPC<HybridModel, AMR_Types>::predictor2_(level_t& level, HybridModel& model,
-                                                    Messenger& fromCoarser,
-                                                    double const currentTime, double const newTime)
+                                                    Messenger& fromCoarser, Float const currentTime,
+                                                    Float const newTime)
 {
     PHARE_LOG_SCOPE("SolverPPC::predictor2_");
 
@@ -436,8 +437,8 @@ void SolverPPC<HybridModel, AMR_Types>::predictor2_(level_t& level, HybridModel&
 
 template<typename HybridModel, typename AMR_Types>
 void SolverPPC<HybridModel, AMR_Types>::corrector_(level_t& level, HybridModel& model,
-                                                   Messenger& fromCoarser, double const currentTime,
-                                                   double const newTime)
+                                                   Messenger& fromCoarser, Float const currentTime,
+                                                   Float const newTime)
 {
     PHARE_LOG_SCOPE("SolverPPC::corrector_");
 
@@ -523,8 +524,8 @@ void SolverPPC<HybridModel, AMR_Types>::average_(level_t& level, HybridModel& mo
 template<typename HybridModel, typename AMR_Types>
 void SolverPPC<HybridModel, AMR_Types>::moveIons_(level_t& level, Ions& ions,
                                                   Electromag& electromag, ResourcesManager& rm,
-                                                  Messenger& fromCoarser, double const currentTime,
-                                                  double const newTime, core::UpdaterMode mode)
+                                                  Messenger& fromCoarser, Float const currentTime,
+                                                  Float const newTime, core::UpdaterMode mode)
 {
     PHARE_LOG_SCOPE("SolverPPC::moveIons_");
 

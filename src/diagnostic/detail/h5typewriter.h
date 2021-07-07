@@ -18,6 +18,7 @@ template<typename Writer>
 class H5TypeWriter : public PHARE::diagnostic::TypeWriter
 {
 public:
+    using float_type                = typename Writer::float_type;
     using Attributes                = typename Writer::Attributes;
     static constexpr auto dimension = Writer::dimension;
 

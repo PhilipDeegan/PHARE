@@ -54,6 +54,7 @@ namespace amr
         using CoarseToFineRefineOpOld  = typename RefinementParams::CoarseToFineRefineOpOld;
         using CoarseToFineRefineOpNew  = typename RefinementParams::CoarseToFineRefineOpNew;
 
+        using Float = typename HybridModel::float_type;
 
     public:
         static const std::string stratName;
@@ -82,7 +83,7 @@ namespace amr
         /**
          * @brief allocate the messenger strategy internal variables to the model resourceManager
          */
-        void allocate(SAMRAI::hier::Patch& patch, double const allocateTime) const override
+        void allocate(SAMRAI::hier::Patch& patch, Float const allocateTime) const override
         {
             resourcesManager_->allocate(EM_old_, patch, allocateTime);
             resourcesManager_->allocate(Jold_, patch, allocateTime);
@@ -179,7 +180,7 @@ namespace amr
         void regrid(std::shared_ptr<SAMRAI::hier::PatchHierarchy> const& hierarchy,
                     const int levelNumber,
                     std::shared_ptr<SAMRAI::hier::PatchLevel> const& oldLevel,
-                    IPhysicalModel& model, double const initDataTime) override
+                    IPhysicalModel& model, Float const initDataTime) override
         {
             auto level = hierarchy->getPatchLevel(levelNumber);
             magneticInit_.regrid(hierarchy, levelNumber, oldLevel, initDataTime);
@@ -224,7 +225,7 @@ namespace amr
          * initDataTime from hybrid coarser data.
          */
         void initLevel(IPhysicalModel& model, SAMRAI::hier::PatchLevel& level,
-                       double const initDataTime) override
+                       Float const initDataTime) override
         {
             auto levelNumber = level.getLevelNumber();
 
@@ -271,7 +272,7 @@ namespace amr
          * The method finds if the name of the VecField is
          *
          */
-        void fillMagneticGhosts(VecFieldT& B, int const levelNumber, double const fillTime) override
+        void fillMagneticGhosts(VecFieldT& B, int const levelNumber, Float const fillTime) override
         {
             PHARE_LOG_SCOPE("HybridHybridMessengerStrategy::fillMagneticGhosts");
             magneticSharedNodes_.fill(B, levelNumber, fillTime);
@@ -281,7 +282,7 @@ namespace amr
 
 
 
-        void fillElectricGhosts(VecFieldT& E, int const levelNumber, double const fillTime) override
+        void fillElectricGhosts(VecFieldT& E, int const levelNumber, Float const fillTime) override
         {
             PHARE_LOG_SCOPE("HybridHybridMessengerStrategy::fillElectricGhosts");
             electricSharedNodes_.fill(E, levelNumber, fillTime);
@@ -291,7 +292,7 @@ namespace amr
 
 
 
-        void fillCurrentGhosts(VecFieldT& J, int const levelNumber, double const fillTime) override
+        void fillCurrentGhosts(VecFieldT& J, int const levelNumber, Float const fillTime) override
         {
             PHARE_LOG_SCOPE("HybridHybridMessengerStrategy::fillCurrentGhosts");
             currentSharedNodes_.fill(J, levelNumber, fillTime);
@@ -306,7 +307,7 @@ namespace amr
          * patches of the same level. Before doing that, it empties the array for all populations
          */
         void fillIonGhostParticles(IonsT& ions, SAMRAI::hier::PatchLevel& level,
-                                   double const fillTime) override
+                                   Float const fillTime) override
         {
             PHARE_LOG_SCOPE("HybridHybridMessengerStrategy::fillIonGhostParticles");
 
@@ -333,7 +334,7 @@ namespace amr
          * interpolation coef.
          */
         void fillIonMomentGhosts(IonsT& ions, SAMRAI::hier::PatchLevel& level,
-                                 double const beforePushTime, double const afterPushTime) override
+                                 Float const beforePushTime, Float const afterPushTime) override
         {
             PHARE_LOG_SCOPE("HybridHybridMessengerStrategy::fillIonMomentGhosts");
 
@@ -392,8 +393,8 @@ namespace amr
          */
         void firstStep(IPhysicalModel& /*model*/, SAMRAI::hier::PatchLevel& level,
                        std::shared_ptr<SAMRAI::hier::PatchHierarchy> const& /*hierarchy*/,
-                       double const currentTime, double const prevCoarserTime,
-                       double const newCoarserTime) override
+                       Float const currentTime, Float const prevCoarserTime,
+                       Float const newCoarserTime) override
         {
             PHARE_LOG_SCOPE("HybridHybridMessengerStrategy::firstStep");
 
@@ -506,7 +507,7 @@ namespace amr
 
 
         void fillRootGhosts(IPhysicalModel& model, SAMRAI::hier::PatchLevel& level,
-                            double const initDataTime) override
+                            Float const initDataTime) override
         {
             auto levelNumber = level.getLevelNumber();
             assert(levelNumber == 0);
@@ -705,8 +706,8 @@ namespace amr
 
 
 
-        double timeInterpCoef_(double const beforePushTime, double const afterPushTime,
-                               std::size_t levelNumber)
+        Float timeInterpCoef_(Float const beforePushTime, Float const afterPushTime,
+                              std::size_t levelNumber)
         {
             return (afterPushTime - beforePushTime)
                    / (afterPushCoarseTime_[levelNumber] - beforePushCoarseTime_[levelNumber]);
@@ -727,10 +728,10 @@ namespace amr
 
 
         int const firstLevel_;
-        std::unordered_map<std::size_t, double> beforePushCoarseTime_;
-        std::unordered_map<std::size_t, double> afterPushCoarseTime_;
+        std::unordered_map<std::size_t, Float> beforePushCoarseTime_;
+        std::unordered_map<std::size_t, Float> afterPushCoarseTime_;
 
-        core::Interpolator<dimension, interpOrder> interpolate_;
+        core::Interpolator<dimension, interpOrder, Float> interpolate_;
 
 
         //! store communicators for magnetic fields that need ghosts to be filled

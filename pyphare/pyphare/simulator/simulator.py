@@ -14,10 +14,22 @@ def simulator_shutdown():
     life_cycles.clear()
 
 
-def make_cpp_simulator(dim, interp, nbrRefinedPart, hier):
+
+def make_cpp_hierarchy(dtype):
+    from pybindlibs import cpp_lib
+    from pyphare.cpp import cpp_float_id
+
+    cpp_type_str = f"make_hierarchy_{cpp_float_id(dtype)}"
+    print("cpp_type_str", cpp_type_str)
+    return getattr(cpp_lib(), cpp_type_str)()
+
+def make_cpp_simulator(dim, interp, nbrRefinedPart, hier, dtype):
     from pyphare.cpp import cpp_lib
-    make_sim = f"make_simulator_{dim}_{interp}_{nbrRefinedPart}"
-    return getattr(cpp_lib(), make_sim)(hier)
+    from pyphare.cpp import cpp_float_id
+
+    cpp_type_str = f"make_simulator_{dim}_{interp}_{nbrRefinedPart}_{cpp_float_id(dtype)}"
+    print("cpp_type_str", cpp_type_str)
+    return getattr(cpp_lib(), cpp_type_str)(hier)
 
 
 def startMPI():
@@ -52,10 +64,10 @@ class Simulator:
             from pyphare.pharein import populateDict
             startMPI()
             populateDict()
-            self.cpp_hier = cpp_lib().make_hierarchy()
+            self.cpp_hier = make_cpp_hierarchy(self.simulation.dtype)
 
             self.cpp_sim = make_cpp_simulator(
-              self.simulation.ndim, self.simulation.interp_order, self.simulation.refined_particle_nbr, self.cpp_hier
+              self.simulation.ndim, self.simulation.interp_order, self.simulation.refined_particle_nbr, self.cpp_hier, self.simulation.dtype
             )
 
             self.cpp_sim.initialize()
@@ -78,7 +90,7 @@ class Simulator:
         self._check_init()
         if dt is None:
             dt = self.timeStep()
-        
+
         try:
             self.cpp_sim.advance(dt)
         except (RuntimeError, TypeError, NameError, ValueError) as e:

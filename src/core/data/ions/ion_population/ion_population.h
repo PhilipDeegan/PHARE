@@ -28,18 +28,19 @@ namespace core
         using particle_array_type              = ParticleArray;
         using particle_resource_type           = ParticlesPack<ParticleArray>;
         using vecfield_type                    = VecField;
+        using Float                            = typename VecField::float_type;
 
 
         IonPopulation(initializer::PHAREDict const& initializer)
             : name_{initializer["name"].template to<std::string>()}
-            , mass_{initializer["mass"].template to<double>()}
+            , mass_{initializer["mass"].template to<Float>()}
             , flux_{name_ + "_flux", HybridQuantity::Vector::V}
             , particleInitializerInfo_{initializer["particle_initializer"]}
         {
         }
 
 
-        double mass() const { return mass_; }
+        Float mass() const { return mass_; }
 
         std::string const& name() const { return name_; }
 
@@ -75,7 +76,17 @@ namespace core
         }
 
 
-
+        ParticleArray& domainParticles() const
+        {
+            if (isUsable())
+            {
+                return *particles_->domainParticles;
+            }
+            else
+            {
+                throw std::runtime_error("Error - cannot provide access to particle buffers");
+            }
+        }
 
         ParticleArray& domainParticles()
         {
@@ -256,7 +267,7 @@ namespace core
 
     private:
         std::string name_;
-        double mass_;
+        Float mass_;
         VecField flux_;
         field_type* rho_{nullptr};
         ParticlesPack<ParticleArray>* particles_{nullptr};

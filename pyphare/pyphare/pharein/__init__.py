@@ -66,7 +66,13 @@ class fn_wrapper(py_fn_wrapper):
         from pyphare.cpp import cpp_lib
         # convert numpy array to C++ SubSpan
         # couples vector init functions to C++
-        return cpp_lib().makePyArrayWrapper(super().__call__(*xyz))
+        cpp = cpp_lib()
+        return {
+          np.dtype('float64')  : lambda supe,*r : cpp.makePyArrayWrapper_d(supe.__call__(*r)),
+          np.dtype('float32')  : lambda supe,*r : cpp.makePyArrayWrapper_s(supe.__call__(*r)),
+        }[np.dtype(getSimulation().dtype)](super(), *xyz)
+
+
 
 
 
@@ -78,6 +84,8 @@ def populateDict():
     # pybind complains if receiving wrong type
     def add_int(path, val):
         pp.add_int(path, int(val))
+    def add_float(path, val):
+        pp.add_s(path, float(val))
     def add_double(path, val):
         pp.add_double(path, float(val))
     def add_size_t(path, val):
@@ -86,7 +94,15 @@ def populateDict():
         pp.add_vector_int(path, list(val))
 
     add_string = pp.add_string
-    addInitFunction = getattr(pp, 'addInitFunction{:d}'.format(simulation.ndim)+'D')
+
+    if np.dtype(simulation.dtype) == np.float64:
+        addInitFunction = getattr(pp, 'addInitFunction_d_{:d}'.format(simulation.ndim)+'D')
+        add_float_type = add_double
+    elif np.dtype(simulation.dtype) == np.float32:
+        addInitFunction = getattr(pp, 'addInitFunction_s_{:d}'.format(simulation.ndim)+'D')
+        add_float_type = add_float
+    else:
+        raise ValueError("Cannot determine Simulation float type")
 
     add_string("simulation/name", "simulation_test")
     add_int("simulation/dimension", simulation.ndim)
@@ -97,11 +113,13 @@ def populateDict():
     if simulation.largest_patch_size is not None:
         add_vector_int("simulation/AMR/largest_patch_size", simulation.largest_patch_size)
 
+    print("simulation.dl.dtype", simulation.dl.dtype, simulation.ndim)
+    print("simulation.origin.dtype", simulation.origin.dtype, simulation.ndim)
 
     add_string("simulation/grid/layout_type", simulation.layout)
     add_int("simulation/grid/nbr_cells/x", simulation.cells[0])
-    add_double("simulation/grid/meshsize/x", simulation.dl[0])
-    add_double("simulation/grid/origin/x", simulation.origin[0])
+    add_float_type("simulation/grid/meshsize/x", simulation.dl[0])
+    add_float_type("simulation/grid/origin/x", simulation.origin[0])
 
     if (simulation.ndim>1):
         add_int("simulation/grid/nbr_cells/y", simulation.cells[1])
@@ -117,7 +135,7 @@ def populateDict():
 
     add_int("simulation/interp_order", simulation.interp_order)
     add_int("simulation/refined_particle_nbr", simulation.refined_particle_nbr)
-    add_double("simulation/time_step", simulation.time_step)
+    add_float_type("simulation/time_step", simulation.time_step)
     add_int("simulation/time_step_nbr", simulation.time_step_nbr)
 
 
@@ -177,7 +195,7 @@ def populateDict():
         partinit_path = pop_path+"{:d}/".format(pop_index)+partinit+"/"
         d = modelDict[pop]
         add_string(pop_path+"{:d}/name".format(pop_index), pop)
-        add_double(pop_path+"{:d}/mass".format(pop_index), d["mass"])
+        add_float_type(pop_path+"{:d}/mass".format(pop_index), d["mass"])
         add_string(partinit_path+"name", "maxwellian")
 
         addInitFunction(partinit_path+"density", fn_wrapper(d["density"]))

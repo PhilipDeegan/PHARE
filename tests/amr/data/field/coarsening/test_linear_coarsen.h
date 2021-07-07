@@ -89,8 +89,8 @@ struct FieldCoarsenTestData
     static constexpr auto interp     = 1;
     static constexpr double absError = 1.e-8;
 
-    using GridYee_t = GridLayout<GridLayoutImplYee<dimension, interp>>;
-    using Field_t   = Field<NdArrayVector<dimension>, HybridQuantity::Scalar>;
+    using GridYee_t = GridLayout<GridLayoutImplYee<dimension, interp, double>>;
+    using Field_t   = Field<NdArrayVector<dimension, double>, HybridQuantity::Scalar>;
 
     EMData<dimension> em;
 
@@ -221,7 +221,7 @@ void load(FieldCoarsenTestData<dimension>& param, Files& file_data)
     SAMRAI::hier::IntVector ratio{dim, 2};
 
     auto coarsen = [&em, &ratio](auto idx, auto& fineBox, auto& coarseBox, auto& centering) {
-        FieldCoarsener<dimension> coarseIt{centering, fineBox, coarseBox, ratio};
+        FieldCoarsener<double, dimension> coarseIt{centering, fineBox, coarseBox, ratio};
 
         auto primals(ConstArray<int, dimension>());
         for (std::size_t i = 0; i < dimension; i++)

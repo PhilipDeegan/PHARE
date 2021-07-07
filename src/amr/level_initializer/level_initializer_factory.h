@@ -16,9 +16,10 @@ namespace solver
     class LevelInitializerFactory
     {
         using AMRTypes = typename HybridModel::amr_types;
+        using Float    = typename HybridModel::Float;
 
     public:
-        static std::unique_ptr<LevelInitializer<AMRTypes>>
+        static std::unique_ptr<LevelInitializer<AMRTypes, Float>>
         create(std::string modelName, PHARE::initializer::PHAREDict const& dict)
         {
             if (modelName == "HybridModel")

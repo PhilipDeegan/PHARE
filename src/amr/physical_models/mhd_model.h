@@ -21,12 +21,14 @@ namespace PHARE
 namespace solver
 {
     template<typename GridLayoutT, typename VecFieldT, typename AMR_Types>
-    class MHDModel : public IPhysicalModel<AMR_Types>
+    class MHDModel : public IPhysicalModel<AMR_Types, typename GridLayoutT::Float>
     {
     public:
-        using patch_t   = typename AMR_Types::patch_t;
-        using level_t   = typename AMR_Types::level_t;
-        using Interface = IPhysicalModel<AMR_Types>;
+        using Float      = typename GridLayoutT::Float;
+        using float_type = Float;
+        using patch_t    = typename AMR_Types::patch_t;
+        using level_t    = typename AMR_Types::level_t;
+        using Interface  = IPhysicalModel<AMR_Types, Float>;
 
         static const std::string model_name;
         static constexpr auto dimension = GridLayoutT::dimension;
@@ -34,7 +36,7 @@ namespace solver
 
 
         explicit MHDModel(std::shared_ptr<resources_manager_type> const& _resourcesManager)
-            : IPhysicalModel<AMR_Types>{model_name}
+            : IPhysicalModel<AMR_Types, Float>{model_name}
             , resourcesManager{std::move(_resourcesManager)}
         {
         }
@@ -42,7 +44,7 @@ namespace solver
         virtual void initialize(level_t& /*level*/) override {}
 
 
-        virtual void allocate(patch_t& patch, double const allocateTime) override
+        virtual void allocate(patch_t& patch, Float const allocateTime) override
         {
             resourcesManager->allocate(state.B, patch, allocateTime);
             resourcesManager->allocate(state.V, patch, allocateTime);

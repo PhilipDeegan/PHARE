@@ -23,6 +23,7 @@ class FieldLinearTimeInterpolate : public SAMRAI::hier::TimeInterpolateOperator
 {
 public:
     using GridLayoutImpl = typename GridLayoutT::implT;
+    using Float          = typename GridLayoutT::Float;
 
     FieldLinearTimeInterpolate()
         : SAMRAI::hier::TimeInterpolateOperator{"FieldLinearTimeInterpolate"}
@@ -49,13 +50,13 @@ public:
         auto const& fieldDataSrcOld = dynamic_cast<FieldDataT const&>(srcDataOld);
         auto const& fieldDataSrcNew = dynamic_cast<FieldDataT const&>(srcDataNew);
 
-        double const interpTime = fieldDataDest.getTime();
+        Float const interpTime = fieldDataDest.getTime();
 
-        double const oldTime = fieldDataSrcOld.getTime();
-        double const newTime = fieldDataSrcNew.getTime();
+        Float const oldTime = fieldDataSrcOld.getTime();
+        Float const newTime = fieldDataSrcNew.getTime();
 
 
-        double const alpha = (interpTime - oldTime) / (newTime - oldTime);
+        Float const alpha = (interpTime - oldTime) / (newTime - oldTime);
 
         auto const& layout = fieldDataDest.gridLayout;
 

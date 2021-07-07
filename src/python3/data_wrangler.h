@@ -21,55 +21,21 @@
 
 namespace PHARE::pydata
 {
-template<std::size_t dimension, std::size_t interp_order, std::size_t nbRefinedPart>
-class SimulatorCaster
-{
-public:
-    using Simulator_t = Simulator<dimension, interp_order, nbRefinedPart>;
-
-    SimulatorCaster(std::shared_ptr<ISimulator> const& _simulator)
-        : simulator{_simulator}
-    {
-    }
-
-    template<typename Dimension, typename InterpOrder, typename NbRefinedPart>
-    Simulator_t* operator()(std::size_t userDim, std::size_t userInterpOrder,
-                            std::size_t userNbRefinedPart, Dimension dimension_fn,
-                            InterpOrder interp_order_fn, NbRefinedPart nbRefinedPart_fn)
-    {
-        if (userDim == dimension_fn() and userInterpOrder == interp_order_fn()
-            and userNbRefinedPart == nbRefinedPart_fn())
-        {
-            std::size_t constexpr d  = dimension_fn();
-            std::size_t constexpr io = interp_order_fn();
-            std::size_t constexpr nb = nbRefinedPart_fn();
-
-            // extra if constexpr as cast is templated and not generic interface
-            if constexpr (d == dimension and io == interp_order and nb == nbRefinedPart)
-                return dynamic_cast<Simulator_t*>(simulator.get());
-        }
-        return nullptr;
-    }
-
-private:
-    std::shared_ptr<ISimulator> const& simulator;
-};
-
-
-
-template<std::size_t _dimension, std::size_t _interp_order, std::size_t _nbRefinedPart>
-class DataWrangler
+template<std::size_t _dimension, std::size_t _interp_order, std::size_t _nbRefinedPart,
+         typename Float_>
+class __attribute__((visibility("hidden"))) DataWrangler
 {
 public:
     static constexpr std::size_t dimension     = _dimension;
     static constexpr std::size_t interp_order  = _interp_order;
     static constexpr std::size_t nbRefinedPart = _nbRefinedPart;
 
-    using Simulator   = PHARE::Simulator<dimension, interp_order, nbRefinedPart>;
+    using Float       = Float_;
+    using Simulator   = PHARE::Simulator<dimension, interp_order, nbRefinedPart, Float>;
     using HybridModel = typename Simulator::HybridModel;
 
-    DataWrangler(std::shared_ptr<ISimulator> const& simulator,
-                 std::shared_ptr<amr::Hierarchy> const& hierarchy)
+    DataWrangler(std::shared_ptr<ISimulator<Float>> const& simulator,
+                 std::shared_ptr<amr::Hierarchy<Float>> const& hierarchy)
         : simulator_{cast_simulator(simulator)}
         , hierarchy_{hierarchy}
 
@@ -81,18 +47,18 @@ public:
 
     auto getPatchLevel(size_t lvl)
     {
-        return PatchLevel<_dimension, _interp_order, _nbRefinedPart>{
+        return PatchLevel<_dimension, _interp_order, _nbRefinedPart, Float>{
             *hierarchy_, *simulator_.getHybridModel(), lvl};
     }
 
-    auto sort_merge_1d(std::vector<PatchData<std::vector<double>, dimension>> const&& input,
+    auto sort_merge_1d(std::vector<PatchData<std::vector<Float>, dimension>> const&& input,
                        bool shared_patch_border = false)
     {
-        std::vector<std::pair<double, const PatchData<std::vector<double>, dimension>*>> sorted;
+        std::vector<std::pair<Float, const PatchData<std::vector<Float>, dimension>*>> sorted;
         for (auto const& data : input)
-            sorted.emplace_back(core::Point<double, 1>::fromString(data.origin)[0], &data);
+            sorted.emplace_back(core::Point<Float, 1>::fromString(data.origin)[0], &data);
         std::sort(sorted.begin(), sorted.end(), [](auto& a, auto& b) { return a.first < b.first; });
-        std::vector<double> ret;
+        std::vector<Float> ret;
         for (size_t i = 0; i < sorted.size(); i++)
         { // skip empty patches in case of unequal patches across MPI domains
             if (!sorted[i].second->data.size())
@@ -108,17 +74,17 @@ public:
         return ret;
     }
 
-    auto sync(std::vector<PatchData<std::vector<double>, dimension>> const& input)
+    auto sync(std::vector<PatchData<std::vector<Float>, dimension>> const& input)
     {
         int mpi_size = core::mpi::size();
-        std::vector<PatchData<std::vector<double>, dimension>> collected;
+        std::vector<PatchData<std::vector<Float>, dimension>> collected;
 
         auto reinterpret_array = [&](auto& py_array) {
             return reinterpret_cast<std::array<std::size_t, dimension>&>(
                 *static_cast<std::size_t*>(py_array.request().ptr));
         };
 
-        auto collect = [&](PatchData<std::vector<double>, dimension> const& patch_data) {
+        auto collect = [&](PatchData<std::vector<Float>, dimension> const& patch_data) {
             auto patchIDs = core::mpi::collect(patch_data.patchID, mpi_size);
             auto origins  = core::mpi::collect(patch_data.origin, mpi_size);
             auto lower    = core::mpi::collect_raw(makeSpan(patch_data.lower), mpi_size);
@@ -137,7 +103,7 @@ public:
 
         std::size_t max = core::mpi::max(input.size(), mpi_size);
 
-        PatchData<std::vector<double>, dimension> empty;
+        PatchData<std::vector<Float>, dimension> empty;
 
         for (size_t i = 0; i < max; i++)
         {
@@ -149,7 +115,7 @@ public:
         return collected;
     }
 
-    auto sync_merge(std::vector<PatchData<std::vector<double>, dimension>> const& input,
+    auto sync_merge(std::vector<PatchData<std::vector<Float>, dimension>> const& input,
                     [[maybe_unused]] bool primal)
     {
         if constexpr (dimension == 1)
@@ -160,18 +126,17 @@ public:
 
 private:
     Simulator& simulator_;
-    std::shared_ptr<amr::Hierarchy> hierarchy_;
+    std::shared_ptr<amr::Hierarchy<Float>> hierarchy_;
 
 
-
-
-    static Simulator& cast_simulator(std::shared_ptr<ISimulator> const& simulator)
+    static Simulator& cast_simulator(std::shared_ptr<ISimulator<Float>> const& simulator)
     {
-        using SimulatorCaster = SimulatorCaster<dimension, interp_order, nbRefinedPart>;
+        using SimulatorCaster
+            = PHARE::SimulatorCaster<dimension, interp_order, nbRefinedPart, Float>;
 
         auto const& simDict = initializer::PHAREDictHandler::INSTANCE().dict()["simulation"];
 
-        Simulator* simulator_ptr = core::makeAtRuntime<SimulatorCaster>(
+        Simulator* simulator_ptr = core::makeAtRuntime<Float, SimulatorCaster>(
             simDict["dimension"].template to<int>(), simDict["interp_order"].template to<int>(),
             simDict["refined_particle_nbr"].template to<int>(), SimulatorCaster{simulator});
         if (!simulator_ptr)

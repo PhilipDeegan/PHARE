@@ -4,7 +4,7 @@
 #include "diagnostic/detail/h5typewriter.h"
 #include "diagnostic/detail/h5_utils.h"
 
-#include "core/data/particles/particle_packer.h"
+#include "core/data/particles/contiguous.h"
 
 #include "amr/data/particles/particles_data.h"
 
@@ -37,9 +37,10 @@ public:
     using Super::writeIonPopAttributes_;
     static constexpr auto dimension   = H5Writer::dimension;
     static constexpr auto interpOrder = H5Writer::interpOrder;
+    using Float                       = typename H5Writer::float_type;
     using Attributes                  = typename Super::Attributes;
-    using Packer                      = core::ParticlePacker<dimension>;
     using FloatType                   = typename H5Writer::FloatType;
+    using Packer                      = core::ParticlePacker<FloatType, dimension>;
 
     ParticlesDiagnosticWriter(H5Writer& h5Writer)
         : Super{h5Writer}
@@ -184,8 +185,7 @@ void ParticlesDiagnosticWriter<H5Writer>::write(DiagnosticProperties& diagnostic
 
         auto& h5file = *fileData_.at(diagnostic.quantity);
         Packer packer(particles);
-        core::ContiguousParticles<dimension> copy{particles.size()};
-        packer.pack(copy);
+        core::ContiguousParticles<Float, dimension> copy{particles};
 
 
         h5file.template write_data_set_flat<2>(path + packer.keys()[0], copy.weight.data());

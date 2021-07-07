@@ -1,6 +1,6 @@
 
-
-import pyphare.pharein as ph, numpy as np
+import numpy as np
+import pyphare.pharein as ph
 from pyphare.pharein import ElectronModel
 
 # Block accidental dictionary key rewrites
@@ -41,6 +41,7 @@ def basicSimulatorArgs(dim: int, interp: int, **kwargs):
         "diag_options": {},
         "nesting_buffer": 0,
         "strict": True,
+        "dtype": np.float64,
     }
     for k, v in kwargs.items():
         if k in args:

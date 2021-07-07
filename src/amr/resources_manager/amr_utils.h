@@ -158,16 +158,17 @@ namespace amr
     template<typename GridLayoutT>
     GridLayoutT layoutFromPatch(SAMRAI::hier::Patch const& patch)
     {
-        int constexpr dimension = GridLayoutT::dimension;
+        constexpr auto dimension = GridLayoutT::dimension;
+        using Float              = typename GridLayoutT::Float;
 
         SAMRAI::tbox::Dimension const dim{dimension};
 
         //  We get geometry information from the patch, such as meshSize, and physical origin
         auto patchGeom = std::dynamic_pointer_cast<SAMRAI::geom::CartesianPatchGeometry>(
             patch.getPatchGeometry());
-        core::Point<double, dimension> origin;
+        core::Point<Float, dimension> origin;
 
-        std::array<double, dimension> dl;
+        std::array<Float, dimension> dl;
 
         if (patchGeom != nullptr)
         {

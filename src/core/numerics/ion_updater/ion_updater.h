@@ -32,8 +32,9 @@ public:
     static constexpr auto interp_order = GridLayout::interp_order;
 
     using Box               = PHARE::core::Box<int, dimension>;
-    using Interpolator      = PHARE::core::Interpolator<dimension, interp_order>;
     using VecField          = typename Ions::vecfield_type;
+    using Float             = typename VecField::float_type;
+    using Interpolator      = PHARE::core::Interpolator<dimension, interp_order, Float>;
     using ParticleArray     = typename Ions::particle_array_type;
     using PartIterator      = typename ParticleArray::iterator;
     using BoundaryCondition = PHARE::core::BoundaryCondition<dimension, interp_order>;

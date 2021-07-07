@@ -7,11 +7,13 @@ class DataWrangler:
     def __init__(self, simulator):
         from .. import pharein as ph
         from pyphare.cpp import cpp_lib
+        from pyphare.cpp import cpp_float_id
 
         self.dim = ph.global_vars.sim.ndim
         self.interp = ph.global_vars.sim.interp_order
         self.refined_particle_nbr = ph.global_vars.sim.refined_particle_nbr
-        self.cpp = getattr(cpp_lib(), f"DataWrangler_{self.dim}_{self.interp}_{self.refined_particle_nbr}")\
+        cpp_float_str = cpp_float_id(simulator.simulation.dtype)
+        self.cpp = getattr(cpp_lib(), f"DataWrangler_{self.dim}_{self.interp}_{self.refined_particle_nbr}_{cpp_float_str}")\
                                             (simulator.cpp_sim, simulator.cpp_hier)
 
     def kill(self):

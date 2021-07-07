@@ -26,7 +26,7 @@ public:
     auto splitLeaving()
     {
         return std::partition(std::begin(particles), std::end(particles),
-                              [this](Particle<2> const& part) {
+                              [this](Particle<double, 2> const& part) {
                                   return PHARE::core::isIn(PHARE::core::cellAsPoint(part),
                                                            patchBox);
                               }
@@ -111,10 +111,10 @@ public:
 
 
 protected:
-    ParticleArray<2> particles;
+    ParticleArray<double, 2> particles;
     Box<int, 2> patchBox;
     std::vector<Box<int, 2>> boundaryBoxes;
-    ParticleArray<2>::iterator firstLeaving;
+    ParticleArray<double, 2>::iterator firstLeaving;
 };
 
 

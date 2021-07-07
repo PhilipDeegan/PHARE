@@ -32,6 +32,7 @@ namespace amr
         static constexpr std::size_t dimension = GridLayoutT::dimension;
         static constexpr std::size_t maxRafinement{10};
         using FieldDataT = FieldData<GridLayoutT, FieldT>;
+        using Float      = typename GridLayoutT::Float;
 
         FieldCoarsenOperator()
             : SAMRAI::hier::CoarsenOperator("FieldDataCoarsenOperator")
@@ -125,8 +126,8 @@ namespace amr
 
 
             // We can now create the coarsening operator
-            FieldCoarsener<dimension> coarsener{destinationLayout.centering(qty), sourceBox,
-                                                destinationBox, ratio};
+            FieldCoarsener<Float, dimension> coarsener{destinationLayout.centering(qty), sourceBox,
+                                                       destinationBox, ratio};
 
             // now we can loop over the intersection box
 

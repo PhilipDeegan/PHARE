@@ -24,7 +24,8 @@ class NDlayout
 {
     NDlayout() {}
 
-    using nDL = GridLayout<GridLayoutImplYee<dim, interp>>;
+    using nDL = GridLayout<GridLayoutImplYee<dim, interp, double>>;
+
 
 public:
     static nDL create()
@@ -65,27 +66,27 @@ struct OhmTest : public ::testing::Test
     static constexpr auto dim    = typename TypeInfo::first_type{}();
     static constexpr auto interp = typename TypeInfo::second_type{}();
 
-    using GridYee  = GridLayout<GridLayoutImplYee<dim, interp>>;
+    using GridYee  = GridLayout<GridLayoutImplYee<dim, interp, double>>;
     GridYee layout = NDlayout<dim, interp>::create();
 
-    Field<NdArrayVector<dim>, HybridQuantity::Scalar> n;
-    Field<NdArrayVector<dim>, HybridQuantity::Scalar> Vx;
-    Field<NdArrayVector<dim>, HybridQuantity::Scalar> Vy;
-    Field<NdArrayVector<dim>, HybridQuantity::Scalar> Vz;
-    Field<NdArrayVector<dim>, HybridQuantity::Scalar> P;
-    Field<NdArrayVector<dim>, HybridQuantity::Scalar> Bx;
-    Field<NdArrayVector<dim>, HybridQuantity::Scalar> By;
-    Field<NdArrayVector<dim>, HybridQuantity::Scalar> Bz;
-    Field<NdArrayVector<dim>, HybridQuantity::Scalar> Jx;
-    Field<NdArrayVector<dim>, HybridQuantity::Scalar> Jy;
-    Field<NdArrayVector<dim>, HybridQuantity::Scalar> Jz;
-    Field<NdArrayVector<dim>, HybridQuantity::Scalar> Exnew;
-    Field<NdArrayVector<dim>, HybridQuantity::Scalar> Eynew;
-    Field<NdArrayVector<dim>, HybridQuantity::Scalar> Eznew;
-    VecField<NdArrayVector<dim>, HybridQuantity> V;
-    VecField<NdArrayVector<dim>, HybridQuantity> B;
-    VecField<NdArrayVector<dim>, HybridQuantity> J;
-    VecField<NdArrayVector<dim>, HybridQuantity> Enew;
+    Field<NdArrayVector<dim, double>, HybridQuantity::Scalar> n;
+    Field<NdArrayVector<dim, double>, HybridQuantity::Scalar> Vx;
+    Field<NdArrayVector<dim, double>, HybridQuantity::Scalar> Vy;
+    Field<NdArrayVector<dim, double>, HybridQuantity::Scalar> Vz;
+    Field<NdArrayVector<dim, double>, HybridQuantity::Scalar> P;
+    Field<NdArrayVector<dim, double>, HybridQuantity::Scalar> Bx;
+    Field<NdArrayVector<dim, double>, HybridQuantity::Scalar> By;
+    Field<NdArrayVector<dim, double>, HybridQuantity::Scalar> Bz;
+    Field<NdArrayVector<dim, double>, HybridQuantity::Scalar> Jx;
+    Field<NdArrayVector<dim, double>, HybridQuantity::Scalar> Jy;
+    Field<NdArrayVector<dim, double>, HybridQuantity::Scalar> Jz;
+    Field<NdArrayVector<dim, double>, HybridQuantity::Scalar> Exnew;
+    Field<NdArrayVector<dim, double>, HybridQuantity::Scalar> Eynew;
+    Field<NdArrayVector<dim, double>, HybridQuantity::Scalar> Eznew;
+    VecField<NdArrayVector<dim, double>, HybridQuantity> V;
+    VecField<NdArrayVector<dim, double>, HybridQuantity> B;
+    VecField<NdArrayVector<dim, double>, HybridQuantity> J;
+    VecField<NdArrayVector<dim, double>, HybridQuantity> Enew;
     Ohm<GridYee> ohm;
 
     OhmTest()
@@ -327,7 +328,7 @@ TYPED_TEST(OhmTest, ThatOhmHasCtorWithDict)
     auto constexpr dim    = pair.first();
     auto constexpr interp = pair.second();
 
-    using GridYee = GridLayout<GridLayoutImplYee<dim, interp>>;
+    using GridYee = GridLayout<GridLayoutImplYee<dim, interp, double>>;
 
     Ohm<GridYee> ohm(createDict());
 }
@@ -341,7 +342,7 @@ TYPED_TEST(OhmTest, ShouldBeGivenAGridLayoutPointerToBeOperational)
     auto constexpr dim    = pair.first();
     auto constexpr interp = pair.second();
 
-    using GridYee = GridLayout<GridLayoutImplYee<dim, interp>>;
+    using GridYee = GridLayout<GridLayoutImplYee<dim, interp, double>>;
 
     auto layout = std::make_unique<GridYee>(NDlayout<dim, interp>::create());
 
@@ -383,7 +384,7 @@ TYPED_TEST(OhmTest, ThatElectricFieldIsOkFromOhmsLaw)
     auto expected_ohmY = read(filenameY);
     auto expected_ohmZ = read(filenameZ);
 
-    using GridYee = GridLayout<GridLayoutImplYee<dim, interp>>;
+    using GridYee = GridLayout<GridLayoutImplYee<dim, interp, double>>;
     auto layout   = std::make_unique<GridYee>(NDlayout<dim, interp>::create());
 
     this->ohm.setLayout(layout.get());

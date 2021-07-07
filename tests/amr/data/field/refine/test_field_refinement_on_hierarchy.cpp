@@ -12,6 +12,7 @@
 
 
 
+
 template<typename TypeInfo /*= std::pair<DimConst<1>, InterpConst<1>>*/>
 struct ALinearFieldRefineTest : public ::testing::Test
 {
@@ -19,8 +20,8 @@ struct ALinearFieldRefineTest : public ::testing::Test
     static constexpr auto interp = typename TypeInfo::second_type{}();
     static constexpr auto refine = 2;
 
-    using GridYee = GridLayout<GridLayoutImplYee<dim, interp>>;
-    using FieldND = Field<NdArrayVector<dim>, HybridQuantity::Scalar>;
+    using GridYee = GridLayout<GridLayoutImplYee<dim, interp, double>>;
+    using FieldND = Field<NdArrayVector<dim, double>, HybridQuantity::Scalar>;
 
 public:
     void SetUp() override
@@ -50,8 +51,8 @@ TYPED_TEST(ALinearFieldRefineTest, ConserveLinearFunction)
     auto constexpr dim    = pair.first();
     auto constexpr interp = pair.second();
 
-    using GridYee = GridLayout<GridLayoutImplYee<dim, interp>>;
-    using FieldND = Field<NdArrayVector<dim>, HybridQuantity::Scalar>;
+    using GridYee = GridLayout<GridLayoutImplYee<dim, interp, double>>;
+    using FieldND = Field<NdArrayVector<dim, double>, HybridQuantity::Scalar>;
 
 
     auto& basicHierarchy = this->basicHierarchy_;

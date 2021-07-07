@@ -16,13 +16,17 @@ namespace PHARE::pydata
 template<typename T>
 using py_array_t = pybind11::array_t<T, pybind11::array::c_style | pybind11::array::forcecast>;
 
+template<typename Float = double>
+using pyarray_particles_t = std::tuple<py_array_t<int32_t>, py_array_t<Float>, py_array_t<Float>,
+                                       py_array_t<Float>, py_array_t<Float>>;
 
-using pyarray_particles_t = std::tuple<py_array_t<int32_t>, py_array_t<double>, py_array_t<double>,
-                                       py_array_t<double>, py_array_t<double>>;
 
+template<typename Float = double>
 using pyarray_particles_crt
-    = std::tuple<py_array_t<int32_t> const&, py_array_t<double> const&, py_array_t<double> const&,
-                 py_array_t<double> const&, py_array_t<double> const&>;
+    = std::tuple<py_array_t<int32_t> const&, py_array_t<Float> const&, py_array_t<Float> const&,
+                 py_array_t<Float> const&, py_array_t<Float> const&>;
+
+
 
 template<typename PyArrayInfo>
 std::size_t ndSize(PyArrayInfo const& ar_info)
@@ -35,7 +39,7 @@ std::size_t ndSize(PyArrayInfo const& ar_info)
 
 
 template<typename T>
-class PyArrayWrapper : public core::Span<T>
+class __attribute__((visibility("hidden"))) PyArrayWrapper : public core::Span<T>
 {
 public:
     PyArrayWrapper(PHARE::pydata::py_array_t<T> const& array)

@@ -19,17 +19,18 @@
 namespace PHARE::amr
 {
 template<typename HybridModel>
-class HybridTagger : public Tagger
+class HybridTagger : public Tagger<typename HybridModel::Float>
 {
-    using patch_t         = typename Tagger::patch_t;
+    using Float           = typename HybridModel::Float;
+    using patch_t         = typename Tagger<Float>::patch_t;
     using amr_t           = PHARE::amr::SAMRAI_Types;
-    using IPhysicalModel  = PHARE::solver::IPhysicalModel<amr_t>;
+    using IPhysicalModel  = PHARE::solver::IPhysicalModel<amr_t, Float>;
     using gridlayout_type = typename HybridModel::gridlayout_type;
 
 
 public:
     HybridTagger(std::unique_ptr<HybridTaggerStrategy<HybridModel>> strat)
-        : Tagger{"HybridTagger"}
+        : Tagger<Float>{"HybridTagger"}
         , strat_{std::move(strat)}
     {
     }
@@ -51,8 +52,9 @@ private:
 
 
 template<typename HybridModel>
-void HybridTagger<HybridModel>::tag(PHARE::solver::IPhysicalModel<amr_t>& model, patch_t& patch,
-                                    int tag_index)
+void HybridTagger<HybridModel>::tag(
+    PHARE::solver::IPhysicalModel<amr_t, typename HybridModel::Float>& model, patch_t& patch,
+    int tag_index)
 {
     if (strat_)
     {

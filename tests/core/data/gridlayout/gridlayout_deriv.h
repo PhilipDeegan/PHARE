@@ -27,8 +27,8 @@ class a1DDerivative : public ::testing::Test
 protected:
     GridLayout<GridLayoutImpl> layout;
     static constexpr std::size_t interp_order = GridLayoutImpl::interp_order;
-    Field<NdArrayVector<1>, HybridQuantity::Scalar> By;
-    Field<NdArrayVector<1>, HybridQuantity::Scalar> Ez;
+    Field<NdArrayVector<1, double>, HybridQuantity::Scalar> By;
+    Field<NdArrayVector<1, double>, HybridQuantity::Scalar> Ez;
 
 public:
     a1DDerivative()
@@ -47,8 +47,8 @@ class a2DDerivative : public ::testing::Test
 protected:
     GridLayout<GridLayoutImpl> layout;
     static constexpr std::size_t interp_order = GridLayoutImpl::interp_order;
-    Field<NdArrayVector<2>, HybridQuantity::Scalar> By;
-    Field<NdArrayVector<2>, HybridQuantity::Scalar> Ez;
+    Field<NdArrayVector<2, double>, HybridQuantity::Scalar> By;
+    Field<NdArrayVector<2, double>, HybridQuantity::Scalar> Ez;
 
 public:
     a2DDerivative()
@@ -67,8 +67,8 @@ class a3DDerivative : public ::testing::Test
 protected:
     GridLayout<GridLayoutImpl> layout;
     static constexpr std::size_t interp_order = GridLayoutImpl::interp_order;
-    Field<NdArrayVector<3>, HybridQuantity::Scalar> By;
-    Field<NdArrayVector<3>, HybridQuantity::Scalar> Ez;
+    Field<NdArrayVector<3, double>, HybridQuantity::Scalar> By;
+    Field<NdArrayVector<3, double>, HybridQuantity::Scalar> Ez;
 
 public:
     a3DDerivative()

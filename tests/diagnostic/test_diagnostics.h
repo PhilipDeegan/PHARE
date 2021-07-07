@@ -323,14 +323,14 @@ void validateParticleDump(Simulator& sim, Hi5Diagnostic& hi5)
 
         core::ParticlePacker packer{particles};
 
-        auto first            = packer.empty();
-        std::size_t iCellSize = std::get<2>(first).size();
-        std::size_t deltaSize = std::get<3>(first).size();
-        std::size_t vSize     = std::get<4>(first).size();
-        std::size_t part_idx  = 0;
-        while (packer.hasNext())
+        auto first       = packer.empty();
+        size_t iCellSize = std::get<2>(first).size();
+        size_t deltaSize = std::get<3>(first).size();
+        size_t vSize     = std::get<4>(first).size();
+        size_t part_idx  = 0;
+        for (size_t i = 0; i < particles.size(); i++)
         {
-            auto next = packer.next();
+            auto next = packer.forward_as_tuple(particles[i]);
 
             for (std::size_t i = 0; i < iCellSize; i++)
                 EXPECT_EQ(iCellV[(part_idx * iCellSize) + i], std::get<2>(next)[i]);

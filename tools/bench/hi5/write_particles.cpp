@@ -7,7 +7,7 @@
 
 #include "core/data/particles/particle.h"
 #include "core/data/particles/particle_array.h"
-#include "core/data/particles/particle_packer.h"
+#include "core/data/particles/contiguous.h"
 
 #include "phare/phare.h"
 
@@ -15,12 +15,13 @@ constexpr std::size_t dim = 1;
 
 namespace PHARE::diagnostic
 {
+template<typename Float = double>
 void do_bench(benchmark::State& state)
 {
     using HiFile              = HighFive::File;
-    using Packer              = core::ParticlePacker<dim>;
-    using ContiguousParticles = core::ContiguousParticles<dim>;
-    using ParticleArray       = core::ParticleArray<dim>;
+    using Packer              = core::ParticlePacker<Float, dim>;
+    using ContiguousParticles = core::ContiguousParticles<Float, dim>;
+    using ParticleArray       = core::ParticleArray<Float, dim>;
 
     auto getSize = [](auto const& value) -> std::size_t {
         using ValueType = std::decay_t<decltype(value)>;

@@ -24,12 +24,14 @@ namespace amr
         using IPhysicalModel = typename HybridModel::Interface;
 
     public:
+        using Float = typename HybridModel::float_type;
+
         /**
          * @brief allocate HybridMessengerStrategy internal resources on a given patch for a given
          * allocation time. The method is virtual and is implemented by a concrete
          * HybridMessengerStrategy
          */
-        virtual void allocate(SAMRAI::hier::Patch& patch, double const allocateTime) const = 0;
+        virtual void allocate(SAMRAI::hier::Patch& patch, Float const allocateTime) const = 0;
 
 
         /**
@@ -55,37 +57,37 @@ namespace amr
         virtual void regrid(std::shared_ptr<SAMRAI::hier::PatchHierarchy> const& hierarchy,
                             const int levelNumber,
                             std::shared_ptr<SAMRAI::hier::PatchLevel> const& oldLevel,
-                            IPhysicalModel& model, double const initDataTime)
+                            IPhysicalModel& model, Float const initDataTime)
             = 0;
 
         // domain filling methods
         // used during level creation
         virtual void initLevel(IPhysicalModel& model, SAMRAI::hier::PatchLevel& level,
-                               double const initDataTime)
+                               Float const initDataTime)
             = 0;
 
         // ghost filling
 
         // used during solver advance
-        virtual void fillMagneticGhosts(VecFieldT& B, int const levelNumber, double const fillTime)
+        virtual void fillMagneticGhosts(VecFieldT& B, int const levelNumber, Float const fillTime)
             = 0;
 
 
-        virtual void fillElectricGhosts(VecFieldT& E, int const levelNumber, double const fillTime)
+        virtual void fillElectricGhosts(VecFieldT& E, int const levelNumber, Float const fillTime)
             = 0;
 
 
-        virtual void fillCurrentGhosts(VecFieldT& J, int const levelNumber, double const fillTime)
+        virtual void fillCurrentGhosts(VecFieldT& J, int const levelNumber, Float const fillTime)
             = 0;
 
 
         virtual void fillIonGhostParticles(IonsT& ions, SAMRAI::hier::PatchLevel& level,
-                                           double const fillTime)
+                                           Float const fillTime)
             = 0;
 
 
         virtual void fillIonMomentGhosts(IonsT& ions, SAMRAI::hier::PatchLevel& level,
-                                         double beforePushTime, double const afterPushTime)
+                                         Float beforePushTime, Float const afterPushTime)
             = 0;
 
 
@@ -96,8 +98,8 @@ namespace amr
 
         virtual void firstStep(IPhysicalModel& model, SAMRAI::hier::PatchLevel& level,
                                std::shared_ptr<SAMRAI::hier::PatchHierarchy> const& hierarchy,
-                               double const currentTime, double const prevCoarserTime,
-                               double const newCoarserTime)
+                               Float const currentTime, Float const prevCoarserTime,
+                               Float const newCoarserTime)
             = 0;
 
         virtual void lastStep(IPhysicalModel& model, SAMRAI::hier::PatchLevel& level) = 0;
@@ -110,7 +112,7 @@ namespace amr
 
 
         virtual void fillRootGhosts(IPhysicalModel& model, SAMRAI::hier::PatchLevel& level,
-                                    double const initDataTime)
+                                    Float const initDataTime)
             = 0;
 
 

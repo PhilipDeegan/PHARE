@@ -51,6 +51,8 @@ namespace amr
     template<typename IPhysicalModel>
     class IMessenger
     {
+        using Float = typename IPhysicalModel::Float;
+
     public:
         virtual std::string name() = 0;
 
@@ -71,7 +73,7 @@ namespace amr
          * @param patch is the samrai Patch onto which we want to allocate the data
          * @param allocateTime is the time at which data is allocated
          */
-        virtual void allocate(SAMRAI::hier::Patch& patch, double const allocateTime) const = 0;
+        virtual void allocate(SAMRAI::hier::Patch& patch, Float const allocateTime) const = 0;
 
 
         /**
@@ -135,7 +137,7 @@ namespace amr
         virtual void regrid(std::shared_ptr<SAMRAI::hier::PatchHierarchy> const& hierarchy,
                             const int levelNumber,
                             std::shared_ptr<SAMRAI::hier::PatchLevel> const& oldLevel,
-                            IPhysicalModel& model, double const initDataTime)
+                            IPhysicalModel& model, Float const initDataTime)
             = 0;
 
 
@@ -147,7 +149,7 @@ namespace amr
          * quantities registered during registerQuantities().
          */
         virtual void initLevel(IPhysicalModel& model, SAMRAI::hier::PatchLevel& level,
-                               double const initDataTime)
+                               Float const initDataTime)
             = 0;
 
 
@@ -167,8 +169,8 @@ namespace amr
          */
         virtual void firstStep(IPhysicalModel& model, SAMRAI::hier::PatchLevel& level,
                                const std::shared_ptr<SAMRAI::hier::PatchHierarchy>& hierarchy,
-                               double const currentTime, double const prevCoarserTime,
-                               double const newCoarserTime)
+                               Float const currentTime, Float const prevCoarserTime,
+                               Float const newCoarserTime)
             = 0;
 
 
@@ -198,7 +200,7 @@ namespace amr
 
 
         virtual void fillRootGhosts(IPhysicalModel& model, SAMRAI::hier::PatchLevel& level,
-                                    double const initDataTime)
+                                    Float const initDataTime)
             = 0;
 
 
