@@ -160,6 +160,8 @@ def main():
 
     from pyphare.pharesee.run import Run
     from pyphare.pharesee.hierarchy import flat_finest_field
+    from pyphare.cpp import cpp_lib
+    mpi_rank = cpp_lib().mpi_rank
 
 
     config()

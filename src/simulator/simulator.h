@@ -39,7 +39,8 @@ public:
     virtual bool dump(double timestamp, double timestep) { return false; } // overriding optional
 };
 
-template<std::size_t _dimension, std::size_t _interp_order, std::size_t _nbRefinedPart>
+template<std::size_t _dimension, std::size_t _interp_order, std::size_t _nbRefinedPart,
+         bool offload = false>
 class Simulator : public ISimulator
 {
 public:
@@ -79,7 +80,7 @@ public:
     static constexpr std::size_t nbRefinedPart = _nbRefinedPart;
 
     using SAMRAITypes = PHARE::amr::SAMRAI_Types;
-    using PHARETypes  = PHARE_Types<dimension, interp_order, nbRefinedPart>;
+    using PHARETypes  = PHARE_Types<dimension, interp_order, nbRefinedPart, offload>;
 
     using IPhysicalModel = PHARE::solver::IPhysicalModel<SAMRAITypes>;
     using HybridModel    = typename PHARETypes::HybridModel_t;
@@ -156,8 +157,9 @@ namespace
 
 
 
-template<std::size_t _dimension, std::size_t _interp_order, std::size_t _nbRefinedPart>
-Simulator<_dimension, _interp_order, _nbRefinedPart>::Simulator(
+template<std::size_t _dimension, std::size_t _interp_order, std::size_t _nbRefinedPart,
+         bool offload>
+Simulator<_dimension, _interp_order, _nbRefinedPart, offload>::Simulator(
     PHARE::initializer::PHAREDict const& dict,
     std::shared_ptr<PHARE::amr::Hierarchy> const& hierarchy)
     : coutbuf{logging(log_out)}
@@ -236,8 +238,9 @@ Simulator<_dimension, _interp_order, _nbRefinedPart>::Simulator(
 
 
 
-template<std::size_t _dimension, std::size_t _interp_order, std::size_t _nbRefinedPart>
-std::string Simulator<_dimension, _interp_order, _nbRefinedPart>::to_str()
+template<std::size_t _dimension, std::size_t _interp_order, std::size_t _nbRefinedPart,
+         bool offload>
+std::string Simulator<_dimension, _interp_order, _nbRefinedPart, offload>::to_str()
 {
     std::stringstream ss;
     ss << "PHARE SIMULATOR\n";
@@ -247,14 +250,21 @@ std::string Simulator<_dimension, _interp_order, _nbRefinedPart>::to_str()
     ss << "time step            : " << dt_ << "\n";
     ss << "number of time steps : " << timeStepNbr_ << "\n";
     ss << core::to_str(hybridModel_->state);
+
+
+    ss << "\n";
+    ss << "SolverPPC: " << typeid(SolverPPC).name() << "\n";
+
+
     return ss.str();
 }
 
 
 
 
-template<std::size_t _dimension, std::size_t _interp_order, std::size_t _nbRefinedPart>
-void Simulator<_dimension, _interp_order, _nbRefinedPart>::initialize()
+template<std::size_t _dimension, std::size_t _interp_order, std::size_t _nbRefinedPart,
+         bool offload>
+void Simulator<_dimension, _interp_order, _nbRefinedPart, offload>::initialize()
 {
     try
     {
@@ -289,8 +299,9 @@ void Simulator<_dimension, _interp_order, _nbRefinedPart>::initialize()
 
 
 
-template<std::size_t _dimension, std::size_t _interp_order, std::size_t _nbRefinedPart>
-double Simulator<_dimension, _interp_order, _nbRefinedPart>::advance(double dt)
+template<std::size_t _dimension, std::size_t _interp_order, std::size_t _nbRefinedPart,
+         bool offload>
+double Simulator<_dimension, _interp_order, _nbRefinedPart, offload>::advance(double dt)
 {
     double dt_new = 0;
 
@@ -326,8 +337,9 @@ double Simulator<_dimension, _interp_order, _nbRefinedPart>::advance(double dt)
 
 
 
-template<std::size_t _dimension, std::size_t _interp_order, std::size_t _nbRefinedPart>
-auto Simulator<_dimension, _interp_order, _nbRefinedPart>::find_model(std::string name)
+template<std::size_t _dimension, std::size_t _interp_order, std::size_t _nbRefinedPart,
+         bool offload>
+auto Simulator<_dimension, _interp_order, _nbRefinedPart, offload>::find_model(std::string name)
 {
     return std::find(std::begin(modelNames_), std::end(modelNames_), name) != std::end(modelNames_);
 }
@@ -355,14 +367,16 @@ struct SimulatorMaker
             std::size_t constexpr io = interp_order();
             std::size_t constexpr nb = nbRefinedPart();
 
-            PHARE::initializer::PHAREDict& theDict
-                = PHARE::initializer::PHAREDictHandler::INSTANCE().dict();
-            return std::make_unique<Simulator<d, io, nb>>(theDict, hierarchy_);
+            auto& theDict = PHARE::initializer::PHAREDictHandler::INSTANCE().dict();
+
+#if defined(PHARE_WITH_GPU)
+            return std::make_unique<Simulator<d, io, nb, 1>>(theDict, hierarchy_);
+#else
+            return std::make_unique<Simulator<d, io, nb, 0>>(theDict, hierarchy_);
+#endif
         }
-        else
-        {
-            return nullptr;
-        }
+
+        return nullptr;
     }
 };
 
@@ -370,12 +384,10 @@ struct SimulatorMaker
 std::unique_ptr<PHARE::ISimulator> getSimulator(std::shared_ptr<PHARE::amr::Hierarchy>& hierarchy);
 
 
-template<std::size_t dim, std::size_t interp, size_t nbRefinedPart>
-std::unique_ptr<Simulator<dim, interp, nbRefinedPart>>
-makeSimulator(std::shared_ptr<amr::Hierarchy> const& hierarchy)
+template<typename Simulator>
+std::unique_ptr<Simulator> makeSimulator(std::shared_ptr<amr::Hierarchy> const& hierarchy)
 {
-    return std::make_unique<Simulator<dim, interp, nbRefinedPart>>(
-        initializer::PHAREDictHandler::INSTANCE().dict(), hierarchy);
+    return std::make_unique<Simulator>(initializer::PHAREDictHandler::INSTANCE().dict(), hierarchy);
 }
 
 
