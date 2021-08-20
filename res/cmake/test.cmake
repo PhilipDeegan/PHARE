@@ -139,6 +139,21 @@ if (test AND ${PHARE_EXEC_LEVEL_MIN} GREATER 0) # 0 = no tests
   # use
   #  phare_mpi_python3_exec(1 2 test_id script.py ${CMAKE_CURRENT_BINARY_DIR} $ARGS)
 
+
+  function(phare_mpi_python3_exec level N target file directory)
+    if(${level} GREATER_EQUAL ${PHARE_EXEC_LEVEL_MIN} AND ${level} LESS_EQUAL ${PHARE_EXEC_LEVEL_MAX})
+      if(${N} EQUAL 1)
+        add_test(NAME py3_${target} COMMAND python3 -u ${file} WORKING_DIRECTORY ${directory})
+        set_exe_paths_(py3_${target})
+      else()
+        add_test(NAME py3_${target}_mpi_n_${N} COMMAND mpirun -n ${N} python3 -u ${file} WORKING_DIRECTORY ${directory})
+        set_exe_paths_(py3_${target}_mpi_n_${N})
+      endif()
+    endif()
+  endfunction(phare_mpi_python3_exec)
+  # use
+  #  phare_mpi_python3_exec(1 2 test_id script.py ${CMAKE_CURRENT_BINARY_DIR})
+
   set(GTEST_INCLUDE_DIRS ${GTEST_INCLUDE_DIRS} ${PHARE_PROJECT_DIR})
 
   enable_testing()
