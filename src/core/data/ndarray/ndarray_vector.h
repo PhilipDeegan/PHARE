@@ -10,6 +10,10 @@
 
 #include "core/def.h"
 
+#ifdef HAVE_UMPIRE
+#include "umpire/ResourceManager.hpp"
+#endif
+
 namespace PHARE::core
 {
 template<std::size_t dim, typename DataType = double>
@@ -185,12 +189,46 @@ private:
 template<std::size_t dim, typename DataType = double>
 class NdArrayVector
 {
+    static auto accumulate(std::array<std::uint32_t, dim> const& ncells)
+    {
+        std::accumulate(ncells.begin(), ncells.end(), 1, std::multiplies<std::uint32_t>())
+    }
+
 public:
     static constexpr bool is_contiguous = 1;
     static const std::size_t dimension  = dim;
     using type                          = DataType;
 
     NdArrayVector() = delete;
+
+    ~NdArrayVector()
+    {
+#if defined(HAVE_UMPIRE)
+        d_allocator.deallocate(data_, accumulate(ncells) * sizeof(DataType));
+#endif
+    }
+
+#if defined(HAVE_UMPIRE)
+
+    template<typename... Nodes>
+    explicit NdArrayVector(Nodes... nodes)
+        : nCells_{nodes...}
+        , allocator_{umpire::ResourceManager::getInstance().getAllocator(
+              "PHARE::nd_data_allocator")}
+        , data_((... * nodes) * sizeof(DataType))
+    {
+        static_assert(sizeof...(Nodes) == dim);
+    }
+
+    explicit NdArrayVector(std::array<std::uint32_t, dim> const& ncells)
+        : nCells_{ncells}
+        , allocator_{umpire::ResourceManager::getInstance().getAllocator(
+              "PHARE::nd_data_allocator")}
+        , data_{allocator_.allocate(accumulate(ncells) * sizeof(DataType))}
+    {
+    }
+
+#else
 
     template<typename... Nodes>
     explicit NdArrayVector(Nodes... nodes)
@@ -202,9 +240,12 @@ public:
 
     explicit NdArrayVector(std::array<std::uint32_t, dim> const& ncells)
         : nCells_{ncells}
-        , data_(std::accumulate(ncells.begin(), ncells.end(), 1, std::multiplies<int>()))
+        , data_(accumulate(ncells))
     {
     }
+#endif
+
+
 
     NdArrayVector(NdArrayVector const& source) = default;
     NdArrayVector(NdArrayVector&& source)      = default;
@@ -219,10 +260,7 @@ public:
     auto end() const { return std::end(data_); }
     auto end() { return std::end(data_); }
 
-    void zero()
-    { // data_ = std::vector<DataType>(data_.size(), {0});
-        std::fill(data_.begin(), data_.end(), 0);
-    }
+    void zero() { std::fill(data_.begin(), data_.end(), 0); }
 
 
     NdArrayVector& operator=(NdArrayVector const& source)
@@ -283,7 +321,13 @@ public:
 
 private:
     std::array<std::uint32_t, dim> nCells_;
+
+#ifdef HAVE_UMPIRE
+    umpire::TypedAllocator<TYPE> allocator_;
+    DataType* data_;
+#else
     std::vector<DataType> data_;
+#endif
 };
 
 

@@ -26,34 +26,32 @@
 
 #include "cppdict/include/dict.hpp"
 
-namespace PHARE::core
-{
-template<std::size_t dim, bool offload>
-auto constexpr type_selector()
-{
-    using Array_t = PHARE::core::NdArrayVector<dimension>;
+#if defined(WITH_RAJA) and defined(WITH_UMPIRE)
+#include "core/data/particles/llnl/particle_array.h"
+#elif defined(PHARE_WITH_GPU)
 
-#if defined(PHARE_WITH_GPU)
-    using GPU_SolverPPC_t = PHARE::solver::gpu::SolverPPC<HybridModel_t, PHARE::amr::SAMRAI_Types>;
-
-#elif defined(WITH_RAJA) and defined(WITH_UMPIRE)
-    using GPU_SolverPPC_t = PHARE::solver::llnl::SolverPPC<HybridModel_t, PHARE::amr::SAMRAI_Types>;
-
-#elif defined(WITH_RAJA) or defined(WITH_UMPIRE)
-#error // invalid, both RAJA and UMPIRE are required together.
 #endif
 
-    return static_cast<std::conditional_t<offload, GPU_SolverPPC_t, CPU_SolverPPC_t>*>(nullptr);
+namespace PHARE::core
+{
+template<typename Particle>
+auto constexpr particle_array_selector()
+{
+#if defined(WITH_RAJA) and defined(WITH_UMPIRE)
+    return static_cast<PHARE::core::llnl::ParticleArray<Particle_t>*>(nullptr);
+#elif defined(WITH_RAJA) or defined(WITH_UMPIRE)
+#error // invalid, both RAJA and UMPIRE are required together.
+#else
+    return static_cast<PHARE::core::ParticleArray<Particle_t>*>(nullptr);
+#endif
 }
 
-} // namespace PHARE::core
 
-template<std::size_t dimension_, std::size_t interp_order_, bool offload_ = false>
+template<std::size_t dimension_, std::size_t interp_order_>
 struct PHARE_Types
 {
     static auto constexpr dimension    = dimension_;
     static auto constexpr interp_order = interp_order_;
-    static auto constexpr offload      = offload_;
 
     using Array_t      = PHARE::core::NdArrayVector<dimension>;
     using VecField_t   = PHARE::core::VecField<Array_t, PHARE::core::HybridQuantity>;
@@ -63,10 +61,7 @@ struct PHARE_Types
     using GridLayout_t = PHARE::core::GridLayout<YeeLayout_t>;
 
     using Particle_t      = PHARE::core::Particle<dimension>;
-    using ParticleAoS_t   = PHARE::core::ParticleArray<dimension>;
-    using ParticleArray_t = ParticleAoS_t;
-    using ParticleSoA_t   = PHARE::core::ContiguousParticles<dimension>;
-
+    using ParticleArray_t = decltype(*particle_array_selector<Particle_t>());
 
     using MaxwellianParticleInitializer_t
         = PHARE::core::MaxwellianParticleInitializer<ParticleArray_t, GridLayout_t>;

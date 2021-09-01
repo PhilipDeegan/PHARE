@@ -5,22 +5,29 @@
 #include <stdexcept>
 #include <string_view>
 
+#if !defined(PHARE_WITH_GPU)
+#if defined(HAVE_RAJA) and defined(HAVE_UMPIRE)
+#define PHARE_WITH_GPU 1
+#endif
+#endif
+
 #if defined(PHARE_WITH_GPU)
 
 #define _PHARE_GPU_FN_DEV_ __device__
 #define _PHARE_GPU_FN_HST_ __host__
 #define _PHARE_FN_SIG_ _PHARE_GPU_FN_HST_ _PHARE_GPU_FN_DEV_
 
-
 namespace PHARE
 {
-inline void throw_runtime_error(char const* const /*err*/) _PHARE_GPU_FN_DEV_
+template<typename T>
+inline constexpr void throw_runtime_error(T const& /*err*/) _PHARE_GPU_FN_DEV_
 {
     // gpu cannot throw
     assert(false);
 }
 
-inline void throw_runtime_error(char const* const err) _PHARE_GPU_FN_HST_
+template<typename T>
+inline constexpr void throw_runtime_error(T const& err) _PHARE_GPU_FN_HST_
 {
     throw std::runtime_error(err);
 }
@@ -34,7 +41,8 @@ inline void throw_runtime_error(char const* const err) _PHARE_GPU_FN_HST_
 
 namespace PHARE
 {
-inline void throw_runtime_error(char const* const err)
+template<typename T>
+inline constexpr void throw_runtime_error(T const& err)
 {
     throw std::runtime_error(err);
 }
