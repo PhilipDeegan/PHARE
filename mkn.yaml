@@ -3,9 +3,9 @@
 name: phare
 
 property:
-  MPI_INC: /usr/include/hdf5/mpich
+  MPI_INC: /usr/include/hdf5/openmpi #/usr/include/hdf5/mpich #/usr/include/hdf5/openmpi #/usr/local/netcdf/include
   MPI_LIB: hdf5
-  MPI_PTH: /usr/lib/x86_64-linux-gnu/hdf5/mpich
+  MPI_PTH: /usr/lib/x86_64-linux-gnu/hdf5/openmpi #/usr/lib/x86_64-linux-gnu/hdf5/mpich # /usr/lib64/openmpi/lib #
 
 profile:
 - name: base
@@ -68,6 +68,7 @@ profile:
   self: simulator init
   src: src/python3/cpp_simulator.cpp
   install: build/pybindlibs
+  #test: tests/amr/solvers/ppc/test_gpu_solverppc.cpp
   out: cpp
 
 - name: cpp_ext

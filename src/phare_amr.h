@@ -40,7 +40,7 @@ struct PHARE_Types
                                           PHARE::core::InterpConst<interp_order>,
                                           PHARE::core::RefinedParticlesConst<nbRefinedPart>>;
 
-    using core_types = PHARE::core::PHARE_Types<dimension, interp_order, offload>;
+    using core_types = PHARE::core::PHARE_Types<dimension, interp_order>;
 
     using RefinementParams
         = PHARE::amr::RefinementParams<typename core_types::ParticleArray_t, Splitter>;

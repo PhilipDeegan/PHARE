@@ -13,7 +13,7 @@ struct PHARE_Types
     static auto constexpr interp_order  = interp_order_;
     static auto constexpr nbRefinedPart = nbRefinedPart_;
 
-    using core_types      = PHARE::core::PHARE_Types<dimension, interp_order, offload>;
+    using core_types      = PHARE::core::PHARE_Types<dimension, interp_order>;
     using Array_t         = typename core_types::Array_t;
     using Field_t         = typename core_types::Field_t;
     using VecField_t      = typename core_types::VecField_t;

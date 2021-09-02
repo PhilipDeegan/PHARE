@@ -61,7 +61,7 @@ struct PHARE_Types
     using GridLayout_t = PHARE::core::GridLayout<YeeLayout_t>;
 
     using Particle_t      = PHARE::core::Particle<dimension>;
-    using ParticleArray_t = decltype(*particle_array_selector<Particle_t>());
+    using ParticleArray_t = std::decay_t<decltype(*particle_array_selector<Particle_t>())>;
 
     using MaxwellianParticleInitializer_t
         = PHARE::core::MaxwellianParticleInitializer<ParticleArray_t, GridLayout_t>;

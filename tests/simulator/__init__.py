@@ -1,6 +1,6 @@
 
-# import ctypes
-# ctypes.CDLL("libmpi.so", mode=ctypes.RTLD_GLOBAL)
+import ctypes
+ctypes.CDLL("libmpi.so", mode=ctypes.RTLD_GLOBAL)
 
 import pyphare.pharein as ph, numpy as np
 from pyphare.pharein import ElectronModel

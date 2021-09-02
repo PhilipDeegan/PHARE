@@ -36,6 +36,7 @@ struct PatchState
     using GridLayout                = GridLayout_;
     static constexpr auto dimension = GridLayout::dimension;
     using HybridQuantity            = core::HybridQuantity;
+    using ParticleArray_t           = typename core::PHARE_Types<dimension, GridLayout::interp_order>::ParticleArray_t;
 
     template<typename State>
     PatchState(GridLayout const& gridLayout, State& state)
@@ -82,7 +83,7 @@ struct PatchState
     GridLayout const layout;
     std::vector<core::NdArrayView<dimension, Float, Float*>> electromag;
     std::vector<core::NdArrayView<dimension, Float, Float*>> density, flux;
-    std::vector<core::ParticleArray<dimension>*> ions;
+    std::vector<ParticleArray_t*> ions;
     std::vector<double> masses;
 };
 

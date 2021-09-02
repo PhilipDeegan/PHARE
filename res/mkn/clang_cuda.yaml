@@ -15,8 +15,7 @@ compiler:
 env: |
   OMPI_CXX=clang++
 
-#path: /usr/local/cuda/targets/x86_64-linux/lib
-#inc: /usr/local/cuda-10.2/targets/x86_64-linux/include
+path: /usr/local/cuda-10.1/targets/x86_64-linux/lib
 
 # The following compile flags will likely be required with their specific values for your current hardware
 #

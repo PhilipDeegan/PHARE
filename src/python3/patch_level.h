@@ -18,9 +18,10 @@ public:
     static constexpr std::size_t dimension     = dim;
     static constexpr std::size_t interp_order  = interpOrder;
     static constexpr std::size_t nbRefinedPart = nbrRefPart;
-
+   
     using PHARESolverTypes = solver::PHARE_Types<dimension, interp_order, nbRefinedPart>;
     using HybridModel      = typename PHARESolverTypes::HybridModel_t;
+    using Particle_t       = typename core::PHARE_Types<dim, interp_order>::Particle_t;
 
     using GridLayout = typename HybridModel::gridlayout_type;
 
@@ -270,7 +271,7 @@ public:
 
             auto& patch_data = inner[key].emplace_back(particles.size());
             setPatchDataFromGrid(patch_data, grid, patchID);
-            core::ParticlePacker<dimension>{particles}.pack(patch_data.data);
+            core::ParticlePacker<Particle_t>{particles}.pack(patch_data.data);
         };
 
         auto& ions = model_.state.ions;

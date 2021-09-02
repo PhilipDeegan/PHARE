@@ -40,7 +40,8 @@ public:
     static constexpr auto dimension   = H5Writer::dimension;
     static constexpr auto interpOrder = H5Writer::interpOrder;
     using Attributes                  = typename Super::Attributes;
-    using Packer                      = core::ParticlePacker<dimension>;
+    using Particle_t                  = typename core::PHARE_Types<dimension, interpOrder>::Particle_t;
+    using Packer                      = core::ParticlePacker<Particle_t>;
     using FloatType                   = typename H5Writer::FloatType;
 
     ParticlesDiagnosticWriter(H5Writer& h5Writer)

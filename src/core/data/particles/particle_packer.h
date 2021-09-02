@@ -5,7 +5,6 @@
 #include <cstddef>
 #include <vector>
 
-#include "particle.h"
 #include "particle_array.h"
 
 namespace PHARE::core
@@ -18,16 +17,18 @@ inline std::array<std::string, 5> packer_keys()
     return {"weight", "charge", "iCell", "delta", "v"};
 }
 
-template<std::size_t dim>
+template<typename Particle>
 class ParticlePacker
 {
+    static constexpr auto dim = Particle::dimension;
+
 public:
-    ParticlePacker(ParticleArray<dim> const& particles)
+    ParticlePacker(ParticleArray<Particle> const& particles)
         : particles_{particles}
     {
     }
 
-    static auto get(Particle<dim> const& particle)
+    static auto get(Particle const& particle)
     {
         return std::forward_as_tuple(particle.weight, particle.charge, particle.iCell,
                                      particle.delta, particle.v);
@@ -35,7 +36,7 @@ public:
 
     static auto empty()
     {
-        Particle<dim> particle;
+        Particle particle;
         return get(particle);
     }
 
@@ -63,7 +64,7 @@ public:
     }
 
 private:
-    ParticleArray<dim> const& particles_;
+    ParticleArray<Particle> const& particles_;
     std::size_t it_ = 0;
 };
 

@@ -23,8 +23,8 @@
 
 namespace PHARE::solver
 {
-template<bool offload>
-auto* constexpr solver_select()
+template<typename HybridModel_t, bool offload>
+auto solver_select()
 {
     using CPU_SolverPPC_t = PHARE::solver::SolverPPC<HybridModel_t, PHARE::amr::SAMRAI_Types>;
 
@@ -50,7 +50,7 @@ struct PHARE_Types
     static auto constexpr nbRefinedPart = nbRefinedPart_;
 
     // core deps
-    using core_types   = PHARE::core::PHARE_Types<dimension, interp_order, offload>;
+    using core_types   = PHARE::core::PHARE_Types<dimension, interp_order>;
     using VecField_t   = typename core_types::VecField_t;
     using Electromag_t = typename core_types::Electromag_t;
     using Ions_t       = typename core_types::Ions_t;
@@ -63,7 +63,7 @@ struct PHARE_Types
                                                      Electrons_t, PHARE::amr::SAMRAI_Types>;
     using MHDModel_t = PHARE::solver::MHDModel<GridLayout_t, VecField_t, PHARE::amr::SAMRAI_Types>;
 
-    using SolverPPC_t = decltype(*solver_select<offload>());
+    using SolverPPC_t = decltype(*solver_select<HybridModel_t, offload>());
 
     using SolverMHD_t = PHARE::solver::SolverMHD<MHDModel_t, PHARE::amr::SAMRAI_Types>;
     using LevelInitializerFactory_t = PHARE::solver::LevelInitializerFactory<HybridModel_t>;

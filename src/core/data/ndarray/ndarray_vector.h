@@ -193,7 +193,7 @@ class NdArrayVector
 {
     static auto accumulate(std::array<std::uint32_t, dim> const& ncells)
     {
-        std::accumulate(ncells.begin(), ncells.end(), 1, std::multiplies<std::size_t>());
+        return std::accumulate(ncells.begin(), ncells.end(), 1, std::multiplies<std::size_t>());
     }
 
 public:

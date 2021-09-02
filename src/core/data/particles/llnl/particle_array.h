@@ -68,7 +68,7 @@ template<typename Particle, bool GPU = false>
 struct BufferedParticleVector : ABufferedParticleVector<GPU, Particle>
 {
     using Super    = ABufferedParticleVector<GPU, Particle>;
-    using iterator = Particle;
+    using iterator = Particle*;
     using gpu_t    = BufferedParticleVector<Particle, true>;
     using Super::info;
     using Super::particles;
@@ -162,5 +162,5 @@ void swap(llnl::ParticleArray<dim>& array1, llnl::ParticleArray<dim>& array2)
 
 } // namespace PHARE::core
 
-
 #endif
+
