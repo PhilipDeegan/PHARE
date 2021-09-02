@@ -38,11 +38,11 @@ template<typename Particle>
 auto constexpr particle_array_selector()
 {
 #if defined(WITH_RAJA) and defined(WITH_UMPIRE)
-    return static_cast<PHARE::core::llnl::ParticleArray<Particle_t>*>(nullptr);
+    return static_cast<PHARE::core::llnl::ParticleArray<Particle>*>(nullptr);
 #elif defined(WITH_RAJA) or defined(WITH_UMPIRE)
 #error // invalid, both RAJA and UMPIRE are required together.
 #else
-    return static_cast<PHARE::core::ParticleArray<Particle_t>*>(nullptr);
+    return static_cast<PHARE::core::ParticleArray<Particle>*>(nullptr);
 #endif
 }
 

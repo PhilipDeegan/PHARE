@@ -1,0 +1,33 @@
+
+# local:
+#   repo: /mkn/r
+#   mod-repo: /mkn/m
+
+#property:
+#  nvhpc.version: 21.3
+#  nvhpc.arch: Linux_x86_64
+#  nvhpc.path: /opt/nvidia/hpc_sdk
+
+#  PATH=${nvhpc.path}/${nvhpc.arch}/${nvhpc.version}/compilers/bin:${PATH}
+env: |
+  OMPI_CXX=nvc++
+  MKN_LIB_LINK_LIB=1
+
+path:
+ /usr/local/cuda-10.1/targets/x86_64-linux/lib
+
+#path:
+#  ${nvhpc.path}/${nvhpc.arch}/${nvhpc.version}/compilers/lib
+
+compiler:
+  mask:
+    g++:
+      mpicxx
+
+file:
+  - type: cpp:cxx:cc
+    archiver: ar -cr
+    compiler: mpicxx -gpu=cc60 -cuda -std=c++17 -fPIC
+    linker: mpicxx  -lcudart
+
+

@@ -19,15 +19,15 @@
 
 namespace PHARE
 {
+/*
 template<typename T>
-inline constexpr void throw_runtime_error(T const& /*err*/) _PHARE_GPU_FN_DEV_
+inline void throw_runtime_error(char const*const) __device__
 {
     // gpu cannot throw
     assert(false);
-}
+}*/
 
-template<typename T>
-inline constexpr void throw_runtime_error(T const& err) _PHARE_GPU_FN_HST_
+inline void throw_runtime_error(char const*const err) __host__
 {
     throw std::runtime_error(err);
 }
@@ -42,7 +42,7 @@ inline constexpr void throw_runtime_error(T const& err) _PHARE_GPU_FN_HST_
 namespace PHARE
 {
 template<typename T>
-inline constexpr void throw_runtime_error(T const& err)
+inline void throw_runtime_error(T const& err)
 {
     throw std::runtime_error(err);
 }

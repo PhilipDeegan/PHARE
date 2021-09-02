@@ -9,7 +9,7 @@ property:
 
 profile:
 - name: base
-  arg: -DPHARE_HAS_HIGHFIVE=1 -DPHARE_DIAG_DOUBLES=1 -Wno-macro-redefined -Wno-unknown-cuda-version
+  arg: -DPHARE_HAS_HIGHFIVE=1 -DPHARE_DIAG_DOUBLES=1 -Wno-macro-redefined -Wno-unknown-cuda-version -DHAVE_RAJA -DHAVE_UMPIRE
 
 - name: core
   inc: src subprojects
@@ -19,7 +19,7 @@ profile:
 
 - name: samrai
   self: core
-  dep: llnl.samrai(https://github.com/dekken/llnl.samrai)
+  dep: llnl.samrai(https://github.com/dekken/llnl.samrai) llnl.raja[lib] llnl.umpire[lib]
   src: src/amr
   out: phare_amr
 

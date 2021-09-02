@@ -44,7 +44,7 @@ if (test AND ${PHARE_EXEC_LEVEL_MIN} GREATER 0) # 0 = no tests
   endfunction(set_exe_paths_)
 
   function(add_phare_test_ binary)
-    target_compile_options(${binary} PRIVATE ${PHARE_WERROR_FLAGS} -DPHARE_HAS_HIGHFIVE=${PHARE_HAS_HIGHFIVE})
+    target_compile_options(${binary} PRIVATE ${PHARE_FLAGS} ${PHARE_WERROR_FLAGS} -DPHARE_HAS_HIGHFIVE=${PHARE_HAS_HIGHFIVE})
     target_link_options(${binary} PRIVATE ${PHARE_BIN_FLAGS})
     set_exe_paths_(${binary})
     set_property(TEST ${binary} APPEND PROPERTY ENVIRONMENT GMON_OUT_PREFIX=gprof.${binary})

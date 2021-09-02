@@ -16,7 +16,7 @@ if(DEFINED WITH_UMPIRE AND DEFINED WITH_RAJA)
 
   set (THRUST_DIR ${PHARE_PROJECT_DIR}/subprojects/thrust)
   if (NOT EXISTS ${THRUST_DIR})
-    execute_process(COMMAND ${Git} clone https://github.com/NVIDIA/thrust -b main ${THRUST_DIR} --depth 5 --shallow-submodules --recursive WORKING_DIRECTORY ${GTEST_ROOT})
+    execute_process(COMMAND ${Git} clone https://github.com/NVIDIA/thrust -b main ${THRUST_DIR} --depth 5 --shallow-submodules --recursive WORKING_DIRECTORY ${PHARE_PROJECT_DIR})
   endif()
   include_directories(${THRUST_DIR})
 

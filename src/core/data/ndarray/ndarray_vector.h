@@ -12,6 +12,8 @@
 
 #ifdef HAVE_UMPIRE
 #include "umpire/ResourceManager.hpp"
+#include "umpire/Allocator.hpp"
+#include "umpire/TypedAllocator.hpp"
 #endif
 
 namespace PHARE::core
@@ -191,7 +193,7 @@ class NdArrayVector
 {
     static auto accumulate(std::array<std::uint32_t, dim> const& ncells)
     {
-        std::accumulate(ncells.begin(), ncells.end(), 1, std::multiplies<std::uint32_t>())
+        std::accumulate(ncells.begin(), ncells.end(), 1, std::multiplies<std::size_t>());
     }
 
 public:
@@ -204,12 +206,11 @@ public:
     ~NdArrayVector()
     {
 #if defined(HAVE_UMPIRE)
-        d_allocator.deallocate(data_, accumulate(ncells) * sizeof(DataType));
+        allocator_.deallocate(data_, accumulate(nCells_) * sizeof(DataType));
 #endif
     }
 
 #if defined(HAVE_UMPIRE)
-
     template<typename... Nodes>
     explicit NdArrayVector(Nodes... nodes)
         : nCells_{nodes...}
@@ -229,7 +230,6 @@ public:
     }
 
 #else
-
     template<typename... Nodes>
     explicit NdArrayVector(Nodes... nodes)
         : nCells_{nodes...}
@@ -245,11 +245,20 @@ public:
     }
 #endif
 
-
-
     NdArrayVector(NdArrayVector const& source) = default;
     NdArrayVector(NdArrayVector&& source)      = default;
 
+#if defined(HAVE_UMPIRE)
+    auto data() { return data_; }
+    auto data() const { return data_; }
+    auto size() const { return accumulate(nCells_); }
+
+    //auto begin() const { return std::begin(data_); }
+    //auto begin() { return std::begin(data_); }
+
+    //auto end() const { return std::end(data_); }
+    //auto end() { return std::end(data_); }
+#else
     auto data() { return data_.data(); }
     auto data() const { return data_.data(); }
     auto size() const { return data_.size(); }
@@ -261,6 +270,7 @@ public:
     auto end() { return std::end(data_); }
 
     void zero() { std::fill(data_.begin(), data_.end(), 0); }
+#endif
 
 
     NdArrayVector& operator=(NdArrayVector const& source)
@@ -288,7 +298,7 @@ public:
     template<typename... Indexes>
     DataType const& operator()(Indexes... indexes) const
     {
-        return NdArrayViewer<dim, DataType>::at(data_.data(), nCells_, indexes...);
+        return NdArrayViewer<dim, DataType>::at(data(), nCells_, indexes...);
     }
 
     template<typename... Indexes>
@@ -300,7 +310,7 @@ public:
     template<typename Index>
     DataType const& operator()(std::array<Index, dim> const& indexes) const
     {
-        return NdArrayViewer<dim, DataType>::at(data_.data(), nCells_, indexes);
+        return NdArrayViewer<dim, DataType>::at(data(), nCells_, indexes);
     }
 
     template<typename Index>
@@ -318,12 +328,11 @@ public:
         return MaskedView{*this, std::forward<Mask>(mask)};
     }
 
-
 private:
     std::array<std::uint32_t, dim> nCells_;
 
 #ifdef HAVE_UMPIRE
-    umpire::TypedAllocator<TYPE> allocator_;
+    ::umpire::TypedAllocator<DataType> allocator_;
     DataType* data_;
 #else
     std::vector<DataType> data_;
