@@ -29,14 +29,14 @@ public:
     using ParticleSelector = typename Super::ParticleSelector;
     using ParticleRange    = Range<ParticleIterator>;
 
-    GranovPusher() _PHARE_FN_SIG_ {}
+    GranovPusher() _PHARE_ALL_FN_ {}
 
-    GranovPusher(GridLayout const& layout, double timestep, double mass) _PHARE_FN_SIG_
+    GranovPusher(GridLayout const& layout, double timestep, double mass) _PHARE_ALL_FN_
     {
         setMeshAndTimeStep(layout.meshSize(), timestep);
         accelerate_setup(mass);
     }
-    ~GranovPusher() _PHARE_FN_SIG_ {}
+    ~GranovPusher() _PHARE_ALL_FN_ {}
 
     /** see Pusher::move() documentation*/
     ParticleIterator move(ParticleRange const& rangeIn, ParticleRange& rangeOut,
@@ -63,7 +63,7 @@ public:
     template<typename Particle_t, typename Selector>
     bool move_in_place(Particle_t& particle, Electromag const& emFields, Interpolator& interpolator,
                        Selector const& particleIsNotLeaving,
-                       GridLayout const& layout) _PHARE_FN_SIG_
+                       GridLayout const& layout) _PHARE_ALL_FN_
     {
         advancePosition_(particle);
 
@@ -90,7 +90,7 @@ public:
 
     /** see Pusher::move() documentation*/
     virtual void setMeshAndTimeStep(std::array<double, dim> const& ms,
-                                    double ts) override _PHARE_FN_SIG_
+                                    double ts) override _PHARE_ALL_FN_
     {
         // std::transform(std::begin(ms), std::end(ms), std::begin(halfDtOverDl_),
         //                [ts](double const& x) { return 0.5 * ts / x; });
@@ -105,7 +105,7 @@ public:
     }
 
 
-    void accelerate_setup(double mass) _PHARE_FN_SIG_
+    void accelerate_setup(double mass) _PHARE_ALL_FN_
     {
         dto2m_ = 0.5 * dt_ / mass;
         assert(dto2m_ > 0);
@@ -117,13 +117,13 @@ private:
     /** move the particle partIn of half a time step and store it in partOut
      */
     template<typename ParticleIter>
-    void advancePosition_(ParticleIter& particle) _PHARE_FN_SIG_
+    void advancePosition_(ParticleIter& particle) _PHARE_ALL_FN_
     {
         advancePosition_(particle, particle);
     }
 
     template<typename Particle>
-    void advancePosition_(Particle const& partIn, Particle& partOut) _PHARE_FN_SIG_
+    void advancePosition_(Particle const& partIn, Particle& partOut) _PHARE_ALL_FN_
     {
         // push the particle
         for (std::size_t iDim = 0; iDim < dim; ++iDim)
@@ -147,14 +147,14 @@ private:
      */
     template<typename Particle_t, typename ParticleElectromag>
     void accelerate_(Particle_t& particle,
-                     ParticleElectromag const& particleElectromag) _PHARE_FN_SIG_
+                     ParticleElectromag const& particleElectromag) _PHARE_ALL_FN_
     {
         accelerate_(particle, particle, particleElectromag);
     }
 
     template<typename Particle_t, typename ParticleElectromag>
     void accelerate_(Particle_t const& currentIn, Particle_t& currentOut,
-                     ParticleElectromag const& particleElectromag) _PHARE_FN_SIG_
+                     ParticleElectromag const& particleElectromag) _PHARE_ALL_FN_
     {
         double coef1 = currentIn.charge * dto2m_;
 

@@ -47,13 +47,16 @@ namespace core
                     return gridLayout.fieldNodeCoordinates(field_, gridLayout.origin(), args...);
                 });
 
-            std::shared_ptr<Span<double>> gridPtr // keep grid data alive
-                = std::apply([&](auto&... args) { return init(args...); }, coords);
-            Span<double>& grid = *gridPtr;
+            // keep grid data alive
+            auto grid = std::apply([&](auto const&... args) { return init(args...); }, coords);
 
+#if defined(HAVE_RAJA)
+
+#else // NORMAL
             for (std::size_t cell_idx = 0; cell_idx < indices.size(); cell_idx++)
-                std::apply([&](auto&... args) { field(args...) = grid[cell_idx]; },
+                std::apply([&](auto&... args) { field(args...) = (*grid)[cell_idx]; },
                            indices[cell_idx]);
+#endif
         }
 
 

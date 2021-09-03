@@ -100,24 +100,26 @@ void SolverPPC<HybridModel, AMR_Types>::advanceLevel(std::shared_ptr<hierarchy_t
     };
     // reset_moments();
 
-    predictor1_(*level, hybridModel, fromCoarser, currentTime, newTime);
-    average_(*level, hybridModel);
-    //     saveState_(*level, hybridState.ions, resourcesManager);
+    // predictor1_(*level, hybridModel, fromCoarser, currentTime, newTime);
+    // average_(*level, hybridModel);
+    // //     saveState_(*level, hybridState.ions, resourcesManager);
 
-    moveIons_(*level, hybridState.ions, electromagAvg_, resourcesManager, fromCoarser, currentTime,
-              newTime, core::UpdaterMode::domain_only);
+    // moveIons_(*level, hybridState.ions, electromagAvg_, resourcesManager, fromCoarser,
+    // currentTime,
+    //           newTime, core::UpdaterMode::domain_only);
 
-    predictor2_(*level, hybridModel, fromCoarser, currentTime, newTime);
-    average_(*level, hybridModel);
-    //     restoreState_(*level, hybridState.ions, resourcesManager);
+    // predictor2_(*level, hybridModel, fromCoarser, currentTime, newTime);
+    // average_(*level, hybridModel);
+    // //     restoreState_(*level, hybridState.ions, resourcesManager);
 
-    reset_moments();
+    // reset_moments();
 
 
-    moveIons_(*level, hybridState.ions, electromagAvg_, resourcesManager, fromCoarser, currentTime,
-              newTime, core::UpdaterMode::all);
+    // moveIons_(*level, hybridState.ions, electromagAvg_, resourcesManager, fromCoarser,
+    // currentTime,
+    //           newTime, core::UpdaterMode::all);
 
-    corrector_(*level, hybridModel, fromCoarser, currentTime, newTime);
+    // corrector_(*level, hybridModel, fromCoarser, currentTime, newTime);
 }
 
 

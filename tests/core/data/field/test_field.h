@@ -7,11 +7,11 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-namespace PHARE{
-
+namespace PHARE
+{
 template<typename FieldFilter, typename Func, typename GridLayout, typename Field>
 std::array<std::size_t, GridLayout::dimension> fieldIndices(FieldFilter ff, Func&& func,
-                                                              GridLayout& layout, Field& field)
+                                                            GridLayout& layout, Field& field)
 {
     constexpr auto dim = GridLayout::dimension;
     static_assert(dim >= 1 and dim <= 3, "Invalid dimension.");
@@ -77,52 +77,83 @@ private:
 struct FieldDomainFilter : public FieldDomainPlusNFilter
 {
 };
-}// end namespace PHARE
+} // end namespace PHARE
 
-namespace PHARE::core{
-    
+namespace PHARE::core
+{
+template<std::size_t dim>
+struct FieldMock
+{
+    static auto constexpr dimension = dim;
+    double data;
+
+    FieldMock() = default;
+
+    template<typename... Args>
+    auto& operator()(Args...)
+    {
+        return data;
+    }
+    template<typename... Args>
+    auto& operator()(Args...) const
+    {
+        return data;
+    }
+    auto physicalQuantity() const { return qty; }
+    std::string name() const { return "FieldMock"; }
+
+    PHARE::core::HybridQuantity::Scalar qty = PHARE::core::HybridQuantity::Scalar::Ex;
+};
+
+
 template<std::size_t dim, typename DataType, typename Pointer, typename PhysicalQuantity>
-class FieldView : public NdArrayView<dim, DataType, Pointer>{
+class FieldView : public NdArrayView<dim, DataType, Pointer>
+{
 public:
     static constexpr bool is_contiguous = 1;
     static const std::size_t dimension  = dim;
     using type                          = DataType;
-    using Super = NdArrayView<dim, DataType, Pointer>;
+    using Super                         = NdArrayView<dim, DataType, Pointer>;
     using Super::shape;
     using Super::size;
-    
+
     FieldView(Pointer ptr, std::array<std::uint32_t, dim> shape, PhysicalQuantity qty)
-        : Super{ptr, shape}, qty_{qty}
+        : Super{ptr, shape}
+        , qty_{qty}
     {
     }
-    
-    FieldView(Super & view, PhysicalQuantity qty)
-        : Super{view.data(), view.shape()}, qty_{qty}
+
+    FieldView(Super& view, PhysicalQuantity qty)
+        : Super{view.data(), view.shape()}
+        , qty_{qty}
     {
     }
-    
+
     constexpr PhysicalQuantity physicalQuantity() const { return qty_; }
+
 private:
     PhysicalQuantity qty_;
 };
-    
-template<typename GridLayout, typename Field, typename T1, typename FF = PHARE::FieldNullFilter>    
-void test_fields(GridLayout const& layout, Field const& field0, T1 const& field1, FF const ff = FF{}){
+
+template<typename GridLayout, typename Field, typename T1, typename FF = PHARE::FieldNullFilter>
+void test_fields(GridLayout const& layout, Field const& field0, T1 const& field1,
+                 FF const ff = FF{})
+{
     constexpr auto dim = GridLayout::dimension;
-    
+
     EXPECT_EQ(field0.shape(), field1.shape());
 
-    auto beg = fieldIndices(ff, std::mem_fn(&FF::template start<Field, GridLayout>),
-                            layout, field0);
-    auto end = fieldIndices(ff, std::mem_fn(&FF::template end<Field, GridLayout>), layout,
-                            field0);
-    
+    auto beg
+        = fieldIndices(ff, std::mem_fn(&FF::template start<Field, GridLayout>), layout, field0);
+    auto end = fieldIndices(ff, std::mem_fn(&FF::template end<Field, GridLayout>), layout, field0);
+
     if constexpr (dim == 1)
     {
         for (std::size_t i = beg[0]; i < end[0]; ++i)
         {
             if (std::isnan(field0(i)) || std::isnan(field1(i)))
-                throw std::runtime_error("This 1dfield should not be NaN index " + std::to_string(i));
+                throw std::runtime_error("This 1dfield should not be NaN index "
+                                         + std::to_string(i));
             EXPECT_FLOAT_EQ(field0(i), field1(i));
         }
     }
@@ -158,61 +189,61 @@ void test_fields(GridLayout const& layout, Field const& field0, T1 const& field1
 
 template<typename GridLayout, typename NdArrayImpl, typename FF = PHARE::FieldNullFilter>
 void test(GridLayout const& layout,
-    PHARE::core::Field<NdArrayImpl, PHARE::core::HybridQuantity::Scalar> const& field0,
-    PHARE::core::Field<NdArrayImpl, PHARE::core::HybridQuantity::Scalar> const& field1,
-    FF const ff = FF{}
-){
+          PHARE::core::Field<NdArrayImpl, PHARE::core::HybridQuantity::Scalar> const& field0,
+          PHARE::core::Field<NdArrayImpl, PHARE::core::HybridQuantity::Scalar> const& field1,
+          FF const ff = FF{})
+{
     test_fields(layout, field0, field1, ff);
 }
 
 
-template<typename GridLayout, typename NdArrayImpl, std::size_t dim, typename T, typename FF = PHARE::FieldNullFilter>
+template<typename GridLayout, typename NdArrayImpl, std::size_t dim, typename T,
+         typename FF = PHARE::FieldNullFilter>
 void test(GridLayout const& layout,
-    PHARE::core::Field<NdArrayImpl, PHARE::core::HybridQuantity::Scalar> const& field0,
-    PHARE::core::NdArrayView<dim, T> const& field1, FF const ff = FF{}
-){
+          PHARE::core::Field<NdArrayImpl, PHARE::core::HybridQuantity::Scalar> const& field0,
+          PHARE::core::NdArrayView<dim, T> const& field1, FF const ff = FF{})
+{
     static_assert(NdArrayImpl::dimension == dim);
     static_assert(std::is_same_v<typename NdArrayImpl::type, T>);
     test_fields(layout, field0, field1, ff);
 }
 
 
-template<typename GridLayout, typename NdArrayImpl, typename T, typename FF = PHARE::FieldNullFilter>
+template<typename GridLayout, typename NdArrayImpl, typename T,
+         typename FF = PHARE::FieldNullFilter>
 void test(GridLayout const& layout,
-    PHARE::core::Field<NdArrayImpl, PHARE::core::HybridQuantity::Scalar> const& field0,
-    std::vector<T> const& fieldV, FF const ff = FF{}
-){
+          PHARE::core::Field<NdArrayImpl, PHARE::core::HybridQuantity::Scalar> const& field0,
+          std::vector<T> const& fieldV, FF const ff = FF{})
+{
     static_assert(std::is_same_v<typename NdArrayImpl::type, T>);
     EXPECT_EQ(field0.size(), fieldV.size());
     core::NdArrayView<GridLayout::dimension, T> field1{fieldV, field0.shape()};
     test_fields(layout, field0, field1, ff);
 }
 
-template<typename GridLayout, std::size_t dim, typename T, typename Ptr, typename Qty, typename FF = PHARE::FieldNullFilter>
-void test(GridLayout const& layout,
-    PHARE::core::FieldView<dim, T, Ptr, Qty> field0,
-    std::vector<T> && fieldV, FF const ff = FF{}
-){    
+template<typename GridLayout, std::size_t dim, typename T, typename Ptr, typename Qty,
+         typename FF = PHARE::FieldNullFilter>
+void test(GridLayout const& layout, PHARE::core::FieldView<dim, T, Ptr, Qty> field0,
+          std::vector<T>&& fieldV, FF const ff = FF{})
+{
     EXPECT_EQ(field0.size(), fieldV.size());
     core::NdArrayView<GridLayout::dimension, T> field1{fieldV, field0.shape()};
     test_fields(layout, field0, field1, ff);
-}    
+}
 
-    
-template<typename GridLayout, std::size_t dim, typename T, typename Ptr, typename Qty, typename FF = PHARE::FieldNullFilter>
-void test(GridLayout const& layout,
-    PHARE::core::FieldView<dim, T, Ptr, Qty> field0,
-    PHARE::core::FieldView<dim, T, Ptr, Qty> field1, FF const ff = FF{}
-){
+
+template<typename GridLayout, std::size_t dim, typename T, typename Ptr, typename Qty,
+         typename FF = PHARE::FieldNullFilter>
+void test(GridLayout const& layout, PHARE::core::FieldView<dim, T, Ptr, Qty> field0,
+          PHARE::core::FieldView<dim, T, Ptr, Qty> field1, FF const ff = FF{})
+{
     test_fields(layout, field0, field1, ff);
-}    
-  
-    
-}// end namespace PHARE
+}
 
+
+} // namespace PHARE::core
 
 
 
 
 #endif /* PHARE_TEST_CORE_FIELD_TEST_H */
-

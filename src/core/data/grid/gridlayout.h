@@ -18,12 +18,27 @@
 #include <cmath>
 #include <tuple>
 #include <cstddef>
+#include <functional>
 #include <type_traits>
 
 namespace PHARE
 {
 namespace core
 {
+    template<typename T, typename Attempt = void>
+    struct has_physicalQuantity : std::false_type
+    {
+    };
+
+    template<typename T>
+    struct has_physicalQuantity<
+        T, core::tryToInstanciate<decltype(std::declval<T>().physicalQuantity())>> : std::true_type
+    {
+    };
+    template<typename T>
+    constexpr bool has_physicalQuantity_v = has_physicalQuantity<T>::value;
+
+
     constexpr int centering2int(QtyCentering c) { return static_cast<int>(c); }
 
     template<typename T, std::size_t s>
@@ -70,6 +85,7 @@ namespace core
     public:
         static constexpr std::size_t dimension    = GridLayoutImpl::dimension;
         static constexpr std::size_t interp_order = GridLayoutImpl::interp_order;
+        using This                                = GridLayout<GridLayoutImpl>;
         using implT                               = GridLayoutImpl;
 
 
@@ -132,7 +148,7 @@ namespace core
         /**
          * @brief returns the mesh size in the 'dim' dimensions
          */
-        std::array<double, dimension> const& meshSize() const noexcept _PHARE_FN_SIG_
+        std::array<double, dimension> const& meshSize() const noexcept _PHARE_ALL_FN_
         {
             return meshSize_;
         }
@@ -157,7 +173,7 @@ namespace core
         std::array<std::uint32_t, dimension> nbrCells() const { return nbrPhysicalCells_; }
 
 
-        auto const& AMRBox() const _PHARE_FN_SIG_ { return AMRBox_; }
+        auto const& AMRBox() const _PHARE_ALL_FN_ { return AMRBox_; }
 
 
 
@@ -173,9 +189,8 @@ namespace core
                                    ghostEndIndex(centering, direction));
         }
 
-        template<typename NdArrayImpl>
-        auto ghostStartToEnd(Field<NdArrayImpl, HybridQuantity::Scalar> const& field,
-                             Direction direction) const
+        template<typename Field, std::enable_if_t<has_physicalQuantity_v<Field>, bool> = 0>
+        auto ghostStartToEnd(Field const& field, Direction direction) const
         {
             return ghostStartToEnd(field.physicalQuantity(), direction);
         }
@@ -187,9 +202,9 @@ namespace core
                                    physicalEndIndex(centering, direction));
         }
 
-        template<typename NdArrayImpl>
-        auto physicalStartToEnd(Field<NdArrayImpl, HybridQuantity::Scalar> const& field,
-                                Direction direction) const
+
+        template<typename Field, std::enable_if_t<has_physicalQuantity_v<Field>, bool> = 0>
+        auto physicalStartToEnd(Field const& field, Direction direction) const
         {
             return physicalStartToEnd(field.physicalQuantity(), direction);
         }
@@ -269,7 +284,7 @@ namespace core
          * centering and in a given direction that is in the physical domain, i.e. not a ghost node.
          */
         std::uint32_t physicalStartIndex(QtyCentering centering,
-                                         Direction direction) const _PHARE_FN_SIG_
+                                         Direction direction) const _PHARE_ALL_FN_
         {
             std::uint32_t icentering = static_cast<std::uint32_t>(centering);
             std::uint32_t iDir       = static_cast<std::uint32_t>(direction);
@@ -521,7 +536,7 @@ namespace core
         /**
          * @brief the number of ghost nodes on each side of the mesh for a given centering
          */
-        std::uint32_t static nbrGhosts(QtyCentering centering) _PHARE_FN_SIG_
+        std::uint32_t static nbrGhosts(QtyCentering centering) _PHARE_ALL_FN_
         {
             std::uint32_t nbrGhosts = nbrPrimalGhosts_();
 
@@ -766,7 +781,7 @@ namespace core
          * This method only deals with **cell** indexes.
          */
         template<typename T>
-        auto AMRToLocal(Point<T, dimension> AMRPoint) const _PHARE_FN_SIG_
+        auto AMRToLocal(Point<T, dimension> AMRPoint) const _PHARE_ALL_FN_
         {
             static_assert(std::is_integral_v<T>, "Error, must be MeshIndex (integral Point)");
             Point<T, dimension> localPoint;
@@ -866,7 +881,7 @@ namespace core
          * arrays of an HybridQuantity::Quantity 'qty' in every directions.
          */
         std::array<std::uint32_t, dimension>
-        allocSize(HybridQuantity::Scalar qty) const _PHARE_FN_SIG_
+        allocSize(HybridQuantity::Scalar qty) const _PHARE_ALL_FN_
         {
             std::uint32_t iQty = static_cast<std::uint32_t>(qty);
 
@@ -1105,6 +1120,54 @@ namespace core
         auto static constexpr JzToEz() { return GridLayoutImpl::JzToEz(); }
 
 
+        template<typename IndicesFn, typename Field, typename Fn>
+        void scan_(Field& field, Fn& fn, IndicesFn&& startToEnd) const
+        {
+            auto const [ix0, ix1] = startToEnd(field, Direction::X);
+            for (auto ix = ix0; ix <= ix1; ++ix)
+            {
+                if constexpr (dimension == 1)
+                {
+                    fn(ix);
+                }
+                else
+                {
+                    auto const [iy0, iy1] = startToEnd(field, Direction::Y);
+
+                    for (auto iy = iy0; iy <= iy1; ++iy)
+                    {
+                        if constexpr (dimension == 2)
+                        {
+                            fn(ix, iy);
+                        }
+                        else
+                        {
+                            auto const [iz0, iz1] = startToEnd(field, Direction::Z);
+
+                            for (auto iz = iz0; iz <= iz1; ++iz)
+                                fn(ix, iy, iz);
+                        }
+                    }
+                }
+            }
+        }
+
+        template<typename Field, typename Fn>
+        void scan(Field& field, Fn&& fn) const
+        {
+            scan_(field, fn, [&](auto const& centering, auto const direction) {
+                return this->physicalStartToEnd(centering, direction);
+            });
+        }
+
+        template<typename Field, typename Fn>
+        void scan_all(Field& field, Fn&& fn) const
+        {
+            scan_(field, fn, [&](auto const& centering, auto const direction) {
+                return this->ghostStartToEnd(centering, direction);
+            });
+        }
+
 
     private:
         template<typename Centering, typename StartToEnd>
@@ -1262,7 +1325,7 @@ namespace core
          * directions depending on the multi-dimensional centering.
          */
         std::array<std::uint32_t, dimension> physicalNodeNbrFromCentering_(
-            std::array<QtyCentering, dimension> const& qtyCenterings) const _PHARE_FN_SIG_
+            std::array<QtyCentering, dimension> const& qtyCenterings) const _PHARE_ALL_FN_
         {
             std::array<std::uint32_t, dimension> nodeNbr;
 
@@ -1284,7 +1347,7 @@ namespace core
          * + 2 times the number of ghost nodes.
          */
         std::array<std::uint32_t, dimension> nodeNbrFromCentering_(
-            std::array<QtyCentering, dimension> const& qtyCenterings) const _PHARE_FN_SIG_
+            std::array<QtyCentering, dimension> const& qtyCenterings) const _PHARE_ALL_FN_
         {
             std::array<std::uint32_t, dimension> nbrNodes
                 = physicalNodeNbrFromCentering_(qtyCenterings);

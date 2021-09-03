@@ -188,11 +188,14 @@ namespace core
         void operator()(VecField const& B, VecField& J)
         {
             if (!this->hasLayout())
-            {
                 throw std::runtime_error(
                     "Error - Ampere - GridLayout not set, cannot proceed to calculate ampere()");
-            }
+
+#if defined(HAVE_RAJA)
+
+#else // NORMAL
             compute_(B, J);
+#endif
         }
     };
 } // namespace core

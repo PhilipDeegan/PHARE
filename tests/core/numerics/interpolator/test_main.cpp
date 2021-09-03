@@ -178,7 +178,7 @@ class A1DInterpolator : public ::testing::Test
 public:
     using VF = VecField<NdArrayVector<1>, HybridQuantity>;
     Electromag<VF> em;
-    ParticleArray<1> particles;
+    ParticleArray<Particle<1>> particles;
     InterpolatorT interp;
 
     // arbitrary number of cells
@@ -249,29 +249,29 @@ TYPED_TEST(A1DInterpolator, canComputeAllEMfieldsAtParticle)
 
     this->interp(std::begin(this->particles), std::end(this->particles), this->em, this->layout);
 
-//     EXPECT_TRUE(std::all_of(
-//         std::begin(this->particles), std::end(this->particles),
-//         [this](Particle<1> const& part) { return std::abs(part.Ex - this->ex0) < 1e-8; }));
+    //     EXPECT_TRUE(std::all_of(
+    //         std::begin(this->particles), std::end(this->particles),
+    //         [this](Particle<1> const& part) { return std::abs(part.Ex - this->ex0) < 1e-8; }));
 
-//     EXPECT_TRUE(std::all_of(
-//         std::begin(this->particles), std::end(this->particles),
-//         [this](Particle<1> const& part) { return std::abs(part.Ey - this->ey0) < 1e-8; }));
+    //     EXPECT_TRUE(std::all_of(
+    //         std::begin(this->particles), std::end(this->particles),
+    //         [this](Particle<1> const& part) { return std::abs(part.Ey - this->ey0) < 1e-8; }));
 
-//     EXPECT_TRUE(std::all_of(
-//         std::begin(this->particles), std::end(this->particles),
-//         [this](Particle<1> const& part) { return std::abs(part.Ez - this->ez0) < 1e-8; }));
+    //     EXPECT_TRUE(std::all_of(
+    //         std::begin(this->particles), std::end(this->particles),
+    //         [this](Particle<1> const& part) { return std::abs(part.Ez - this->ez0) < 1e-8; }));
 
-//     EXPECT_TRUE(std::all_of(
-//         std::begin(this->particles), std::end(this->particles),
-//         [this](Particle<1> const& part) { return std::abs(part.Bx - this->bx0) < 1e-8; }));
+    //     EXPECT_TRUE(std::all_of(
+    //         std::begin(this->particles), std::end(this->particles),
+    //         [this](Particle<1> const& part) { return std::abs(part.Bx - this->bx0) < 1e-8; }));
 
-//     EXPECT_TRUE(std::all_of(
-//         std::begin(this->particles), std::end(this->particles),
-//         [this](Particle<1> const& part) { return std::abs(part.By - this->by0) < 1e-8; }));
+    //     EXPECT_TRUE(std::all_of(
+    //         std::begin(this->particles), std::end(this->particles),
+    //         [this](Particle<1> const& part) { return std::abs(part.By - this->by0) < 1e-8; }));
 
-//     EXPECT_TRUE(std::all_of(
-//         std::begin(this->particles), std::end(this->particles),
-//         [this](Particle<1> const& part) { return std::abs(part.Bz - this->bz0) < 1e-8; }));
+    //     EXPECT_TRUE(std::all_of(
+    //         std::begin(this->particles), std::end(this->particles),
+    //         [this](Particle<1> const& part) { return std::abs(part.Bz - this->bz0) < 1e-8; }));
 
 
     this->em.E.setBuffer("EM_E_x", nullptr);
@@ -290,7 +290,7 @@ class A2DInterpolator : public ::testing::Test
 public:
     using VF = VecField<NdArrayVector<2>, HybridQuantity>;
     Electromag<VF> em;
-    ParticleArray<2> particles;
+    ParticleArray<Particle<2>> particles;
     InterpolatorT interp;
 
     // arbitrary number of cells
@@ -365,29 +365,29 @@ TYPED_TEST(A2DInterpolator, canComputeAllEMfieldsAtParticle)
     this->interp(std::begin(this->particles), std::end(this->particles), this->em, this->layout);
 
     // TODO
-//     EXPECT_TRUE(std::all_of(
-//         std::begin(this->particles), std::end(this->particles),
-//         [this](Particle<2> const& part) { return std::abs(part.Ex - this->ex0) < 1e-8; }));
+    //     EXPECT_TRUE(std::all_of(
+    //         std::begin(this->particles), std::end(this->particles),
+    //         [this](Particle<2> const& part) { return std::abs(part.Ex - this->ex0) < 1e-8; }));
 
-//     EXPECT_TRUE(std::all_of(
-//         std::begin(this->particles), std::end(this->particles),
-//         [this](Particle<2> const& part) { return std::abs(part.Ey - this->ey0) < 1e-8; }));
+    //     EXPECT_TRUE(std::all_of(
+    //         std::begin(this->particles), std::end(this->particles),
+    //         [this](Particle<2> const& part) { return std::abs(part.Ey - this->ey0) < 1e-8; }));
 
-//     EXPECT_TRUE(std::all_of(
-//         std::begin(this->particles), std::end(this->particles),
-//         [this](Particle<2> const& part) { return std::abs(part.Ez - this->ez0) < 1e-8; }));
+    //     EXPECT_TRUE(std::all_of(
+    //         std::begin(this->particles), std::end(this->particles),
+    //         [this](Particle<2> const& part) { return std::abs(part.Ez - this->ez0) < 1e-8; }));
 
-//     EXPECT_TRUE(std::all_of(
-//         std::begin(this->particles), std::end(this->particles),
-//         [this](Particle<2> const& part) { return std::abs(part.Bx - this->bx0) < 1e-8; }));
+    //     EXPECT_TRUE(std::all_of(
+    //         std::begin(this->particles), std::end(this->particles),
+    //         [this](Particle<2> const& part) { return std::abs(part.Bx - this->bx0) < 1e-8; }));
 
-//     EXPECT_TRUE(std::all_of(
-//         std::begin(this->particles), std::end(this->particles),
-//         [this](Particle<2> const& part) { return std::abs(part.By - this->by0) < 1e-8; }));
+    //     EXPECT_TRUE(std::all_of(
+    //         std::begin(this->particles), std::end(this->particles),
+    //         [this](Particle<2> const& part) { return std::abs(part.By - this->by0) < 1e-8; }));
 
-//     EXPECT_TRUE(std::all_of(
-//         std::begin(this->particles), std::end(this->particles),
-//         [this](Particle<2> const& part) { return std::abs(part.Bz - this->bz0) < 1e-8; }));
+    //     EXPECT_TRUE(std::all_of(
+    //         std::begin(this->particles), std::end(this->particles),
+    //         [this](Particle<2> const& part) { return std::abs(part.Bz - this->bz0) < 1e-8; }));
 
 
     this->em.E.setBuffer("EM_E_x", nullptr);
@@ -407,7 +407,7 @@ class A3DInterpolator : public ::testing::Test
 public:
     using VF = VecField<NdArrayVector<3>, HybridQuantity>;
     Electromag<VF> em;
-    ParticleArray<3> particles;
+    ParticleArray<Particle<3>> particles;
     InterpolatorT interp;
 
     // arbitrary number of cells
@@ -485,29 +485,29 @@ TYPED_TEST(A3DInterpolator, canComputeAllEMfieldsAtParticle)
 
     this->interp(std::begin(this->particles), std::end(this->particles), this->em, this->layout);
 
-//     EXPECT_TRUE(std::all_of(
-//         std::begin(this->particles), std::end(this->particles),
-//         [this](Particle<3> const& part) { return std::abs(part.Ex - this->ex0) < 1e-8; }));
+    //     EXPECT_TRUE(std::all_of(
+    //         std::begin(this->particles), std::end(this->particles),
+    //         [this](Particle<3> const& part) { return std::abs(part.Ex - this->ex0) < 1e-8; }));
 
-//     EXPECT_TRUE(std::all_of(
-//         std::begin(this->particles), std::end(this->particles),
-//         [this](Particle<3> const& part) { return std::abs(part.Ey - this->ey0) < 1e-8; }));
+    //     EXPECT_TRUE(std::all_of(
+    //         std::begin(this->particles), std::end(this->particles),
+    //         [this](Particle<3> const& part) { return std::abs(part.Ey - this->ey0) < 1e-8; }));
 
-//     EXPECT_TRUE(std::all_of(
-//         std::begin(this->particles), std::end(this->particles),
-//         [this](Particle<3> const& part) { return std::abs(part.Ez - this->ez0) < 1e-8; }));
+    //     EXPECT_TRUE(std::all_of(
+    //         std::begin(this->particles), std::end(this->particles),
+    //         [this](Particle<3> const& part) { return std::abs(part.Ez - this->ez0) < 1e-8; }));
 
-//     EXPECT_TRUE(std::all_of(
-//         std::begin(this->particles), std::end(this->particles),
-//         [this](Particle<3> const& part) { return std::abs(part.Bx - this->bx0) < 1e-8; }));
+    //     EXPECT_TRUE(std::all_of(
+    //         std::begin(this->particles), std::end(this->particles),
+    //         [this](Particle<3> const& part) { return std::abs(part.Bx - this->bx0) < 1e-8; }));
 
-//     EXPECT_TRUE(std::all_of(
-//         std::begin(this->particles), std::end(this->particles),
-//         [this](Particle<3> const& part) { return std::abs(part.By - this->by0) < 1e-8; }));
+    //     EXPECT_TRUE(std::all_of(
+    //         std::begin(this->particles), std::end(this->particles),
+    //         [this](Particle<3> const& part) { return std::abs(part.By - this->by0) < 1e-8; }));
 
-//     EXPECT_TRUE(std::all_of(
-//         std::begin(this->particles), std::end(this->particles),
-//         [this](Particle<3> const& part) { return std::abs(part.Bz - this->bz0) < 1e-8; }));
+    //     EXPECT_TRUE(std::all_of(
+    //         std::begin(this->particles), std::end(this->particles),
+    //         [this](Particle<3> const& part) { return std::abs(part.Bz - this->bz0) < 1e-8; }));
 
 
     this->em.E.setBuffer("EM_E_x", nullptr);
@@ -536,7 +536,7 @@ public:
     static constexpr std::uint32_t nbrPoints = nbrPointsSupport(Interpolator::interp_order);
     static constexpr std::uint32_t numOfPart = Interpolator::interp_order + 2;
     Particle<1> part;
-    ParticleArray<1> particles;
+    ParticleArray<Particle<1>> particles;
     Field<NdArrayVector<1>, typename HybridQuantity::Scalar> rho;
     Field<NdArrayVector<1>, typename HybridQuantity::Scalar> vx;
     Field<NdArrayVector<1>, typename HybridQuantity::Scalar> vy;
@@ -724,7 +724,7 @@ struct ACollectionOfParticles_2d : public ::testing::Test
     GridLayout<GridLayoutImplYee<dim, Interpolator::interp_order>> layout{
         ConstArray<double, dim>(.1), {nx, ny}, ConstArray<double, dim>(0)};
 
-    ParticleArray<dim> particles;
+    ParticleArray<Particle<dim>> particles;
     Field<NdArrayVector<dim>, typename HybridQuantity::Scalar> rho, vx, vy, vz;
     VecField<NdArrayVector<dim>, HybridQuantity> v;
     Interpolator interpolator;

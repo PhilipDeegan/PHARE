@@ -65,9 +65,9 @@ namespace core
 
         constexpr Point() { core::fill(Type{0}, r); }
 
-        type& operator[](std::size_t i) _PHARE_FN_SIG_ { return r[i]; }
+        type& operator[](std::size_t i) _PHARE_ALL_FN_ { return r[i]; }
 
-        type const& operator[](std::size_t i) const _PHARE_FN_SIG_ { return r[i]; }
+        type const& operator[](std::size_t i) const _PHARE_ALL_FN_ { return r[i]; }
 
 
         bool operator==(Point const& p) const
@@ -143,7 +143,7 @@ namespace core
              typename
              = typename std::enable_if<(true && ... && std::is_arithmetic_v<Indexes>), void>::type>
     Point(Indexes... indexes)
-        -> Point<typename std::tuple_element<0, std::tuple<Indexes...>>::type, sizeof...(indexes)>;
+        ->Point<typename std::tuple_element<0, std::tuple<Indexes...>>::type, sizeof...(indexes)>;
 
 
 

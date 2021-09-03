@@ -1,10 +1,17 @@
 #ifndef PHARE_CORE_DATA_PARTICLES_PARTICLE_ARRAY_H
 #define PHARE_CORE_DATA_PARTICLES_PARTICLE_ARRAY_H
 
+#ifndef HAVE_UMPIRE
+#error // expected
+#endif
+
 #include <atomic>
 #include <cstddef>
 
 #include "kul/gpu.hpp"
+#include "umpire/ResourceManager.hpp"
+#include "umpire/Allocator.hpp"
+#include "umpire/TypedAllocator.hpp"
 
 namespace PHARE::core::llnl
 {
@@ -22,6 +29,8 @@ struct ABufferedParticleVector<false, Particle>
         , buffer_by{realloc_by_}
         , realloc_by{realloc_by_}
         , capacity{size + size * buffer_by}
+        , allocator_{}
+        , particles{capacity, allocator_}
     {
         assert(buffer_by < 1 and buffer_by > 0);
         assert(realloc_by < 1 and realloc_by > 0);
@@ -39,9 +48,7 @@ struct ABufferedParticleVector<false, Particle>
         {
             size = n_elements;
             capacity += size * buffer_by;
-            auto new_buffer = std::make_unique<kul::gpu::DeviceMem<Particle>>(capacity);
-            // TODO copy old to new in kernel?
-            particles = std::move(new_buffer);
+            particles.reserve(capacity);
         }
 
         // bool realloc_less = false;
@@ -55,7 +62,9 @@ struct ABufferedParticleVector<false, Particle>
     double buffer_by, realloc_by;
     std::size_t capacity;
     std::unique_ptr<kul::gpu::DeviceMem<std::size_t>> info;
-    std::unique_ptr<kul::gpu::DeviceMem<Particle>> particles;
+
+    umpire::TypedAllocator<double> allocator_;
+    std::vector<double, umpire::TypedAllocator<double>> particles;
 };
 template<typename Particle>
 struct ABufferedParticleVector<true, Particle>
@@ -79,26 +88,19 @@ struct BufferedParticleVector : ABufferedParticleVector<GPU, Particle>
     {
     }
 
-    auto operator()() __host__ { return Super::template alloc<gpu_t>(*info, *particles); }
-
     std::size_t size() const __host__ { return Super::size; }
     std::size_t size() const __device__ { return info[0]; }
 
+    auto operator()() __host__ { return Super::template alloc<gpu_t>(*info, *particles); }
     auto& operator[](std::size_t i) const __device__ { return particles[i]; }
     auto& operator[](std::size_t i) __device__ { return particles[i]; }
-
 
     void push_back(Particle const& particle) __device__
     {
         auto index       = atomicAdd(&info[0], 1);
         particles[index] = particle;
     }
-
-    void push_back(Particle&& particle) __device__
-    {
-        auto index       = atomicAdd(&info[0], 1);
-        particles[index] = particle;
-    }
+    void push_back(Particle&& particle) __device__ { push_back(particle); }
 
     void erase(std::size_t index) __device__
     {
@@ -121,7 +123,7 @@ public:
 
     ParticleArray() = delete;
     ParticleArray(std::size_t size)
-        : particles(size)
+        : vector{size}
     {
     }
 
@@ -163,4 +165,3 @@ void swap(llnl::ParticleArray<dim>& array1, llnl::ParticleArray<dim>& array2)
 } // namespace PHARE::core
 
 #endif
-

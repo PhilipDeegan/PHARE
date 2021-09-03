@@ -28,7 +28,7 @@ struct ParticleDeltaDistribution
 
 
 template<typename Particle>
-auto cellAsPoint(Particle const& particle) _PHARE_FN_SIG_
+auto cellAsPoint(Particle const& particle) _PHARE_ALL_FN_
 {
     return Point<int, Particle::dimension>{particle.iCell};
 }

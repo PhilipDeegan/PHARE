@@ -9,7 +9,10 @@ property:
 
 profile:
 - name: base
-  arg: -DPHARE_HAS_HIGHFIVE=1 -DPHARE_DIAG_DOUBLES=1 -Wno-macro-redefined -Wno-unknown-cuda-version -DHAVE_RAJA -DHAVE_UMPIRE
+  # diagnostics disabled for the moment
+  # -DPHARE_HAS_HIGHFIVE=1 -DPHARE_DIAG_DOUBLES=1
+  arg: -Wno-macro-redefined -Wno-unknown-cuda-version -DHAVE_RAJA -DHAVE_UMPIRE
+
 
 - name: core
   inc: src subprojects

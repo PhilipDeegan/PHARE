@@ -14,27 +14,10 @@
 #include "core/utilities/box/box.h"
 #include "core/utilities/index/index.h"
 
+#include "tests/core/data/field/test_field.h"
+#include "tests/core/data/vecfield/test_vecfield.h"
+
 using namespace PHARE::core;
-
-template<std::size_t dim>
-struct FieldMock
-{
-    static auto constexpr dimension = dim;
-    double data;
-    double& operator()([[maybe_unused]] std::uint32_t i) { return data; }
-    double const& operator()([[maybe_unused]] std::uint32_t i) const { return data; }
-    QtyCentering physicalQuantity() { return QtyCentering::dual; }
-};
-
-template<typename Field>
-struct VecFieldMock
-{
-    using field_type                = Field;
-    static auto constexpr dimension = Field::dimension;
-    Field fm;
-    Field& getComponent([[maybe_unused]] Component comp) { return fm; }
-    Field const& getComponent([[maybe_unused]] Component comp) const { return fm; }
-};
 
 
 struct GridLayoutMock1D

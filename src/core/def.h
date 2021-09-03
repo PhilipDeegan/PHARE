@@ -13,21 +13,23 @@
 
 #if defined(PHARE_WITH_GPU)
 
-#define _PHARE_GPU_FN_DEV_ __device__
-#define _PHARE_GPU_FN_HST_ __host__
-#define _PHARE_FN_SIG_ _PHARE_GPU_FN_HST_ _PHARE_GPU_FN_DEV_
+#define _PHARE_DEV_FN_ __device__
+#define _PHARE_HST_FN_ __host__
+#define _PHARE_ALL_FN_ _PHARE_HST_FN_ _PHARE_DEV_FN_
 
 namespace PHARE
 {
-/*
+// !WARNING!
+// PGIC++/NVC++ CANNOT HANDLE separate device/host functions!
 template<typename T>
-inline void throw_runtime_error(char const*const) __device__
+inline void throw_runtime_error(T const&) __device__
 {
     // gpu cannot throw
     assert(false);
-}*/
+}
 
-inline void throw_runtime_error(char const*const err) __host__
+template<typename T>
+inline void throw_runtime_error(T const& err) __host__
 {
     throw std::runtime_error(err);
 }
@@ -35,9 +37,9 @@ inline void throw_runtime_error(char const*const err) __host__
 
 #else
 
-#define _PHARE_GPU_FN_DEV_
-#define _PHARE_GPU_FN_HST_
-#define _PHARE_FN_SIG_
+#define _PHARE_DEV_FN_
+#define _PHARE_HST_FN_
+#define _PHARE_ALL_FN_
 
 namespace PHARE
 {

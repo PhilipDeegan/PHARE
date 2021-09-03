@@ -28,6 +28,8 @@ namespace core
     class VecField
     {
     public:
+        using field_type = Field<NdArrayImpl, typename PhysicalQuantity::Scalar>;
+
         VecField()                                 = delete;
         VecField& Vecfield(VecField const& source) = delete;
         VecField(VecField&& source)                = default;
@@ -49,8 +51,6 @@ namespace core
         {
         }
 
-
-
         //-------------------------------------------------------------------------
         //                  start the ResourcesUser interface
         //-------------------------------------------------------------------------
@@ -62,8 +62,6 @@ namespace core
         };
 
         using resources_properties = std::vector<VecFieldProperties>;
-
-        using field_type = Field<NdArrayImpl, typename PhysicalQuantity::Scalar>;
 
         resources_properties getFieldNamesAndQuantities() const
         {
@@ -136,16 +134,6 @@ namespace core
             throw std::runtime_error("Error - VecField not usable");
         }
 
-        auto getComponents() _PHARE_FN_SIG_
-        {
-            return std::forward_as_tuple(*components_[0], *components_[1], *components_[2]);
-        }
-        auto getComponents() const _PHARE_FN_SIG_
-        {
-            return std::forward_as_tuple(*components_[0], *components_[1], *components_[2]);
-        }
-
-
         Field<NdArrayImpl, typename PhysicalQuantity::Scalar> const&
         getComponent(Component component) const
         {
@@ -160,6 +148,25 @@ namespace core
             }
             throw std::runtime_error("Error - VecField not usable");
         }
+
+        auto& operator()(Component component) _PHARE_ALL_FN_ { return getComponent(component); }
+        auto& operator()(Component component) const _PHARE_ALL_FN_
+        {
+            return getComponent(component);
+        }
+
+
+        auto getComponents() _PHARE_ALL_FN_
+        {
+            return std::forward_as_tuple(*components_[0], *components_[1], *components_[2]);
+        }
+        auto getComponents() const _PHARE_ALL_FN_
+        {
+            return std::forward_as_tuple(*components_[0], *components_[1], *components_[2]);
+        }
+
+        auto operator()() _PHARE_ALL_FN_ { return getComponents(); }
+        auto operator()() const _PHARE_ALL_FN_ { return getComponents(); }
 
 
 

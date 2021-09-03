@@ -8,17 +8,43 @@
 #include "core/data/grid/gridlayout.h"
 #include "core/data/grid/gridlayout_utils.h"
 #include "core/data/vecfield/vecfield_component.h"
-#include "core/utilities/index/index.h"
 
-#include "phare_core.h"
 #include "initializer/data_provider.h"
+
+
+namespace PHARE::core
+{
+template<typename GridLayout>
+struct StandardOhmComputer
+{
+    constexpr static auto dimension = GridLayout::dimension;
+
+    template<typename _VF_, typename _F_, typename... IDXs>
+    void ex(_F_ const& n, _VF_ const& Ve, _F_ const& Pe, _VF_ const& B, _VF_ const& J, _F_& Eznew,
+            IDXs const&... ijk) const _PHARE_ALL_FN_
+    {
+    }
+    template<typename _VF_, typename _F_, typename... IDXs>
+    void ey(_F_ const& n, _VF_ const& Ve, _F_ const& Pe, _VF_ const& B, _VF_ const& J, _F_& Eznew,
+            IDXs const&... ijk) const _PHARE_ALL_FN_
+    {
+    }
+    template<typename _VF_, typename _F_, typename... IDXs>
+    void ez(_F_ const& n, _VF_ const& Ve, _F_ const& Pe, _VF_ const& B, _VF_ const& J, _F_& Eznew,
+            IDXs const&... ijk) const _PHARE_ALL_FN_
+    {
+    }
+
+    GridLayout& layout;
+};
+} // namespace PHARE::core
 
 
 namespace PHARE
 {
 namespace core
 {
-    template<typename GridLayout>
+    template<typename GridLayout, typename Computer = StandardOhmComputer<GridLayout>>
     class Ohm : public LayoutHolder<GridLayout>
     {
     public:
@@ -502,8 +528,11 @@ namespace core
                 throw std::runtime_error(
                     "Error - Ohm - GridLayout not set, cannot proceed to calculate ohm()");
             }
+#if defined(HAVE_RAJA)
 
+#else // NORMAL
             compute_(n, Ve, Pe, B, J, Enew);
+#endif
         }
     };
 } // namespace core

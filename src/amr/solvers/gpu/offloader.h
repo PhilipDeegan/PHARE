@@ -36,7 +36,8 @@ struct PatchState
     using GridLayout                = GridLayout_;
     static constexpr auto dimension = GridLayout::dimension;
     using HybridQuantity            = core::HybridQuantity;
-    using ParticleArray_t           = typename core::PHARE_Types<dimension, GridLayout::interp_order>::ParticleArray_t;
+    using ParticleArray_t =
+        typename core::PHARE_Types<dimension, GridLayout::interp_order>::ParticleArray_t;
 
     template<typename State>
     PatchState(GridLayout const& gridLayout, State& state)
@@ -195,7 +196,7 @@ class Offloader : gpu::BaseOffloader<Solver>
         double timestep, mass, coef = 1;
     };
 
-    bool static inDomain(GridLayout const& layout, Particle_t const& particle) _PHARE_FN_SIG_
+    bool static inDomain(GridLayout const& layout, Particle_t const& particle) _PHARE_ALL_FN_
     {
         return core::isIn(core::cellAsPoint(particle), layout.AMRBox());
     }

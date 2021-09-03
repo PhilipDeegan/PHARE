@@ -28,7 +28,9 @@ static constexpr std::size_t dim         = 1;
 static constexpr std::size_t interpOrder = 1;
 using GridImplYee1D                      = GridLayoutImplYee<dim, interpOrder>;
 using GridYee1D                          = GridLayout<GridImplYee1D>;
-using MaxwellianParticleInitializer1D = MaxwellianParticleInitializer<ParticleArray<1>, GridYee1D>;
+using Particle_t                         = Particle<dim>;
+using ParticleArray_t                    = ParticleArray<Particle_t>;
+using MaxwellianParticleInitializer1D = MaxwellianParticleInitializer<ParticleArray_t, GridYee1D>;
 
 
 
@@ -38,7 +40,7 @@ protected:
     using VecField1D    = VecField<NdArrayVector<1>, HybridQuantity>;
     using InitFunctionT = PHARE::initializer::InitFunction<1>;
 
-    using IonPopulation1D = IonPopulation<ParticleArray<1>, VecField1D, GridYee1D>;
+    using IonPopulation1D = IonPopulation<ParticleArray_t, VecField1D, GridYee1D>;
     Ions<IonPopulation1D, GridYee1D> ions;
 
     PHARE::initializer::PHAREDict createIonsDict()

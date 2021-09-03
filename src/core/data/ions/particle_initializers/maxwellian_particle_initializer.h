@@ -185,10 +185,14 @@ void MaxwellianParticleInitializer<ParticleArray, GridLayout>::loadParticles(
             if (basis_ == Basis::Magnetic)
                 particleVelocity = basisTransform(basis, particleVelocity);
 
+#if defined(HAVE_RAJA)
+
+#else // NORMAL
             particles.emplace_back(
                 Particle{cellWeight, particleCharge_, AMRCellIndex.template toArray<int>(),
                          core::ConstArrayFrom<dimension>([&] { return deltaDistrib(randGen); }),
                          particleVelocity});
+#endif
         }
     }
 }

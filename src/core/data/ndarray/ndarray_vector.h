@@ -23,7 +23,7 @@ struct NdArrayViewer
 {
     template<typename NCells, typename... Indexes>
     static DataType const& at(DataType const* data, NCells const& nCells,
-                              Indexes const&... indexes) _PHARE_FN_SIG_
+                              Indexes const&... indexes) _PHARE_ALL_FN_
     {
         auto params = std::forward_as_tuple(indexes...);
         static_assert(sizeof...(Indexes) == dim);
@@ -57,7 +57,7 @@ struct NdArrayViewer
 
     template<typename NCells, typename Index>
     static DataType const& at(DataType const* data, NCells const& nCells,
-                              std::array<Index, dim> const& indexes) _PHARE_FN_SIG_
+                              std::array<Index, dim> const& indexes) _PHARE_ALL_FN_
 
     {
         if constexpr (dim == 1)
@@ -136,7 +136,7 @@ public:
     static const std::size_t dimension  = dim;
     using type                          = DataType;
 
-    NdArrayView(Pointer ptr, std::array<std::uint32_t, dim> const nCells) _PHARE_FN_SIG_
+    NdArrayView(Pointer ptr, std::array<std::uint32_t, dim> const nCells) _PHARE_ALL_FN_
         : ptr_{ptr},
           nCells_{nCells}
     {
@@ -148,25 +148,25 @@ public:
     }
 
     template<typename... Indexes>
-    DataType const& operator()(Indexes... indexes) const _PHARE_FN_SIG_
+    DataType const& operator()(Indexes... indexes) const _PHARE_ALL_FN_
     {
         return NdArrayViewer<dim, DataType>::at(ptr_, nCells_, indexes...);
     }
 
     template<typename... Indexes>
-    DataType& operator()(Indexes... indexes) _PHARE_FN_SIG_
+    DataType& operator()(Indexes... indexes) _PHARE_ALL_FN_
     {
         return const_cast<DataType&>(static_cast<NdArrayView const&>(*this)(indexes...));
     }
 
     template<typename Index>
-    DataType const& operator()(std::array<Index, dim> const& indexes) const _PHARE_FN_SIG_
+    DataType const& operator()(std::array<Index, dim> const& indexes) const _PHARE_ALL_FN_
     {
         return NdArrayViewer<dim, DataType>::at(ptr_, nCells_, indexes);
     }
 
     template<typename Index>
-    DataType& operator()(std::array<Index, dim> const& indexes) _PHARE_FN_SIG_
+    DataType& operator()(std::array<Index, dim> const& indexes) _PHARE_ALL_FN_
     {
         return const_cast<DataType&>(static_cast<NdArrayView const&>(*this)(indexes));
     }
@@ -191,7 +191,7 @@ private:
 template<std::size_t dim, typename DataType = double>
 class NdArrayVector
 {
-    static auto accumulate(std::array<std::uint32_t, dim> const& ncells)
+    static std::size_t accumulate(std::array<std::uint32_t, dim> const& ncells)
     {
         return std::accumulate(ncells.begin(), ncells.end(), 1, std::multiplies<std::size_t>());
     }
@@ -210,37 +210,42 @@ public:
 #endif
     }
 
+// clang format doesn't look so good when #if defs are used in member construction, so a block each
 #if defined(HAVE_UMPIRE)
     template<typename... Nodes>
     explicit NdArrayVector(Nodes... nodes)
-        : nCells_{nodes...}
+        : size_{(... * nodes)}
+        , nCells_{nodes...}
         , allocator_{umpire::ResourceManager::getInstance().getAllocator(
               "PHARE::nd_data_allocator")}
-        , data_((... * nodes) * sizeof(DataType))
+        , data_(size_ * sizeof(DataType))
     {
         static_assert(sizeof...(Nodes) == dim);
     }
 
     explicit NdArrayVector(std::array<std::uint32_t, dim> const& ncells)
-        : nCells_{ncells}
+        : size_{accumulate(ncells)}
+        , nCells_{ncells}
         , allocator_{umpire::ResourceManager::getInstance().getAllocator(
               "PHARE::nd_data_allocator")}
-        , data_{allocator_.allocate(accumulate(ncells) * sizeof(DataType))}
+        , data_{allocator_.allocate(size_ * sizeof(DataType))}
     {
     }
 
 #else
     template<typename... Nodes>
     explicit NdArrayVector(Nodes... nodes)
-        : nCells_{nodes...}
-        , data_((... * nodes))
+        : size_{(... * nodes)}
+        , nCells_{nodes...}
+        , data_(size_)
     {
         static_assert(sizeof...(Nodes) == dim);
     }
 
     explicit NdArrayVector(std::array<std::uint32_t, dim> const& ncells)
-        : nCells_{ncells}
-        , data_(accumulate(ncells))
+        : size_{accumulate(ncells)}
+        , nCells_{ncells}
+        , data_(size_)
     {
     }
 #endif
@@ -248,20 +253,21 @@ public:
     NdArrayVector(NdArrayVector const& source) = default;
     NdArrayVector(NdArrayVector&& source)      = default;
 
+    auto size() const { return size_; }
+
 #if defined(HAVE_UMPIRE)
     auto data() { return data_; }
     auto data() const { return data_; }
-    auto size() const { return accumulate(nCells_); }
 
-    //auto begin() const { return std::begin(data_); }
-    //auto begin() { return std::begin(data_); }
+    auto begin() const { return data_; }
+    auto begin() { return data_; }
 
-    //auto end() const { return std::end(data_); }
-    //auto end() { return std::end(data_); }
+    auto end() const { return data_ + size_; }
+    auto end() { return data_ + size_; }
+
 #else
     auto data() { return data_.data(); }
     auto data() const { return data_.data(); }
-    auto size() const { return data_.size(); }
 
     auto begin() const { return std::begin(data_); }
     auto begin() { return std::begin(data_); }
@@ -329,6 +335,7 @@ public:
     }
 
 private:
+    std::size_t size_;
     std::array<std::uint32_t, dim> nCells_;
 
 #ifdef HAVE_UMPIRE

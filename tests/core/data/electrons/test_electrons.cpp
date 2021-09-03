@@ -129,7 +129,7 @@ struct ElectronsTest : public ::testing::Test
     using VecFieldND = VecField<NdArrayVector<dim>, HybridQuantity>;
     using FieldND    = typename VecFieldND::field_type;
 
-    using IonPopulationND = IonPopulation<ParticleArray<dim>, VecFieldND, GridYee>;
+    using IonPopulationND = IonPopulation<ParticleArray<Particle<dim>>, VecFieldND, GridYee>;
     using IonsT           = Ions<IonPopulationND, GridYee>;
     using PartPackND      = ParticlesPack<typename IonPopulationND::particle_array_type>;
     using StandardHybridElectronFluxComputerT = StandardHybridElectronFluxComputer<IonsT>;

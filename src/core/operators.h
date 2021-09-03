@@ -14,7 +14,7 @@ struct GPU_Operators
     template<typename T>
     struct Operator
     {
-        void operator+=(T const& v) _PHARE_FN_SIG_ { t += v; }
+        void operator+=(T const& v) _PHARE_ALL_FN_ { t += v; }
 
         T& t;
     };
@@ -22,17 +22,17 @@ struct GPU_Operators
     template<typename T>
     struct AtomicOperator
     {
-        AtomicOperator() _PHARE_GPU_FN_DEV_ = default;
-        AtomicOperator() _PHARE_GPU_FN_HST_ = delete;
+        AtomicOperator() _PHARE_DEV_FN_ = default;
+        AtomicOperator() _PHARE_HST_FN_ = delete;
 
-        void operator+=(T const& v) _PHARE_GPU_FN_DEV_ { atomicAdd(&t, v); }
-        void operator+=(T const&& v) _PHARE_GPU_FN_DEV_ { atomicAdd(&t, v); }
+        void operator+=(T const& v) _PHARE_DEV_FN_ { atomicAdd(&t, v); }
+        void operator+=(T const&& v) _PHARE_DEV_FN_ { atomicAdd(&t, v); }
 
-        void operator+=(T const& v) _PHARE_GPU_FN_HST_
+        void operator+=(T const& v) _PHARE_HST_FN_
         {
             throw_runtime_error("1 PHARE NOT BUILT WITH PHARE_WITH_GPU");
         }
-        void operator+=(T const&& v) _PHARE_GPU_FN_HST_
+        void operator+=(T const&& v) _PHARE_HST_FN_
         {
             throw_runtime_error("2 PHARE NOT BUILT WITH PHARE_WITH_GPU");
         }
