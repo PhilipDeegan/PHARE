@@ -52,8 +52,9 @@ private:
 
 
 template<typename Ions, typename Electromag, typename GridLayout>
-void IonUpdater<Ions, Electromag, GridLayout, Offloader>::updatePopulations(
-    Ions& ions, Electromag const& em, GridLayout const& layout, double dt, UpdaterMode mode)
+void IonUpdater<Ions, Electromag, GridLayout>::updatePopulations(Ions& ions, Electromag const& em,
+                                                                 GridLayout const& layout,
+                                                                 double dt, UpdaterMode mode)
 {
     pusher_->setMeshAndTimeStep(layout.meshSize(), dt);
 
@@ -70,8 +71,7 @@ void IonUpdater<Ions, Electromag, GridLayout, Offloader>::updatePopulations(
 
 
 template<typename Ions, typename Electromag, typename GridLayout>
-void IonUpdater<Ions, Electromag, GridLayout, Offloader>::updateIons(Ions& ions,
-                                                                     GridLayout const& layout)
+void IonUpdater<Ions, Electromag, GridLayout>::updateIons(Ions& ions, GridLayout const& layout)
 {
     fixMomentGhosts(ions, layout);
     ions.computeDensity();
@@ -82,11 +82,12 @@ void IonUpdater<Ions, Electromag, GridLayout, Offloader>::updateIons(Ions& ions,
 
 template<typename Ions, typename Electromag, typename GridLayout>
 /**
- * @brief IonUpdater<Ions, Electromag, GridLayout, Offloader>::updateAndDepositDomain_
+ * @brief IonUpdater<Ions, Electromag, GridLayout>::updateAndDepositDomain_
    evolves moments from time n to n+1 without updating particles, which stay at time n
  */
-void IonUpdater<Ions, Electromag, GridLayout, Offloader>::updateAndDepositDomain_(
-    Ions& ions, Electromag const& em, GridLayout const& layout)
+void IonUpdater<Ions, Electromag, GridLayout>::updateAndDepositDomain_(Ions& ions,
+                                                                       Electromag const& em,
+                                                                       GridLayout const& layout)
 {
     // domain particles are offloaded so are not pushed/interpoloated here.
 
@@ -151,11 +152,12 @@ void IonUpdater<Ions, Electromag, GridLayout, Offloader>::updateAndDepositDomain
 
 template<typename Ions, typename Electromag, typename GridLayout>
 /**
- * @brief IonUpdater<Ions, Electromag, GridLayout, Offloader>::updateAndDepositDomain_
+ * @brief IonUpdater<Ions, Electromag, GridLayout>::updateAndDepositDomain_
    evolves moments and particles from time n to n+1
  */
-void IonUpdater<Ions, Electromag, GridLayout, Offloader>::updateAndDepositAll_(
-    Ions& ions, Electromag const& em, GridLayout const& layout)
+void IonUpdater<Ions, Electromag, GridLayout>::updateAndDepositAll_(Ions& ions,
+                                                                    Electromag const& em,
+                                                                    GridLayout const& layout)
 {
     auto constexpr partGhostWidth = GridLayout::ghostWidthForParticles();
     auto domainBox                = layout.AMRBox();

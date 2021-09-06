@@ -185,15 +185,27 @@ private:
     std::array<std::uint32_t, dim> nCells_;
 };
 
+namespace
+{
+    template<typename DataType, typename Allocator>
+    auto get_allocator()
+    {
+        if constexpr (std::is_same_v<Allocator, typename std::vector<DataType>::allocator_type>)
+            return Allocator{};
+#if defined(HAVE_UMPIRE)
+        else
+            return umpire::ResourceManager::getInstance().getAllocator("samrai::data_allocator");
+#endif
+    }
+} // namespace
 
-
-
-template<std::size_t dim, typename DataType = double>
+template<std::size_t dim, typename DataType = double,
+         typename Allocator = typename std::vector<DataType>::allocator_type>
 class NdArrayVector
 {
-    static std::size_t accumulate(std::array<std::uint32_t, dim> const& ncells)
+    static std::uint32_t accumulate(std::array<std::uint32_t, dim> const& ncells)
     {
-        return std::accumulate(ncells.begin(), ncells.end(), 1, std::multiplies<std::size_t>());
+        return std::accumulate(ncells.begin(), ncells.end(), 1, std::multiplies<std::uint32_t>());
     }
 
 public:
@@ -203,22 +215,11 @@ public:
 
     NdArrayVector() = delete;
 
-    ~NdArrayVector()
-    {
-#if defined(HAVE_UMPIRE)
-        allocator_.deallocate(data_, accumulate(nCells_) * sizeof(DataType));
-#endif
-    }
-
-// clang format doesn't look so good when #if defs are used in member construction, so a block each
-#if defined(HAVE_UMPIRE)
     template<typename... Nodes>
     explicit NdArrayVector(Nodes... nodes)
         : size_{(... * nodes)}
         , nCells_{nodes...}
-        , allocator_{umpire::ResourceManager::getInstance().getAllocator(
-              "PHARE::nd_data_allocator")}
-        , data_(size_ * sizeof(DataType))
+        , data_(size_, get_allocator<DataType, Allocator>())
     {
         static_assert(sizeof...(Nodes) == dim);
     }
@@ -226,46 +227,15 @@ public:
     explicit NdArrayVector(std::array<std::uint32_t, dim> const& ncells)
         : size_{accumulate(ncells)}
         , nCells_{ncells}
-        , allocator_{umpire::ResourceManager::getInstance().getAllocator(
-              "PHARE::nd_data_allocator")}
-        , data_{allocator_.allocate(size_ * sizeof(DataType))}
+        , data_(size_, get_allocator<DataType, Allocator>())
     {
     }
-
-#else
-    template<typename... Nodes>
-    explicit NdArrayVector(Nodes... nodes)
-        : size_{(... * nodes)}
-        , nCells_{nodes...}
-        , data_(size_)
-    {
-        static_assert(sizeof...(Nodes) == dim);
-    }
-
-    explicit NdArrayVector(std::array<std::uint32_t, dim> const& ncells)
-        : size_{accumulate(ncells)}
-        , nCells_{ncells}
-        , data_(size_)
-    {
-    }
-#endif
 
     NdArrayVector(NdArrayVector const& source) = default;
     NdArrayVector(NdArrayVector&& source)      = default;
 
     auto size() const { return size_; }
 
-#if defined(HAVE_UMPIRE)
-    auto data() { return data_; }
-    auto data() const { return data_; }
-
-    auto begin() const { return data_; }
-    auto begin() { return data_; }
-
-    auto end() const { return data_ + size_; }
-    auto end() { return data_ + size_; }
-
-#else
     auto data() { return data_.data(); }
     auto data() const { return data_.data(); }
 
@@ -275,8 +245,14 @@ public:
     auto end() const { return std::end(data_); }
     auto end() { return std::end(data_); }
 
-    void zero() { std::fill(data_.begin(), data_.end(), 0); }
+    void zero()
+    {
+#if defined(HAVE_RAJA)
+        assert(false);
+#else
+        std::fill(data_.begin(), data_.end(), 0);
 #endif
+    }
 
 
     NdArrayVector& operator=(NdArrayVector const& source)
@@ -338,12 +314,7 @@ private:
     std::size_t size_;
     std::array<std::uint32_t, dim> nCells_;
 
-#ifdef HAVE_UMPIRE
-    ::umpire::TypedAllocator<DataType> allocator_;
-    DataType* data_;
-#else
-    std::vector<DataType> data_;
-#endif
+    std::vector<DataType, Allocator> data_;
 };
 
 

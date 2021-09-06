@@ -22,13 +22,14 @@ template<typename GridLayout, typename... Args>
 void computeBulkVelocity(GridLayout const& layout, Args&... args)
 {
     constexpr auto dimension = GridLayout::dimension;
-
-    auto const& [Ni, Vi, Ve, J] = std::forward_as_tuple(args...);
-    auto const& [Vix, Viy, Viz] = Vi();
-    auto const& [Vex, Vey, Vez] = Ve();
-    auto const& [Jx, Jy, Jz]    = J();
+    auto tuple               = std::forward_as_tuple(args...);
 
     auto _compute = [&](auto const&& arr) _PHARE_ALL_FN_ {
+        auto const& [Ni, Vi, Ve, J] = tuple;
+        auto const& [Vix, Viy, Viz] = Vi();
+        auto const& [Vex, Vey, Vez] = Ve();
+        auto const& [Jx, Jy, Jz]    = J();
+
         auto const JxOnVx = GridLayout::project(Jx, arr, GridLayout::JxToMoments());
         auto const JyOnVy = GridLayout::project(Jy, arr, GridLayout::JyToMoments());
         auto const JzOnVz = GridLayout::project(Jz, arr, GridLayout::JzToMoments());

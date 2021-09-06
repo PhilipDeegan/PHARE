@@ -23,10 +23,32 @@
 
 namespace PHARE::solver
 {
+template<std::size_t dimension, std::size_t interp_order>
+struct CPU_Types
+{
+    using core_types = PHARE::core::CPU_Types<dimension, interp_order>;
+
+    using VecField_t   = typename core_types::VecField_t;
+    using Electromag_t = typename core_types::Electromag_t;
+    using Ions_t       = typename core_types::Ions_t;
+    using GridLayout_t = typename core_types::GridLayout_t;
+    using Electrons_t  = typename core_types::Electrons_t;
+
+    using IPhysicalModel = PHARE::solver::IPhysicalModel<PHARE::amr::SAMRAI_Types>;
+    using HybridModel_t  = PHARE::solver::HybridModel<GridLayout_t, Electromag_t, Ions_t,
+                                                     Electrons_t, PHARE::amr::SAMRAI_Types>;
+
+
+    using SolverPPC_t = PHARE::solver::SolverPPC<HybridModel_t, PHARE::amr::SAMRAI_Types>;
+};
+
+
 template<typename HybridModel_t, bool offload>
 auto constexpr solver_select()
 {
-    using CPU_SolverPPC_t = PHARE::solver::SolverPPC<HybridModel_t, PHARE::amr::SAMRAI_Types>;
+    auto constexpr dimension    = HybridModel_t::dimension;
+    auto constexpr interp_order = HybridModel_t::gridlayout_type::interp_order;
+    using CPU_SolverPPC_t       = typename CPU_Types<dimension, interp_order>::SolverPPC_t;
 
 #if defined(HAVE_RAJA) and defined(HAVE_UMPIRE)
     using GPU_SolverPPC_t = PHARE::solver::llnl::SolverPPC<HybridModel_t, PHARE::amr::SAMRAI_Types>;
@@ -39,6 +61,7 @@ auto constexpr solver_select()
 #elif defined(HAVE_RAJA) or defined(HAVE_UMPIRE)
 #error // invalid, both RAJA and UMPIRE are required together.
 #else
+
     return static_cast<CPU_SolverPPC_t*>(nullptr);
 #endif
 }

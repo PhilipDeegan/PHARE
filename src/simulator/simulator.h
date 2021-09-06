@@ -83,6 +83,7 @@ public:
     using PHARETypes  = PHARE_Types<dimension, interp_order, nbRefinedPart, offload>;
 
     using IPhysicalModel = PHARE::solver::IPhysicalModel<SAMRAITypes>;
+    using HybridInit     = typename solver::CPU_Types<dimension, interp_order>::HybridModel_t;
     using HybridModel    = typename PHARETypes::HybridModel_t;
     using MHDModel       = typename PHARETypes::MHDModel_t;
 
@@ -121,6 +122,7 @@ private:
     std::size_t fineDumpLvlMax = 0;
 
     // physical models that can be used
+    std::shared_ptr<HybridInit> hybridInit_;
     std::shared_ptr<HybridModel> hybridModel_;
     std::shared_ptr<MHDModel> mhdModel_;
 
@@ -176,16 +178,31 @@ Simulator<_dimension, _interp_order, _nbRefinedPart, offload>::Simulator(
 {
     if (find_model("HybridModel"))
     {
-        hybridModel_ = std::make_shared<HybridModel>(
-            dict["simulation"], std::make_shared<typename HybridModel::resources_manager_type>());
+        auto init_prefix = []() {
+#if defined(HAVE_UMPIRE)
+            return "host_";
+#else
+            return "";
+#endif
+        };
 
+        hybridInit_ = std::make_shared<HybridInit>(
+            dict["simulation"],
+            std::make_shared<typename HybridInit::resources_manager_type>(init_prefix()));
+        hybridInit_->resourcesManager->registerResources(hybridInit_->state);
 
-        hybridModel_->resourcesManager->registerResources(hybridModel_->state);
+        if constexpr (!std::is_same_v<HybridModel, HybridInit>)
+        {
+            hybridModel_ = std::make_shared<HybridModel>(
+                dict["simulation"],
+                std::make_shared<typename HybridModel::resources_manager_type>());
+            hybridModel_->resourcesManager->registerResources(hybridModel_->state);
+        } // else hybridModel_ = move(hybridInit_)
 
         // we register the hybrid model for all possible levels in the hierarchy
         // since for now it is the only model available
         // same for the solver
-        multiphysInteg_->registerModel(0, maxLevelNumber_ - 1, hybridModel_);
+        multiphysInteg_->registerModel(0, maxLevelNumber_ - 1, hybridInit_);
 
         multiphysInteg_->registerAndInitSolver(
             0, maxLevelNumber_ - 1, std::make_unique<SolverPPC>(dict["simulation"]["algo"]));
@@ -212,7 +229,7 @@ Simulator<_dimension, _interp_order, _nbRefinedPart, offload>::Simulator(
             auto& diagDict = dict["simulation"]["diagnostics"];
 
             dMan = PHARE::diagnostic::DiagnosticsManagerResolver::make_unique(
-                *hierarchy_, *hybridModel_, diagDict);
+                *hierarchy_, *hybridInit_, diagDict);
 
             if (diagDict.contains("fine_dump_lvl_max"))
             {
@@ -259,9 +276,6 @@ std::string Simulator<_dimension, _interp_order, _nbRefinedPart, offload>::to_st
     return ss.str();
 }
 
-
-
-
 template<std::size_t _dimension, std::size_t _interp_order, std::size_t _nbRefinedPart,
          bool offload>
 void Simulator<_dimension, _interp_order, _nbRefinedPart, offload>::initialize()
@@ -275,6 +289,11 @@ void Simulator<_dimension, _interp_order, _nbRefinedPart, offload>::initialize()
             integrator_->initialize();
         else
             throw std::runtime_error("Error - Simulator has no integrator");
+
+        if constexpr (std::is_same_v<HybridModel, HybridInit>)
+            hybridModel_ = std::move(hybridInit_);
+        else
+            core::fill_state_from(hybridInit_, hybridModel_);
     }
     catch (const std::runtime_error& e)
     {
