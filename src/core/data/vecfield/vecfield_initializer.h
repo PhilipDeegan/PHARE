@@ -41,6 +41,9 @@ namespace core
         void initializeComponent_(Field& field, GridLayout const& layout,
                                   initializer::InitFunction<dimension> const& init)
         {
+            if constexpr (!Field::is_host_mem)
+                return;
+
             auto const indices = layout.ghostStartToEndIndices(field, /*includeEnd=*/true);
             auto const coords  = layout.template indexesToCoordVectors</*WithField=*/true>(
                 indices, field, [](auto& gridLayout, auto& field_, auto const&... args) {
@@ -50,13 +53,9 @@ namespace core
             // keep grid data alive
             auto grid = std::apply([&](auto const&... args) { return init(args...); }, coords);
 
-#if defined(HAVE_RAJA)
-
-#else // NORMAL
             for (std::size_t cell_idx = 0; cell_idx < indices.size(); cell_idx++)
                 std::apply([&](auto&... args) { field(args...) = (*grid)[cell_idx]; },
                            indices[cell_idx]);
-#endif
         }
 
 

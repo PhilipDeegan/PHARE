@@ -13,6 +13,21 @@
 #include "amr/resources_manager/resources_manager.h"
 #include "amr/messengers/hybrid_messenger_info.h"
 
+
+
+namespace PHARE::solver
+{
+template<typename ModelSrc, typename ModelDst>
+auto constexpr fill_state_from(ModelSrc const& src, ModelDst& dst)
+{
+    static_assert(!std::is_same_v<ModelSrc, ModelDst>);
+
+#if defined(HAVE_UMPIRE)
+    // copy to GPU
+#endif
+}
+} // namespace PHARE::solver
+
 namespace PHARE::solver
 {
 /**
@@ -111,6 +126,12 @@ template<typename GridLayoutT, typename Electromag, typename Ions, typename Elec
          typename AMR_Types>
 void HybridModel<GridLayoutT, Electromag, Ions, Electrons, AMR_Types>::initialize(level_t& level)
 {
+    using VecFieldT = typename Electromag::vecfield_type;
+    using FieldT    = typename VecFieldT::field_type;
+
+    if constexpr (!FieldT::is_host_mem)
+        return; // don't even think about it!
+
     for (auto& patch : level)
     {
         // first initialize the ions

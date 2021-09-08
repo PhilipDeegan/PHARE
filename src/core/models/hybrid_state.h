@@ -14,18 +14,6 @@
 #include <string>
 #include <utility>
 
-namespace PHARE::core
-{
-template<typename ModelSrc, typename ModelDst>
-auto constexpr fill_state_from(ModelSrc const& src, ModelDst& dst)
-{
-    static_assert(!std::is_same_v<ModelSrc, ModelDst>);
-
-#if defined(HAVE_UMPIRE)
-    // copy to GPU
-#endif
-}
-} // namespace PHARE::core
 
 namespace PHARE
 {

@@ -197,10 +197,18 @@ namespace
             return umpire::ResourceManager::getInstance().getAllocator("samrai::data_allocator");
 #endif
     }
+
+    template<typename DataType, typename Allocator>
+    constexpr bool is_host_mem_type()
+    {
+        if constexpr (std::is_same_v<Allocator, typename std::vector<DataType>::allocator_type>)
+            return true;
+        return false;
+    }
 } // namespace
 
 template<std::size_t dim, typename DataType = double,
-         typename Allocator = typename std::vector<DataType>::allocator_type>
+         typename Allocator_ = typename std::vector<DataType>::allocator_type>
 class NdArrayVector
 {
     static std::uint32_t accumulate(std::array<std::uint32_t, dim> const& ncells)
@@ -210,7 +218,9 @@ class NdArrayVector
 
 public:
     static constexpr bool is_contiguous = 1;
+    static constexpr bool is_host_mem   = is_host_mem_type<DataType, Allocator_>();
     static const std::size_t dimension  = dim;
+    using Allocator                     = Allocator_;
     using type                          = DataType;
 
     NdArrayVector() = delete;
