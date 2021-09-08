@@ -5,12 +5,6 @@
 #include <stdexcept>
 #include <string_view>
 
-#if !defined(PHARE_WITH_GPU)
-#if defined(HAVE_RAJA) and defined(HAVE_UMPIRE)
-#define PHARE_WITH_GPU 1
-#endif
-#endif
-
 #if defined(PHARE_WITH_GPU)
 
 #define _PHARE_DEV_FN_ __device__

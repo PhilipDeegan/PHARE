@@ -24,7 +24,7 @@ void computeBulkVelocity(GridLayout const& layout, Args&... args)
     constexpr auto dimension = GridLayout::dimension;
     auto tuple               = std::forward_as_tuple(args...);
 
-    auto _compute = [&](auto const&& arr) _PHARE_ALL_FN_ {
+    auto _compute = [&] _PHARE_ALL_FN_ (auto const&& arr) {
         auto const& [Ni, Vi, Ve, J] = tuple;
         auto const& [Vix, Viy, Viz] = Vi();
         auto const& [Vex, Vey, Vez] = Ve();
@@ -41,6 +41,7 @@ void computeBulkVelocity(GridLayout const& layout, Args&... args)
 
 #if defined(HAVE_UMPIRE) and defined(HAVE_RAJA)
     // TODO kernel magic
+    assert(false);
 #else
     for (auto const& idx : layout.physicalStartToEndIndices(QtyCentering::primal))
         std::apply([&](auto&... args) { _compute(std::array{args...}); }, idx);

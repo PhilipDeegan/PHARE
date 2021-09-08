@@ -532,8 +532,9 @@ namespace amr
                 {
                     auto data = getResourcesPointer_<ResourcesType, RequestedPtr>(
                         resourceType, resourceInfoIt->second, patch);
-
-                    obj.setBuffer(resourcesName, data);
+                    
+                    // ignore prefix for setBuffer
+                    obj.setBuffer(properties.name, data);
                 }
                 else
                 {
