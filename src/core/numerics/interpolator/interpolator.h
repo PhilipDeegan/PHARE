@@ -642,6 +642,11 @@ namespace core
             return ebs;
         }
 
+        template<typename Particles, typename Electromag, typename GridLayout>
+        inline auto operator()(Particles& particles, Electromag const& Em, GridLayout const& layout)
+        {
+            return (*this)(std::begin(particles), std::end(particles), Em, layout);
+        }
 
 
 
@@ -655,7 +660,7 @@ namespace core
          */
         template<typename Particle_t, typename VecField, typename GridLayout, typename Field>
         void particleToMesh(Particle_t const& particle, Field& density, VecField& flux,
-                            GridLayout const& layout, double coef) _PHARE_ALL_FN_
+                            GridLayout const& layout, double coef = 1.) _PHARE_ALL_FN_
         {
             auto constexpr densityCentering = GridLayout::centering(HybridQuantity::Scalar::rho);
             auto constexpr fluxCentering    = GridLayout::centering(HybridQuantity::Vector::V);
@@ -681,11 +686,22 @@ namespace core
             // calculated twice, and not for each E,B component.
 
             PHARE_LOG_START("ParticleToMesh::operator()");
-            for (auto currPart = begin; currPart != end; ++currPart)
-                particleToMesh(*currPart, density, flux, layout, coef);
+            if constexpr (Field::is_host_mem)
+                for (auto currPart = begin; currPart != end; ++currPart)
+                    particleToMesh(*currPart, density, flux, layout, coef);
+#if defined(HAVE_RAJA)
+            else
+                assert(false);
+#endif
             PHARE_LOG_STOP("ParticleToMesh::operator()");
         }
 
+        template<typename Particles, typename VecField, typename GridLayout, typename Field>
+        inline void operator()(Particles const& particles, Field& density, VecField& flux,
+                               GridLayout const& layout, double coef = 1.)
+        {
+            return (*this)(std::begin(particles), std::end(particles), density, flux, layout, coef);
+        }
 
 
 

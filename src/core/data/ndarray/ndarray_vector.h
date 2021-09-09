@@ -1,6 +1,9 @@
 #ifndef PHARE_CORE_DATA_NDARRAY_NDARRAY_VECTOR_H
 #define PHARE_CORE_DATA_NDARRAY_NDARRAY_VECTOR_H
 
+
+#include <iostream>
+
 #include <stdexcept>
 #include <array>
 #include <cstdint>
@@ -14,6 +17,7 @@
 #include "umpire/ResourceManager.hpp"
 #include "umpire/Allocator.hpp"
 #include "umpire/TypedAllocator.hpp"
+#include "kul/gpu.hpp"
 #endif
 
 namespace PHARE::core
@@ -188,22 +192,30 @@ private:
 namespace
 {
     template<typename DataType, typename Allocator>
-    auto get_allocator()
-    {
-        if constexpr (std::is_same_v<Allocator, typename std::vector<DataType>::allocator_type>)
-            return Allocator{};
-#if defined(HAVE_UMPIRE)
-        else
-            return umpire::ResourceManager::getInstance().getAllocator("samrai::data_allocator");
-#endif
-    }
-
-    template<typename DataType, typename Allocator>
     constexpr bool is_host_mem_type()
     {
         if constexpr (std::is_same_v<Allocator, typename std::vector<DataType>::allocator_type>)
             return true;
         return false;
+    }
+
+
+    template<typename DataType, typename Allocator>
+    auto get_allocator()
+    {
+        auto constexpr is_host_mem = is_host_mem_type<DataType, Allocator>();
+        std::cout << __FILE__ << " " << __LINE__ << " " << is_host_mem << " " << std::endl;
+
+        if constexpr (is_host_mem)
+            return Allocator{};
+#if defined(HAVE_UMPIRE)
+        else
+        {
+            auto& rm = umpire::ResourceManager::getInstance();
+            assert(rm.isAllocator("samrai::data_allocator"));
+            return rm.getAllocator("samrai::data_allocator");
+        }
+#endif
     }
 } // namespace
 
@@ -214,6 +226,12 @@ class NdArrayVector
     static std::uint32_t accumulate(std::array<std::uint32_t, dim> const& ncells)
     {
         return std::accumulate(ncells.begin(), ncells.end(), 1, std::multiplies<std::uint32_t>());
+    }
+
+    void _print()
+    {
+        std::cout << __FILE__ << " " << __LINE__ << " " << is_host_mem << " " << data()
+                  << std::endl;
     }
 
 public:
@@ -232,6 +250,7 @@ public:
         , data_(size_, get_allocator<DataType, Allocator>())
     {
         static_assert(sizeof...(Nodes) == dim);
+        _print();
     }
 
     explicit NdArrayVector(std::array<std::uint32_t, dim> const& ncells)
@@ -239,6 +258,7 @@ public:
         , nCells_{ncells}
         , data_(size_, get_allocator<DataType, Allocator>())
     {
+        _print();
     }
 
     NdArrayVector(NdArrayVector const& source) = default;
@@ -257,10 +277,11 @@ public:
 
     void zero()
     {
+        if constexpr (is_host_mem)
+            std::fill(data_.begin(), data_.end(), 0);
 #if defined(HAVE_RAJA)
-        assert(false);
-#else
-        std::fill(data_.begin(), data_.end(), 0);
+        else
+            KUL_GPU_NS::send(data(), std::vector<DataType>(0, size()).data(), size());
 #endif
     }
 

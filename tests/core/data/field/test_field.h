@@ -84,7 +84,8 @@ namespace PHARE::core
 template<std::size_t dim>
 struct FieldMock
 {
-    static auto constexpr dimension = dim;
+    static auto constexpr dimension   = dim;
+    static auto constexpr is_host_mem = true;
     double data;
 
     FieldMock() = default;

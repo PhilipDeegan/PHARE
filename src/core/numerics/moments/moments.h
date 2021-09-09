@@ -6,6 +6,58 @@
 #include "core/numerics/interpolator/interpolator.h"
 
 
+namespace PHARE::core
+{
+struct DomainDeposit
+{
+};
+
+struct PatchGhostDeposit
+{
+};
+
+struct LevelGhostDeposit
+{
+};
+
+template<typename Ions, typename GridLayout, typename DepositTag>
+void deposit_particles(Ions& ions, GridLayout& layout,
+                       Interpolator<GridLayout::dimension, GridLayout::interp_order> interpolate,
+                       DepositTag)
+{
+    for (auto& pop : ions)
+    {
+        auto& density = pop.density();
+        auto& flux    = pop.flux();
+
+        if constexpr (std::is_same_v<DepositTag, DomainDeposit>)
+            interpolate(pop.domainParticles(), density, flux, layout);
+
+        else if constexpr (std::is_same_v<DepositTag, PatchGhostDeposit>)
+            interpolate(pop.patchGhostParticles(), density, flux, layout);
+
+        else if constexpr (std::is_same_v<DepositTag, LevelGhostDeposit>)
+            interpolate(pop.levelGhostParticlesOld(), density, flux, layout);
+
+        else
+            assert(false);
+    }
+}
+
+#if defined(HAVE_UMPIRE)
+template<typename Ions, typename GridLayout, typename DepositTag>
+void deposit_umpire_particles(
+    Ions& ions, GridLayout& layout,
+    Interpolator<GridLayout::dimension, GridLayout::interp_order> interpolate, DepositTag)
+{
+    // assert(false);
+}
+#endif
+
+} // namespace PHARE::core
+
+
+
 namespace PHARE
 {
 namespace core
@@ -21,44 +73,22 @@ namespace core
     }
 
 
-    struct DomainDeposit
-    {
-    };
-
-    struct PatchGhostDeposit
-    {
-    };
-    struct LevelGhostDeposit
-    {
-    };
-
-
     template<typename Ions, typename GridLayout, typename DepositTag>
     void depositParticles(Ions& ions, GridLayout& layout,
                           Interpolator<GridLayout::dimension, GridLayout::interp_order> interpolate,
-                          DepositTag)
+                          DepositTag tag)
     {
-        for (auto& pop : ions)
-        {
-            auto& density = pop.density();
-            auto& flux    = pop.flux();
+        using FieldT = typename Ions::field_type;
 
-            if constexpr (std::is_same_v<DepositTag, DomainDeposit>)
-            {
-                auto& partArray = pop.domainParticles();
-                interpolate(std::begin(partArray), std::end(partArray), density, flux, layout);
-            }
-            else if constexpr (std::is_same_v<DepositTag, PatchGhostDeposit>)
-            {
-                auto& partArray = pop.patchGhostParticles();
-                interpolate(std::begin(partArray), std::end(partArray), density, flux, layout);
-            }
-            else if constexpr (std::is_same_v<DepositTag, LevelGhostDeposit>)
-            {
-                auto& partArray = pop.levelGhostParticlesOld();
-                interpolate(std::begin(partArray), std::end(partArray), density, flux, layout);
-            }
-        }
+        if constexpr (FieldT::is_host_mem)
+            deposit_particles(ions, layout, interpolate, tag);
+#if defined(HAVE_UMPIRE)
+        else
+            deposit_umpire_particles(ions, layout, interpolate, tag);
+#else
+        else
+            assert(false);
+#endif
     }
 
 } // namespace core

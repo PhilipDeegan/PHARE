@@ -6,6 +6,8 @@
 #endif
 
 #include "core/utilities/types.h"
+#include "interop/patch_state.h"
+
 
 #define PHARE_WITH_GPU_MKN // TORM
 
@@ -23,6 +25,7 @@ public:
     virtual ~BaseOffloader() = default;
 };
 } // namespace PHARE::solver::gpu
+
 
 #if defined(PHARE_WITH_GPU_MKN)
 #include "kul/gpu/asio.hpp"

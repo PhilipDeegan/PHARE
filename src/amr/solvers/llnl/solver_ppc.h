@@ -133,47 +133,15 @@ void SolverPPC<HybridModel, AMR_Types>::moveIons_(level_t& level, Ions& ions,
 {
     PHARE_LOG_SCOPE("SolverPPC::moveIons_");
 
-    std::size_t nbrDomainParticles        = 0;
-    std::size_t nbrPatchGhostParticles    = 0;
-    std::size_t nbrLevelGhostNewParticles = 0;
-    std::size_t nbrLevelGhostOldParticles = 0;
-    std::size_t nbrLevelGhostParticles    = 0;
-    for (auto& patch : level)
-    {
-        auto _ = rm.setOnPatch(*patch, ions);
-
-        for (auto& pop : ions)
-        {
-            nbrDomainParticles += pop.domainParticles().size();
-            nbrPatchGhostParticles += pop.patchGhostParticles().size();
-            nbrLevelGhostNewParticles += pop.levelGhostParticlesNew().size();
-            nbrLevelGhostOldParticles += pop.levelGhostParticlesOld().size();
-            nbrLevelGhostParticles += pop.levelGhostParticles().size();
-            nbrPatchGhostParticles += pop.patchGhostParticles().size();
-
-            if (nbrLevelGhostOldParticles < nbrLevelGhostParticles
-                and nbrLevelGhostOldParticles > 0)
-                throw std::runtime_error("Error - there are less old level ghost particles ("
-                                         + std::to_string(nbrLevelGhostOldParticles)
-                                         + ") than pushable ("
-                                         + std::to_string(nbrLevelGhostParticles) + ")");
-        }
-    }
-
-
     auto dt = newTime - currentTime;
 
     for (auto& patch : level)
     {
-        auto _ = rm.setOnPatch(*patch, electromag, ions);
-
+        auto _      = rm.setOnPatch(*patch, electromag, ions);
         auto layout = PHARE::amr::layoutFromPatch<GridLayout>(*patch);
         ionUpdater_.updatePopulations(ions, electromag, layout, dt, mode);
-
-        // this needs to be done before calling the messenger
         rm.setTime(ions, *patch, newTime);
     }
-
 
     fromCoarser.fillIonGhostParticles(ions, level, newTime);
     fromCoarser.fillIonMomentGhosts(ions, level, currentTime, newTime);
@@ -183,8 +151,6 @@ void SolverPPC<HybridModel, AMR_Types>::moveIons_(level_t& level, Ions& ions,
         auto _      = rm.setOnPatch(*patch, electromag, ions);
         auto layout = PHARE::amr::layoutFromPatch<GridLayout>(*patch);
         ionUpdater_.updateIons(ions, layout);
-
-        // no need to update time, since it has been done before
     }
 }
 } // namespace PHARE::solver::llnl

@@ -20,8 +20,8 @@ struct VecFieldMock
     Field& getComponent(Component) { return fm; }
     Field const& getComponent(Component) const { return fm; }
 
-    auto operator()(Component c) { return getComponent(c); }
-    auto operator()(Component c) const { return getComponent(c); }
+    auto& operator()(Component c) { return getComponent(c); }
+    auto& operator()(Component c) const { return getComponent(c); }
 
     auto getComponents() const { return std::forward_as_tuple(fm, fm, fm); }
     auto getComponents() { return std::forward_as_tuple(fm, fm, fm); }

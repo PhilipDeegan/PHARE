@@ -14,22 +14,35 @@
 #include "amr/messengers/hybrid_messenger_info.h"
 
 
+#include "interop/patch_state.h"
+
+
 
 namespace PHARE::solver
 {
-template<typename ModelSrc, typename ModelDst>
-auto constexpr fill_state_from(ModelSrc const& src, ModelDst& dst)
+template<typename Hierarchy, typename ModelSrc, typename ModelDst>
+auto constexpr fill_state_from(Hierarchy const& hierarchy, ModelSrc const& src, ModelDst& dst)
 {
     static_assert(!std::is_same_v<ModelSrc, ModelDst>);
 
 #if defined(HAVE_UMPIRE)
-    // copy to GPU
+    auto& cpuState = src.state;
+    auto& devState = dst.state;
+    for (int levelNumber = 0; levelNumber < hierarchy.getNumberOfLevels(); ++levelNumber)
+    {
+        auto& level = hierarchy->getPatchLevel(levelNumber);
+        for (auto& patch : *level)
+        {
+            auto _0 = *src.resourcesManager.setOnPatch(*patch, cpuState);
+            auto _1 = *dst.resourcesManager.setOnPatch(*patch, devState);
+            load_to_umpire_device_mem(PatchState{cpuState}, PatchState{devState});
+        }
+    }
+#else
+    assert(false);
 #endif
 }
-} // namespace PHARE::solver
 
-namespace PHARE::solver
-{
 /**
  * @brief The HybridModel class is a concrete implementation of a IPhysicalModel. The class
  * holds a HybridState and a ResourcesManager.
@@ -128,9 +141,8 @@ void HybridModel<GridLayoutT, Electromag, Ions, Electrons, AMR_Types>::initializ
 {
     using VecFieldT = typename Electromag::vecfield_type;
     using FieldT    = typename VecFieldT::field_type;
-
     if constexpr (!FieldT::is_host_mem)
-        return; // don't even think about it!
+        return;
 
     for (auto& patch : level)
     {

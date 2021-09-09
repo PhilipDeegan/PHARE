@@ -523,15 +523,19 @@ namespace core
                         typename VecField::field_type const& Pe, VecField const& B,
                         VecField const& J, VecField& Enew) const
         {
+            using FieldT = typename VecField::field_type;
+
             if (!this->hasLayout())
-            {
                 throw std::runtime_error(
                     "Error - Ohm - GridLayout not set, cannot proceed to calculate ohm()");
-            }
-#if defined(HAVE_RAJA)
 
-#else // NORMAL
-            compute_(n, Ve, Pe, B, J, Enew);
+            if constexpr (FieldT::is_host_mem)
+                compute_(n, Ve, Pe, B, J, Enew);
+#if defined(HAVE_RAJA)
+            else
+            {
+                assert(false);
+            }
 #endif
         }
     };

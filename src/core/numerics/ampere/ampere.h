@@ -187,14 +187,19 @@ namespace core
         template<typename VecField>
         void operator()(VecField const& B, VecField& J)
         {
+            using FieldT = typename VecField::field_type;
+
             if (!this->hasLayout())
                 throw std::runtime_error(
                     "Error - Ampere - GridLayout not set, cannot proceed to calculate ampere()");
 
+            if constexpr (FieldT::is_host_mem)
+                compute_(B, J);
 #if defined(HAVE_RAJA)
-
-#else // NORMAL
-            compute_(B, J);
+            else
+            {
+                assert(false);
+            }
 #endif
         }
     };

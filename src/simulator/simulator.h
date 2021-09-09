@@ -39,13 +39,13 @@ public:
     virtual bool dump(double timestamp, double timestep) { return false; } // overriding optional
 };
 
-template<typename StateTypes>
+template<typename StateType>
 struct State
 {
-    static constexpr std::size_t dimension = StateTypes::dimension;
-    using HybridModel                      = typename StateTypes::HybridModel;
-    using MultiPhysicsIntegrator           = typename StateTypes::MultiPhysicsIntegrator;
-    using SolverPPC                        = typename StateTypes::SolverPPC;
+    static constexpr std::size_t dimension = StateType::dimension;
+    using HybridModel                      = typename StateType::HybridModel;
+    using MultiPhysicsIntegrator           = typename StateType::MultiPhysicsIntegrator;
+    using SolverPPC                        = typename StateType::SolverPPC;
     using Integrator                       = PHARE::amr::Integrator<dimension>;
 
     template<typename SimFunctors>
@@ -54,9 +54,17 @@ struct State
     {
     }
 
+    template<typename OtherType>
+    State(State<OtherType>& that)
+        : hybridModel_{that.hybridModel_}
+        , multiphysInteg_{that.multiphysInteg_}
+        , integrator_{that.integrator_}
+    {
+    }
+
     std::shared_ptr<HybridModel> hybridModel_;
     std::shared_ptr<MultiPhysicsIntegrator> multiphysInteg_;
-    std::unique_ptr<Integrator> integrator_;
+    std::shared_ptr<Integrator> integrator_;
 };
 
 
@@ -109,6 +117,8 @@ public:
 
     bool dump(double timestamp, double timestep) override
     {
+        if constexpr (!WorkingState_t::is_cpu) // load cpu from gpu for diag dumps
+            solver::fill_state_from(state_->hybridModel_, hostState_->hybridModel_);
         return dMan->dump(timestamp, timestep);
     }
 
@@ -179,8 +189,8 @@ private:
     }
 
 
-    std::unique_ptr<State<InitState_t>> initState_;
-    std::unique_ptr<State<WorkingState_t>> state_;
+    std::shared_ptr<State<InitState_t>> hostState_;
+    std::shared_ptr<State<WorkingState_t>> state_;
 };
 
 namespace
@@ -202,7 +212,7 @@ namespace
 //-----------------------------------------------------------------------------
 
 template<typename State_t, typename Hierarchy_t, typename MessengerFactory_t>
-auto init_state(std::unique_ptr<State_t>&& state, Hierarchy_t& hierarchy,
+auto init_state(std::shared_ptr<State_t>&& state, Hierarchy_t& hierarchy,
                 MessengerFactory_t& messengerFactory, PHARE::initializer::PHAREDict const& dict,
                 int maxLevelNumber, std::string prefix = "")
 {
@@ -218,8 +228,7 @@ auto init_state(std::unique_ptr<State_t>&& state, Hierarchy_t& hierarchy,
     hybridModel_->resourcesManager->registerResources(hybridModel_->state);
 
     // we register the hybrid model for all possible levels in the hierarchy
-    // since for now it is the only model available
-    // same for the solver
+    // since for now it is the only model available same for the solver
     multiphysInteg_->registerModel(0, maxLevelNumber - 1, hybridModel_);
     multiphysInteg_->registerAndInitSolver(0, maxLevelNumber - 1,
                                            std::make_unique<SolverPPC>(dict["simulation"]["algo"]));
@@ -228,10 +237,10 @@ auto init_state(std::unique_ptr<State_t>&& state, Hierarchy_t& hierarchy,
     auto startTime = 0.; // TODO make it runtime
     auto endTime   = 0.; // TODO make it runtime
 
-    integrator_ = std::make_unique<typename State_t::Integrator>(
+    integrator_ = std::make_shared<typename State_t::Integrator>(
         dict, hierarchy, multiphysInteg_, multiphysInteg_, startTime, endTime);
 
-    return std::move(state);
+    return state;
 }
 
 template<std::size_t _dimension, std::size_t _interp_order, std::size_t _nbRefinedPart,
@@ -252,17 +261,18 @@ Simulator<_dimension, _interp_order, _nbRefinedPart, offload>::Simulator(
 {
     if (find_model("HybridModel"))
     {
-        state_ = init_state(std::make_unique<State<WorkingState_t>>(dict, functors_), hierarchy_,
-                            messengerFactory_, dict, maxLevelNumber_);
+        hostState_ = init_state(std::make_shared<State<InitState_t>>(dict, functors_), hierarchy_,
+                                messengerFactory_, dict, maxLevelNumber_);
 
         if constexpr (!WorkingState_t::is_cpu)
-            initState_ = init_state(std::make_unique<State<InitState_t>>(dict, functors_),
-                                    hierarchy_, messengerFactory_, dict, maxLevelNumber_, "host_");
+            state_ = init_state(std::make_shared<State<WorkingState_t>>(dict, functors_),
+                                hierarchy_, messengerFactory_, dict, maxLevelNumber_, "dev_");
+        else
+            state_ = std::make_shared<State<WorkingState_t>>(*hostState_);
 
         // hard coded for now, should get some params later from the dict
         auto hybridTagger_ = amr::TaggerFactory<PHARETypes>::make("HybridModel", "default");
         state_->multiphysInteg_->registerTagger(0, maxLevelNumber_ - 1, std::move(hybridTagger_));
-
 
         timeStamper = core::TimeStamperFactory::create(dict["simulation"]);
 
@@ -309,12 +319,8 @@ std::string Simulator<_dimension, _interp_order, _nbRefinedPart, offload>::to_st
     ss << "time step            : " << dt_ << "\n";
     ss << "number of time steps : " << timeStepNbr_ << "\n";
     ss << core::to_str(state_->hybridModel_->state);
-
-
     ss << "\n";
     ss << "SolverPPC: " << typeid(SolverPPC).name() << "\n";
-
-
     return ss.str();
 }
 
@@ -327,12 +333,7 @@ void Simulator<_dimension, _interp_order, _nbRefinedPart, offload>::initialize()
         if (isInitialized)
             std::runtime_error("cannot initialize  - simulator already isInitialized");
 
-        auto* integrator_ = [&]() {
-            if constexpr (WorkingState_t::is_cpu)
-                return state_->integrator_.get();
-            else
-                return initState_->integrator_.get();
-        }();
+        auto& integrator_ = hostState_->integrator_;
 
         if (integrator_ == nullptr)
             throw std::runtime_error("Error - Simulator has no integrator");
@@ -340,7 +341,7 @@ void Simulator<_dimension, _interp_order, _nbRefinedPart, offload>::initialize()
         integrator_->initialize();
 
         if constexpr (!WorkingState_t::is_cpu)
-            solver::fill_state_from(initState_->hybridModel_, state_->hybridModel_);
+            solver::fill_state_from(hostState_->hybridModel_, state_->hybridModel_);
     }
     catch (const std::runtime_error& e)
     {

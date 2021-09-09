@@ -41,9 +41,6 @@ namespace core
         void initializeComponent_(Field& field, GridLayout const& layout,
                                   initializer::InitFunction<dimension> const& init)
         {
-            if constexpr (!Field::is_host_mem)
-                return;
-
             auto const indices = layout.ghostStartToEndIndices(field, /*includeEnd=*/true);
             auto const coords  = layout.template indexesToCoordVectors</*WithField=*/true>(
                 indices, field, [](auto& gridLayout, auto& field_, auto const&... args) {
