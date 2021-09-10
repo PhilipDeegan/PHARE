@@ -92,9 +92,10 @@ namespace amr
     /**
      * @brief The ParticlesData class
      */
-    template<typename ParticleArray>
+    template<typename ParticleArray_>
     class ParticlesData : public SAMRAI::hier::PatchData
     {
+        using ParticleArray       = ParticleArray_;
         using Particle_t          = typename ParticleArray::Particle_t;
         static constexpr auto dim = ParticleArray::dimension;
 
@@ -377,23 +378,24 @@ namespace amr
                         // interior array or ghost array
                         auto const intersect = getGhostBox() * overlapBox;
 
-                        for (auto const& particle : particleArray)
-                        {
-                            if (isInBox(intersect, particle))
+                        if constexpr (ParticleArray::is_host_mem)
+                            for (auto const& particle : particleArray)
                             {
-                                if (isInBox(myBox, particle))
+                                if (isInBox(intersect, particle))
                                 {
-                                    domainParticles.push_back(std::move(particle));
+                                    if (isInBox(myBox, particle))
+                                    {
+                                        domainParticles.push_back(std::move(particle));
+                                    }
+                                    else
+                                    {
+                                        patchGhostParticles.push_back(std::move(particle));
+                                    }
                                 }
-                                else
-                                {
-                                    patchGhostParticles.push_back(std::move(particle));
-                                }
-                            }
-                        } // end species loop
-                    }     // end box loop
-                }         // end no rotation
-            }             // end overlap not empty
+                            } // end species loop
+                    }         // end box loop
+                }             // end no rotation
+            }                 // end overlap not empty
         }
 
 
@@ -441,20 +443,21 @@ namespace amr
             //      - if not, let's add it to my ghost particle array
             for (auto const& sourceParticlesArray : particlesArrays)
             {
-                for (auto const& particle : *sourceParticlesArray)
-                {
-                    if (isInBox(intersectionBox, particle))
+                if constexpr (ParticleArray::is_host_mem)
+                    for (auto const& particle : *sourceParticlesArray)
                     {
-                        if (isInBox(myDomainBox, particle))
+                        if (isInBox(intersectionBox, particle))
                         {
-                            domainParticles.push_back(particle);
-                        }
-                        else
-                        {
-                            patchGhostParticles.push_back(particle);
+                            if (isInBox(myDomainBox, particle))
+                            {
+                                domainParticles.push_back(particle);
+                            }
+                            else
+                            {
+                                patchGhostParticles.push_back(particle);
+                            }
                         }
                     }
-                }
             }
         }
 
@@ -470,39 +473,40 @@ namespace amr
                 &sourceData.domainParticles, &sourceData.patchGhostParticles};
 
             auto myDomainBox = this->getBox();
+            auto offset      = transformation.getOffset();
 
-            auto offset = transformation.getOffset();
 
             for (auto const& sourceParticlesArray : particlesArrays)
             {
-                for (auto const& particle : *sourceParticlesArray)
-                {
-                    // the particle is only copied if it is in the intersectionBox
-                    // but before its iCell must be shifted by the transformation offset
-
-                    auto newParticle{particle};
-                    for (auto iDir = 0u; iDir < newParticle.iCell.size(); ++iDir)
+                if constexpr (ParticleArray::is_host_mem)
+                    for (auto const& particle : *sourceParticlesArray)
                     {
-                        newParticle.iCell[iDir] += offset[iDir];
-                    }
+                        // the particle is only copied if it is in the intersectionBox
+                        // but before its iCell must be shifted by the transformation offset
 
-                    if (isInBox(intersectionBox, newParticle))
-                    {
-                        // now we now the particle is in the intersection
-                        // we need to know whether it is in the domain part of that
-                        // intersection. If it is not, then it must be in the ghost part
-
-
-                        if (isInBox(myDomainBox, newParticle))
+                        auto newParticle{particle};
+                        for (auto iDir = 0u; iDir < newParticle.iCell.size(); ++iDir)
                         {
-                            domainParticles.push_back(newParticle);
+                            newParticle.iCell[iDir] += offset[iDir];
                         }
-                        else
+
+                        if (isInBox(intersectionBox, newParticle))
                         {
-                            patchGhostParticles.push_back(newParticle);
+                            // now we now the particle is in the intersection
+                            // we need to know whether it is in the domain part of that
+                            // intersection. If it is not, then it must be in the ghost part
+
+
+                            if (isInBox(myDomainBox, newParticle))
+                            {
+                                domainParticles.push_back(newParticle);
+                            }
+                            else
+                            {
+                                patchGhostParticles.push_back(newParticle);
+                            }
                         }
                     }
-                }
             }
 
 
@@ -568,13 +572,12 @@ namespace amr
         {
             std::size_t numberParticles{0};
 
-            for (auto const& particle : domainParticles)
-            {
-                if (isInBox(box, particle))
-                {
-                    ++numberParticles;
-                }
-            }
+            if constexpr (ParticleArray::is_host_mem)
+                for (auto const& particle : domainParticles)
+                    if (isInBox(box, particle))
+                        ++numberParticles;
+
+
             return numberParticles;
         }
 
@@ -590,19 +593,20 @@ namespace amr
 
             for (auto const& sourceParticlesArray : particlesArrays)
             {
-                for (auto const& particle : *sourceParticlesArray)
-                {
-                    auto shiftedParticle{particle};
-                    auto offset = transformation.getOffset();
-                    for (auto i = 0u; i < dim; ++i)
+                if constexpr (ParticleArray::is_host_mem)
+                    for (auto const& particle : *sourceParticlesArray)
                     {
-                        shiftedParticle.iCell[i] += offset[i];
+                        auto shiftedParticle{particle};
+                        auto offset = transformation.getOffset();
+                        for (auto i = 0u; i < dim; ++i)
+                        {
+                            shiftedParticle.iCell[i] += offset[i];
+                        }
+                        if (isInBox(intersectionBox, shiftedParticle))
+                        {
+                            buffer.push_back(shiftedParticle);
+                        }
                     }
-                    if (isInBox(intersectionBox, shiftedParticle))
-                    {
-                        buffer.push_back(shiftedParticle);
-                    }
-                }
             }
         }
     };

@@ -130,7 +130,7 @@ private:
 
 template<typename ParticleArray, typename GridLayout>
 void MaxwellianParticleInitializer<ParticleArray, GridLayout>::loadParticles(
-    ParticleArray& particles, GridLayout const& layout) const
+    ParticleArray& out_particles, GridLayout const& layout) const
 {
     auto point = [](std::size_t i, auto const& indices) -> core::Point<std::uint32_t, dimension> {
         if constexpr (dimension == 1)
@@ -140,6 +140,8 @@ void MaxwellianParticleInitializer<ParticleArray, GridLayout>::loadParticles(
         if constexpr (dimension == 3)
             return {std::get<0>(indices[i]), std::get<1>(indices[i]), std::get<2>(indices[i])};
     };
+
+    using Particle_t = typename ParticleArray::Particle_t;
 
 
     // in the following two calls,
@@ -161,8 +163,10 @@ void MaxwellianParticleInitializer<ParticleArray, GridLayout>::loadParticles(
     auto const [n, V, Vth] = fns();
     auto randGen           = getRNG(rngSeed_);
     ParticleDeltaDistribution<double> deltaDistrib;
+    std::vector<Particle_t> particles;
+    particles.reserve(ndCellIndices.size() * nbrParticlePerCell_);
 
-    for (std::size_t flatCellIdx = 0; flatCellIdx < ndCellIndices.size(); flatCellIdx++)
+    for (std::size_t flatCellIdx = 0, i = 0; flatCellIdx < ndCellIndices.size(); ++flatCellIdx, ++i)
     {
         auto const cellWeight   = n[flatCellIdx] / nbrParticlePerCell_;
         auto const AMRCellIndex = layout.localToAMR(point(flatCellIdx, ndCellIndices));
@@ -185,16 +189,14 @@ void MaxwellianParticleInitializer<ParticleArray, GridLayout>::loadParticles(
             if (basis_ == Basis::Magnetic)
                 particleVelocity = basisTransform(basis, particleVelocity);
 
-#if defined(HAVE_RAJA)
-
-#else // NORMAL
             particles.emplace_back(
                 Particle{cellWeight, particleCharge_, AMRCellIndex.template toArray<int>(),
                          core::ConstArrayFrom<dimension>([&] { return deltaDistrib(randGen); }),
                          particleVelocity});
-#endif
         }
     }
+
+    out_particles = std::move(particles);
 }
 
 } // namespace PHARE::core

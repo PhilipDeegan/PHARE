@@ -5,7 +5,39 @@
 #include "core/data/vecfield/vecfield_component.h"
 #include "initializer/data_provider.h"
 
-#include <array>
+#include <tuple>
+#include <cstdint>
+
+namespace PHARE::core
+{
+template<typename Field, typename GridLayout, typename InitFunction>
+void initialize_field(Field& field, GridLayout const& layout, InitFunction const& init)
+{
+    auto const indices = layout.ghostStartToEndIndices(field, /*includeEnd=*/true);
+    auto const coords  = layout.template indexesToCoordVectors</*WithField=*/true>(
+        indices, field, [](auto& gridLayout, auto& field_, auto const&... args) {
+            return gridLayout.fieldNodeCoordinates(field_, gridLayout.origin(), args...);
+        });
+
+    // keep grid data alive
+    auto grid = std::apply([&](auto const&... args) { return init(args...); }, coords);
+    assert(field.size() == grid->size());
+
+    if constexpr (Field::is_host_mem) // could this be a memcpy?
+        for (std::size_t cell_idx = 0; cell_idx < indices.size(); cell_idx++)
+            std::apply([&](auto&... args) { field(args...) = (*grid)[cell_idx]; },
+                       indices[cell_idx]);
+#if defined(HAVE_RAJA)
+    else
+    {
+        RAJA::resources::Cuda{}.memcpy(
+            /*device pointer*/ field.data(),
+            /*host pointer*/ grid->data(),
+            /*size in bytes*/ sizeof(typename Field::type) * field.size());
+    }
+#endif
+}
+} // namespace PHARE::core
 
 namespace PHARE
 {
@@ -31,32 +63,12 @@ namespace core
             static_assert(GridLayout::dimension == VecField::dimension,
                           "dimension mismatch between vecfield and gridlayout");
 
-            initializeComponent_(v.getComponent(Component::X), layout, x_);
-            initializeComponent_(v.getComponent(Component::Y), layout, y_);
-            initializeComponent_(v.getComponent(Component::Z), layout, z_);
+            initialize_field(v.getComponent(Component::X), layout, x_);
+            initialize_field(v.getComponent(Component::Y), layout, y_);
+            initialize_field(v.getComponent(Component::Z), layout, z_);
         }
 
     private:
-        template<typename Field, typename GridLayout>
-        void initializeComponent_(Field& field, GridLayout const& layout,
-                                  initializer::InitFunction<dimension> const& init)
-        {
-            auto const indices = layout.ghostStartToEndIndices(field, /*includeEnd=*/true);
-            auto const coords  = layout.template indexesToCoordVectors</*WithField=*/true>(
-                indices, field, [](auto& gridLayout, auto& field_, auto const&... args) {
-                    return gridLayout.fieldNodeCoordinates(field_, gridLayout.origin(), args...);
-                });
-
-            // keep grid data alive
-            auto grid = std::apply([&](auto const&... args) { return init(args...); }, coords);
-
-            for (std::size_t cell_idx = 0; cell_idx < indices.size(); cell_idx++)
-                std::apply([&](auto&... args) { field(args...) = (*grid)[cell_idx]; },
-                           indices[cell_idx]);
-        }
-
-
-
         initializer::InitFunction<dimension> x_;
         initializer::InitFunction<dimension> y_;
         initializer::InitFunction<dimension> z_;

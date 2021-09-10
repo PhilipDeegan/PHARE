@@ -68,15 +68,15 @@ struct State
 };
 
 
-template<std::size_t _dimension, std::size_t interp_order, std::size_t nbRefinedPart>
-struct InitState // always CPU
-{
-    static constexpr std::size_t dimension = _dimension;
-    using PHARETypes             = solver::CPU_Types<dimension, interp_order, nbRefinedPart>;
-    using HybridModel            = typename PHARETypes::HybridModel_t;
-    using MultiPhysicsIntegrator = typename PHARETypes::MultiPhysicsIntegrator;
-    using SolverPPC              = typename PHARETypes::SolverPPC_t;
-};
+// template<std::size_t _dimension, std::size_t interp_order, std::size_t nbRefinedPart>
+// struct InitState // always CPU
+// {
+//     static constexpr std::size_t dimension = _dimension;
+//     using PHARETypes             = solver::CPU_Types<dimension, interp_order, nbRefinedPart>;
+//     using HybridModel            = typename PHARETypes::HybridModel_t;
+//     using MultiPhysicsIntegrator = typename PHARETypes::MultiPhysicsIntegrator;
+//     using SolverPPC              = typename PHARETypes::SolverPPC_t;
+// };
 
 template<std::size_t _dimension, std::size_t interp_order, std::size_t nbRefinedPart, bool offload>
 struct WorkingState // might be CPU
@@ -87,9 +87,10 @@ struct WorkingState // might be CPU
     using MultiPhysicsIntegrator = typename PHARETypes::MultiPhysicsIntegrator;
     using SolverPPC              = typename PHARETypes::SolverPPC_t;
 
-    static constexpr bool is_cpu
-        = std::is_same_v<HybridModel,
-                         typename InitState<dimension, interp_order, nbRefinedPart>::HybridModel>;
+    // static constexpr bool is_cpu
+    //     = std::is_same_v<HybridModel,
+    //                      typename InitState<dimension, interp_order,
+    //                      nbRefinedPart>::HybridModel>;
 };
 
 template<std::size_t _dimension, std::size_t _interp_order, std::size_t _nbRefinedPart,
@@ -117,8 +118,8 @@ public:
 
     bool dump(double timestamp, double timestep) override
     {
-        if constexpr (!WorkingState_t::is_cpu) // load cpu from gpu for diag dumps
-            solver::fill_state_from(state_->hybridModel_, hostState_->hybridModel_);
+        // if constexpr (!WorkingState_t::is_cpu) // load cpu from gpu for diag dumps
+        //     solver::fill_state_from(state_->hybridModel_, hostState_->hybridModel_);
         return dMan->dump(timestamp, timestep);
     }
 
@@ -149,7 +150,7 @@ public:
     using SimFunctorParams = typename core::PHARE_Sim_Types::SimFunctorParams;
     using SimFunctors      = typename core::PHARE_Sim_Types::SimulationFunctors;
 
-    using InitState_t    = InitState<dimension, interp_order, nbRefinedPart>;
+    // using InitState_t    = InitState<dimension, interp_order, nbRefinedPart>;
     using WorkingState_t = WorkingState<dimension, interp_order, nbRefinedPart, offload>;
 
 
@@ -189,7 +190,7 @@ private:
     }
 
 
-    std::shared_ptr<State<InitState_t>> hostState_;
+    // std::shared_ptr<State<InitState_t>> hostState_;
     std::shared_ptr<State<WorkingState_t>> state_;
 };
 
@@ -261,14 +262,15 @@ Simulator<_dimension, _interp_order, _nbRefinedPart, offload>::Simulator(
 {
     if (find_model("HybridModel"))
     {
-        hostState_ = init_state(std::make_shared<State<InitState_t>>(dict, functors_), hierarchy_,
-                                messengerFactory_, dict, maxLevelNumber_);
+        // hostState_ = init_state(std::make_shared<State<InitState_t>>(dict, functors_),
+        // hierarchy_,
+        //                         messengerFactory_, dict, maxLevelNumber_);
 
-        if constexpr (!WorkingState_t::is_cpu)
-            state_ = init_state(std::make_shared<State<WorkingState_t>>(dict, functors_),
-                                hierarchy_, messengerFactory_, dict, maxLevelNumber_, "dev_");
-        else
-            state_ = std::make_shared<State<WorkingState_t>>(*hostState_);
+        // if constexpr (!WorkingState_t::is_cpu)
+        state_ = init_state(std::make_shared<State<WorkingState_t>>(dict, functors_), hierarchy_,
+                            messengerFactory_, dict, maxLevelNumber_);
+        // else
+        // state_ = std::make_shared<State<WorkingState_t>>(*hostState_);
 
         // hard coded for now, should get some params later from the dict
         auto hybridTagger_ = amr::TaggerFactory<PHARETypes>::make("HybridModel", "default");
@@ -333,15 +335,15 @@ void Simulator<_dimension, _interp_order, _nbRefinedPart, offload>::initialize()
         if (isInitialized)
             std::runtime_error("cannot initialize  - simulator already isInitialized");
 
-        auto& integrator_ = hostState_->integrator_;
+        auto& integrator_ = state_->integrator_;
 
         if (integrator_ == nullptr)
             throw std::runtime_error("Error - Simulator has no integrator");
 
         integrator_->initialize();
 
-        if constexpr (!WorkingState_t::is_cpu)
-            solver::fill_state_from(hostState_->hybridModel_, state_->hybridModel_);
+        // if constexpr (!WorkingState_t::is_cpu)
+        //     solver::fill_state_from(hostState_->hybridModel_, state_->hybridModel_);
     }
     catch (const std::runtime_error& e)
     {

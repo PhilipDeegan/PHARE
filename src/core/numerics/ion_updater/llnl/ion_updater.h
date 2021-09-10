@@ -2,7 +2,22 @@
 #define PHARE_CORE_LLNL_ION_UPDATER_H
 
 #include "core/numerics/pusher/granov.h"
-#include "core/numerics/ion_updater/ion_updater.h"
+
+#include "core/utilities/box/box.h"
+#include "core/numerics/interpolator/interpolator.h"
+#include "core/numerics/pusher/pusher.h"
+#include "core/numerics/pusher/pusher_factory.h"
+#include "core/numerics/boundary_condition/boundary_condition.h"
+#include "core/numerics/moments/moments.h"
+
+#include "core/data/ions/ions.h"
+
+#include "initializer/data_provider.h"
+
+#include "core/logger.h"
+
+#include <memory>
+
 // TODO alpha coef for interpolating new and old levelGhost should be given somehow...
 
 
@@ -27,13 +42,14 @@ public:
                                        BoundaryCondition, GridLayout>;
 
 private:
-    constexpr static auto makePusher
-        = PHARE::core::PusherFactory::makePusher<dimension, PartIterator, Electromag, Interpolator,
-                                                 BoundaryCondition, GridLayout>;
+    // constexpr static auto makePusher
+    //     = PHARE::core::PusherFactory::makePusher<dimension, PartIterator, Electromag,
+    //     Interpolator,
+    //                                              BoundaryCondition, GridLayout>;
 
 public:
     IonUpdater(PHARE::initializer::PHAREDict const& dict)
-        : pusher_{makePusher(dict["pusher"]["name"].template to<std::string>())}
+    // : pusher_{makePusher(dict["pusher"]["name"].template to<std::string>())}
     {
     }
 
@@ -46,7 +62,7 @@ private:
     void updateAndDepositDomain_(Ions& ions, Electromag const& em, GridLayout const& layout);
     void updateAndDepositAll_(Ions& ions, Electromag const& em, GridLayout const& layout);
 
-    std::unique_ptr<Pusher> pusher_;
+    // std::unique_ptr<Pusher> pusher_;
     Interpolator interpolator_{};
     double dt_;
 };
@@ -59,7 +75,7 @@ void IonUpdater<Ions, Electromag, GridLayout>::updatePopulations(Ions& ions, Ele
                                                                  GridLayout const& layout,
                                                                  double dt, UpdaterMode mode)
 {
-    pusher_->setMeshAndTimeStep(layout.meshSize(), dt);
+    // pusher_->setMeshAndTimeStep(layout.meshSize(), dt);
     dt_ = dt;
 
     if (mode == UpdaterMode::domain_only)

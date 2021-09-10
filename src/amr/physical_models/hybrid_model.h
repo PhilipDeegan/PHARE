@@ -14,7 +14,9 @@
 #include "amr/messengers/hybrid_messenger_info.h"
 
 
+#if defined(HAVE_UMPIRE)
 #include "interop/patch_state.h"
+#endif
 
 
 
@@ -139,11 +141,6 @@ template<typename GridLayoutT, typename Electromag, typename Ions, typename Elec
          typename AMR_Types>
 void HybridModel<GridLayoutT, Electromag, Ions, Electrons, AMR_Types>::initialize(level_t& level)
 {
-    using VecFieldT = typename Electromag::vecfield_type;
-    using FieldT    = typename VecFieldT::field_type;
-    if constexpr (!FieldT::is_host_mem)
-        return;
-
     for (auto& patch : level)
     {
         // first initialize the ions

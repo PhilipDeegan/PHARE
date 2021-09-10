@@ -1,5 +1,5 @@
-#ifndef PHARE_CORE_DATA_PARTICLES_PARTICLE_ARRAY_H
-#define PHARE_CORE_DATA_PARTICLES_PARTICLE_ARRAY_H
+#ifndef PHARE_CORE_LLNL_PARTICLES_PARTICLE_ARRAY_H
+#define PHARE_CORE_LLNL_PARTICLES_PARTICLE_ARRAY_H
 
 #ifndef HAVE_UMPIRE
 #error // expected
@@ -15,33 +15,34 @@
 
 namespace PHARE::core::llnl
 {
-template<bool GPU, typename Particle>
+template<typename Particle>
 struct ABufferedParticleVector
 {
-    ABufferedParticleVector() = delete;
-};
+    auto get_allocator()
+    {
+        auto& rm = umpire::ResourceManager::getInstance();
+        assert(rm.isAllocator("samrai::data_allocator"));
+        return rm.getAllocator("samrai::data_allocator");
+    }
 
-template<typename Particle>
-struct ABufferedParticleVector<false, Particle>
-{
+
     ABufferedParticleVector(std::size_t size_, double buffer_by_, double realloc_by_)
         : size{size_}
         , buffer_by{realloc_by_}
         , realloc_by{realloc_by_}
-        , capacity{size + size * buffer_by}
-        , allocator_{}
+        , capacity{static_cast<std::size_t>(size + size * buffer_by)}
+        , allocator_{get_allocator()}
         , particles{capacity, allocator_}
     {
         assert(buffer_by < 1 and buffer_by > 0);
         assert(realloc_by < 1 and realloc_by > 0);
 
-        info      = std::make_unique<kul::gpu::DeviceMem<std::size_t>>(1, size);
-        particles = std::make_unique<kul::gpu::DeviceMem<Particle>>(v_info[3]);
+        // info = std::make_unique<kul::gpu::DeviceMem<std::size_t>>(std::vector(1, size));
     }
 
     bool check() __host__
     {
-        auto n_elements = info()[0];
+        auto n_elements = (*info)()[0];
 
         bool realloc_more = n_elements >= size + size * realloc_by;
         if (realloc_more)
@@ -66,54 +67,50 @@ struct ABufferedParticleVector<false, Particle>
     umpire::TypedAllocator<double> allocator_;
     std::vector<double, umpire::TypedAllocator<double>> particles;
 };
-template<typename Particle>
-struct ABufferedParticleVector<true, Particle>
-{
-    std::size_t* info;
-    Particle* particles;
-};
 
-template<typename Particle, bool GPU = false>
-struct BufferedParticleVector : ABufferedParticleVector<GPU, Particle>
+
+template<typename Particle>
+struct BufferedParticleVector : ABufferedParticleVector<Particle>
 {
-    using Super    = ABufferedParticleVector<GPU, Particle>;
+    using Super    = ABufferedParticleVector<Particle>;
     using iterator = Particle*;
-    using gpu_t    = BufferedParticleVector<Particle, true>;
     using Super::info;
     using Super::particles;
 
     BufferedParticleVector(std::size_t size, double buffer_by = .1,
                            double realloc_by = .05) __host__
-        : ABufferedParticleVector<false, Particle>{size, buffer_by}
+        : ABufferedParticleVector<Particle>{size, buffer_by, realloc_by}
     {
     }
 
     std::size_t size() const __host__ { return Super::size; }
     std::size_t size() const __device__ { return info[0]; }
 
-    auto operator()() __host__ { return Super::template alloc<gpu_t>(*info, *particles); }
     auto& operator[](std::size_t i) const __device__ { return particles[i]; }
     auto& operator[](std::size_t i) __device__ { return particles[i]; }
 
     void push_back(Particle const& particle) __device__
     {
-        auto index       = atomicAdd(&info[0], 1);
-        particles[index] = particle;
+        assert(false);
+        // auto index       = atomicAdd(&info[0], 1);
+        // particles[index] = particle;
     }
     void push_back(Particle&& particle) __device__ { push_back(particle); }
 
     void erase(std::size_t index) __device__
     {
-        auto top = atomicSub(&info[0], 1);
-        if (index != top)
-            particles[index] = top;
+        assert(false);
+        // auto top = atomicSub(&info[0], 1);
+        // if (index != top)
+        //     particles[index] = top;
     }
 };
 
-template<typename Particle, typename Vector_ = BufferedParticleVector>
+template<typename Particle, typename Vector_ = BufferedParticleVector<Particle>>
 class ParticleArray
 {
 public:
+    static constexpr bool is_host_mem   = false;
     static constexpr bool is_contiguous = false;
     static constexpr auto dimension     = Particle::dimension;
     using Particle_t                    = Particle;
@@ -121,26 +118,72 @@ public:
     using iterator                      = typename Vector::iterator;
     using value_type                    = Particle_t;
 
-    ParticleArray() = delete;
+    ParticleArray() { std::cout << __FILE__ << " " << __LINE__ << std::endl; };
     ParticleArray(std::size_t size)
-        : vector{size}
+        : vector{std::make_unique<Vector>(size)}
     {
+        std::cout << __FILE__ << " " << __LINE__ << " " << size << std::endl;
     }
 
-    std::size_t size() const { return vector.size(); }
+    std::size_t size() const
+    {
+        check();
+        return vector->size();
+    }
 
-    auto& operator[](std::size_t i) { return vector[i]; }
-    auto& operator[](std::size_t i) const { return vector[i]; }
+    void clear() { vector.release(); }
 
-    void erase(std::size_t index) { return vector.erase(index); }
+    auto& operator=(std::vector<Particle_t>&& input)
+    {
+        // this->particles = std::move(vector);
+        vector = std::make_unique<Vector>(input.size());
+        std::cout << __FILE__ << " " << __LINE__ << " " << input.size() << std::endl;
+
+#if defined(HAVE_RAJA)
+
+        RAJA::resources::Cuda{}.memcpy(
+            /*device pointer*/ input.data(),
+            /*host pointer*/ vector->particles.data(),
+            /*size in bytes*/ sizeof(Particle_t) * input.size());
+
+#endif
+
+        input.clear(); // probably dies here but just in case;
+        return *this;
+    }
+
+    operator bool() const { return vector != nullptr; }
+    void check() const { assert(bool{*this}); }
+
+    // auto& operator[](std::size_t i) _PHARE_ALL_FN_
+    // {
+    //     check();
+    //     return vector[i];
+    // }
+    // auto& operator[](std::size_t i) const _PHARE_ALL_FN_
+    // {
+    //     check();
+    //     return vector[i];
+    // }
+
+    auto data() const { return vector->particles.data(); }
+    auto data() { return vector->particles.data(); }
+    void erase(std::size_t index)
+    {
+        assert(false);
+        // vector->erase(index);
+    }
 
     void push_back(Particle_t&& p) { vector.push_back(p); }
     void push_back(Particle_t const& p) { vector.push_back(p); }
 
-    void swap(ParticleArray<dim>& that) { this->vector.particles.swap(that.vector.particles); }
+    void swap(ParticleArray<Particle_t>& that)
+    {
+        this->vector->particles.swap(that.vector->particles);
+    }
 
 private:
-    Vector vector;
+    std::unique_ptr<Vector> vector;
 };
 
 } // namespace PHARE::core::llnl
@@ -148,20 +191,26 @@ private:
 
 namespace PHARE::core
 {
-template<std::size_t dim>
-void empty(llnl::ParticleArray<dim>& array)
+template<typename Particle>
+void empty(llnl::ParticleArray<Particle>& array)
 {
-    static_assert(false);
+    assert(false);
     array.clear();
 }
 
-template<std::size_t dim>
-void swap(llnl::ParticleArray<dim>& array1, llnl::ParticleArray<dim>& array2)
+template<typename Particle>
+void swap(llnl::ParticleArray<Particle>& array1, llnl::ParticleArray<Particle>& array2)
 {
-    static_assert(false);
+    assert(false);
     array1.swap(array2);
+}
+
+template<typename Particle>
+void append(llnl::ParticleArray<Particle> const& src, llnl::ParticleArray<Particle>& dst)
+{
+    assert(false);
 }
 
 } // namespace PHARE::core
 
-#endif
+#endif /*PHARE_CORE_LLNL_PARTICLES_PARTICLE_ARRAY_H*/

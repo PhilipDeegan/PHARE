@@ -12,13 +12,13 @@ namespace PHARE::solver::llnl
 // -----------------------------------------------------------------------------
 
 template<typename HybridModel, typename AMR_Types>
-class SolverPPC : public PHARE::solver::SolverPPC<HybridModel, AMR_Types>
+class SolverPPC : public PHARE::solver::SolverPPCBase<HybridModel, AMR_Types>
 {
 public:
     static constexpr auto dimension    = HybridModel::dimension;
     static constexpr auto interp_order = HybridModel::gridlayout_type::interp_order;
 
-    using Super            = PHARE::solver::SolverPPC<HybridModel, AMR_Types>;
+    using Super            = PHARE::solver::SolverPPCBase<HybridModel, AMR_Types>;
     using This             = PHARE::solver::llnl::SolverPPC<HybridModel, AMR_Types>;
     using HybridModel_t    = HybridModel;
     using Electromag       = typename HybridModel::electromag_type;
@@ -37,8 +37,7 @@ private:
     using Super::electromagAvg_;
     using Super::predictor1_;
     using Super::predictor2_;
-    using Super::restoreState_;
-    using Super::saveState_;
+
 
     PHARE::core::llnl::IonUpdater<Ions, Electromag, GridLayout> ionUpdater_;
 

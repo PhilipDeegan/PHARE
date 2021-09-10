@@ -17,7 +17,6 @@
 #include "umpire/ResourceManager.hpp"
 #include "umpire/Allocator.hpp"
 #include "umpire/TypedAllocator.hpp"
-#include "kul/gpu.hpp"
 #endif
 
 namespace PHARE::core
@@ -213,10 +212,11 @@ namespace
         {
             auto& rm = umpire::ResourceManager::getInstance();
             assert(rm.isAllocator("samrai::data_allocator"));
-            return rm.getAllocator("samrai::data_allocator");
+            return Allocator{rm.getAllocator("samrai::data_allocator")};
         }
 #endif
     }
+
 } // namespace
 
 template<std::size_t dim, typename DataType = double,
@@ -247,8 +247,9 @@ public:
     explicit NdArrayVector(Nodes... nodes)
         : size_{(... * nodes)}
         , nCells_{nodes...}
-        , data_(size_, get_allocator<DataType, Allocator>())
+        , data_(get_allocator<DataType, Allocator>())
     {
+        data_.resize(size_);
         static_assert(sizeof...(Nodes) == dim);
         _print();
     }
@@ -256,8 +257,9 @@ public:
     explicit NdArrayVector(std::array<std::uint32_t, dim> const& ncells)
         : size_{accumulate(ncells)}
         , nCells_{ncells}
-        , data_(size_, get_allocator<DataType, Allocator>())
+        , data_(get_allocator<DataType, Allocator>())
     {
+        data_.resize(size_);
         _print();
     }
 
@@ -281,7 +283,13 @@ public:
             std::fill(data_.begin(), data_.end(), 0);
 #if defined(HAVE_RAJA)
         else
-            KUL_GPU_NS::send(data(), std::vector<DataType>(0, size()).data(), size());
+        {
+            std::vector<DataType> zeroes(0, size());
+            RAJA::resources::Cuda{}.memcpy(
+                /*device pointer*/ data(),
+                /*host pointer*/ zeroes.data(),
+                /*size in bytes*/ sizeof(DataType) * size());
+        }
 #endif
     }
 
@@ -289,22 +297,26 @@ public:
     NdArrayVector& operator=(NdArrayVector const& source)
     {
         if (nCells_ != source.nCells_)
-        {
             throw std::runtime_error("Error NdArrayVector cannot be assigned, incompatible sizes");
-        }
 
-        this->data_ = source.data_;
+        if constexpr (is_host_mem)
+            this->data_ = source.data_;
+        else
+            assert(false);
+
         return *this;
     }
 
     NdArrayVector& operator=(NdArrayVector&& source)
     {
         if (nCells_ != source.nCells_)
-        {
             throw std::runtime_error("Error NdArrayVector cannot be assigned, incompatible sizes");
-        }
 
-        this->data_ = std::move(source.data_);
+        if constexpr (is_host_mem)
+            this->data_ = std::move(source.data_);
+        else
+            assert(false);
+
         return *this;
     }
 

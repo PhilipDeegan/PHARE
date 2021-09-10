@@ -217,10 +217,10 @@ PYBIND11_MODULE(PHARE_CPP_MOD_NAME, m)
 
     core::apply(core::possibleSimulators(), [&](auto const& simType) { declare(m, simType); });
 
-    {
-        using namespace PHARE::core;
-        declare<DimConst<1>, InterpConst<1>, std::integral_constant<std::size_t, 2>, true>(m);
-    }
+    // {
+    //     using namespace PHARE::core;
+    //     declare<DimConst<1>, InterpConst<1>, std::integral_constant<std::size_t, 2>, true>(m);
+    // }
 
     declarePatchData<std::vector<double>, 1>(m, "PatchDataVectorDouble_1D");
     declarePatchData<std::vector<double>, 2>(m, "PatchDataVectorDouble_2D");

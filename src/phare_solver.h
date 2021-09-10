@@ -63,22 +63,21 @@ struct CPU_Types
 template<typename HybridModel_t, std::size_t nbRefinedPart, bool offload>
 auto constexpr solver_select()
 {
-    auto constexpr dimension    = HybridModel_t::dimension;
-    auto constexpr interp_order = HybridModel_t::gridlayout_type::interp_order;
-    using CPU_SolverPPC_t = typename CPU_Types<dimension, interp_order, nbRefinedPart>::SolverPPC_t;
-
 #if defined(HAVE_RAJA) and defined(HAVE_UMPIRE)
     using GPU_SolverPPC_t = PHARE::solver::llnl::SolverPPC<HybridModel_t, PHARE::amr::SAMRAI_Types>;
-    return static_cast<std::conditional_t<offload, GPU_SolverPPC_t, CPU_SolverPPC_t>*>(nullptr);
+    return static_cast<GPU_SolverPPC_t*>(nullptr);
 
 #elif defined(PHARE_WITH_GPU)
     using GPU_SolverPPC_t = PHARE::solver::gpu::SolverPPC<HybridModel_t, PHARE::amr::SAMRAI_Types>;
-    return static_cast<std::conditional_t<offload, GPU_SolverPPC_t, CPU_SolverPPC_t>*>(nullptr);
+    return static_cast<GPU_SolverPPC_t*>(nullptr);
 
 #elif defined(HAVE_RAJA) or defined(HAVE_UMPIRE)
 #error // invalid, both RAJA and UMPIRE are required together.
 #else
 
+    auto constexpr dimension    = HybridModel_t::dimension;
+    auto constexpr interp_order = HybridModel_t::gridlayout_type::interp_order;
+    using CPU_SolverPPC_t = typename CPU_Types<dimension, interp_order, nbRefinedPart>::SolverPPC_t;
     return static_cast<CPU_SolverPPC_t*>(nullptr);
 #endif
 }

@@ -700,7 +700,12 @@ namespace core
         inline void operator()(Particles const& particles, Field& density, VecField& flux,
                                GridLayout const& layout, double coef = 1.)
         {
-            return (*this)(std::begin(particles), std::end(particles), density, flux, layout, coef);
+            if constexpr (Field::is_host_mem)
+                (*this)(std::begin(particles), std::end(particles), density, flux, layout, coef);
+#if defined(HAVE_RAJA)
+            else
+                assert(false);
+#endif
         }
 
 

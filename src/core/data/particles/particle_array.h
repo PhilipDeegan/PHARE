@@ -10,6 +10,7 @@ template<typename Particle>
 class ParticleArray
 {
 public:
+    static constexpr bool is_host_mem   = true;
     static constexpr bool is_contiguous = false;
     static constexpr auto dimension     = Particle::dimension;
     using Particle_t                    = Particle;
@@ -46,6 +47,12 @@ public:
     auto& operator=(ParticleArray&& that)
     {
         this->particles = std::move(that.particles);
+        return *this;
+    }
+
+    auto& operator=(Vector&& vector)
+    {
+        this->particles = std::move(vector);
         return *this;
     }
 
@@ -109,6 +116,12 @@ template<typename Particle>
 void swap(ParticleArray<Particle>& array1, ParticleArray<Particle>& array2)
 {
     array1.swap(array2);
+}
+
+template<typename Particle>
+void append(ParticleArray<Particle> const& src, ParticleArray<Particle>& dst)
+{
+    std::copy(std::begin(src), std::end(src), std::back_inserter(dst));
 }
 
 } // namespace PHARE::core

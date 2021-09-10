@@ -26,7 +26,7 @@
 
 #include "cppdict/include/dict.hpp"
 
-#if defined(WITH_RAJA) and defined(WITH_UMPIRE)
+#if defined(HAVE_RAJA) and defined(HAVE_UMPIRE)
 #include "core/data/particles/llnl/particle_array.h"
 #elif defined(PHARE_WITH_GPU)
 
@@ -71,7 +71,7 @@ struct CPU_Types
         = PHARE::core::MaxwellianParticleInitializer<ParticleArray_t, GridLayout_t>;
 };
 
-#if defined(WITH_RAJA) and defined(WITH_UMPIRE)
+#if defined(HAVE_RAJA) and defined(HAVE_UMPIRE)
 template<std::size_t dimension>
 struct RAJA_Types
 {
@@ -83,9 +83,9 @@ template<std::size_t dimension>
 auto constexpr particle_array_selector()
 {
     using Particle_t = typename CPU_Types<dimension>::Particle_t;
-#if defined(WITH_RAJA) and defined(WITH_UMPIRE)
+#if defined(HAVE_RAJA) and defined(HAVE_UMPIRE)
     return static_cast<PHARE::core::llnl::ParticleArray<Particle_t>*>(nullptr);
-#elif defined(WITH_RAJA) or defined(WITH_UMPIRE)
+#elif defined(HAVE_RAJA) or defined(HAVE_UMPIRE)
 #error // invalid, both RAJA and UMPIRE are required together.
 #else
     return static_cast<PHARE::core::ParticleArray<Particle_t>*>(nullptr);
@@ -95,9 +95,9 @@ auto constexpr particle_array_selector()
 template<std::size_t dimension>
 auto constexpr nd_array_selector()
 {
-#if defined(WITH_RAJA) and defined(WITH_UMPIRE)
-    return static_cast<typename RAJA_Types::Array_t*>(nullptr);
-#elif defined(WITH_RAJA) or defined(WITH_UMPIRE)
+#if defined(HAVE_RAJA) and defined(HAVE_UMPIRE)
+    return static_cast<typename RAJA_Types<dimension>::Array_t*>(nullptr);
+#elif defined(HAVE_RAJA) or defined(HAVE_UMPIRE)
 #error // invalid, both RAJA and UMPIRE are required together.
 #else
     return static_cast<typename CPU_Types<dimension>::Array_t*>(nullptr);
