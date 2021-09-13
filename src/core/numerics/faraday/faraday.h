@@ -115,7 +115,7 @@ public:
 #if defined(HAVE_RAJA)
         else
         {
-            assert(false);
+            //assert(false);
         }
 #endif
     }

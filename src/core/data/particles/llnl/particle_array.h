@@ -32,12 +32,16 @@ struct ABufferedParticleVector
         , realloc_by{realloc_by_}
         , capacity{static_cast<std::size_t>(size + size * buffer_by)}
         , allocator_{get_allocator()}
-        , particles{capacity, allocator_}
+        , particles{allocator_}
     {
+        particles.resize(capacity);
+        assert(particles.size() == capacity);
         assert(buffer_by < 1 and buffer_by > 0);
         assert(realloc_by < 1 and realloc_by > 0);
 
-        // info = std::make_unique<kul::gpu::DeviceMem<std::size_t>>(std::vector(1, size));
+        //info = std::make_unique<kul::gpu::DeviceMem<std::size_t>>(std::vector(1, size));
+        //KLOG(INF) << info->p;
+	//KLOG(INF) << info.get();
     }
 
     bool check() __host__
@@ -142,12 +146,12 @@ public:
 #if defined(HAVE_RAJA)
 
         RAJA::resources::Cuda{}.memcpy(
-            /*device pointer*/ input.data(),
-            /*host pointer*/ vector->particles.data(),
+            /*device pointer*/ vector->particles.data(),
+            /*host pointer*/ input.data(),
             /*size in bytes*/ sizeof(Particle_t) * input.size());
 
 #endif
-
+        KLOG(INF);
         input.clear(); // probably dies here but just in case;
         return *this;
     }

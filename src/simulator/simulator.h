@@ -16,6 +16,22 @@
 #include <exception>
 
 
+#if defined(HAVE_UMPIRE)
+#include "umpire/ResourceManager.hpp"
+#endif
+
+
+namespace PHARE{
+auto static_init(){
+#if defined(HAVE_UMPIRE)
+
+	
+#endif  
+  return true;
+}
+}
+
+
 namespace PHARE
 {
 class ISimulator

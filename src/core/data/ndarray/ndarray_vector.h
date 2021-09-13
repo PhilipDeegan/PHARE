@@ -17,6 +17,7 @@
 #include "umpire/ResourceManager.hpp"
 #include "umpire/Allocator.hpp"
 #include "umpire/TypedAllocator.hpp"
+#include "kul/log.hpp"
 #endif
 
 namespace PHARE::core
@@ -203,7 +204,6 @@ namespace
     auto get_allocator()
     {
         auto constexpr is_host_mem = is_host_mem_type<DataType, Allocator>();
-        std::cout << __FILE__ << " " << __LINE__ << " " << is_host_mem << " " << std::endl;
 
         if constexpr (is_host_mem)
             return Allocator{};
@@ -230,8 +230,7 @@ class NdArrayVector
 
     void _print()
     {
-        std::cout << __FILE__ << " " << __LINE__ << " " << is_host_mem << " " << data()
-                  << std::endl;
+        KLOG(INF) << data() << " " << size();
     }
 
 public:
@@ -279,12 +278,16 @@ public:
 
     void zero()
     {
+        if(size() == 0) return;
         if constexpr (is_host_mem)
             std::fill(data_.begin(), data_.end(), 0);
 #if defined(HAVE_RAJA)
         else
         {
-            std::vector<DataType> zeroes(0, size());
+            KLOG(INF) << size();
+            std::vector<DataType> zeroes(size(), 0);
+            assert(zeroes.size() == size());
+            // TODO replace with "fill"
             RAJA::resources::Cuda{}.memcpy(
                 /*device pointer*/ data(),
                 /*host pointer*/ zeroes.data(),
