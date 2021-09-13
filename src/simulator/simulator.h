@@ -18,18 +18,44 @@
 
 #if defined(HAVE_UMPIRE)
 #include "umpire/ResourceManager.hpp"
+#include "umpire/strategy/AllocationAdvisor.hpp"
 #endif
 
 
-namespace PHARE{
-auto static_init(){
+namespace PHARE
+{
+auto static_init()
+{
 #if defined(HAVE_UMPIRE)
+    auto& rm = umpire::ResourceManager::getInstance();
 
-	
-#endif  
-  return true;
+
+    // initialize samrai internals allocator to HOST
+    assert(!rm.isAllocator("samrai::data_allocator"));
+    [[maybe_unused]] auto samrai_allocator = rm.makeAllocator<umpire::strategy::DynamicPool>(
+        "samrai::data_allocator", rm.getAllocator(umpire::resource::Host));
+    assert(samrai_allocator.getPlatform() == umpire::Platform::host);
+
+    SAMRAI::tbox::AllocatorDatabase::getDatabase()->initialize();
+    // assert(rm.isAllocator("internal::samrai::um_allocation_advisor")); // HAX
+
+    auto allocator = rm.makeAllocator<umpire::strategy::AllocationAdvisor>(
+        "internal::PHARE::um_allocation_advisor", rm.getAllocator(umpire::resource::Unified),
+        // Set preferred location to GPU
+        "PREFERRED_LOCATION");
+
+    assert(!rm.isAllocator("PHARE::data_allocator"));
+    [[maybe_unused]] auto phare_allocator
+        = rm.makeAllocator<umpire::strategy::DynamicPool>("PHARE::data_allocator", allocator);
+    assert(phare_allocator.getPlatform() != umpire::Platform::host);
+    assert(rm.isAllocator("PHARE::data_allocator"));
+
+
+#endif
+    return true;
 }
-}
+static auto _static_sim_init = static_init();
+} // namespace PHARE
 
 
 namespace PHARE

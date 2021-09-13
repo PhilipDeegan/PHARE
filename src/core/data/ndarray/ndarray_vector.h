@@ -211,8 +211,8 @@ namespace
         else
         {
             auto& rm = umpire::ResourceManager::getInstance();
-            assert(rm.isAllocator("samrai::data_allocator"));
-            return Allocator{rm.getAllocator("samrai::data_allocator")};
+            assert(rm.isAllocator("PHARE::data_allocator"));
+            return Allocator{rm.getAllocator("PHARE::data_allocator")};
         }
 #endif
     }
@@ -228,10 +228,7 @@ class NdArrayVector
         return std::accumulate(ncells.begin(), ncells.end(), 1, std::multiplies<std::uint32_t>());
     }
 
-    void _print()
-    {
-        KLOG(INF) << data() << " " << size();
-    }
+    void _print() { KLOG(INF) << data() << " " << size(); }
 
 public:
     static constexpr bool is_contiguous = 1;
@@ -278,7 +275,8 @@ public:
 
     void zero()
     {
-        if(size() == 0) return;
+        if (size() == 0)
+            return;
         if constexpr (is_host_mem)
             std::fill(data_.begin(), data_.end(), 0);
 #if defined(HAVE_RAJA)

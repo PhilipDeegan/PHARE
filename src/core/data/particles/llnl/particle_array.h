@@ -21,8 +21,8 @@ struct ABufferedParticleVector
     auto get_allocator()
     {
         auto& rm = umpire::ResourceManager::getInstance();
-        assert(rm.isAllocator("samrai::data_allocator"));
-        return rm.getAllocator("samrai::data_allocator");
+        assert(rm.isAllocator("PHARE::data_allocator"));
+        return rm.getAllocator("PHARE::data_allocator");
     }
 
 
@@ -39,9 +39,9 @@ struct ABufferedParticleVector
         assert(buffer_by < 1 and buffer_by > 0);
         assert(realloc_by < 1 and realloc_by > 0);
 
-        //info = std::make_unique<kul::gpu::DeviceMem<std::size_t>>(std::vector(1, size));
-        //KLOG(INF) << info->p;
-	//KLOG(INF) << info.get();
+        // info = std::make_unique<kul::gpu::DeviceMem<std::size_t>>(std::vector(1, size));
+        // KLOG(INF) << info->p;
+        // KLOG(INF) << info.get();
     }
 
     bool check() __host__
