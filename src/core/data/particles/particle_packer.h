@@ -1,11 +1,13 @@
 #ifndef PHARE_CORE_DATA_PARTICLE_PACKER_H
 #define PHARE_CORE_DATA_PARTICLE_PACKER_H
 
-
-#include <cstddef>
 #include <vector>
+#include <cstddef>
 
 #include "particle_array.h"
+#if defined(HAVE_UMPIRE)
+#include "llnl/particle_array.h"
+#endif
 
 namespace PHARE::core
 {
@@ -27,6 +29,15 @@ public:
         : particles_{particles}
     {
     }
+
+#if defined(HAVE_UMPIRE)
+    auto to_host_particle_array(llnl::ParticleArray<Particle> const& particles) {}
+
+    ParticlePacker(llnl::ParticleArray<Particle> const& particles)
+        : particles_{particles()}
+    {
+    }
+#endif
 
     static auto get(Particle const& particle)
     {

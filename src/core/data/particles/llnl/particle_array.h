@@ -144,12 +144,12 @@ public:
         std::cout << __FILE__ << " " << __LINE__ << " " << input.size() << std::endl;
 
 #if defined(HAVE_RAJA)
-
         RAJA::resources::Cuda{}.memcpy(
             /*device pointer*/ vector->particles.data(),
             /*host pointer*/ input.data(),
             /*size in bytes*/ sizeof(Particle_t) * input.size());
-
+#else
+        static_assert(false, "no other impl defined");
 #endif
         KLOG(INF);
         input.clear(); // probably dies here but just in case;
@@ -178,12 +178,29 @@ public:
         // vector->erase(index);
     }
 
-    void push_back(Particle_t&& p) { vector.push_back(p); }
-    void push_back(Particle_t const& p) { vector.push_back(p); }
+    void push_back(Particle&& p) { vector.push_back(p); }
+    void push_back(Particle const& p) { vector.push_back(p); }
 
-    void swap(ParticleArray<Particle_t>& that)
+    void swap(ParticleArray<Particle>& that)
     {
         this->vector->particles.swap(that.vector->particles);
+    }
+
+    auto operator()()()
+    {
+        check();
+        std::vector<Particle> particles(size());
+
+#if defined(HAVE_RAJA)
+        RAJA::resources::Cuda{}.memcpy( // expects CUDA unified mem
+            /*dst host pointer*/ particles.data(),
+            /*src dev pointer*/ vector->particles.data(),
+            /*size in bytes*/ sizeof(Particle) * size());
+#else
+        static_assert(false, "no other impl defined");
+#endif
+
+        return std::move(particles);
     }
 
 private:

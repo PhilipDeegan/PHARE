@@ -29,15 +29,12 @@ auto static_init()
 #if defined(HAVE_UMPIRE)
     auto& rm = umpire::ResourceManager::getInstance();
 
-
-    // initialize samrai internals allocator to HOST
-    assert(!rm.isAllocator("samrai::data_allocator"));
-    [[maybe_unused]] auto samrai_allocator = rm.makeAllocator<umpire::strategy::DynamicPool>(
-        "samrai::data_allocator", rm.getAllocator(umpire::resource::Host));
-    assert(samrai_allocator.getPlatform() == umpire::Platform::host);
-
-    SAMRAI::tbox::AllocatorDatabase::getDatabase()->initialize();
-    // assert(rm.isAllocator("internal::samrai::um_allocation_advisor")); // HAX
+    { // initialize samrai internals allocator to HOST
+        assert(!rm.isAllocator("samrai::data_allocator"));
+        [[maybe_unused]] auto samrai_allocator = rm.makeAllocator<umpire::strategy::DynamicPool>(
+            "samrai::data_allocator", rm.getAllocator(umpire::resource::Host));
+        assert(samrai_allocator.getPlatform() == umpire::Platform::host);
+    }
 
     auto allocator = rm.makeAllocator<umpire::strategy::AllocationAdvisor>(
         "internal::PHARE::um_allocation_advisor", rm.getAllocator(umpire::resource::Unified),
@@ -49,8 +46,6 @@ auto static_init()
         = rm.makeAllocator<umpire::strategy::DynamicPool>("PHARE::data_allocator", allocator);
     assert(phare_allocator.getPlatform() != umpire::Platform::host);
     assert(rm.isAllocator("PHARE::data_allocator"));
-
-
 #endif
     return true;
 }
