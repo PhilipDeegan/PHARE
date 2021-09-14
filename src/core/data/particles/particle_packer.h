@@ -31,8 +31,6 @@ public:
     }
 
 #if defined(HAVE_UMPIRE)
-    auto to_host_particle_array(llnl::ParticleArray<Particle> const& particles) {}
-
     ParticlePacker(llnl::ParticleArray<Particle> const& particles)
         : particles_{particles()}
     {

@@ -1119,9 +1119,39 @@ namespace core
          */
         auto static constexpr JzToEz() { return GridLayoutImpl::JzToEz(); }
 
+        template<typename Field, typename IndicesFn>
+        auto scan_shape_(Field& field, IndicesFn& startToEnd) const
+        {
+            std::array<std::size_t, dimension> shape;
 
-        template<typename IndicesFn, typename Field, typename Fn>
-        void scan_(Field& field, Fn& fn, IndicesFn&& startToEnd) const
+            auto const [ix0, ix1] = startToEnd(field, Direction::X);
+            shape[0]              = ix1 - ix0 + 1;
+
+            if constexpr (dimension > 1)
+            {
+                auto const [iy0, iy1] = startToEnd(field, Direction::Y);
+                shape[1]              = iy1 - iy0 + 1;
+            }
+
+            if constexpr (dimension > 2)
+            {
+                auto const [iz0, iz1] = startToEnd(field, Direction::Z);
+                shape[2]              = iz1 - iz0 + 1;
+            }
+            return shape;
+        }
+
+
+        template<typename Field, typename IndicesFn>
+        auto scan_size_(Field& field, IndicesFn& startToEnd) const
+        {
+            auto shape = scan_shape_(startToEnd);
+            return std::accumulate(shape().begin(), shape().end(), 1,
+                                   std::multiplies<std::size_t>());
+        }
+
+        template<typename Field, typename IndicesFn, typename Fn>
+        void scan_(Field& field, Fn& fn, IndicesFn& startToEnd) const
         {
             auto const [ix0, ix1] = startToEnd(field, Direction::X);
             for (auto ix = ix0; ix <= ix1; ++ix)
@@ -1152,12 +1182,48 @@ namespace core
             }
         }
 
+#if defined(HAVE_UMPIRE) and defined(HAVE_RAJA)
+        template<typename IndicesFn, typename Field, typename Fn>
+        void raja_scan_(Field& field, Fn& fn, IndicesFn& startToEnd) const
+        {
+            using Index    = tuple_fixed_type<std::uint32_t, dimension>;
+            auto n_indexes = scan_size_(field, startToEnd);
+
+            umpire::TypedAllocator<Index> allocator{
+                umpire::ResourceManager::getInstance().getAllocator("PHARE::data_allocator")};
+            Index* d_indexes = allocator.allocate(n_indexes * sizeof(Index));
+
+            {
+                std::vector<Index> indexes;
+                indexes.reserve(n_indexes);
+                auto indices = [&](auto const&... args) { indexes.emplace_back(args...); };
+                scan_(field, indices, startToEnd);
+                RAJA::resources::Cuda{}.memcpy(d_indexes, indexes.data(),
+                                               sizeof(Index) * n_indexes);
+            }
+
+            SAMRAI::hier::parallel_for_all(0, n_indexes, [=] SAMRAI_HOST_DEVICE(int i) {
+                std::apply([&](auto const&... args) { fn(args...); }, d_indexes[i])
+            });
+            allocator.deallocate(d_indexes, n_indexes * sizeof(Index));
+        }
+#endif
+
         template<typename Field, typename Fn>
         void scan(Field& field, Fn&& fn) const
         {
-            scan_(field, fn, [&](auto const& centering, auto const direction) {
+            auto indices = [&](auto const& centering, auto const direction) {
                 return this->physicalStartToEnd(centering, direction);
-            });
+            };
+            if constexpr (Field::is_host_mem)
+                scan_(field, fn, indices);
+#if defined(HAVE_UMPIRE) and defined(HAVE_RAJA)
+            else
+                raja_scan_(field, fn, indices);
+#else
+            else
+                assert(false);
+#endif
         }
 
         template<typename Field, typename Fn>

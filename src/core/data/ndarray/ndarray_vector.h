@@ -228,8 +228,6 @@ class NdArrayVector
         return std::accumulate(ncells.begin(), ncells.end(), 1, std::multiplies<std::uint32_t>());
     }
 
-    void _print() { KLOG(INF) << data() << " " << size(); }
-
 public:
     static constexpr bool is_contiguous = 1;
     static constexpr bool is_host_mem   = is_host_mem_type<DataType, Allocator_>();
@@ -247,7 +245,6 @@ public:
     {
         data_.resize(size_);
         static_assert(sizeof...(Nodes) == dim);
-        _print();
     }
 
     explicit NdArrayVector(std::array<std::uint32_t, dim> const& ncells)
@@ -256,7 +253,6 @@ public:
         , data_(get_allocator<DataType, Allocator>())
     {
         data_.resize(size_);
-        _print();
     }
 
     NdArrayVector(NdArrayVector const& source) = default;
@@ -281,16 +277,7 @@ public:
             std::fill(data_.begin(), data_.end(), 0);
 #if defined(HAVE_RAJA)
         else
-        {
-            KLOG(INF) << size();
-            std::vector<DataType> zeroes(size(), 0);
-            assert(zeroes.size() == size());
-            // TODO replace with "fill"
-            RAJA::resources::Cuda{}.memcpy(
-                /*device pointer*/ data(),
-                /*host pointer*/ zeroes.data(),
-                /*size in bytes*/ sizeof(DataType) * size());
-        }
+            RAJA::resources::Cuda{}.memset(data(), 0, sizeof(DataType) * size());
 #endif
     }
 

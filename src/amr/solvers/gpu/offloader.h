@@ -236,7 +236,7 @@ public:
 
     auto& clear()
     {
-        KLOG(TRC);
+        // KLOG(TRC);
         std::apply([](auto&... v) { (v.clear(), ...); },
                    std::forward_as_tuple(etcs_, particles_, particle_copies_, patch_states,
                                          post_partition, batches));
@@ -269,7 +269,7 @@ public:
     template<bool noop = false>
     void _move0()
     {
-        KLOG(TRC);
+        // KLOG(TRC);
         assert(patch_states.size());
 
         _send_em();
@@ -302,7 +302,7 @@ public:
 
     void _move1()
     {
-        KLOG(TRC);
+        // KLOG(TRC);
         assert(batches.size() > 0);
 
         _send_em();
@@ -369,7 +369,7 @@ public:
 
     void _copy_back_particles()
     {
-        KLOG(TRC);
+        // KLOG(TRC);
         visit([&](auto& batch, auto& patch_state, auto& pop, auto pop_idx) {
             auto& copy_back = batch.get(0);
             assert(pop.size() > 0);
@@ -404,7 +404,7 @@ public:
     auto const& new_end(ParticleArray& array)
     {
         assert(array.size());
-        KLOG(INF) << array.data() << " " << array.size();
+        // KLOG(INF) << array.data() << " " << array.size();
         assert(post_partition.count(array.data()));
         return post_partition.at(array.data());
     }

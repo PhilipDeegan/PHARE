@@ -8,9 +8,6 @@
 #include <tuple>
 #include <cstdint>
 
-#if defined(HAVE_UMPIRE)
-#include "kul/log.hpp"
-#endif
 
 namespace PHARE::core
 {
@@ -27,7 +24,6 @@ void initialize_field(Field& field, GridLayout const& layout, InitFunction const
     auto grid = std::apply([&](auto const&... args) { return init(args...); }, coords);
     assert(field.size() == grid->size());
 
-    KLOG(INF) << Field::is_host_mem;
     if constexpr (Field::is_host_mem) // could this be a memcpy?
         for (std::size_t cell_idx = 0; cell_idx < indices.size(); cell_idx++)
             std::apply([&](auto&... args) { field(args...) = (*grid)[cell_idx]; },
@@ -35,7 +31,6 @@ void initialize_field(Field& field, GridLayout const& layout, InitFunction const
 #if defined(HAVE_RAJA)
     else
     {
-        KLOG(INF);
         RAJA::resources::Cuda{}.memcpy(
             /*device pointer*/ field.data(),
             /*host pointer*/ grid->data(),

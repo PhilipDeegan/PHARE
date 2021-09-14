@@ -113,21 +113,27 @@ TEST(Ampere, canBe3D)
 TEST(Ampere, shouldBeGivenAGridLayoutPointerToBeOperational)
 {
     VecFieldMock<FieldMock<1>> B, J;
-
-    Ampere<GridLayoutMock1D> ampere1d;
-    auto layout1d = std::make_unique<GridLayoutMock1D>();
-    EXPECT_ANY_THROW(ampere1d(B, J));
-    ampere1d.setLayout(layout1d.get());
-
-    Ampere<GridLayoutMock2D> ampere2d;
-    auto layout2d = std::make_unique<GridLayoutMock2D>();
-    // EXPECT_ANY_THROW(ampere2d(B2, J2));
-    ampere2d.setLayout(layout2d.get());
-
-    Ampere<GridLayoutMock3D> ampere3d;
-    auto layout3d = std::make_unique<GridLayoutMock3D>();
-    // EXPECT_ANY_THROW(ampere3d(B3, J3));
-    ampere3d.setLayout(layout3d.get());
+    {
+        using GridLayout = GridLayout<GridLayoutImplYee<1, 1>>;
+        Ampere<GridLayout> ampere1d;
+        auto layout1d = std::make_unique<GridLayout>();
+        EXPECT_ANY_THROW(ampere1d(B, J));
+        ampere1d.setLayout(layout1d.get());
+    }
+    {
+        using GridLayout = GridLayout<GridLayoutImplYee<2, 1>>;
+        Ampere<GridLayout> ampere2d;
+        auto layout2d = std::make_unique<GridLayout>();
+        // EXPECT_ANY_THROW(ampere2d(B2, J2));
+        ampere2d.setLayout(layout2d.get());
+    }
+    {
+        using GridLayout = GridLayout<GridLayoutImplYee<3, 1>>;
+        Ampere<GridLayout> ampere3d;
+        auto layout3d = std::make_unique<GridLayout>();
+        // EXPECT_ANY_THROW(ampere3d(B3, J3));
+        ampere3d.setLayout(layout3d.get());
+    }
 }
 
 

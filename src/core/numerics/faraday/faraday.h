@@ -88,8 +88,6 @@ public:
     template<typename VecField>
     void operator()(VecField const& B, VecField const& E, VecField& Bnew, double dt) _PHARE_ALL_FN_
     {
-        using FieldT = typename VecField::field_type;
-
         if (!this->hasLayout())
             throw std::runtime_error(
                 "Error - Faraday - GridLayout not set, cannot proceed to calculate faraday()");
@@ -97,29 +95,19 @@ public:
         if (!(B.isUsable() && E.isUsable() && Bnew.isUsable()))
             throw std::runtime_error("Error - Faraday - not all VecField parameters are usable");
 
-        auto const& [Bxnew, Bynew, Bznew] = Bnew();
-
-        if constexpr (FieldT::is_host_mem)
-        {
-            Computer op{dt, *this->layout_};
-            layout_->scan(Bxnew, [&](auto const&... args) {
-                op.bx(B(Component::X), E, Bnew(Component::X), args...);
-            });
-            layout_->scan(Bynew, [&](auto const&... args) {
-                op.by(B(Component::Y), E, Bnew(Component::Y), args...);
-            });
-            layout_->scan(Bznew, [&](auto const&... args) {
-                op.bz(B(Component::Z), E, Bnew(Component::Z), args...);
-            });
-        }
-#if defined(HAVE_RAJA)
-        else
-        {
-            //assert(false);
-        }
-#endif
+        Computer op{dt, *this->layout_};
+        layout_->scan(Bnew(Component::X), [&](auto const&... args) {
+            op.bx(B(Component::X), E, Bnew(Component::X), args...);
+        });
+        layout_->scan(Bnew(Component::Y), [&](auto const&... args) {
+            op.by(B(Component::Y), E, Bnew(Component::Y), args...);
+        });
+        layout_->scan(Bnew(Component::Z), [&](auto const&... args) {
+            op.bz(B(Component::Z), E, Bnew(Component::Z), args...);
+        });
     }
 };
+
 } // namespace PHARE::core
 
 

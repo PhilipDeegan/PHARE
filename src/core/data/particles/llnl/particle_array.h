@@ -40,8 +40,8 @@ struct ABufferedParticleVector
         assert(realloc_by < 1 and realloc_by > 0);
 
         // info = std::make_unique<kul::gpu::DeviceMem<std::size_t>>(std::vector(1, size));
-        // KLOG(INF) << info->p;
-        // KLOG(INF) << info.get();
+        // //KLOG(INF) << info->p;
+        // //KLOG(INF) << info.get();
     }
 
     bool check() __host__
@@ -151,7 +151,7 @@ public:
 #else
         static_assert(false, "no other impl defined");
 #endif
-        KLOG(INF);
+        // KLOG(INF);
         input.clear(); // probably dies here but just in case;
         return *this;
     }
