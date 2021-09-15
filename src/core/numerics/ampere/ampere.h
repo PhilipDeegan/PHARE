@@ -75,17 +75,20 @@ public:
             throw std::runtime_error(
                 "Error - Ampere - GridLayout not set, cannot proceed to calculate ampere()");
 
-	auto B = B_.as_view();
+        auto B = B_.as_view();
         auto J = J_.as_view();
 
         Computer op{*this->layout_};
 
-        layout_->scan(J(Component::X),
-                      [=]_PHARE_ALL_FN_(auto const&... args) { op.Jx(J(Component::X), B, args...); });
-        layout_->scan(J(Component::Y),
-                      [=]_PHARE_ALL_FN_(auto const&... args) { op.Jy(J(Component::Y), B, args...); });
-        layout_->scan(J(Component::Z),
-                      [=]_PHARE_ALL_FN_(auto const&... args) { op.Jz(J(Component::Z), B, args...); });
+        layout_->scan(J_(Component::X), [=] _PHARE_ALL_FN_(auto const&... args) mutable {
+            op.Jx(J(Component::X), B, args...);
+        });
+        layout_->scan(J_(Component::Y), [=] _PHARE_ALL_FN_(auto const&... args) mutable {
+            op.Jy(J(Component::Y), B, args...);
+        });
+        layout_->scan(J_(Component::Z), [=] _PHARE_ALL_FN_(auto const&... args) mutable {
+            op.Jz(J(Component::Z), B, args...);
+        });
     }
 };
 

@@ -107,34 +107,7 @@ struct FieldMock
 };
 
 
-template<std::size_t dim, typename DataType, typename Pointer, typename PhysicalQuantity>
-class FieldView : public NdArrayView<dim, DataType, Pointer>
-{
-public:
-    static constexpr bool is_contiguous = 1;
-    static const std::size_t dimension  = dim;
-    using type                          = DataType;
-    using Super                         = NdArrayView<dim, DataType, Pointer>;
-    using Super::shape;
-    using Super::size;
 
-    FieldView(Pointer ptr, std::array<std::uint32_t, dim> shape, PhysicalQuantity qty)
-        : Super{ptr, shape}
-        , qty_{qty}
-    {
-    }
-
-    FieldView(Super& view, PhysicalQuantity qty)
-        : Super{view.data(), view.shape()}
-        , qty_{qty}
-    {
-    }
-
-    constexpr PhysicalQuantity physicalQuantity() const { return qty_; }
-
-private:
-    PhysicalQuantity qty_;
-};
 
 template<typename GridLayout, typename Field, typename T1, typename FF = PHARE::FieldNullFilter>
 void test_fields(GridLayout const& layout, Field const& field0, T1 const& field1,

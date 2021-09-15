@@ -86,23 +86,28 @@ class Faraday : public LayoutHolder<GridLayout>
 
 public:
     template<typename VecField>
-    void operator()(VecField const& B, VecField const& E, VecField& Bnew, double dt) _PHARE_ALL_FN_
+    void operator()(VecField const& B_, VecField const& E_, VecField& Bnew_,
+                    double dt) _PHARE_ALL_FN_
     {
         if (!this->hasLayout())
             throw std::runtime_error(
                 "Error - Faraday - GridLayout not set, cannot proceed to calculate faraday()");
 
-        if (!(B.isUsable() && E.isUsable() && Bnew.isUsable()))
+        if (!(B_.isUsable() && E_.isUsable() && Bnew_.isUsable()))
             throw std::runtime_error("Error - Faraday - not all VecField parameters are usable");
 
+        auto B    = B_.as_view();
+        auto E    = E_.as_view();
+        auto Bnew = Bnew_.as_view();
+
         Computer op{dt, *this->layout_};
-        layout_->scan(Bnew(Component::X), [&]_PHARE_ALL_FN_(auto const&... args) {
+        layout_->scan(Bnew_(Component::X), [=] _PHARE_ALL_FN_(auto const&... args) mutable {
             op.bx(B(Component::X), E, Bnew(Component::X), args...);
         });
-        layout_->scan(Bnew(Component::Y), [&]_PHARE_ALL_FN_(auto const&... args) {
+        layout_->scan(Bnew_(Component::Y), [=] _PHARE_ALL_FN_(auto const&... args) mutable {
             op.by(B(Component::Y), E, Bnew(Component::Y), args...);
         });
-        layout_->scan(Bnew(Component::Z), [&]_PHARE_ALL_FN_(auto const&... args) {
+        layout_->scan(Bnew_(Component::Z), [=] _PHARE_ALL_FN_(auto const&... args) mutable {
             op.bz(B(Component::Z), E, Bnew(Component::Z), args...);
         });
     }

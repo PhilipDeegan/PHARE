@@ -51,7 +51,7 @@ struct PatchState
     template<typename T, typename Qty>
     static auto view(GridLayout_ const& layout, T* ptr, Qty qty)
     {
-        return core::NdArrayView<dimension, T, T*>{ptr, layout.allocSize(qty)};
+        return core::NdArrayView<dimension, T>{ptr, layout.allocSize(qty)};
     }
     template<typename T, typename Qty>
     auto view(T* ptr, Qty qty)
@@ -61,8 +61,8 @@ struct PatchState
 
 
     GridLayout const layout;
-    std::vector<core::NdArrayView<dimension, Float, Float*>> electromag;
-    std::vector<core::NdArrayView<dimension, Float, Float*>> density, flux;
+    std::vector<core::NdArrayView<dimension, Float>> electromag;
+    std::vector<core::NdArrayView<dimension, Float>> density, flux;
     std::vector<ParticleArray_t*> ions;
     std::vector<double> masses;
 };

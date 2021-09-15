@@ -11,6 +11,68 @@
 #include "vecfield_component.h"
 #include "core/utilities/meta/meta_utilities.h"
 
+namespace PHARE::core
+{
+template<typename FieldView_>
+class VecFieldView
+{
+public:
+    using field_type                       = FieldView_;
+    static constexpr std::size_t dimension = field_type::dimension;
+
+    template<typename VecField>
+    VecFieldView(VecField& vecfield)
+        : views{field_type{vecfield[0].data(), vecfield[0].shape(), vecfield[0].physicalQuantity()},
+                field_type{vecfield[0].data(), vecfield[0].shape(), vecfield[0].physicalQuantity()},
+                field_type{vecfield[0].data(), vecfield[0].shape(), vecfield[0].physicalQuantity()}}
+    {
+    }
+
+    auto& getComponent(Component component) _PHARE_ALL_FN_
+    {
+        switch (component)
+        {
+            case Component::X: return views[0];
+            case Component::Y: return views[1];
+            case Component::Z: return views[2];
+        }
+    }
+
+    auto& getComponent(Component component) const _PHARE_ALL_FN_
+    {
+        switch (component)
+        {
+            case Component::X: return views[0];
+            case Component::Y: return views[1];
+            case Component::Z: return views[2];
+        }
+    }
+
+    auto& operator()(Component component) _PHARE_ALL_FN_ { return getComponent(component); }
+    auto& operator()(Component component) const _PHARE_ALL_FN_ { return getComponent(component); }
+
+
+    auto getComponents() _PHARE_ALL_FN_
+    {
+        return std::forward_as_tuple(views[0], views[1], views[2]);
+    }
+    auto getComponents() const _PHARE_ALL_FN_
+    {
+        return std::forward_as_tuple(views[0], views[1], views[2]);
+    }
+
+    auto operator()() _PHARE_ALL_FN_ { return getComponents(); }
+    auto operator()() const _PHARE_ALL_FN_ { return getComponents(); }
+
+    auto& operator[](size_t i) { return views[i]; }
+    auto& operator[](size_t i) const { return views[i]; }
+
+private:
+    std::array<field_type, 3> views;
+};
+
+} // namespace PHARE::core
+
 namespace PHARE
 {
 namespace core
@@ -83,12 +145,11 @@ namespace core
 
 
         //! return true if the VecField can be used to access component data
-        bool isUsable() const _PHARE_HST_FN_
+        bool isUsable() const
         {
             return std::all_of(std::begin(components_), std::end(components_),
                                [](auto const& c) { return c != nullptr; });
         }
-	bool isUsable() const _PHARE_DEV_FN_ { return true; }
 
         bool isSettable() const
         {
@@ -121,7 +182,7 @@ namespace core
 
 
 
-        Field<NdArrayImpl, typename PhysicalQuantity::Scalar>& getComponent(Component component) _PHARE_ALL_FN_
+        Field<NdArrayImpl, typename PhysicalQuantity::Scalar>& getComponent(Component component)
         {
             if (isUsable())
             {
@@ -132,11 +193,11 @@ namespace core
                     case Component::Z: return *components_[2];
                 }
             }
-            throw_runtime_error("Error - VecField not usable");
+            throw std::runtime_error("Error - VecField not usable");
         }
 
         Field<NdArrayImpl, typename PhysicalQuantity::Scalar> const&
-        getComponent(Component component) const _PHARE_ALL_FN_
+        getComponent(Component component) const
         {
             if (isUsable())
             {
@@ -147,7 +208,7 @@ namespace core
                     case Component::Z: return *components_[2];
                 }
             }
-            throw_runtime_error("Error - VecField not usable");
+            throw std::runtime_error("Error - VecField not usable");
         }
 
         auto& operator()(Component component) _PHARE_ALL_FN_ { return getComponent(component); }
@@ -211,6 +272,9 @@ namespace core
         auto& operator[](size_t i) { return *components_[i]; }
         auto& operator[](size_t i) const { return *components_[i]; }
 
+        auto as_view() { return VecFieldView<decltype(components_[0]->as_view())>{*this}; }
+        auto as_view() const { return VecFieldView<decltype(components_[0]->as_view())>{*this}; }
+
     private:
         std::string name_ = "No Name";
         std::array<typename PhysicalQuantity::Scalar, 3> physQties_;
@@ -240,5 +304,6 @@ namespace core
 
 } // namespace core
 } // namespace PHARE
+
 
 #endif

@@ -606,7 +606,8 @@ namespace core
          * on the dimensionality of the GridLayout.
          */
         template<typename Field, typename DirectionTag>
-        auto deriv(Field const& operand, MeshIndex<Field::dimension> index, DirectionTag) _PHARE_ALL_FN_
+        auto deriv(Field const& operand, MeshIndex<Field::dimension> index,
+                   DirectionTag) _PHARE_ALL_FN_
         {
             auto fieldCentering = centering(operand.physicalQuantity());
             using PHARE::core::dirX;
@@ -817,8 +818,9 @@ namespace core
 
 
         template<typename Field, std::size_t nbr_points>
-        static typename Field::type project(Field const& field, MeshIndex<dimension> index,
-                                            std::array<WeightPoint<dimension>, nbr_points> wps) _PHARE_ALL_FN_
+        static typename Field::type
+        project(Field const& field, MeshIndex<dimension> index,
+                std::array<WeightPoint<dimension>, nbr_points> wps) _PHARE_ALL_FN_
         {
             typename Field::type result = 0.;
             for (auto const& wp : wps)
@@ -1146,8 +1148,7 @@ namespace core
         auto scan_size_(Field& field, IndicesFn& startToEnd) const
         {
             auto shape = scan_shape_(field, startToEnd);
-            return std::accumulate(shape.begin(), shape.end(), 1,
-                                   std::multiplies<std::size_t>());
+            return std::accumulate(shape.begin(), shape.end(), 1, std::multiplies<std::size_t>());
         }
 
         template<typename Field, typename IndicesFn, typename Fn>
@@ -1184,7 +1185,7 @@ namespace core
 
 #if defined(HAVE_UMPIRE) and defined(HAVE_RAJA)
         template<typename IndicesFn, typename Field, typename Fn>
-        void raja_scan_(Field& field, Fn& fn, IndicesFn& startToEnd) const
+        void raja_scan_(Field& field, Fn& fn, IndicesFn& startToEnd)
         {
             using Index    = tuple_fixed_type<std::uint32_t, dimension>;
             auto n_indexes = scan_size_(field, startToEnd);
@@ -1202,7 +1203,7 @@ namespace core
                                                sizeof(Index) * n_indexes);
             }
 
-            SAMRAI::hier::parallel_for_all(0, n_indexes, [=] SAMRAI_HOST_DEVICE(int i) {
+            SAMRAI::hier::parallel_for_all(0, n_indexes, [=] SAMRAI_HOST_DEVICE(int i) mutable {
                 std::apply([&](auto const&... args) { fn(args...); }, d_indexes[i]);
             });
             allocator.deallocate(d_indexes, n_indexes * sizeof(Index));
@@ -1210,7 +1211,7 @@ namespace core
 #endif
 
         template<typename Field, typename Fn>
-        void scan(Field& field, Fn&& fn) const
+        void scan(Field& field, Fn&& fn)
         {
             auto indices = [&](auto const& centering, auto const direction) {
                 return this->physicalStartToEnd(centering, direction);
@@ -1227,7 +1228,7 @@ namespace core
         }
 
         template<typename Field, typename Fn>
-        void scan_all(Field& field, Fn&& fn) const
+        void scan_all(Field& field, Fn&& fn)
         {
             scan_(field, fn, [&](auto const& centering, auto const direction) {
                 return this->ghostStartToEnd(centering, direction);

@@ -26,9 +26,8 @@ namespace PHARE::core
 template<std::size_t dim, typename DataType = double>
 struct NdArrayViewer
 {
-    template<typename NCells, typename... Indexes>
-    static DataType const& at(DataType const* data, NCells const& nCells,
-                              Indexes const&... indexes) _PHARE_ALL_FN_
+    template<typename Array, typename NCells, typename... Indexes>
+    static auto& at(Array* data, NCells const& nCells, Indexes const&... indexes) _PHARE_ALL_FN_
     {
         auto params = std::forward_as_tuple(indexes...);
         static_assert(sizeof...(Indexes) == dim);
@@ -133,21 +132,24 @@ private:
 
 
 
-template<std::size_t dim, typename DataType = double, typename Pointer = DataType const*>
+template<std::size_t dim, typename DataType = double, typename Ptr_ = double*,
+         bool is_host_mem_ = true>
 class NdArrayView : NdArrayViewer<dim, DataType>
 {
 public:
-    static constexpr bool is_contiguous = 1;
+    static constexpr bool is_host_mem   = is_host_mem_; // could be int designator
+    static constexpr bool is_contiguous = true;
     static const std::size_t dimension  = dim;
     using type                          = DataType;
+    using pointer_type                  = Ptr_;
 
-    NdArrayView(Pointer ptr, std::array<std::uint32_t, dim> const nCells) _PHARE_ALL_FN_
+    NdArrayView(pointer_type ptr, std::array<std::uint32_t, dim> const nCells) _PHARE_ALL_FN_
         : ptr_{ptr},
           nCells_{nCells}
     {
     }
 
-    NdArrayView(std::vector<DataType> const& v, std::array<std::uint32_t, dim> const& nbCell)
+    NdArrayView(std::vector<DataType>& v, std::array<std::uint32_t, dim> const& nbCell)
         : NdArrayView{v.data(), nbCell}
     {
     }
@@ -161,7 +163,7 @@ public:
     template<typename... Indexes>
     DataType& operator()(Indexes... indexes) _PHARE_ALL_FN_
     {
-        return const_cast<DataType&>(static_cast<NdArrayView const&>(*this)(indexes...));
+        return NdArrayViewer<dim, DataType>::at(ptr_, nCells_, indexes...);
     }
 
     template<typename Index>
@@ -176,7 +178,7 @@ public:
         return const_cast<DataType&>(static_cast<NdArrayView const&>(*this)(indexes));
     }
 
-    auto data() const { return ptr_; }
+    // auto data() const { return ptr_; }
     auto data() { return ptr_; }
 
     std::size_t size() const
@@ -186,7 +188,7 @@ public:
     auto shape() const { return nCells_; }
 
 private:
-    Pointer ptr_ = nullptr;
+    pointer_type ptr_ = nullptr;
     std::array<std::uint32_t, dim> nCells_;
 };
 
@@ -264,8 +266,8 @@ public:
     auto data() _PHARE_HST_FN_ { return data_.data(); }
     auto data() const _PHARE_HST_FN_ { return data_.data(); }
 
-//    auto data() _PHARE_DEV_FN_ { return &data_[0]; }
-//    auto data() const _PHARE_DEV_FN_ { return &data_[0]; }
+    //    auto data() _PHARE_DEV_FN_ { return &data_[0]; }
+    //    auto data() const _PHARE_DEV_FN_ { return &data_[0]; }
 
     auto begin() const { return std::begin(data_); }
     auto begin() { return std::begin(data_); }
@@ -345,8 +347,14 @@ public:
         return MaskedView{*this, std::forward<Mask>(mask)};
     }
 
-    auto as_view() const { return NdArrayView<dim, DataType>{data(), nCells_}; }
-    auto as_view() { return NdArrayView<dim, DataType>{data(), nCells_}; }
+    auto as_view() const
+    {
+        return NdArrayView<dim, DataType, decltype(data()), is_host_mem>{data(), nCells_};
+    }
+    auto as_view()
+    {
+        return NdArrayView<dim, DataType, decltype(data()), is_host_mem>{data(), nCells_};
+    }
 
 private:
     std::size_t size_;

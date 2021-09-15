@@ -332,12 +332,12 @@ class Ohm : public LayoutHolder<GridLayout>
 {
     using LayoutHolder<GridLayout>::layout_;
 
-    template<typename VecField>
+    template<typename VecField_ref, typename Field, typename VecField_cref>
     struct OhmPack
     {
-        VecField& Exyz;
-        typename VecField::field_type const &n, &Pe;
-        VecField const &Ve, &B, &J;
+        VecField_ref& Exyz;
+        Field const &n, &Pe;
+        VecField_cref const &Ve, &B, &J;
     };
 
 public:
@@ -348,31 +348,39 @@ public:
     }
 
     template<typename VecField>
-    void operator()(typename VecField::field_type const& n, VecField const& Ve,
-                    typename VecField::field_type const& Pe, VecField const& B, VecField const& J,
-                    VecField& Enew) const
+    void operator()(typename VecField::field_type const& n_, VecField const& Ve_,
+                    typename VecField::field_type const& Pe_, VecField const& B_,
+                    VecField const& J_, VecField& Enew_)
     {
-        using Pack = OhmPack<VecField>;
+        using Pack
+            = OhmPack<decltype(Enew_.as_view()), decltype(n_.as_view()), decltype(Ve_.as_view())>;
 
         if (!this->hasLayout())
             throw std::runtime_error(
                 "Error - Ohm - GridLayout not set, cannot proceed to calculate ohm()");
 
+        auto n    = n_.as_view();
+        auto Ve   = Ve_.as_view();
+        auto Pe   = Pe_.as_view();
+        auto B    = B_.as_view();
+        auto J    = J_.as_view();
+        auto Enew = Enew_.as_view();
+
         Computer op{eta_, nu_, *this->layout_};
-        layout_->scan(Enew(Component::X), [&]_PHARE_ALL_FN_(auto const&... args) {
+        layout_->scan(Enew_(Component::X), [=] _PHARE_ALL_FN_(auto const&... args) mutable {
             op.template exyz<Component, Component::X>(Pack{Enew, n, Pe, Ve, B, J}, args...);
         });
-        layout_->scan(Enew(Component::Y), [&]_PHARE_ALL_FN_(auto const&... args) {
+        layout_->scan(Enew_(Component::Y), [=] _PHARE_ALL_FN_(auto const&... args) mutable {
             op.template exyz<Component, Component::Y>(Pack{Enew, n, Pe, Ve, B, J}, args...);
         });
-        layout_->scan(Enew(Component::Z), [&]_PHARE_ALL_FN_(auto const&... args) {
+        layout_->scan(Enew_(Component::Z), [=] _PHARE_ALL_FN_(auto const&... args) mutable {
             op.template exyz<Component, Component::Z>(Pack{Enew, n, Pe, Ve, B, J}, args...);
         });
     }
 
 private:
-    double eta_;
-    double nu_;
+    double const eta_;
+    double const nu_;
 };
 
 
