@@ -186,7 +186,7 @@ public:
         this->vector->particles.swap(that.vector->particles);
     }
 
-    auto operator()()()
+    auto operator()()
     {
         check();
         std::vector<Particle> particles(size());

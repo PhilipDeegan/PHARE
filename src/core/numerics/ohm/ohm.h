@@ -359,13 +359,13 @@ public:
                 "Error - Ohm - GridLayout not set, cannot proceed to calculate ohm()");
 
         Computer op{eta_, nu_, *this->layout_};
-        layout_->scan(Enew(Component::X), [&](auto const&... args) {
+        layout_->scan(Enew(Component::X), [&]_PHARE_ALL_FN_(auto const&... args) {
             op.template exyz<Component, Component::X>(Pack{Enew, n, Pe, Ve, B, J}, args...);
         });
-        layout_->scan(Enew(Component::Y), [&](auto const&... args) {
+        layout_->scan(Enew(Component::Y), [&]_PHARE_ALL_FN_(auto const&... args) {
             op.template exyz<Component, Component::Y>(Pack{Enew, n, Pe, Ve, B, J}, args...);
         });
-        layout_->scan(Enew(Component::Z), [&](auto const&... args) {
+        layout_->scan(Enew(Component::Z), [&]_PHARE_ALL_FN_(auto const&... args) {
             op.template exyz<Component, Component::Z>(Pack{Enew, n, Pe, Ve, B, J}, args...);
         });
     }

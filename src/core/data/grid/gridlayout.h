@@ -584,7 +584,7 @@ namespace core
          * The next index is not just indexCenter+1 because this depends on the number
          * of ghost nodes for dual and primal nodes.
          */
-        auto static nextIndex(QtyCentering centering, std::uint32_t indexCenter)
+        auto static nextIndex(QtyCentering centering, std::uint32_t indexCenter) _PHARE_ALL_FN_
         {
             return indexCenter + nextIndexTable_[centering2int(centering)];
         }
@@ -594,7 +594,7 @@ namespace core
          * @brief prevIndex does the same thing as nextIndex but returns the index
          * of the node of a given centering just to the left of indexCenter.
          */
-        auto static prevIndex(QtyCentering centering, std::uint32_t indexCenter)
+        auto static prevIndex(QtyCentering centering, std::uint32_t indexCenter) _PHARE_ALL_FN_
         {
             return indexCenter + prevIndexTable_[centering2int(centering)];
         }
@@ -606,7 +606,7 @@ namespace core
          * on the dimensionality of the GridLayout.
          */
         template<typename Field, typename DirectionTag>
-        auto deriv(Field const& operand, MeshIndex<Field::dimension> index, DirectionTag)
+        auto deriv(Field const& operand, MeshIndex<Field::dimension> index, DirectionTag) _PHARE_ALL_FN_
         {
             auto fieldCentering = centering(operand.physicalQuantity());
             using PHARE::core::dirX;
@@ -673,7 +673,7 @@ namespace core
          * on the dimensionality of the GridLayout.
          */
         template<typename Field>
-        auto laplacian(Field const& operand, MeshIndex<Field::dimension> index)
+        auto laplacian(Field const& operand, MeshIndex<Field::dimension> index) _PHARE_ALL_FN_
         {
             static_assert(Field::dimension == dimension,
                           "field dimension must be equal to gridlayout dimension");
@@ -818,7 +818,7 @@ namespace core
 
         template<typename Field, std::size_t nbr_points>
         static typename Field::type project(Field const& field, MeshIndex<dimension> index,
-                                            std::array<WeightPoint<dimension>, nbr_points> wps)
+                                            std::array<WeightPoint<dimension>, nbr_points> wps) _PHARE_ALL_FN_
         {
             typename Field::type result = 0.;
             for (auto const& wp : wps)
@@ -1145,8 +1145,8 @@ namespace core
         template<typename Field, typename IndicesFn>
         auto scan_size_(Field& field, IndicesFn& startToEnd) const
         {
-            auto shape = scan_shape_(startToEnd);
-            return std::accumulate(shape().begin(), shape().end(), 1,
+            auto shape = scan_shape_(field, startToEnd);
+            return std::accumulate(shape.begin(), shape.end(), 1,
                                    std::multiplies<std::size_t>());
         }
 
@@ -1203,7 +1203,7 @@ namespace core
             }
 
             SAMRAI::hier::parallel_for_all(0, n_indexes, [=] SAMRAI_HOST_DEVICE(int i) {
-                std::apply([&](auto const&... args) { fn(args...); }, d_indexes[i])
+                std::apply([&](auto const&... args) { fn(args...); }, d_indexes[i]);
             });
             allocator.deallocate(d_indexes, n_indexes * sizeof(Index));
         }

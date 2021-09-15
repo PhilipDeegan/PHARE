@@ -69,20 +69,23 @@ class Ampere : public LayoutHolder<GridLayout>
 
 public:
     template<typename VecField>
-    void operator()(VecField const& B, VecField& J)
+    void operator()(VecField const& B_, VecField& J_)
     {
         if (!this->hasLayout())
             throw std::runtime_error(
                 "Error - Ampere - GridLayout not set, cannot proceed to calculate ampere()");
 
+	auto B = B_.as_view();
+        auto J = J_.as_view();
+
         Computer op{*this->layout_};
 
         layout_->scan(J(Component::X),
-                      [&](auto const&... args) { op.Jx(J(Component::X), B, args...); });
+                      [=]_PHARE_ALL_FN_(auto const&... args) { op.Jx(J(Component::X), B, args...); });
         layout_->scan(J(Component::Y),
-                      [&](auto const&... args) { op.Jy(J(Component::Y), B, args...); });
+                      [=]_PHARE_ALL_FN_(auto const&... args) { op.Jy(J(Component::Y), B, args...); });
         layout_->scan(J(Component::Z),
-                      [&](auto const&... args) { op.Jz(J(Component::Z), B, args...); });
+                      [=]_PHARE_ALL_FN_(auto const&... args) { op.Jz(J(Component::Z), B, args...); });
     }
 };
 

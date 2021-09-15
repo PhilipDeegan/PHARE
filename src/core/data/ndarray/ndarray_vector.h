@@ -18,6 +18,7 @@
 #include "umpire/Allocator.hpp"
 #include "umpire/TypedAllocator.hpp"
 #include "kul/log.hpp"
+#include "SAMRAI/hier/ForAll.h"
 #endif
 
 namespace PHARE::core
@@ -260,8 +261,11 @@ public:
 
     auto size() const { return size_; }
 
-    auto data() { return data_.data(); }
-    auto data() const { return data_.data(); }
+    auto data() _PHARE_HST_FN_ { return data_.data(); }
+    auto data() const _PHARE_HST_FN_ { return data_.data(); }
+
+//    auto data() _PHARE_DEV_FN_ { return &data_[0]; }
+//    auto data() const _PHARE_DEV_FN_ { return &data_[0]; }
 
     auto begin() const { return std::begin(data_); }
     auto begin() { return std::begin(data_); }
@@ -309,13 +313,13 @@ public:
     }
 
     template<typename... Indexes>
-    DataType const& operator()(Indexes... indexes) const
+    DataType const& operator()(Indexes... indexes) const _PHARE_ALL_FN_
     {
         return NdArrayViewer<dim, DataType>::at(data(), nCells_, indexes...);
     }
 
     template<typename... Indexes>
-    DataType& operator()(Indexes... indexes)
+    DataType& operator()(Indexes... indexes) _PHARE_ALL_FN_
     {
         return const_cast<DataType&>(static_cast<NdArrayVector const&>(*this)(indexes...));
     }
@@ -340,6 +344,9 @@ public:
     {
         return MaskedView{*this, std::forward<Mask>(mask)};
     }
+
+    auto as_view() const { return NdArrayView<dim, DataType>{data(), nCells_}; }
+    auto as_view() { return NdArrayView<dim, DataType>{data(), nCells_}; }
 
 private:
     std::size_t size_;

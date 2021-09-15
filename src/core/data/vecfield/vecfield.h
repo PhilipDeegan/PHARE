@@ -83,11 +83,12 @@ namespace core
 
 
         //! return true if the VecField can be used to access component data
-        bool isUsable() const
+        bool isUsable() const _PHARE_HST_FN_
         {
             return std::all_of(std::begin(components_), std::end(components_),
                                [](auto const& c) { return c != nullptr; });
         }
+	bool isUsable() const _PHARE_DEV_FN_ { return true; }
 
         bool isSettable() const
         {
@@ -120,7 +121,7 @@ namespace core
 
 
 
-        Field<NdArrayImpl, typename PhysicalQuantity::Scalar>& getComponent(Component component)
+        Field<NdArrayImpl, typename PhysicalQuantity::Scalar>& getComponent(Component component) _PHARE_ALL_FN_
         {
             if (isUsable())
             {
@@ -131,11 +132,11 @@ namespace core
                     case Component::Z: return *components_[2];
                 }
             }
-            throw std::runtime_error("Error - VecField not usable");
+            throw_runtime_error("Error - VecField not usable");
         }
 
         Field<NdArrayImpl, typename PhysicalQuantity::Scalar> const&
-        getComponent(Component component) const
+        getComponent(Component component) const _PHARE_ALL_FN_
         {
             if (isUsable())
             {
@@ -146,7 +147,7 @@ namespace core
                     case Component::Z: return *components_[2];
                 }
             }
-            throw std::runtime_error("Error - VecField not usable");
+            throw_runtime_error("Error - VecField not usable");
         }
 
         auto& operator()(Component component) _PHARE_ALL_FN_ { return getComponent(component); }
