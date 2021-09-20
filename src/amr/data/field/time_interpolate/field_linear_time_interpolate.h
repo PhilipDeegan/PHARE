@@ -80,10 +80,10 @@ public:
 
         if constexpr (dim == 1)
         {
-            auto const iDestStartX = localDestBox.lower(dirX);
-            auto const iDestEndX   = localDestBox.upper(dirX);
+            auto const iDestStartX = localDestBox.lower(dirX) - 1;
+            auto const iDestEndX   = localDestBox.upper(dirX) + 1;
 
-            auto const iSrcStartX = localSrcBox.lower(dirX);
+            auto const iSrcStartX = localSrcBox.lower(dirX) - 1;
 
             for (auto ix = iDestStartX, ixSrc = iSrcStartX; ix <= iDestEndX; ++ix, ++ixSrc)
             {
