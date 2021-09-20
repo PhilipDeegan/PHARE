@@ -172,6 +172,7 @@ def main():
     refinement_boxes={"L0": {"B0": [( 15, 15), ( 19, 19)]}}
     refinement_boxes={"L0": {"B0": [( 10, 10), ( 14, 14)]}}
     refinement_boxes={"L0": [Box((10, 10),(14, 14)), Box((10, 15),(14, 19))]}
+    refinement_boxes={"L0": [Box((0, 0),(4, 4)), ]}
 
     Simulator(config(L0_diags, {"seed": rando}), post_advance=post_advance_0).run().reset()
     sim = config(L0L1_diags, {"seed": rando}, refinement_boxes)
