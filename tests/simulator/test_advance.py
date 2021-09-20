@@ -541,7 +541,7 @@ class AdvanceTestBase(unittest.TestCase):
         rando = random.randint(0, 1e10)
 
         def _getHier(diag_dir, boxes=[]):
-            return self.getHierarchy(interp_order, boxes, "eb", cells=60,
+            return self.getHierarchy(interp_order, boxes, "eb", cells=30,
                 time_step_nbr=1, largest_patch_size=15,
                 diag_outputs=diag_dir, extra_diag_options={"fine_dump_lvl_max": 10}, time_step=0.001,
                 model_init={"seed": rando}, ndim=ndim
