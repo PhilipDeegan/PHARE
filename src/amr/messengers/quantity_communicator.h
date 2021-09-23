@@ -221,9 +221,18 @@ namespace amr
               };
 
         // register refine operators for each component of the vecfield
-        registerRefine(ghost.xName, model.xName, oldModel.xName, xVariableFillPattern);
-        registerRefine(ghost.yName, model.yName, oldModel.yName, yVariableFillPattern);
-        registerRefine(ghost.zName, model.zName, oldModel.zName, zVariableFillPattern);
+        if (model.yName.find("B") != std::string::npos)
+        { // hack so first registered is always primal direction in x
+            registerRefine(ghost.xName, model.xName, oldModel.xName, xVariableFillPattern);
+            registerRefine(ghost.yName, model.yName, oldModel.yName, yVariableFillPattern);
+            registerRefine(ghost.zName, model.zName, oldModel.zName, zVariableFillPattern);
+        }
+        else
+        {
+            registerRefine(ghost.yName, model.yName, oldModel.yName, yVariableFillPattern);
+            registerRefine(ghost.xName, model.xName, oldModel.xName, xVariableFillPattern);
+            registerRefine(ghost.zName, model.zName, oldModel.zName, zVariableFillPattern);
+        }
 
         return com;
     }

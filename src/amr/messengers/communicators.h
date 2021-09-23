@@ -20,7 +20,8 @@ namespace amr
         InitField,
         InitInteriorPart,
         LevelBorderParticles,
-        InteriorGhostParticles
+        InteriorGhostParticles,
+        SharedBorder
     };
 
 
@@ -165,6 +166,12 @@ namespace amr
                 // this branch is used to create a schedule that will transfer particles into the
                 // patches' ghost zones.
                 else if constexpr (Type == RefinerType::InteriorGhostParticles)
+                {
+                    refiner.add(algo->createSchedule(level), levelNumber);
+                }
+
+                // schedule to synchronize shared border values, and not include refinement
+                else if constexpr (Type == RefinerType::SharedBorder)
                 {
                     refiner.add(algo->createSchedule(level), levelNumber);
                 }
