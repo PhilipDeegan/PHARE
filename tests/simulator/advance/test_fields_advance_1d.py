@@ -5,7 +5,7 @@
 
 import unittest
 from ddt import ddt, data, unpack
-from pyphare.core.box import Box, Box1D, nDBox
+from pyphare.core.box import Box1D
 from tests.simulator.test_advance import AdvanceTestBase
 
 import matplotlib

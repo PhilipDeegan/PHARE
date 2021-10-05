@@ -109,25 +109,33 @@ class Splitter : public ASplitter<dimension, interp_order, nbRefinedPart>
 };
 
 template<typename dim>
-struct BlackDispatcher : SplitPattern<dim, core::RefinedParticlesConst<1>>
+struct BlackPattern : SplitPattern<dim, core::RefinedParticlesConst<1>>
 {
     using Super = SplitPattern<dim, core::RefinedParticlesConst<1>>;
-    constexpr BlackDispatcher(float const weight)
+    constexpr BlackPattern(float const weight)
         : Super{weight}
     {
     }
 };
 
 template<typename dim>
-struct PurpleDispatcher
+struct PinkPattern
 {
 };
 template<typename dim>
-struct BrownDispatcher
+struct PurplePattern
 {
 };
 template<typename dim>
-struct PinkDispatcher
+struct BrownPattern
+{
+};
+template<typename dim>
+struct LimePattern
+{
+};
+template<typename dim>
+struct WhitePattern
 {
 };
 

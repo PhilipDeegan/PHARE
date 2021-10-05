@@ -5,7 +5,7 @@
 
 import unittest
 from ddt import ddt, data, unpack
-from pyphare.core.box import Box, Box2D, nDBox
+from pyphare.core.box import Box2D
 from tests.simulator.test_advance import AdvanceTestBase
 
 import matplotlib
@@ -32,6 +32,7 @@ class AdvanceTest(AdvanceTestBase):
     def test_overlapped_particledatas_have_identical_particles(self, interp_order, refinement_boxes):
         self._test_overlapped_particledatas_have_identical_particles(
             ndim, interp_order, refinement_boxes, ppc=ppc, cells=40, largest_patch_size=20)
+
 
     @data(*interp_orders)
     def test_L0_particle_number_conservation(self, interp):

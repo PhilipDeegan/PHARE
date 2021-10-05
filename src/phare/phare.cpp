@@ -32,7 +32,8 @@ std::unique_ptr<PHARE::initializer::DataProvider> fromCommandLine(int argc, char
     return nullptr;
 }
 
-int main(int argc, char** argv)
+
+int naim(int argc, char** argv)
 {
     std::string const welcome = R"~(
                   _____   _    _            _____   ______
@@ -76,4 +77,14 @@ int main(int argc, char** argv)
         std::cout << simulator->currentTime() << "\n";
         //    time += simulator.timeStep();
     }
+
+    return 0;
 }
+
+
+#if !defined(PHARE_EXE_NO_MAIN)
+int main(int argc, char** argv)
+{
+    return naim(argc, argv);
+}
+#endif

@@ -5,7 +5,7 @@
 
 import unittest
 from ddt import ddt, data, unpack
-from pyphare.core.box import Box, Box2D, nDBox
+from pyphare.core.box import Box2D
 from tests.simulator.test_advance import AdvanceTestBase
 
 import matplotlib
@@ -50,6 +50,7 @@ class AdvanceTest(AdvanceTestBase):
         from pyphare.pharein.simulation import check_patch_size
         diag_outputs=f"phare_overlaped_fields_are_equal_with_min_max_patch_size_of_max_ghosts/{ndim}/{interp_order}/{self.ddt_test_id()}"
         largest_patch_size, smallest_patch_size = check_patch_size(ndim, interp_order=interp_order, cells=[60] * ndim)
+        print("largest_patch_size, smallest_patch_size", largest_patch_size, smallest_patch_size)
         datahier = self.getHierarchy(interp_order, refinement_boxes, "eb", diag_outputs=diag_outputs,
                                   smallest_patch_size=smallest_patch_size, largest_patch_size=smallest_patch_size,
                                   time_step=time_step, time_step_nbr=time_step_nbr, ndim=ndim, nbr_part_per_cell=ppc)
