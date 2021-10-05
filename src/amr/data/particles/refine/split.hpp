@@ -3,6 +3,7 @@
 
 #include "amr/data/particles/refine/split_1d.hpp"
 #include "amr/data/particles/refine/split_2d.hpp"
+#include "amr/data/particles/refine/split_3d.h"
 
 
 #endif // endif PHARE_SPLIT_HPP

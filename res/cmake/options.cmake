@@ -70,6 +70,12 @@ option(lowResourceTests "Disable heavy tests for CI (2d/3d/etc" OFF)
 option(testDuringBuild "Runs C++ unit tests after they are built" OFF)
 
 
+# -DwithPGO_GEN
+option(withPGO_GEN "Activate generate step of PGO")
+# -DwithPGO_A
+option(withPGO_USE "Activate usage step of PGO")
+
+
 # Controlling the activation of tests
 if (NOT DEFINED PHARE_EXEC_LEVEL_MIN)
   set(PHARE_EXEC_LEVEL_MIN 1)
