@@ -180,6 +180,12 @@ def diff_boxes(self, slice1, slice2, box, atol=None):
 
 
 def clean_up_diags(test_or_sim):
+    from pyphare.simulator.simulator import startMPI
+    from pyphare.cpp import cpp_lib
+    startMPI()
+    if cpp_lib().mpi_rank() > 0:
+        return # only delete h5 files for rank 0
+
     ok = True
     import unittest
     if isinstance(test_or_sim, unittest.TestCase):
