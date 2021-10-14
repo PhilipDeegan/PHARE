@@ -22,11 +22,12 @@ def init(ghost_box, layout, L, qty, fn):
     dl, origin = layout.dl, layout.origin
     xyz, directions = [], ["x", "y", "z"][:ndim]
     for dimdex, direction in enumerate(directions):
-        primal = yee_element_is_primal(qty, direction)
-        nbrGhosts = layout.nbrGhosts(primal, layout.interp_order)
+        is_primal = yee_element_is_primal(qty, direction)
+        centering = "primal" if yee_element_is_primal(qty, direction) else "dual"
+        nbrGhosts = 5 # layout.nbrGhosts(layout.interp_order, centering)
         xyz.append(
             origin[dimdex]
-            + np.arange(ghost_box.shape[dimdex] + primal) * dl[dimdex]
+            + np.arange(ghost_box.shape[dimdex] + int(is_primal)) * dl[dimdex]
             - nbrGhosts * dl[dimdex]
         )
 
@@ -180,10 +181,11 @@ def build_patch_datas(domain_box, boxes, **kwargs):
             patch_datas[ilvl] = []
 
         for box in lvl_box:
-
-            ghost_box = boxm.grow(box, [5] * ndim)
             origin = box.lower * lvl_cell_width
             layout = GridLayout(box, origin, lvl_cell_width, interp_order)
+
+            ghost_len = np.asarray([5] * ndim)
+            ghost_box = boxm.grow(box, ghost_len)
 
             datas = {
                 qty: globals()[qty](ghost_box, layout, domain_size)
@@ -199,6 +201,10 @@ def build_patch_datas(domain_box, boxes, **kwargs):
                     pdata = ParticleData(layout, data, "pop_name")
                 else:
                     pdata = FieldData(layout, qty_name, data)
+                    pdata.ghosts_nbr = ghost_len
+                    # print("get", pdata.ghost_box)
+                    pdata.ghost_box = ghost_box
+                    # print("set", pdata.ghost_box)
 
                 boxed_patch_datas[qty_name] = pdata
 

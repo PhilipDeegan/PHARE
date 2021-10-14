@@ -178,3 +178,26 @@ def diff_boxes(self, slice1, slice2, box, atol=None):
             boxes += [Box([x, y, z], [x, y, z])]
     return boxes
 
+
+def clean_up_diags(test_or_sim):
+    ok = True
+    import unittest
+    if isinstance(test_or_sim, unittest.TestCase):
+        def list2reason(exc_list):
+            if exc_list and exc_list[-1][0] is unittest:
+                return exc_list[-1][1]
+
+        result = test_or_sim.defaultTestResult()
+        error = list2reason(result.errors)
+        failure = list2reason(result.failures)
+        ok = not error and not failure
+        sim = ph.global_vars.sim
+    else:
+        sim = test_or_sim
+
+    if ok and sim is not None:
+        import os
+        import shutil
+        diag_dir = sim.diag_options["options"]["dir"]
+        if os.path.exists(diag_dir):
+            shutil.rmtree(diag_dir)
