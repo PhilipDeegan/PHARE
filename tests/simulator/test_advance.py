@@ -17,10 +17,15 @@ import numpy as np
 import unittest
 from ddt import ddt, data, unpack
 from tests.diagnostic import all_timestamps
-from tests.simulator import diff_boxes
+from tests.simulator import diff_boxes, clean_up_diags
 
 @ddt
 class AdvanceTestBase(unittest.TestCase):
+
+    def tearDown(self):
+
+        clean_up_diags(self)
+
     def pop(kwargs):
         keys = ["rethrow"]
         for key in keys:
@@ -53,6 +58,7 @@ class AdvanceTestBase(unittest.TestCase):
                      dl=0.2, extra_diag_options={}, time_step_nbr=1, timestamps=None, ndim=1):
         diag_outputs = f"phare_outputs/advance/{diag_outputs}"
         from pyphare.pharein import global_vars
+        clean_up_diags(global_vars.sim)
         global_vars.sim = None
 
         if smallest_patch_size is None:
@@ -347,11 +353,15 @@ class AdvanceTestBase(unittest.TestCase):
 
         time_step_nbr=3
 
+        import random
+        rando = 8264952795 #random.randint(0, 1e10)
+        print("OUOOT", rando)
+
         diag_outputs=f"subcycle_coarsening/{dim}/{interp_order}/{self.ddt_test_id()}"
         datahier = self.getHierarchy(interp_order, refinement_boxes, "eb", cells=60,
                                       diag_outputs=diag_outputs, time_step=0.001,
                                       extra_diag_options={"fine_dump_lvl_max": 10},
-                                      time_step_nbr=time_step_nbr,
+                                      time_step_nbr=time_step_nbr, model_init={"seed": rando},
                                       largest_patch_size=30, ndim=dim, **kwargs)
 
         lvl_steps = global_vars.sim.level_time_steps
