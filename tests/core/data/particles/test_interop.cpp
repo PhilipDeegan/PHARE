@@ -45,7 +45,7 @@ TYPED_TEST(ParticleListTest, SoAandAoSInterop)
         EXPECT_EQ(contiguous[i], std::copy(contiguous[i]));
     }
 
-    ParticleArray<dim> particleArray;
+    ParticleArray<Particle> particleArray;
     for (auto const& view : contiguous)
     {
         auto i = particleArray.size();
@@ -56,7 +56,7 @@ TYPED_TEST(ParticleListTest, SoAandAoSInterop)
     EXPECT_EQ(contiguous.size(), particleArray.size());
 
     ContiguousParticles<dim> AoSFromSoA{particleArray.size()};
-    ParticlePacker<dim>{particleArray}.pack(AoSFromSoA);
+    ParticlePacker<Particle>{particleArray}.pack(AoSFromSoA);
 
     std::size_t i = 0;
     for (auto const& particle : AoSFromSoA)

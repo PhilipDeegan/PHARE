@@ -114,7 +114,8 @@ namespace amr
 
 
             // We have a correct data type, we can now perform the refine
-            refine_(*destinationParticlesData, *sourceParticlesData, destinationFieldOverlap);
+            if constexpr (ParticleArray::is_host_mem)
+                refine_(*destinationParticlesData, *sourceParticlesData, destinationFieldOverlap);
         }
 
     private:
@@ -135,8 +136,8 @@ namespace amr
          * an overlap , a ratio and the geometry of both patches, perform the
          * splitting of coarse particules onto the destination patch
          */
-        void refine_(ParticlesData<ParticleArray>& destParticlesData,
-                     ParticlesData<ParticleArray> const& srcParticlesData,
+        template<typename Data_t> // template so only exists on usage
+        void refine_(Data_t& destParticlesData, Data_t const& srcParticlesData,
                      SAMRAI::pdat::CellOverlap const& destFieldOverlap) const
         {
             // the source PatchData is a possible restriction of a "real" patchdata

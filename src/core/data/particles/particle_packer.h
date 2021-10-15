@@ -1,25 +1,43 @@
 #ifndef PHARE_CORE_DATA_PARTICLE_PACKER_H
 #define PHARE_CORE_DATA_PARTICLE_PACKER_H
 
-
-#include <cstddef>
 #include <vector>
+#include <cstddef>
 
-#include "particle.h"
 #include "particle_array.h"
+#if defined(HAVE_UMPIRE)
+#include "llnl/particle_array.h"
+#endif
 
 namespace PHARE::core
 {
-template<std::size_t dim>
+// PGI compiler (nvc++ 21.3-0) doesn't like static initializations of arrays,
+//   would result in empty strings
+inline std::array<std::string, 5> packer_keys()
+{
+    // The order of this array must match the tuple order of ParticlePacker::get(particle)
+    return {"weight", "charge", "iCell", "delta", "v"};
+}
+
+template<typename Particle>
 class ParticlePacker
 {
+    static constexpr auto dim = Particle::dimension;
+
 public:
-    ParticlePacker(ParticleArray<dim> const& particles)
+    ParticlePacker(ParticleArray<Particle> const& particles)
         : particles_{particles}
     {
     }
 
-    static auto get(Particle<dim> const& particle)
+#if defined(HAVE_UMPIRE)
+    ParticlePacker(llnl::ParticleArray<Particle> const& particles)
+        : particles_{particles()}
+    {
+    }
+#endif
+
+    static auto get(Particle const& particle)
     {
         return std::forward_as_tuple(particle.weight, particle.charge, particle.iCell,
                                      particle.delta, particle.v);
@@ -27,11 +45,10 @@ public:
 
     static auto empty()
     {
-        Particle<dim> particle;
+        Particle particle;
         return get(particle);
     }
 
-    static auto& keys() { return keys_; }
 
     auto get(std::size_t i) const { return get(particles_[i]); }
     bool hasNext() const { return it_ < particles_.size(); }
@@ -56,9 +73,8 @@ public:
     }
 
 private:
-    ParticleArray<dim> const& particles_;
+    ParticleArray<Particle> const& particles_;
     std::size_t it_ = 0;
-    static inline std::array<std::string, 5> keys_{"weight", "charge", "iCell", "delta", "v"};
 };
 
 

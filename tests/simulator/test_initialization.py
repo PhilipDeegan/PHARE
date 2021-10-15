@@ -46,8 +46,8 @@ class InitializationTest(unittest.TestCase):
                      diag_outputs, nbr_part_per_cell=100,
                      density = _density,
                      beam = False, time_step_nbr=1,
-                     smallest_patch_size=None, largest_patch_size=10,
-                     cells=120,
+                     smallest_patch_size=20, largest_patch_size=20,
+                     cells=20,
                      dl=0.1, ndim=1):
         diag_outputs = f"phare_outputs/init/{diag_outputs}"
         from pyphare.pharein import global_vars

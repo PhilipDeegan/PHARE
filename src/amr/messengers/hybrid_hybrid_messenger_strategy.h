@@ -359,20 +359,16 @@ namespace amr
                     auto& density     = pop.density();
                     auto& flux        = pop.flux();
 
-                    interpolate_(std::begin(patchGhosts), std::end(patchGhosts), density, flux,
-                                 layout);
+                    interpolate_(patchGhosts, density, flux, layout);
 
                     if (level.getLevelNumber() > 0) // no levelGhost on root level
                     {
                         // then grab levelGhostParticlesOld and levelGhostParticlesNew
                         // and project them with alpha and (1-alpha) coefs, respectively
-                        auto& levelGhostOld = pop.levelGhostParticlesOld();
-                        interpolate_(std::begin(levelGhostOld), std::end(levelGhostOld), density,
-                                     flux, layout, 1. - alpha);
+                        interpolate_(pop.levelGhostParticlesOld(), density, flux, layout,
+                                     1. - alpha);
 
-                        auto& levelGhostNew = pop.levelGhostParticlesNew();
-                        interpolate_(std::begin(levelGhostNew), std::end(levelGhostNew), density,
-                                     flux, layout, alpha);
+                        interpolate_(pop.levelGhostParticlesNew(), density, flux, layout, alpha);
                     }
                 }
             }
@@ -446,9 +442,7 @@ namespace amr
                         core::swap(levelGhostParticlesNew, levelGhostParticlesOld);
                         core::empty(levelGhostParticlesNew);
                         core::empty(levelGhostParticles);
-                        std::copy(std::begin(levelGhostParticlesOld),
-                                  std::end(levelGhostParticlesOld),
-                                  std::back_inserter(levelGhostParticles));
+                        core::append(levelGhostParticlesOld, levelGhostParticles);
 
                         if (level.getLevelNumber() == 0)
                         {
@@ -692,12 +686,9 @@ namespace amr
                 auto dataOnPatch = resourcesManager_->setOnPatch(*patch, ions);
                 for (auto& pop : ions)
                 {
-                    auto& levelGhostParticlesOld = pop.levelGhostParticlesOld();
-                    auto& levelGhostParticles    = pop.levelGhostParticles();
-
+                    auto& levelGhostParticles = pop.levelGhostParticles();
                     core::empty(levelGhostParticles);
-                    std::copy(std::begin(levelGhostParticlesOld), std::end(levelGhostParticlesOld),
-                              std::back_inserter(levelGhostParticles));
+                    core::append(pop.levelGhostParticlesOld(), levelGhostParticles);
                 }
             }
         }

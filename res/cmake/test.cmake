@@ -27,6 +27,8 @@
 #   if these function calls are to files executing python unit tests as they will interfere
 
 
+# this define breaks pgcc / and appears unnecessary
+# sed -i 's/# define GTEST_CAN_STREAM_RESULTS_ 1/# define GTEST_CAN_STREAM_RESULTS_ 0/g' subprojects/googletest/googletest/include/gtest/internal/gtest-port.h
 
 if (test AND ${PHARE_EXEC_LEVEL_MIN} GREATER 0) # 0 = no tests
 
@@ -39,11 +41,11 @@ if (test AND ${PHARE_EXEC_LEVEL_MIN} GREATER 0) # 0 = no tests
 
   function(set_exe_paths_ binary)
     set_property(TEST ${binary}        PROPERTY ENVIRONMENT "PYTHONPATH=${PHARE_PYTHONPATH}")
-    set_property(TEST ${binary} APPEND PROPERTY ENVIRONMENT "LD_LIBRARY_PATH=${LD_LIBRARY_PATH}")
   endfunction(set_exe_paths_)
 
   function(add_phare_test_ binary)
-    target_compile_options(${binary} PRIVATE ${PHARE_WERROR_FLAGS} -DPHARE_HAS_HIGHFIVE=${PHARE_HAS_HIGHFIVE})
+    target_compile_options(${binary} PRIVATE ${PHARE_FLAGS} ${PHARE_WERROR_FLAGS} -DPHARE_HAS_HIGHFIVE=${PHARE_HAS_HIGHFIVE})
+    target_link_options(${binary} PRIVATE ${PHARE_BIN_FLAGS})
     set_exe_paths_(${binary})
     set_property(TEST ${binary} APPEND PROPERTY ENVIRONMENT GMON_OUT_PREFIX=gprof.${binary})
     set_property(TEST ${binary} APPEND PROPERTY ENVIRONMENT PHARE_MPI_PROCS=${PHARE_MPI_PROCS})
@@ -97,25 +99,6 @@ if (test AND ${PHARE_EXEC_LEVEL_MIN} GREATER 0) # 0 = no tests
   endif(testMPI)
 
 
-  if(DEFINED GTEST_ROOT)
-    set(GTEST_ROOT ${GTEST_ROOT} CACHE PATH "Path to googletest")
-    find_package(GTest REQUIRED)
-    set(GTEST_LIBS GTest::GTest GTest::Main)
-  else()
-    set(GTEST_ROOT ${CMAKE_CURRENT_SOURCE_DIR}/subprojects/googletest)
-
-    if (NOT EXISTS ${GTEST_ROOT})
-      execute_process(COMMAND ${Git} clone https://github.com/google/googletest ${GTEST_ROOT})
-    endif()
-
-    add_subdirectory(subprojects/googletest)
-    set(GTEST_INCLUDE_DIRS
-      $<BUILD_INTERFACE:${gtest_SOURCE_DIR}/include>
-      $<BUILD_INTERFACE:${gmock_SOURCE_DIR}/include>)
-    set(GTEST_LIBS gtest gmock)
-
-  endif()
-
   function(phare_exec level target exe directory)
     if(${level} GREATER_EQUAL ${PHARE_EXEC_LEVEL_MIN} AND ${level} LESS_EQUAL ${PHARE_EXEC_LEVEL_MAX})
       add_test(NAME ${target} COMMAND ${exe} WORKING_DIRECTORY ${directory})
@@ -155,6 +138,21 @@ if (test AND ${PHARE_EXEC_LEVEL_MIN} GREATER 0) # 0 = no tests
   endfunction(phare_mpi_python3_exec)
   # use
   #  phare_mpi_python3_exec(1 2 test_id script.py ${CMAKE_CURRENT_BINARY_DIR} $ARGS)
+
+
+  function(phare_mpi_python3_exec level N target file directory)
+    if(${level} GREATER_EQUAL ${PHARE_EXEC_LEVEL_MIN} AND ${level} LESS_EQUAL ${PHARE_EXEC_LEVEL_MAX})
+      if(${N} EQUAL 1)
+        add_test(NAME py3_${target} COMMAND python3 -u ${file} WORKING_DIRECTORY ${directory})
+        set_exe_paths_(py3_${target})
+      else()
+        add_test(NAME py3_${target}_mpi_n_${N} COMMAND mpirun -n ${N} python3 -u ${file} WORKING_DIRECTORY ${directory})
+        set_exe_paths_(py3_${target}_mpi_n_${N})
+      endif()
+    endif()
+  endfunction(phare_mpi_python3_exec)
+  # use
+  #  phare_mpi_python3_exec(1 2 test_id script.py ${CMAKE_CURRENT_BINARY_DIR})
 
   set(GTEST_INCLUDE_DIRS ${GTEST_INCLUDE_DIRS} ${PHARE_PROJECT_DIR})
 

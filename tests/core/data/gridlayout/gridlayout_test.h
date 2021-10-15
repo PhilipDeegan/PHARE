@@ -24,5 +24,11 @@ public:
 };
 
 
+template<typename GridLayout>
+class TestGridLayout : public GridLayout
+{ // to expose a default constructor
+public:
+    TestGridLayout() = default;
+};
 
 #endif

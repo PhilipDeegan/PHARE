@@ -5,6 +5,7 @@
 
 
 #include "core/data/ions/ion_population/ion_population.h"
+#include "core/data/particles/particle.h"
 #include "core/data/particles/particle_array.h"
 #include "initializer/data_provider.h"
 #include "core/hybrid/hybrid_quantities.h"
@@ -52,7 +53,7 @@ PHAREDict getDict()
 
 struct AnIonPopulation : public ::testing::Test
 {
-    IonPopulation<ParticleArray<1>, DummyVecField, DummyLayout> protons{getDict()};
+    IonPopulation<ParticleArray<Particle<1>>, DummyVecField, DummyLayout> protons{getDict()};
     virtual ~AnIonPopulation();
 };
 

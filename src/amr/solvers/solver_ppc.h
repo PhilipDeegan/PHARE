@@ -35,13 +35,19 @@
 namespace PHARE::solver
 {
 // -----------------------------------------------------------------------------
-
 template<typename HybridModel, typename AMR_Types>
-class SolverPPC : public ISolver<AMR_Types>
+class SolverPPCBase : public ISolver<AMR_Types>
 {
-private:
+protected:
     static constexpr auto dimension    = HybridModel::dimension;
     static constexpr auto interp_order = HybridModel::gridlayout_type::interp_order;
+
+
+    SolverPPCBase(PHARE::initializer::PHAREDict const& dict)
+        : ISolver<AMR_Types>{"PPC"}
+        , ohm_{dict["ohm"]}
+    {
+    }
 
     using Electromag       = typename HybridModel::electromag_type;
     using Ions             = typename HybridModel::ions_type;
@@ -52,6 +58,10 @@ private:
     using IPhysicalModel_t = IPhysicalModel<AMR_Types>;
     using IMessenger       = amr::IMessenger<IPhysicalModel_t>;
     using HybridMessenger  = amr::HybridMessenger<HybridModel>;
+    using patch_t          = typename AMR_Types::patch_t;
+    using level_t          = typename AMR_Types::level_t;
+    using hierarchy_t      = typename AMR_Types::hierarchy_t;
+    using Messenger        = amr::HybridMessenger<HybridModel>;
 
 
     Electromag electromagPred_{"EMPred"};
@@ -61,26 +71,6 @@ private:
     PHARE::core::Faraday<GridLayout> faraday_;
     PHARE::core::Ampere<GridLayout> ampere_;
     PHARE::core::Ohm<GridLayout> ohm_;
-    PHARE::core::IonUpdater<Ions, Electromag, GridLayout> ionUpdater_;
-
-
-
-public:
-    using patch_t     = typename AMR_Types::patch_t;
-    using level_t     = typename AMR_Types::level_t;
-    using hierarchy_t = typename AMR_Types::hierarchy_t;
-
-
-
-    explicit SolverPPC(PHARE::initializer::PHAREDict const& dict)
-        : ISolver<AMR_Types>{"PPC"}
-        , ohm_{dict["ohm"]}
-        , ionUpdater_{dict["ion_updater"]}
-
-    {
-    }
-
-    virtual ~SolverPPC() = default;
 
 
     virtual std::string modelName() const override { return HybridModel::model_name; }
@@ -91,186 +81,30 @@ public:
     virtual void registerResources(IPhysicalModel_t& model) override;
 
 
+
     virtual void allocate(IPhysicalModel_t& model, SAMRAI::hier::Patch& patch,
                           double const allocateTime) const override;
-
-
-
-    virtual void advanceLevel(std::shared_ptr<hierarchy_t> const& hierarchy, int const levelNumber,
-                              IPhysicalModel_t& model, IMessenger& fromCoarserMessenger,
-                              double const currentTime, double const newTime) override;
-
-
-
-private:
-    using Messenger = amr::HybridMessenger<HybridModel>;
-
 
     void predictor1_(level_t& level, HybridModel& model, Messenger& fromCoarser,
                      double const currentTime, double const newTime);
 
-
     void predictor2_(level_t& level, HybridModel& model, Messenger& fromCoarser,
                      double const currentTime, double const newTime);
-
 
     void corrector_(level_t& level, HybridModel& model, Messenger& fromCoarser,
                     double const currentTime, double const newTime);
 
-
     void average_(level_t& level, HybridModel& model);
-
-
-    void moveIons_(level_t& level, Ions& ions, Electromag& electromag, ResourcesManager& rm,
-                   Messenger& fromCoarser, double const currentTime, double const newTime,
-                   core::UpdaterMode mode);
-
-
-    void saveState_(level_t& level, Ions& ions, ResourcesManager& rm);
-
-    void restoreState_(level_t& level, Ions& ions, ResourcesManager& rm);
-
-    /*
-    template<typename HybridMessenger>
-    void syncLevel(HybridMessenger& toCoarser)
-    {
-        toCoarser.syncMagnetic(model_.electromag.B);
-        toCoarser.syncElectric(model_.electromag.E);
-    }*/
-
-
-    // extend lifespan
-    std::unordered_map<std::string, ParticleArray> tmpDomain;
-    std::unordered_map<std::string, ParticleArray> patchGhost;
-
-
-}; // end solverPPC
-
-
-
-// -----------------------------------------------------------------------------
-
-template<typename HybridModel, typename AMR_Types>
-void SolverPPC<HybridModel, AMR_Types>::registerResources(IPhysicalModel_t& model)
-{
-    auto& hmodel = dynamic_cast<HybridModel&>(model);
-    hmodel.resourcesManager->registerResources(electromagPred_);
-    hmodel.resourcesManager->registerResources(electromagAvg_);
-}
+};
 
 
 
 
 template<typename HybridModel, typename AMR_Types>
-void SolverPPC<HybridModel, AMR_Types>::allocate(IPhysicalModel_t& model,
-                                                 SAMRAI::hier::Patch& patch,
-                                                 double const allocateTime) const
-{
-    auto& hmodel = dynamic_cast<HybridModel&>(model);
-    hmodel.resourcesManager->allocate(electromagPred_, patch, allocateTime);
-    hmodel.resourcesManager->allocate(electromagAvg_, patch, allocateTime);
-}
-
-
-
-
-template<typename HybridModel, typename AMR_Types>
-void SolverPPC<HybridModel, AMR_Types>::fillMessengerInfo(
-    std::unique_ptr<amr::IMessengerInfo> const& info) const
-{
-    auto& modelInfo = dynamic_cast<amr::HybridMessengerInfo&>(*info);
-
-    auto const& Epred = electromagPred_.E;
-    auto const& Bpred = electromagPred_.B;
-
-    modelInfo.ghostElectric.emplace_back(Epred);
-    modelInfo.ghostMagnetic.emplace_back(Bpred);
-    modelInfo.initMagnetic.emplace_back(Bpred);
-}
-
-
-template<typename HybridModel, typename AMR_Types>
-void SolverPPC<HybridModel, AMR_Types>::saveState_(level_t& level, Ions& ions, ResourcesManager& rm)
-{
-    for (auto& patch : level)
-    {
-        std::stringstream ss;
-        ss << patch->getGlobalId();
-
-        auto _ = rm.setOnPatch(*patch, ions);
-        for (auto& pop : ions)
-        {
-            tmpDomain[ss.str() + "_" + pop.name()]  = pop.domainParticles();
-            patchGhost[ss.str() + "_" + pop.name()] = pop.patchGhostParticles();
-        }
-    }
-}
-
-template<typename HybridModel, typename AMR_Types>
-void SolverPPC<HybridModel, AMR_Types>::restoreState_(level_t& level, Ions& ions,
-                                                      ResourcesManager& rm)
-{
-    for (auto& patch : level)
-    {
-        std::stringstream ss;
-        ss << patch->getGlobalId();
-
-        auto _ = rm.setOnPatch(*patch, ions);
-        for (auto& pop : ions)
-        {
-            pop.domainParticles()     = std::move(tmpDomain[ss.str() + "_" + pop.name()]);
-            pop.patchGhostParticles() = std::move(patchGhost[ss.str() + "_" + pop.name()]);
-        }
-    }
-}
-
-
-template<typename HybridModel, typename AMR_Types>
-void SolverPPC<HybridModel, AMR_Types>::advanceLevel(std::shared_ptr<hierarchy_t> const& hierarchy,
-                                                     int const levelNumber, IPhysicalModel_t& model,
-                                                     IMessenger& fromCoarserMessenger,
-                                                     double const currentTime, double const newTime)
-{
-    PHARE_LOG_SCOPE("SolverPPC::advanceLevel");
-
-    auto& hybridModel      = dynamic_cast<HybridModel&>(model);
-    auto& hybridState      = hybridModel.state;
-    auto& fromCoarser      = dynamic_cast<HybridMessenger&>(fromCoarserMessenger);
-    auto& resourcesManager = *hybridModel.resourcesManager;
-    auto level             = hierarchy->getPatchLevel(levelNumber);
-
-
-    predictor1_(*level, hybridModel, fromCoarser, currentTime, newTime);
-
-
-    average_(*level, hybridModel);
-
-    saveState_(*level, hybridState.ions, resourcesManager);
-    moveIons_(*level, hybridState.ions, electromagAvg_, resourcesManager, fromCoarser, currentTime,
-              newTime, core::UpdaterMode::domain_only);
-
-    predictor2_(*level, hybridModel, fromCoarser, currentTime, newTime);
-
-
-    average_(*level, hybridModel);
-
-    restoreState_(*level, hybridState.ions, resourcesManager);
-    moveIons_(*level, hybridState.ions, electromagAvg_, resourcesManager, fromCoarser, currentTime,
-              newTime, core::UpdaterMode::all);
-
-    corrector_(*level, hybridModel, fromCoarser, currentTime, newTime);
-
-
-    // return newTime;
-}
-
-
-
-
-template<typename HybridModel, typename AMR_Types>
-void SolverPPC<HybridModel, AMR_Types>::predictor1_(level_t& level, HybridModel& model,
-                                                    Messenger& fromCoarser,
-                                                    double const currentTime, double const newTime)
+void SolverPPCBase<HybridModel, AMR_Types>::predictor1_(level_t& level, HybridModel& model,
+                                                        Messenger& fromCoarser,
+                                                        double const currentTime,
+                                                        double const newTime)
 {
     PHARE_LOG_SCOPE("SolverPPC::predictor1_");
 
@@ -352,9 +186,10 @@ void SolverPPC<HybridModel, AMR_Types>::predictor1_(level_t& level, HybridModel&
 
 
 template<typename HybridModel, typename AMR_Types>
-void SolverPPC<HybridModel, AMR_Types>::predictor2_(level_t& level, HybridModel& model,
-                                                    Messenger& fromCoarser,
-                                                    double const currentTime, double const newTime)
+void SolverPPCBase<HybridModel, AMR_Types>::predictor2_(level_t& level, HybridModel& model,
+                                                        Messenger& fromCoarser,
+                                                        double const currentTime,
+                                                        double const newTime)
 {
     PHARE_LOG_SCOPE("SolverPPC::predictor2_");
 
@@ -435,9 +270,10 @@ void SolverPPC<HybridModel, AMR_Types>::predictor2_(level_t& level, HybridModel&
 
 
 template<typename HybridModel, typename AMR_Types>
-void SolverPPC<HybridModel, AMR_Types>::corrector_(level_t& level, HybridModel& model,
-                                                   Messenger& fromCoarser, double const currentTime,
-                                                   double const newTime)
+void SolverPPCBase<HybridModel, AMR_Types>::corrector_(level_t& level, HybridModel& model,
+                                                       Messenger& fromCoarser,
+                                                       double const currentTime,
+                                                       double const newTime)
 {
     PHARE_LOG_SCOPE("SolverPPC::corrector_");
 
@@ -495,7 +331,7 @@ void SolverPPC<HybridModel, AMR_Types>::corrector_(level_t& level, HybridModel& 
 
 
 template<typename HybridModel, typename AMR_Types>
-void SolverPPC<HybridModel, AMR_Types>::average_(level_t& level, HybridModel& model)
+void SolverPPCBase<HybridModel, AMR_Types>::average_(level_t& level, HybridModel& model)
 {
     PHARE_LOG_SCOPE("SolverPPC::average_");
 
@@ -517,6 +353,210 @@ void SolverPPC<HybridModel, AMR_Types>::average_(level_t& level, HybridModel& mo
         PHARE::core::average(E, Epred, Eavg);
     }
 }
+
+
+template<typename HybridModel, typename AMR_Types>
+void SolverPPCBase<HybridModel, AMR_Types>::registerResources(IPhysicalModel_t& model)
+{
+    auto& hmodel = dynamic_cast<HybridModel&>(model);
+    hmodel.resourcesManager->registerResources(electromagPred_);
+    hmodel.resourcesManager->registerResources(electromagAvg_);
+}
+
+
+
+
+template<typename HybridModel, typename AMR_Types>
+void SolverPPCBase<HybridModel, AMR_Types>::allocate(IPhysicalModel_t& model,
+                                                     SAMRAI::hier::Patch& patch,
+                                                     double const allocateTime) const
+{
+    auto& hmodel = dynamic_cast<HybridModel&>(model);
+    hmodel.resourcesManager->allocate(electromagPred_, patch, allocateTime);
+    hmodel.resourcesManager->allocate(electromagAvg_, patch, allocateTime);
+}
+
+
+
+
+template<typename HybridModel, typename AMR_Types>
+void SolverPPCBase<HybridModel, AMR_Types>::fillMessengerInfo(
+    std::unique_ptr<amr::IMessengerInfo> const& info) const
+{
+    auto& modelInfo = dynamic_cast<amr::HybridMessengerInfo&>(*info);
+
+    auto const& Epred = electromagPred_.E;
+    auto const& Bpred = electromagPred_.B;
+
+    modelInfo.ghostElectric.emplace_back(Epred);
+    modelInfo.ghostMagnetic.emplace_back(Bpred);
+    modelInfo.initMagnetic.emplace_back(Bpred);
+}
+
+
+
+template<typename HybridModel, typename AMR_Types>
+class SolverPPC : public SolverPPCBase<HybridModel, AMR_Types>
+{
+protected:
+    static constexpr auto dimension    = HybridModel::dimension;
+    static constexpr auto interp_order = HybridModel::gridlayout_type::interp_order;
+
+    using Super = SolverPPCBase<HybridModel, AMR_Types>;
+
+    using Electromag       = typename HybridModel::electromag_type;
+    using Ions             = typename HybridModel::ions_type;
+    using ParticleArray    = typename Ions::particle_array_type;
+    using VecFieldT        = typename HybridModel::vecfield_type;
+    using GridLayout       = typename HybridModel::gridlayout_type;
+    using ResourcesManager = typename HybridModel::resources_manager_type;
+    using IPhysicalModel_t = IPhysicalModel<AMR_Types>;
+    using IMessenger       = amr::IMessenger<IPhysicalModel_t>;
+    using HybridMessenger  = amr::HybridMessenger<HybridModel>;
+    using Messenger        = typename Super::Messenger;
+
+    using Super::ampere_;
+    using Super::electromagAvg_;
+    using Super::electromagPred_;
+    using Super::faraday_;
+    using Super::ohm_;
+
+    using Super::average_;
+    using Super::corrector_;
+    using Super::predictor1_;
+    using Super::predictor2_;
+
+
+
+public:
+    using patch_t     = typename AMR_Types::patch_t;
+    using level_t     = typename AMR_Types::level_t;
+    using hierarchy_t = typename AMR_Types::hierarchy_t;
+
+
+    explicit SolverPPC(PHARE::initializer::PHAREDict const& dict)
+        : Super{dict}
+        , ionUpdater_{dict["ion_updater"]}
+
+    {
+    }
+
+    virtual ~SolverPPC() = default;
+
+
+
+    virtual void advanceLevel(std::shared_ptr<hierarchy_t> const& hierarchy, int const levelNumber,
+                              IPhysicalModel_t& model, IMessenger& fromCoarserMessenger,
+                              double const currentTime, double const newTime) override;
+
+
+
+protected:
+    void moveIons_(level_t& level, Ions& ions, Electromag& electromag, ResourcesManager& rm,
+                   Messenger& fromCoarser, double const currentTime, double const newTime,
+                   core::UpdaterMode mode);
+
+
+    void saveState_(level_t& level, Ions& ions, ResourcesManager& rm);
+
+    void restoreState_(level_t& level, Ions& ions, ResourcesManager& rm);
+
+    /*
+    template<typename HybridMessenger>
+    void syncLevel(HybridMessenger& toCoarser)
+    {
+        toCoarser.syncMagnetic(model_.electromag.B);
+        toCoarser.syncElectric(model_.electromag.E);
+    }*/
+
+    PHARE::core::IonUpdater<Ions, Electromag, GridLayout> ionUpdater_;
+
+    // extend lifespan
+    std::unordered_map<std::string, ParticleArray> tmpDomain;
+    std::unordered_map<std::string, ParticleArray> patchGhost;
+
+}; // end solverPPC
+
+
+
+// -----------------------------------------------------------------------------
+
+
+template<typename HybridModel, typename AMR_Types>
+void SolverPPC<HybridModel, AMR_Types>::saveState_(level_t& level, Ions& ions, ResourcesManager& rm)
+{
+    for (auto& patch : level)
+    {
+        std::stringstream ss;
+        ss << patch->getGlobalId();
+
+        auto _ = rm.setOnPatch(*patch, ions);
+        for (auto& pop : ions)
+        {
+            tmpDomain[ss.str() + "_" + pop.name()]  = pop.domainParticles();
+            patchGhost[ss.str() + "_" + pop.name()] = pop.patchGhostParticles();
+        }
+    }
+}
+
+template<typename HybridModel, typename AMR_Types>
+void SolverPPC<HybridModel, AMR_Types>::restoreState_(level_t& level, Ions& ions,
+                                                      ResourcesManager& rm)
+{
+    for (auto& patch : level)
+    {
+        std::stringstream ss;
+        ss << patch->getGlobalId();
+
+        auto _ = rm.setOnPatch(*patch, ions);
+        for (auto& pop : ions)
+        {
+            pop.domainParticles()     = std::move(tmpDomain[ss.str() + "_" + pop.name()]);
+            pop.patchGhostParticles() = std::move(patchGhost[ss.str() + "_" + pop.name()]);
+        }
+    }
+}
+
+
+template<typename HybridModel, typename AMR_Types>
+void SolverPPC<HybridModel, AMR_Types>::advanceLevel(std::shared_ptr<hierarchy_t> const& hierarchy,
+                                                     int const levelNumber, IPhysicalModel_t& model,
+                                                     IMessenger& fromCoarserMessenger,
+                                                     double const currentTime, double const newTime)
+{
+    PHARE_LOG_SCOPE("SolverPPC::advanceLevel");
+
+    auto& hybridModel      = dynamic_cast<HybridModel&>(model);
+    auto& hybridState      = hybridModel.state;
+    auto& fromCoarser      = dynamic_cast<HybridMessenger&>(fromCoarserMessenger);
+    auto& resourcesManager = *hybridModel.resourcesManager;
+    auto level             = hierarchy->getPatchLevel(levelNumber);
+
+
+    predictor1_(*level, hybridModel, fromCoarser, currentTime, newTime);
+
+
+    average_(*level, hybridModel);
+
+    saveState_(*level, hybridState.ions, resourcesManager);
+    moveIons_(*level, hybridState.ions, electromagAvg_, resourcesManager, fromCoarser, currentTime,
+              newTime, core::UpdaterMode::domain_only);
+
+    predictor2_(*level, hybridModel, fromCoarser, currentTime, newTime);
+
+
+    average_(*level, hybridModel);
+
+    restoreState_(*level, hybridState.ions, resourcesManager);
+    moveIons_(*level, hybridState.ions, electromagAvg_, resourcesManager, fromCoarser, currentTime,
+              newTime, core::UpdaterMode::all);
+
+    corrector_(*level, hybridModel, fromCoarser, currentTime, newTime);
+
+
+    // return newTime;
+}
+
 
 
 

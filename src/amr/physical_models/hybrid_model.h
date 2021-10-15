@@ -13,8 +13,38 @@
 #include "amr/resources_manager/resources_manager.h"
 #include "amr/messengers/hybrid_messenger_info.h"
 
+
+#if defined(HAVE_UMPIRE)
+#include "interop/patch_state.h"
+#endif
+
+
+
 namespace PHARE::solver
 {
+template<typename Hierarchy, typename ModelSrc, typename ModelDst>
+auto constexpr fill_state_from(Hierarchy const& hierarchy, ModelSrc const& src, ModelDst& dst)
+{
+    static_assert(!std::is_same_v<ModelSrc, ModelDst>);
+
+#if defined(HAVE_UMPIRE)
+    auto& cpuState = src.state;
+    auto& devState = dst.state;
+    for (int levelNumber = 0; levelNumber < hierarchy.getNumberOfLevels(); ++levelNumber)
+    {
+        auto& level = hierarchy->getPatchLevel(levelNumber);
+        for (auto& patch : *level)
+        {
+            auto _0 = *src.resourcesManager.setOnPatch(*patch, cpuState);
+            auto _1 = *dst.resourcesManager.setOnPatch(*patch, devState);
+            load_to_umpire_device_mem(PatchState{cpuState}, PatchState{devState});
+        }
+    }
+#else
+    assert(false);
+#endif
+}
+
 /**
  * @brief The HybridModel class is a concrete implementation of a IPhysicalModel. The class
  * holds a HybridState and a ResourcesManager.
@@ -24,11 +54,13 @@ template<typename GridLayoutT, typename Electromag, typename Ions, typename Elec
 class HybridModel : public IPhysicalModel<AMR_Types>
 {
 public:
-    using type_list = PHARE::core::type_list<GridLayoutT, Electromag, Ions, Electrons, AMR_Types>;
-    using Interface = IPhysicalModel<AMR_Types>;
-    using amr_types = AMR_Types;
-    using patch_t   = typename AMR_Types::patch_t;
-    using level_t   = typename AMR_Types::level_t;
+    using type_list   = PHARE::core::type_list<GridLayoutT, Electromag, Ions, Electrons, AMR_Types>;
+    using Interface   = IPhysicalModel<AMR_Types>;
+    using amr_types   = AMR_Types;
+    using InitState_t = core::HybridState<Electromag, Ions, Electrons>;
+    using State_t     = typename core::HybridState<Electromag, Ions, Electrons>;
+    using patch_t     = typename AMR_Types::patch_t;
+    using level_t     = typename AMR_Types::level_t;
     static const std::string model_name;
     using gridlayout_type           = GridLayoutT;
     using electromag_type           = Electromag;
@@ -42,7 +74,7 @@ public:
         = core::ParticleInitializerFactory<particle_array_type, gridlayout_type>;
 
 
-    core::HybridState<Electromag, Ions, Electrons> state;
+    State_t state;
     std::shared_ptr<resources_manager_type> resourcesManager;
 
 

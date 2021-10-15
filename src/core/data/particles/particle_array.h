@@ -1,21 +1,19 @@
 #ifndef PHARE_CORE_DATA_PARTICLES_PARTICLE_ARRAY_H
 #define PHARE_CORE_DATA_PARTICLES_PARTICLE_ARRAY_H
 
-
-#include <cstddef>
 #include <vector>
-
-#include "particle.h"
+#include <cstddef>
 
 namespace PHARE::core
 {
-template<std::size_t dim>
+template<typename Particle>
 class ParticleArray
 {
 public:
+    static constexpr bool is_host_mem   = true;
     static constexpr bool is_contiguous = false;
-    static constexpr auto dimension     = dim;
-    using Particle_t                    = Particle<dim>;
+    static constexpr auto dimension     = Particle::dimension;
+    using Particle_t                    = Particle;
     using Vector                        = std::vector<Particle_t>;
     using iterator                      = typename Vector::iterator;
     using value_type                    = Particle_t;
@@ -26,9 +24,36 @@ public:
     {
     }
 
+    ParticleArray(ParticleArray const& that)
+        : particles(that.particles)
+    {
+    }
+
+    ParticleArray(ParticleArray&& that)
+        : particles(std::move(that.particles))
+    {
+    }
+
     ParticleArray(std::size_t size, Particle_t&& particle)
         : particles(size, particle)
     {
+    }
+
+    auto& operator=(ParticleArray const& that)
+    {
+        this->particles = that.particles;
+        return *this;
+    }
+    auto& operator=(ParticleArray&& that)
+    {
+        this->particles = std::move(that.particles);
+        return *this;
+    }
+
+    auto& operator=(Vector&& vector)
+    {
+        this->particles = std::move(vector);
+        return *this;
     }
 
     std::size_t size() const { return particles.size(); }
@@ -40,7 +65,7 @@ public:
     auto& operator[](std::size_t i) const { return particles[i]; }
     auto& operator[](std::size_t i) { return particles[i]; }
 
-    bool operator==(ParticleArray<dim> const& that) const
+    bool operator==(ParticleArray<Particle> const& that) const
     {
         return (this->particles == that.particles);
     }
@@ -57,8 +82,14 @@ public:
         particles.insert(position, first, last);
     }
 
+    auto data() { return particles.data(); }
+    auto data() const { return particles.data(); }
+
     auto back() { return particles.back(); }
+    auto back() const { return particles.back(); }
+
     auto front() { return particles.front(); }
+    auto front() const { return particles.front(); }
 
     iterator erase(iterator position) { return particles.erase(position); }
     iterator erase(iterator first, iterator last) { return particles.erase(first, last); }
@@ -69,33 +100,31 @@ public:
     void push_back(Particle_t const& p) { particles.push_back(p); }
     void push_back(Particle_t&& p) { particles.push_back(p); }
 
-    void swap(ParticleArray<dim>& that) { std::swap(this->particles, that.particles); }
+    void swap(ParticleArray<Particle>& that) { std::swap(this->particles, that.particles); }
 
 private:
     Vector particles;
 };
 
+template<typename Particle>
+void empty(ParticleArray<Particle>& array)
+{
+    array.clear();
+}
+
+template<typename Particle>
+void swap(ParticleArray<Particle>& array1, ParticleArray<Particle>& array2)
+{
+    array1.swap(array2);
+}
+
+template<typename Particle>
+void append(ParticleArray<Particle> const& src, ParticleArray<Particle>& dst)
+{
+    std::copy(std::begin(src), std::end(src), std::back_inserter(dst));
+}
+
 } // namespace PHARE::core
-
-
-namespace PHARE
-{
-namespace core
-{
-    template<std::size_t dim>
-    void empty(ParticleArray<dim>& array)
-    {
-        array.clear();
-    }
-
-    template<std::size_t dim>
-    void swap(ParticleArray<dim>& array1, ParticleArray<dim>& array2)
-    {
-        array1.swap(array2);
-    }
-
-} // namespace core
-} // namespace PHARE
 
 
 #endif

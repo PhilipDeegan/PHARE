@@ -14,6 +14,7 @@
 #include "core/data/electromag/electromag.h"
 #include "core/data/grid/gridlayout.h"
 #include "core/data/grid/gridlayoutimplyee.h"
+#include "core/data/particles/particle.h"
 #include "core/data/particles/particle_array.h"
 
 
@@ -21,7 +22,7 @@
 using namespace PHARE::initializer;
 
 using GridLayoutT    = PHARE::core::GridLayout<PHARE::core::GridLayoutImplYee<1, 1>>;
-using ParticleArrayT = PHARE::core::ParticleArray<1>;
+using ParticleArrayT = PHARE::core::ParticleArray<PHARE::core::Particle<1>>;
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"

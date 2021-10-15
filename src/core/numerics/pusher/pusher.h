@@ -67,13 +67,22 @@ namespace core
             = 0;
 
 
+        virtual ParticleIterator move(ParticleRange& range, Electromag const& emFields, double mass,
+                                      Interpolator& interpolator,
+                                      ParticleSelector const& particleIsNotLeaving,
+                                      GridLayout const& layout)
+            = 0;
+
+
         /**
          * @brief setMeshAndTimeStep allows to let the pusher know what is the mesh
          * size and time step in the domain where particles are to be pushed.
          */
-        virtual void setMeshAndTimeStep(std::array<double, dim> ms, double ts) = 0;
+        virtual void setMeshAndTimeStep(std::array<double, dim> const& ms,
+                                        double ts) _PHARE_ALL_FN_ = 0;
 
-        virtual ~Pusher() {}
+        Pusher() _PHARE_ALL_FN_ {}
+        virtual ~Pusher() _PHARE_ALL_FN_ {}
     };
 
 } // namespace core
