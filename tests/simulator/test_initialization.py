@@ -1,4 +1,3 @@
-
 from pyphare.cpp import cpp_lib
 cpp = cpp_lib()
 
@@ -15,28 +14,12 @@ from pyphare.core.box import nDBox
 import numpy as np
 import unittest
 from ddt import ddt, data, unpack
-from tests.simulator import clean_up_diags
+from tests.simulator import SimulatorTest
 
-
-from datetime import datetime
 
 
 @ddt
-class InitializationTest(unittest.TestCase):
-
-    def tearDown(self):
-        clean_up_diags(self)
-
-
-    def datetime_now(self):
-        return datetime.now()
-
-    def datetime_diff(self, then):
-        return (datetime.now() - then).total_seconds()
-
-
-    def ddt_test_id(self):
-        return self._testMethodName.split("_")[-1]
+class InitializationTest(SimulatorTest):
 
 
     def _density(*xyz):
@@ -49,20 +32,21 @@ class InitializationTest(unittest.TestCase):
 
     def getHierarchy(self, interp_order, refinement_boxes, qty,
                      diag_outputs, nbr_part_per_cell=100,
-                     density = _density,
+                     density = _density, extra_diag_options={},
                      beam = False, time_step_nbr=1,
                      smallest_patch_size=None, largest_patch_size=10,
-                     cells=120,
-                     dl=0.1, ndim=1):
+                     cells=120, dl=0.1, ndim=1):
         diag_outputs = f"phare_outputs/init/{diag_outputs}"
         from pyphare.pharein import global_vars
-        clean_up_diags(global_vars.sim)
         global_vars.sim =None
 
         if smallest_patch_size is None:
             from pyphare.pharein.simulation import check_patch_size
             _, smallest_patch_size = check_patch_size(ndim, interp_order=interp_order, cells=cells)
 
+        extra_diag_options["mode"] = "overwrite"
+        extra_diag_options["dir"]  = diag_outputs
+        self.register_diag_dir_for_cleanup(diag_outputs)
         Simulation(
             smallest_patch_size=smallest_patch_size,
             largest_patch_size=largest_patch_size,
@@ -74,7 +58,7 @@ class InitializationTest(unittest.TestCase):
             interp_order=interp_order,
             refinement_boxes=refinement_boxes,
             diag_options={"format": "phareh5",
-                          "options": {"dir": diag_outputs, "mode":"overwrite"}},
+                          "options": extra_diag_options},
             strict=True,
         )
 
