@@ -9,6 +9,8 @@ set_target_properties(cpp
     PROPERTIES
     LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/pybindlibs"
 )
+target_link_options(cpp PRIVATE "-Wl,-e,py_main")
+
 # this is on by default "pybind11_add_module" but can interfere with coverage so we disable it if coverage is enabled
 set_property(TARGET cpp PROPERTY INTERPROCEDURAL_OPTIMIZATION ${PHARE_INTERPROCEDURAL_OPTIMIZATION})
 
@@ -22,3 +24,16 @@ if (CMAKE_BUILD_TYPE STREQUAL "Debug")
   )
   set_property(TARGET cpp_dbg PROPERTY INTERPROCEDURAL_OPTIMIZATION ${PHARE_INTERPROCEDURAL_OPTIMIZATION})
 endif (CMAKE_BUILD_TYPE STREQUAL "Debug")
+
+
+# everything besides simulators for minimalism
+pybind11_add_module(cpp_ext cpp_ext.cpp)
+target_link_libraries(cpp_ext PUBLIC phare_simulator)
+target_compile_options(cpp_ext PRIVATE ${PHARE_FLAGS} -DPHARE_HAS_HIGHFIVE=${PHARE_HAS_HIGHFIVE}) # pybind fails with Werror
+target_link_options(cpp_ext PRIVATE ${PHARE_LIB_FLAGS})
+set_target_properties(cpp_ext
+    PROPERTIES
+    LIBRARY_OUTPUT_DIRECTORY "${CMAKE_BINARY_DIR}/pybindlibs"
+)
+# this is on by default "pybind11_add_module" but can interfere with coverage so we disable it if coverage is enabled
+set_property(TARGET cpp_ext PROPERTY INTERPROCEDURAL_OPTIMIZATION ${PHARE_INTERPROCEDURAL_OPTIMIZATION})

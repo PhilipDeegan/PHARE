@@ -62,3 +62,23 @@ endif(ubsan)
 # msan is not supported - it's not practical to configure - use valgrind
 
 
+# -DwithPGO_GEN
+if (withPGO_GEN)
+  set (PHARE_PGO_FLAGS -fprofile-generate)
+endif(withPGO_GEN)
+
+# -DwithPGO_USE
+if (withPGO_USE)
+  set (PHARE_PGO_FLAGS -fprofile-use)
+endif(withPGO_USE)
+
+if (withPGO_GEN OR withPGO_USE)
+  set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${PHARE_PGO_FLAGS}" )
+  set (CMAKE_MODULE_LINKER_FLAGS "${CMAKE_MODULE_LINKER_FLAGS} ${PHARE_PGO_FLAGS}"  )
+  set (CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} ${PHARE_PGO_FLAGS}"  )
+endif(withPGO_GEN OR withPGO_USE)
+
+if (withPGO_GEN)
+  set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -pg" )
+  set (PHARE_BASE_LIBS ${PHARE_BASE_LIBS} gcov)
+endif(withPGO_GEN)

@@ -201,9 +201,6 @@ PYBIND11_MODULE(PHARE_CPP_MOD_NAME, m)
             .def("dump", &ISimulator::dump, py::arg("timestamp"), py::arg("timestep")));
 
     m.def("make_hierarchy", []() { return PHARE::amr::Hierarchy::make(); });
-    m.def("make_simulator", [](std::shared_ptr<PHARE::amr::Hierarchy>& hier) {
-        return std::shared_ptr<ISimulator>{std::move(PHARE::getSimulator(hier))};
-    });
 
     m.def("mpi_size", []() { return core::mpi::size(); });
     m.def("mpi_rank", []() { return core::mpi::rank(); });
@@ -218,12 +215,6 @@ PYBIND11_MODULE(PHARE_CPP_MOD_NAME, m)
     declarePatchData<std::vector<double>, 2>(m, "PatchDataVectorDouble_2D");
     declarePatchData<std::vector<double>, 3>(m, "PatchDataVectorDouble_3D");
 
-    py::class_<core::Span<double>, std::shared_ptr<core::Span<double>>>(m, "Span");
-    py::class_<PyArrayWrapper<double>, std::shared_ptr<PyArrayWrapper<double>>, core::Span<double>>(
-        m, "PyWrapper");
-
-    m.def("makePyArrayWrapper", makePyArrayWrapper<double>);
-
     m.def("phare_deps", []() {
         std::unordered_map<std::string, std::string> versions{{"pybind", pybind_version()},
                                                               {"samrai", samrai_version()}};
@@ -234,3 +225,40 @@ PYBIND11_MODULE(PHARE_CPP_MOD_NAME, m)
 
 
 } // namespace PHARE::pydata
+
+
+#include <stdio.h>
+#include <stdlib.h>
+
+const char interp_path[] __attribute__((section(".interp"))) = "/lib64/ld-linux-x86-64.so.2";
+
+struct startstack
+{
+    int argc;
+    char* values[1];
+};
+
+struct stackframe
+{
+    void (*func)();
+    struct startstack* st;
+    void* res;
+};
+
+void hellolib(const char* name)
+{
+    printf("%s: Hello world!\n", name);
+}
+
+int __attribute__((visibility("internal"))) py_main_(int argc, char** argv)
+{
+    hellolib(argv[0]);
+    return 0;
+}
+
+void __attribute__((visibility("internal"))) start(void)
+{
+    struct stackframe sf;
+
+    exit(py_main_(sf.st->argc, sf.st->values));
+}

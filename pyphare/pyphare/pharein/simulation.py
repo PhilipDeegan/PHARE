@@ -627,6 +627,7 @@ class Simulation(object):
 # ------------------------------------------------------------------------------
 
 
+
 def serialize(sim):
     import dill, codecs
     return codecs.encode(dill.dumps(sim), 'hex')
@@ -635,4 +636,10 @@ def serialize(sim):
 def deserialize(hex):
     import dill, codecs
     return dill.loads(codecs.decode(hex, 'hex'))
+
+
+def _print(obj):
+   for attr in dir(obj):
+       if hasattr( obj, attr ):
+           print( "obj.%s = %s" % (attr, getattr(obj, attr)))
 
