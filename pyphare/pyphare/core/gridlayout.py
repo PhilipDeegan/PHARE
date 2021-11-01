@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-import math
+
 import numpy as np
 
 from .phare_utilities import is_scalar, listify
