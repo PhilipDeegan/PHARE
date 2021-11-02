@@ -661,15 +661,15 @@ public:
 
             part.iCell[0] = 21; // AMR index
             part.delta[0] = 0.5f;
-            part.weight   = 1;
+            part.weight   = 0.1;
             part.v[0]     = +2.;
             part.v[1]     = -1.;
             part.v[2]     = +1.;
             particles.push_back(part);
 
-            part.iCell[0] = 22; // AMR index
+            part.iCell[0] = 21; // AMR index
             part.delta[0] = 0.5f;
-            part.weight   = 1;
+            part.weight   = 0.9;
             part.v[0]     = +2.;
             part.v[1]     = -1.;
             part.v[2]     = +1.;
