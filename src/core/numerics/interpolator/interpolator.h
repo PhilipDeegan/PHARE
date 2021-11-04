@@ -98,24 +98,22 @@ namespace core
         inline void computeWeight(double normalizedPos, int startIndex,
                                   std::array<double, nbrPointsSupport(3)>& weights)
         {
-            constexpr double _4_over_3 = 4. / 3.;
-            constexpr double _2_over_3 = 2. / 3.;
-
-            auto index   = static_cast<double>(startIndex) - normalizedPos;
-            double coef1 = 1. + 0.5 * index;
-            double coef2 = index + 1;
-            double coef3 = index + 2;
-            double coef4 = 1. - 0.5 * (index + 3);
+            double coef1, coef2, coef3, coef4;
+            auto index = static_cast<double>(startIndex) - normalizedPos;
+            coef1      = 1. + 0.5 * index;
+            coef2      = index + 1;
+            coef3      = index + 2;
+            coef4      = 1. - 0.5 * (index + 3);
 
             double coef2_sq  = coef2 * coef2;
             double coef2_cub = coef2_sq * coef2;
             double coef3_sq  = coef3 * coef3;
             double coef3_cub = coef3_sq * coef3;
 
-            weights[0] = _4_over_3 * coef1 * coef1 * coef1;
-            weights[1] = _2_over_3 - coef2_sq - 0.5 * coef2_cub;
-            weights[2] = _2_over_3 - coef3_sq + 0.5 * coef3_cub;
-            weights[3] = _4_over_3 * coef4 * coef4 * coef4;
+            weights[0] = (4. / 3.) * coef1 * coef1 * coef1;
+            weights[1] = 2. / 3. - coef2_sq - 0.5 * coef2_cub;
+            weights[2] = 2. / 3. - coef3_sq + 0.5 * coef3_cub;
+            weights[3] = (4. / 3.) * coef4 * coef4 * coef4;
         }
 
         static const int interp_order = 3;
@@ -580,11 +578,12 @@ namespace core
             PHARE_LOG_STOP("MeshToParticle::operator()");
         }
 
-        template<typename Particles, typename Electromag, typename GridLayout>
-        inline auto operator()(Particles& particles, Electromag const& Em, GridLayout const& layout)
-        {
-            return (*this)(std::begin(particles), std::end(particles), Em, layout);
-        }
+        // template<typename Particles, typename Electromag, typename GridLayout>
+        // inline auto operator()(Particles& particles, Electromag const& Em, GridLayout const&
+        // layout)
+        // {
+        //     return (*this)(std::begin(particles), std::end(particles), Em, layout);
+        // }
 
 
 
@@ -621,6 +620,7 @@ namespace core
             for (auto currPart = begin; currPart != end; ++currPart)
             {
                 // TODO #3375
+                indexAndWeights_<QtyCentering, QtyCentering::dual>(layout, *currPart);
                 indexAndWeights_<QtyCentering, QtyCentering::primal>(layout, *currPart);
 
                 particleToMesh_(density, xFlux, yFlux, zFlux, densityCentering, fluxCentering,
@@ -630,12 +630,12 @@ namespace core
         }
 
 
-        template<typename Particles, typename VecField, typename GridLayout, typename Field>
-        inline void operator()(Particles const& particles, Field& density, VecField& flux,
-                               GridLayout const& layout, double coef = 1.)
-        {
-            (*this)(std::begin(particles), std::end(particles), density, flux, layout, coef);
-        }
+        // template<typename Particles, typename VecField, typename GridLayout, typename Field>
+        // inline void operator()(Particles const& particles, Field& density, VecField& flux,
+        //                        GridLayout const& layout, double coef = 1.)
+        // {
+        //     (*this)(std::begin(particles), std::end(particles), density, flux, layout, coef);
+        // }
 
 
     private:

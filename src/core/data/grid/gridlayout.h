@@ -557,6 +557,15 @@ namespace core
             return nbrPrimalGhosts_();
         }
 
+        template<typename Centering, Centering centering>
+        std::uint32_t static constexpr nbrGhosts()
+        {
+            if constexpr (centering == QtyCentering::dual)
+                return nbrDualGhosts_();
+            else
+                return nbrPrimalGhosts_();
+        }
+
         template<typename Quantity>
         static std::array<std::uint32_t, dimension> nDNbrGhosts(Quantity quantity)
         {

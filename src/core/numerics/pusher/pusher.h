@@ -60,16 +60,16 @@ namespace core
          * This overload is typically used to push particles outside the domain, like
          * ghost particles.
          */
-        virtual ParticleIterator // decltype(std::declval<ParticleRange>().end())
+        virtual ParticleIterator
         move(ParticleRange const& rangeIn, ParticleRange& rangeOut, Electromag const& emFields,
              double mass, Interpolator& interpolator, ParticleSelector const& particleIsNotLeaving,
              GridLayout const& layout)
             = 0;
 
-        virtual ParticleIterator // decltype(std::declval<ParticleRange>().end())
-        move(ParticleRange const& rangeIn, ParticleRange& rangeOut, Electromag const& emFields,
-             double mass, Interpolator& interpolator, ParticleSelector const&,
-             ParticleSelector const&, GridLayout const& layout)
+        virtual ParticleIterator move(ParticleRange const& rangeIn, ParticleRange& rangeOut,
+                                      Electromag const& emFields, double mass,
+                                      Interpolator& interpolator, ParticleSelector const&,
+                                      ParticleSelector const&, GridLayout const& layout)
             = 0;
 
         /**

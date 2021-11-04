@@ -288,7 +288,7 @@ namespace core
                 currentOut->v[1] = vely1;
                 currentOut->v[2] = velz1;
 
-                ++currentOut;
+                currentOut++;
             }
         }
 

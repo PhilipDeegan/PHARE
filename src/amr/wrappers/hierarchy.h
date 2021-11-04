@@ -1,6 +1,7 @@
 #ifndef PHARE_AMR_HIERARCHY_H
 #define PHARE_AMR_HIERARCHY_H
 
+#include <cassert>
 #include <algorithm>
 
 #include <SAMRAI/algs/TimeRefinementIntegrator.h>
@@ -277,6 +278,7 @@ auto patchHierarchyDatabase(PHARE::initializer::PHAREDict const& amr)
         largestPatchSize   = amr["largest_patch_size"].template to<std::vector<int>>();
     }
 
+
     auto addIntDimArray = [](auto& db, auto const& value, auto const& level) {
         int arr[dimension];
         std::fill_n(arr, dimension, value);
@@ -313,6 +315,15 @@ DimHierarchy<_dimension>::DimHierarchy(PHARE::initializer::PHAREDict const& dict
         parseDimXYZType<double, dimension>(dict["simulation"]["grid"], "origin"),
         parseDimXYZType<double, dimension>(dict["simulation"]["grid"], "meshsize"))
 {
+    // auto& im    = *SAMRAI::tbox::InputManager::getManager();
+    // auto maindb = std::make_shared<SAMRAI::tbox::MemoryDatabase>("Main");
+    // std::vector<int> connector_width(dimension, 0);
+    // maindb->putIntegerVector("connector_width", connector_width);
+
+
+    // assert(SAMRAI::tbox::InputManager::inputDatabaseExists());
+    // std::cout << __FILE__ << " " << __LINE__ << " "
+    //           << SAMRAI::tbox::InputManager::inputDatabaseExists() << std::endl;
 }
 
 
