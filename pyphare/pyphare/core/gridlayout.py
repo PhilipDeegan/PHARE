@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-import math
+
 import numpy as np
 
 from .phare_utilities import is_scalar, listify
@@ -122,6 +122,7 @@ class GridLayout(object):
     def ndim(self):
         return self.box.ndim
 
+
     def qtyCentering(self, quantity, direction):
         return self.centering[direction][quantity]
 
@@ -129,23 +130,13 @@ class GridLayout(object):
     def particleGhostNbr(self, interp_order):
         return 1 if interp_order == 1 else 2
 
+
     def nbrGhosts(self, interpOrder, centering):
-        minNbrGhost = 5
-        if centering == 'primal':
-            if interpOrder == 1:
-                return max(math.floor((interpOrder+1)/2), minNbrGhost)
-            else:
-                return max(math.floor( interpOrder/2 ), minNbrGhost)
-        else:
-            return max(math.floor( (interpOrder +1)/2 ), minNbrGhost)
+        return int((interpOrder + 1) / 2) + self.particleGhostNbr(interpOrder)
 
 
     def nbrGhostsPrimal(self, interpOrder):
-        minNbrGhost = 5
-        if interpOrder == 1:
-            return max(math.floor( (interpOrder+1)/2 ), minNbrGhost)
-        else:
-            return max(math.floor( interpOrder/2 ), minNbrGhost)
+        return self.nbrGhosts(interpOrder, 'primal')
 
 
 
