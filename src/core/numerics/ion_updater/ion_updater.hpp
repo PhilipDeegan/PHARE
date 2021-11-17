@@ -235,8 +235,7 @@ void IonUpdater<Ions, Electromag, GridLayout>::updateAndDepositAll_(Ions& ions,
     for (auto& pop : ions)
     {
         auto& domainParticles = pop.domainParticles();
-
-        auto domainPartRange = makeIndexRange(domainParticles);
+        auto domainPartRange  = makeIndexRange(domainParticles);
 
         auto inDomain = pusher_->move(
             domainPartRange, domainPartRange, em, pop.mass(), interpolator_, layout,
@@ -248,7 +247,7 @@ void IonUpdater<Ions, Electromag, GridLayout>::updateAndDepositAll_(Ions& ions,
             auto inGhostLayerRange = pusher_->move(particleRange, particleRange, em, pop.mass(),
                                                    interpolator_, layout, inGhostBox, inGhostLayer);
 
-            auto particleArray = particleRange.array();
+            auto& particleArray = particleRange.array();
             particleArray.export_particles(domainParticles,
                                            [&](auto const& cell) { return isIn(cell, domainBox); });
 

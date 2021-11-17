@@ -226,7 +226,6 @@ TEST(BoxIterator, iterates)
     expected = Point{3, 1};
     EXPECT_EQ(expected, *it);
 
-    std::cout << "BOX1ITER\n";
     auto dummy1 = Point<int, 1>{};
     for (auto const& point : b1)
     {
@@ -234,7 +233,6 @@ TEST(BoxIterator, iterates)
     }
     auto expected1 = Point{10};
     EXPECT_EQ(expected1, dummy1);
-    std::cout << "END\n";
 
     auto dummy = Point<int, 2>{};
     for (auto const& point : b2)

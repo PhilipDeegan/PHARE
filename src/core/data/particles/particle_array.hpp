@@ -205,6 +205,31 @@ public:
         cellMap_.print(cell);
     }
 
+
+    bool is_mapped() const
+    {
+        bool ok = true;
+        if (particles_.size() != cellMap_.size())
+        {
+            throw std::runtime_error("particle array not mapped, map.size() != array.size()");
+        }
+        for (std::size_t pidx = 0; pidx < particles_.size(); ++pidx)
+        {
+            auto const& p = particles_[pidx];
+            auto& icell   = p.iCell;
+            auto l        = cellMap_.list_at(icell);
+            if (!l)
+                throw std::runtime_error("particle cell not mapped");
+            else
+            {
+                auto& ll = l->get();
+                if (!ll.in_bucket(pidx))
+                    throw std::runtime_error("particle index not in cell bucket");
+            }
+        }
+        return true;
+    }
+
 private:
     Vector particles_;
     mutable CellMap_t cellMap_;
