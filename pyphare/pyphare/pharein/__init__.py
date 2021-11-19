@@ -63,10 +63,10 @@ class fn_wrapper(py_fn_wrapper):
     def __init__(self, fn):
         super().__init__(fn)
     def __call__(self, *xyz):
-        from pyphare.cpp import cpp_lib
+        from pyphare.cpp import cpp_etc_lib
         # convert numpy array to C++ SubSpan
         # couples vector init functions to C++
-        return cpp_lib().makePyArrayWrapper(super().__call__(*xyz))
+        return cpp_etc_lib().makePyArrayWrapper(super().__call__(*xyz))
 
 
 
@@ -158,7 +158,7 @@ def populateDict():
     elif simulation.refinement == "tagging":
         add_string("simulation/AMR/refinement/tagging/method","auto")
     else:
-        add_string("simulation/AMR/refinement/tagging/method","none") # integrator.h might want some looking at
+        add_string("simulation/AMR/refinement/none","none") # integrator.h might want some looking at
 
     add_string("simulation/algo/ion_updater/pusher/name", simulation.particle_pusher)
     add_double("simulation/algo/ohm/resistivity", simulation.resistivity)
