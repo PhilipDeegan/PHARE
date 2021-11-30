@@ -75,7 +75,6 @@ namespace core
                         density, v, vth, charge, nbrPartPerCell, seed);
                 }
             }
-            // TODO throw?
             return nullptr;
         }
     };

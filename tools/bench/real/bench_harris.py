@@ -6,8 +6,11 @@ cpp_lib("pybindlibs.cpp_sim_2_1_4")
 import pyphare.pharein as ph
 
 seed = 133333333337
-cells, dl = 100, .2
-patch_sizes = [50,100]
+time_step_nbr=10
+time_step=0.001
+cells, dl, ppc = 100, .2, 100
+patch_sizes = [12, 50]
+threads=1
 diag_outputs="tools/bench/real/harris/outputs"
 
 def density(x, y):
@@ -51,15 +54,15 @@ def vthxyz(x, y): return np.sqrt(T(x, y))
 def config():
     ph.Simulation(# strict=True,
         smallest_patch_size=patch_sizes[0], largest_patch_size=patch_sizes[1],
-        time_step_nbr=10, time_step=0.001,
+        time_step_nbr=time_step_nbr, time_step=time_step,
         cells=[cells] * 2, dl=[dl] * 2,
         resistivity=0.001, hyper_resistivity=0.001,
         diag_options={"format": "phareh5", "options": {"dir": diag_outputs, "mode":"overwrite"}},
-        refinement_boxes={},
+        refinement_boxes={}, threads=threads,
     )
     ph.MaxwellianFluidModel( bx=bx, by=by, bz=bz,
         protons={"charge": 1, "density": density, "init":{"seed": seed},
-          **{ "nbr_part_per_cell":100,
+          **{ "nbr_part_per_cell":ppc,
             "vbulkx": vxyz, "vbulky": vxyz, "vbulkz": vxyz,
             "vthx": vthxyz, "vthy": vthxyz, "vthz": vthxyz,
           }
