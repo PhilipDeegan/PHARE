@@ -34,6 +34,7 @@ template<typename HybridModel, typename GridLayout>
 class IonRangeUpdater
 {
 public:
+    static constexpr bool atomic_interp      = true;
     static constexpr std::size_t def_op_size = 1e6;
 
     static constexpr auto dimension    = GridLayout::dimension;
@@ -44,9 +45,8 @@ public:
     using HybridStateView = typename HybridModel::StateView_t;
     using Electromag      = typename HybridStateView::Electromag_t;
 
-    using Box = PHARE::core::Box<int, dimension>;
-    using Interpolator
-        = PHARE::core::Interpolator<dimension, interp_order /*, atomic=true*/>; // TODO
+    using Box               = PHARE::core::Box<int, dimension>;
+    using Interpolator      = PHARE::core::Interpolator<dimension, interp_order, atomic_interp>;
     using VecField          = typename Ions::vecfield_type;
     using ParticleArray     = typename Ions::particle_array_type;
     using PartIterator      = typename ParticleArray::iterator;
@@ -130,8 +130,6 @@ void IonRangeUpdater<HybridModel, GridLayout>::updatePopulations(ParticleRanges&
                                                                  double dt, UpdaterMode mode)
 {
     PHARE_LOG_SCOPE("IonRangeUpdater::updatePopulations");
-
-    assert(particleRanges.size());
 
     for (auto& [layout, daos] : particleRanges)
     {

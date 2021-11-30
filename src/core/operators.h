@@ -3,6 +3,8 @@
 
 #include "core/def.h"
 
+#include <atomic>
+
 namespace PHARE::core
 {
 template<typename T, bool atomic = false>
@@ -11,7 +13,11 @@ struct Operators
     void operator+=(T const& v)
     {
         if constexpr (atomic)
-            __sync_fetch_and_add(&t, v);
+        {
+            auto& atomic_t = *reinterpret_cast<std::atomic<T>*>(&t);
+            T tmp          = atomic_t.load();
+            while (!atomic_t.compare_exchange_weak(tmp, tmp + v)) {}
+        }
         else
             t += v;
     }
@@ -20,9 +26,13 @@ struct Operators
     void operator-=(T const& v)
     {
         if constexpr (atomic)
-            __sync_fetch_and_sub(&t, v);
+        {
+            auto& atomic_t = *reinterpret_cast<std::atomic<T>*>(&t);
+            T tmp          = atomic_t.load();
+            while (!atomic_t.compare_exchange_weak(tmp, tmp - v)) {}
+        }
         else
-            t += v;
+            t -= v;
     }
     void operator-=(T const&& v) { (*this) += v; }
 
