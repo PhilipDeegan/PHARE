@@ -2,6 +2,7 @@
 
 #include "phare_core.h"
 
+#include "core/numerics/ion_updater/ion_range.h"
 #include "core/numerics/ion_updater/ion_updater.h"
 
 using namespace PHARE::core;
@@ -396,7 +397,12 @@ struct IonUpdaterTest : public ::testing::Test
     using ParticleArray = typename PHARETypes::ParticleArray_t;
     using ParticleInitializerFactory = typename PHARETypes::ParticleInitializerFactory;
 
-    using IonUpdater = typename PHARE::core::IonUpdater<Ions, Electromag, GridLayout>;
+    using Field    = typename PHARETypes::Field_t;
+    using VecField = typename PHARETypes::VecField_t;
+
+    using IonPopView  = IonPopulationView<ParticleArray, VecField, GridLayout>;
+    using IonPopViews = std::vector<std::vector<std::shared_ptr<IonPopView>>>;
+    using IonUpdater  = typename PHARE::core::IonUpdater<Electromag, ParticleArray, GridLayout>;
 
 
     double dt{0.01};
@@ -407,15 +413,12 @@ struct IonUpdaterTest : public ::testing::Test
 
 
     // data for electromagnetic fields
-    using Field    = typename PHARETypes::Field_t;
-    using VecField = typename PHARETypes::VecField_t;
 
     ElectromagBuffers<dim, interp_order> emBuffers;
     IonsBuffers<dim, interp_order> ionsBuffers;
 
     Electromag EM{init_dict["electromag"]};
     Ions ions{init_dict["ions"]};
-
 
 
     IonUpdaterTest()
@@ -830,13 +833,20 @@ TYPED_TEST(IonUpdaterTest, loadsLevelGhostParticlesOnLeftGhostArea)
 
 TYPED_TEST(IonUpdaterTest, particlesUntouchedInMomentOnlyMode)
 {
-    typename IonUpdaterTest<TypeParam>::IonUpdater ionUpdater{
-        init_dict["simulation"]["algo"]["ion_updater"]};
+    using IonPopView_t = typename TestFixture::IonPopView;
+
+    typename TestFixture::IonUpdater ionUpdater{init_dict["simulation"]["algo"]["ion_updater"]};
 
     IonsBuffers ionsBufferCpy{this->ionsBuffers, this->layout};
 
-    ionUpdater.updatePopulations(this->ions, this->EM, this->layout, this->dt,
-                                 UpdaterMode::domain_only);
+    {
+        typename TestFixture::IonPopViews views{
+            IonPopView_t::make_shared(this->ions, this->layout)};
+        auto units = PHARE::core::updater_ranges_per_thread(views);
+        for (auto& pop : units[0])
+            ionUpdater.updatePopulations(pop, this->EM, this->layout, this->dt,
+                                         UpdaterMode::domain_only);
+    }
 
     this->fillIonsMomentsGhosts();
 
@@ -901,12 +911,20 @@ TYPED_TEST(IonUpdaterTest, particlesUntouchedInMomentOnlyMode)
 
 TYPED_TEST(IonUpdaterTest, momentsAreChangedInParticlesAndMomentsMode)
 {
+    using IonPopView_t = typename TestFixture::IonPopView;
+
     typename IonUpdaterTest<TypeParam>::IonUpdater ionUpdater{
         init_dict["simulation"]["algo"]["ion_updater"]};
 
     IonsBuffers ionsBufferCpy{this->ionsBuffers, this->layout};
 
-    ionUpdater.updatePopulations(this->ions, this->EM, this->layout, this->dt, UpdaterMode::all);
+    {
+        typename TestFixture::IonPopViews views{
+            IonPopView_t::make_shared(this->ions, this->layout)};
+        auto units = PHARE::core::updater_ranges_per_thread(views);
+        for (auto& pop : units[0])
+            ionUpdater.updatePopulations(pop, this->EM, this->layout, this->dt, UpdaterMode::all);
+    }
 
     this->fillIonsMomentsGhosts();
 
@@ -921,13 +939,22 @@ TYPED_TEST(IonUpdaterTest, momentsAreChangedInParticlesAndMomentsMode)
 
 TYPED_TEST(IonUpdaterTest, momentsAreChangedInMomentsOnlyMode)
 {
+    using IonPopView_t = typename TestFixture::IonPopView;
+
     typename IonUpdaterTest<TypeParam>::IonUpdater ionUpdater{
         init_dict["simulation"]["algo"]["ion_updater"]};
 
     IonsBuffers ionsBufferCpy{this->ionsBuffers, this->layout};
 
-    ionUpdater.updatePopulations(this->ions, this->EM, this->layout, this->dt,
-                                 UpdaterMode::domain_only);
+    {
+        typename TestFixture::IonPopViews views{
+            IonPopView_t::make_shared(this->ions, this->layout)};
+        auto units = PHARE::core::updater_ranges_per_thread(views);
+        for (auto& pop : units[0])
+            ionUpdater.updatePopulations(pop, this->EM, this->layout, this->dt,
+                                         UpdaterMode::domain_only);
+    }
+
 
     this->fillIonsMomentsGhosts();
 
@@ -941,11 +968,19 @@ TYPED_TEST(IonUpdaterTest, momentsAreChangedInMomentsOnlyMode)
 
 TYPED_TEST(IonUpdaterTest, thatNoNaNsExistOnPhysicalNodesMoments)
 {
+    using IonPopView_t = typename TestFixture::IonPopView;
+
     typename IonUpdaterTest<TypeParam>::IonUpdater ionUpdater{
         init_dict["simulation"]["algo"]["ion_updater"]};
 
-    ionUpdater.updatePopulations(this->ions, this->EM, this->layout, this->dt,
-                                 UpdaterMode::domain_only);
+    {
+        typename TestFixture::IonPopViews views{
+            IonPopView_t::make_shared(this->ions, this->layout)};
+        auto units = PHARE::core::updater_ranges_per_thread(views);
+        for (auto& pop : units[0])
+            ionUpdater.updatePopulations(pop, this->EM, this->layout, this->dt,
+                                         UpdaterMode::domain_only);
+    }
 
     this->fillIonsMomentsGhosts();
 
@@ -977,11 +1012,20 @@ TYPED_TEST(IonUpdaterTest, thatNoNaNsExistOnPhysicalNodesMoments)
 
 TYPED_TEST(IonUpdaterTest, thatUnusedMomentNodesAreNaN)
 {
+    using IonPopView_t = typename TestFixture::IonPopView;
+
     typename IonUpdaterTest<TypeParam>::IonUpdater ionUpdater{
         init_dict["simulation"]["algo"]["ion_updater"]};
 
-    ionUpdater.updatePopulations(this->ions, this->EM, this->layout, this->dt,
-                                 UpdaterMode::domain_only);
+    {
+        typename TestFixture::IonPopViews views{
+            IonPopView_t::make_shared(this->ions, this->layout)};
+        auto units = PHARE::core::updater_ranges_per_thread(views);
+
+        for (auto& pop : units[0])
+            ionUpdater.updatePopulations(pop, this->EM, this->layout, this->dt,
+                                         UpdaterMode::domain_only);
+    }
 
     this->fillIonsMomentsGhosts();
 

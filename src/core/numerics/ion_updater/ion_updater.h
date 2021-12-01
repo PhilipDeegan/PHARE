@@ -1,8 +1,9 @@
 
 
-#ifndef PHARE_ION_RANGE_UPDATER_H
-#define PHARE_ION_RANGE_UPDATER_H
+#ifndef PHARE_ION_UPDATER_H
+#define PHARE_ION_UPDATER_H
 
+#include "core/logger.h"
 
 #include "core/utilities/box/box.h"
 #include "core/numerics/interpolator/interpolator.h"
@@ -16,49 +17,79 @@
 #include "initializer/data_provider.h"
 #include "core/utilities/range/range_replacer.h"
 
-#include "core/logger.h"
-
-
 // TODO alpha coef for interpolating new and old levelGhost should be given somehow...
-
 
 namespace PHARE::core
 {
 enum class UpdaterMode { domain_only = 1, all = 2 };
 
-template<typename HybridModel, typename GridLayout>
+template<typename Electromag, typename ParticleArray, typename GridLayout>
 class IonUpdater
 {
 public:
+    static constexpr bool atomic_interp      = true;
     static constexpr std::size_t def_op_size = 1e6;
 
     static constexpr auto dimension    = GridLayout::dimension;
     static constexpr auto interp_order = GridLayout::interp_order;
 
-    using Ions = typename HybridModel::ions_type;
-
-    using HybridStateView = typename HybridModel::StateView_t;
-    using Electromag      = typename HybridStateView::Electromag_t;
-
-    using Box = PHARE::core::Box<int, dimension>;
-    using Interpolator
-        = PHARE::core::Interpolator<dimension, interp_order /*, atomic=true*/>; // TODO
-    using VecField          = typename Ions::vecfield_type;
-    using ParticleArray     = typename Ions::particle_array_type;
+    using Box               = PHARE::core::Box<int, dimension>;
+    using Interpolator      = PHARE::core::Interpolator<dimension, interp_order, atomic_interp>;
+    using VecField          = typename Electromag::vecfield_type;
     using PartIterator      = typename ParticleArray::iterator;
     using BoundaryCondition = PHARE::core::BoundaryCondition<dimension, interp_order>;
     using Pusher            = PHARE::core::Pusher<dimension, PartIterator, Electromag, Interpolator,
                                        BoundaryCondition, GridLayout>;
+    using RangeReplacer_t   = RangeReplacer<ParticleArray>;
+    using RangeSynchrotron_t = RangeSynchrotron<ParticleArray>;
 
+
+public:
+    IonUpdater(std::string pusher_name, std::uint16_t thread_idx = 0,
+               std::shared_ptr<RangeSynchrotron_t> synchrotron_ = default_synchotron(),
+               std::size_t operating_particle_size              = def_op_size)
+        : pusher_{makePusher(pusher_name)}
+        , thread_idx_{thread_idx}
+        , synchrotron{synchrotron_}
+        , particle_EBs(operating_particle_size)
+    {
+    }
+
+    IonUpdater(PHARE::initializer::PHAREDict const& dict, std::uint16_t thread_idx = 0,
+               std::shared_ptr<RangeSynchrotron_t> synchrotron_ = default_synchotron())
+        : IonUpdater{dict["pusher"]["name"].template to<std::string>(), thread_idx, synchrotron_,
+                     operating_particle_size(dict)}
+    {
+    }
+
+
+    template<typename Ions>
+    void updatePopulations(Ions& ions, Electromag const& em, GridLayout const& layout, double dt,
+                           UpdaterMode = UpdaterMode::all);
+
+
+    template<typename Ions>
+    void static updateIons(Ions& ions, GridLayout const& layout);
 
 
 private:
+    template<typename ParticleRange>
+    void updateAndDepositDomain_(ParticleRange& particleRange, Electromag const& em,
+                                 GridLayout const& layout);
+
+    template<typename ParticleRange>
+    void updateAndDepositAll_(ParticleRange& particleRange, Electromag const& em,
+                              GridLayout const& layout);
+
+    template<typename ParticleRange, typename Selector>
+    auto& push_domain(ParticleRange& particleRange, Selector& selector, Electromag const& em,
+                      GridLayout const& layout);
+
+
     constexpr static auto makePusher
         = PHARE::core::PusherFactory::makePusher<dimension, PartIterator, Electromag, Interpolator,
                                                  BoundaryCondition, GridLayout>;
 
-    std::unique_ptr<Pusher> pusher_;
-    Interpolator interpolator_{};
 
     std::size_t static operating_particle_size(PHARE::initializer::PHAREDict const& dict)
     {
@@ -66,47 +97,14 @@ private:
             return dict["operating_particle_size"].template to<std::size_t>();
         return def_op_size;
     }
-
-public:
-    IonUpdater(RangeSynchrotron<ParticleArray>& synchrotron_, std::uint16_t thread_idx,
-               std::string pusher_name, std::size_t operating_particle_size = def_op_size)
-        : pusher_{makePusher(pusher_name)}
-        , synchrotron{synchrotron_}
-        , thread_idx_{thread_idx}
-        , particle_EBs(operating_particle_size)
-    {
-    }
-
-    IonUpdater(RangeSynchrotron<ParticleArray>& synchrotron_, std::uint16_t thread_idx,
-               PHARE::initializer::PHAREDict const& dict)
-        : IonUpdater{synchrotron_, thread_idx, dict["pusher"]["name"].template to<std::string>(),
-                     operating_particle_size(dict)}
-    {
-    }
-
-    template<typename ParticleRanges>
-    void updatePopulations(ParticleRanges& particleRanges, double dt,
-                           UpdaterMode = UpdaterMode::all);
-
-
-    void updateIons(Ions& ions, GridLayout const& layout);
-
-
-private:
-    template<typename ParticleRanges>
-    void updateAndDepositDomain_(ParticleRanges& particleRanges);
-
-    template<typename ParticleRanges>
-    void updateAndDepositAll_(ParticleRanges& particleRanges);
-
-    template<typename ParticleRanges, typename Selector>
-    void push_domain(ParticleRanges& particleRanges, Selector& selector);
-
+    auto static default_synchotron() { return std::make_shared<RangeSynchrotron_t>(); }
 
     /** Used here **/
-    RangeSynchrotron<ParticleArray>& synchrotron; // Only one
+    std::unique_ptr<Pusher> pusher_;
     std::uint16_t thread_idx_ = -1;
-    std::unique_ptr<RangeReplacer<ParticleArray>> refiller; // one of many
+    std::shared_ptr<RangeSynchrotron_t> synchrotron; // Only one
+    std::unique_ptr<RangeReplacer_t> refiller;       // one of many
+    Interpolator interpolator_;
     /** Used here **/
 
     /** Used between boris and interpolator **/
@@ -118,36 +116,33 @@ private:
 
 
 
-template<typename HybridModel, typename GridLayout>
+template<typename Electromag, typename ParticleArray, typename GridLayout>
 template<typename ParticleRanges>
-void IonUpdater<HybridModel, GridLayout>::updatePopulations(ParticleRanges& particleRanges,
-                                                            double dt, UpdaterMode mode)
+void IonUpdater<Electromag, ParticleArray, GridLayout>::updatePopulations(ParticleRanges& particles,
+                                                                          Electromag const& em,
+                                                                          GridLayout const& layout,
+                                                                          double dt,
+                                                                          UpdaterMode mode)
 {
     PHARE_LOG_SCOPE("IonUpdater::updatePopulations");
 
-    assert(particleRanges.size());
+    pusher_->setMeshAndTimeStep(layout.meshSize(), dt);
 
-    for (auto& [layout, daos] : particleRanges)
-    {
-        pusher_->setMeshAndTimeStep(layout.meshSize(), dt);
+    if (mode == UpdaterMode::domain_only)
+        for (auto& pair : particles)
+            updateAndDepositDomain_(pair.second, em, layout);
 
-        if (mode == UpdaterMode::domain_only)
-        {
-            for (auto& dao : daos)
-                updateAndDepositDomain_(dao);
-        }
-        else
-        {
-            for (auto& dao : daos)
-                updateAndDepositAll_(dao);
-        }
-    }
+    else
+        for (auto& pair : particles)
+            updateAndDepositAll_(pair.second, em, layout);
 }
 
 
 
-template<typename HybridModel, typename GridLayout>
-void IonUpdater<HybridModel, GridLayout>::updateIons(Ions& ions, GridLayout const& layout)
+template<typename Electromag, typename ParticleArray, typename GridLayout>
+template<typename Ions>
+void IonUpdater<Electromag, ParticleArray, GridLayout>::updateIons(Ions& ions,
+                                                                   GridLayout const& layout)
 {
     fixMomentGhosts(ions, layout);
     ions.computeDensity();
@@ -155,16 +150,17 @@ void IonUpdater<HybridModel, GridLayout>::updateIons(Ions& ions, GridLayout cons
 }
 
 
-template<typename HybridModel, typename GridLayout>
-template<typename Particles, typename Selector>
-void IonUpdater<HybridModel, GridLayout>::push_domain(Particles& particles, Selector& selector)
+template<typename Electromag, typename ParticleArray, typename GridLayout>
+template<typename ParticleRanges, typename Selector>
+auto& IonUpdater<Electromag, ParticleArray, GridLayout>::push_domain(ParticleRanges& particles,
+                                                                     Selector& selector,
+                                                                     Electromag const& em,
+                                                                     GridLayout const& layout)
 {
-    auto& layout        = particles.domain.view->layout;
-    auto& em            = particles.domain.view->electromag;
-    auto& pop           = *(particles.domain.view->ions.begin() + particles.domain.pop_idx);
-    auto const pop_size = (*pop.domain).size();
-    refiller
-        = std::make_unique<RangeReplacer<ParticleArray>>(*pop.domain, synchrotron, thread_idx_);
+    auto& pop           = *particles.domain.view;
+    auto const pop_size = pop.domainParticles().size();
+
+    refiller = RangeReplacer_t::make_unique(*pop.domain, *synchrotron, thread_idx_);
 
     for (auto& range : ranges(particles.domain, particle_EBs.size()))
     {
@@ -176,27 +172,26 @@ void IonUpdater<HybridModel, GridLayout>::push_domain(Particles& particles, Sele
 
         refiller->add_replaceable(range, newEnd);
     }
+
+    return pop;
 }
 
 
 
 
-template<typename HybridModel, typename GridLayout>
-template<typename Particles>
+template<typename Electromag, typename ParticleArray, typename GridLayout>
+template<typename ParticleRanges>
 /**
- * @brief IonUpdater<HybridModel, GridLayout>::updateAndDepositDomain_
+ * @brief IonUpdater<Electromag, ParticleArray, GridLayout>::updateAndDepositDomain_
    evolves moments from time n to n+1 without updating particles, which stay at time n
  */
-void IonUpdater<HybridModel, GridLayout>::updateAndDepositDomain_(Particles& particles)
+void IonUpdater<Electromag, ParticleArray, GridLayout>::updateAndDepositDomain_(
+    ParticleRanges& particles, Electromag const& em, GridLayout const& layout)
 {
     PHARE_LOG_SCOPE("IonUpdater::updateAndDepositDomain_");
 
     auto constexpr partGhostWidth = GridLayout::nbrParticleGhosts();
     constexpr bool copy_src       = true; // ghost ParticleArray outputArray is temporary
-
-    auto& layout = particles.domain.view->layout;
-    auto& em     = particles.domain.view->electromag;
-    auto& pop    = *(particles.domain.view->ions.begin() + particles.domain.pop_idx);
 
     auto domainBox = layout.AMRBox();
     auto ghostBox  = domainBox.copy().grow(partGhostWidth);
@@ -209,11 +204,10 @@ void IonUpdater<HybridModel, GridLayout>::updateAndDepositDomain_(Particles& par
     };
     auto inGhostBox = [&ghostBox](auto& part) { return core::isIn(cellAsPoint(part), ghostBox); };
 
-
     // first push all domain particles push them while
     // still inDomainBox accumulate those inDomainBox
 
-    push_domain(particles, inDomainBox);
+    auto& pop = push_domain(particles, inDomainBox, em, layout);
 
     // then push patch and level ghost particles
     // push those in the ghostArea (i.e. stop pushing if they're not out of it)
@@ -260,22 +254,19 @@ void IonUpdater<HybridModel, GridLayout>::updateAndDepositDomain_(Particles& par
 }
 
 
-template<typename HybridModel, typename GridLayout>
-template<typename Particles>
+template<typename Electromag, typename ParticleArray, typename GridLayout>
+template<typename ParticleRanges>
 /**
- * @brief IonUpdater<HybridModel, GridLayout>::updateAndDepositDomain_
+ * @brief IonUpdater<Electromag, ParticleArray, GridLayout>::updateAndDepositDomain_
    evolves moments and particles from time n to n+1
  */
-void IonUpdater<HybridModel, GridLayout>::updateAndDepositAll_(Particles& particles)
+void IonUpdater<Electromag, ParticleArray, GridLayout>::updateAndDepositAll_(
+    ParticleRanges& particles, Electromag const& em, GridLayout const& layout)
 {
     PHARE_LOG_SCOPE("IonUpdater::updateAndDepositAll_");
 
     auto constexpr partGhostWidth = GridLayout::nbrParticleGhosts();
     auto constexpr copy_src       = false; // no need here
-
-    auto& layout = particles.domain.view->layout;
-    auto& em     = particles.domain.view->electromag;
-    auto& pop    = *(particles.domain.view->ions.begin() + particles.domain.pop_idx);
 
     auto domainBox = layout.AMRBox();
     auto ghostBox  = domainBox.copy().grow(partGhostWidth);
@@ -288,13 +279,12 @@ void IonUpdater<HybridModel, GridLayout>::updateAndDepositAll_(Particles& partic
     auto inDomainBox
         = [&domainBox](auto const& part) { return core::isIn(cellAsPoint(part), domainBox); };
 
-
     // push domain particles, erase from array those leaving domain
     // push patch and level ghost particles that are in ghost area (==ghost box without domain)
     // copy patch and ghost particles out of ghost area that are in domain, in particle array
     // finally all particles in domain are to be interpolated on mesh.
 
-    push_domain(particles, inDomainBox);
+    auto& pop = push_domain(particles, inDomainBox, em, layout);
 
     auto pushAndCopyInDomain = [&](auto& ghostParticlesPtr, auto& ghost_src,
                                    bool clean_src = false) {

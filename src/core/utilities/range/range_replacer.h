@@ -139,6 +139,12 @@ struct RangeReplacer
     {
     }
 
+    auto static make_unique(Container& dst, RangeSynchrotron_t& synchrotron,
+                            std::uint16_t const thread_idx = 0)
+    {
+        return std::make_unique<RangeReplacer<Container>>(dst, synchrotron, thread_idx);
+    }
+
     void replace(Container& src, Range_t src_range, bool copy_src = false, bool erase_src = false)
     {
         auto src_size  = src_range.size();

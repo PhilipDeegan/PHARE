@@ -3,6 +3,8 @@
 #ifndef PHARE_SOLVER_PPC_H
 #define PHARE_SOLVER_PPC_H
 
+#include <thread>
+
 #include <SAMRAI/hier/Patch.h>
 
 #include "initializer/data_provider.h"
@@ -32,7 +34,6 @@
 
 #include "core/numerics/ion_updater/ion_range.h"
 #include "core/numerics/ion_updater/ion_updater.h"
-#include "core/numerics/ion_updater/ion_range_updater.h"
 
 
 
@@ -65,7 +66,7 @@ private:
     PHARE::core::Faraday<GridLayout> faraday_;
     PHARE::core::Ampere<GridLayout> ampere_;
     PHARE::core::Ohm<GridLayout> ohm_;
-    PHARE::core::IonUpdater<Ions, Electromag, GridLayout> ionUpdater_;
+
 
     std::size_t static operating_n_threads(PHARE::initializer::PHAREDict const& dict)
     {
@@ -153,13 +154,11 @@ private:
     std::unordered_map<std::string, ParticleArray> tmpDomain;
     std::unordered_map<std::string, ParticleArray> patchGhost;
 
-    using StateView_t       = typename HybridModel::StateView_t;
-    using IonRangeUpdater_t = PHARE::core::IonRangeUpdater<HybridModel, GridLayout>;
-    std::vector<std::shared_ptr<StateView_t>> state_views;
-
+    using IonUpdater_t       = core::IonUpdater<Electromag, ParticleArray, GridLayout>;
+    using IonPopView         = core::IonPopulationView<ParticleArray, VecFieldT, GridLayout>;
     using RangeSynchrotron_t = PHARE::core::RangeSynchrotron<ParticleArray>;
 
-
+    std::vector<std::shared_ptr<IonPopView>> ion_pop_views;
 }; // end solverPPC
 
 
@@ -264,13 +263,15 @@ void SolverPPC<HybridModel, AMR_Types>::advanceLevel(std::shared_ptr<hierarchy_t
         }
     };
 
-    state_views = core::generate(
+    ion_pop_views = core::generate(
         [&](auto& patch) {
             auto _      = resourcesManager.setOnPatch(*patch, hybridState);
             auto layout = PHARE::amr::layoutFromPatch<GridLayout>(*patch);
-            return std::make_shared<StateView_t>(hybridState, layout);
+            return core::generate(
+                [&]() { return IonPopView::make_shared(hybridState.ions, layout); },
+                hybridState.ions);
         },
-        level);
+        *level);
 
     predictor1_(*level, hybridModel, fromCoarser, currentTime, newTime);
     average_(*level, hybridModel);
@@ -586,15 +587,14 @@ void SolverPPC<HybridModel, AMR_Types>::moveIons_(level_t& level, Ions& ions,
     auto dt = newTime - currentTime;
 
     { // syncs on destruct
-        auto units = PHARE::core::solver_update_dao_per_thread(state_views, n_threads);
+        auto units = PHARE::core::updater_ranges_per_thread(ion_pop_views, n_threads);
         core::abort_if(units.size() != n_threads);
 
         RangeSynchrotron_t synchrotron{static_cast<std::uint16_t>(n_threads)};
 
         auto thread_fn = [&](std::uint16_t thread_idx) {
             for (auto& pop : units[thread_idx])
-                IonRangeUpdater_t{synchrotron, thread_idx, updaterDict}.updatePopulations(pop, dt,
-                                                                                          mode);
+                IonUpdater_t{synchrotron, thread_idx, updaterDict}.updatePopulations(pop, dt, mode);
         };
         auto threads = PHARE::core::generate(
             [&](auto i) { return std::thread{[&, i]() { thread_fn(i); }}; }, 1, n_threads);
@@ -618,7 +618,7 @@ void SolverPPC<HybridModel, AMR_Types>::moveIons_(level_t& level, Ions& ions,
     {
         auto _      = rm.setOnPatch(*patch, electromag, ions);
         auto layout = PHARE::amr::layoutFromPatch<GridLayout>(*patch);
-        ionUpdater_.updateIons(ions, layout);
+        IonUpdater_t::updateIons(ions, layout);
         // no need to update time, since it has been done before
     }
 }

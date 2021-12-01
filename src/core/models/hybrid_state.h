@@ -15,61 +15,6 @@
 #include <utility>
 
 
-namespace PHARE::core
-{
-template<typename HybridState_, typename GridLayout_>
-struct HybridStateView
-{
-    static constexpr auto dimension = GridLayout_::dimension;
-
-    using HybridState = HybridState_;
-    using GridLayout  = GridLayout_;
-
-    using ParticleArray_t = typename HybridState::ParticleArray_t;
-    using VecField_t      = typename HybridState::VecField;
-    using VecFieldView_t  = typename VecField_t::view_t;
-
-    using Field_t     = typename VecField_t::field_type;
-    using FieldView_t = typename Field_t::view_t;
-
-    struct _EM_
-    {
-        VecFieldView_t E, B;
-    };
-
-    struct _IONS_
-    {
-        FieldView_t density;
-        VecFieldView_t flux;
-        ParticleArray_t* domain;
-        ParticleArray_t* patch_ghost;
-        ParticleArray_t* level_ghost;
-        double const mass;
-    };
-
-    using Electromag_t = _EM_;
-    using Ions_t       = _IONS_;
-
-
-    HybridStateView(HybridState& state, GridLayout const& gridLayout)
-        : layout{gridLayout}
-        , electromag{state.electromag.E.view(), state.electromag.B.view()}
-        , J{state.J.view()}
-    {
-        for (auto& pop : state.ions)
-            ions.emplace_back(pop.density().view(), pop.flux().view(), &pop.domainParticles(),
-                              &pop.patchGhostParticles(), &pop.levelGhostParticles(), pop.mass());
-    }
-
-
-    GridLayout layout;
-    _EM_ electromag;
-    std::vector<aggregate_adapter<_IONS_>> ions;
-    VecFieldView_t J;
-};
-
-} // namespace PHARE::core
-
 namespace PHARE
 {
 namespace core
@@ -87,9 +32,6 @@ namespace core
     public:
         using VecField        = typename Electromag::vecfield_type;
         using ParticleArray_t = typename Ions::particle_array_type;
-
-        template<typename GridLayout>
-        using view_t = HybridStateView<This, GridLayout>;
 
         static constexpr auto dimension = Ions::dimension;
 

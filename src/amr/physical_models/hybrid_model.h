@@ -41,8 +41,7 @@ public:
     using ParticleInitializerFactory
         = core::ParticleInitializerFactory<particle_array_type, gridlayout_type>;
 
-    using State_t     = core::HybridState<Electromag, Ions, Electrons>;
-    using StateView_t = typename State_t::template view_t<GridLayoutT>;
+    using State_t = core::HybridState<Electromag, Ions, Electrons>;
 
     State_t state;
     std::shared_ptr<resources_manager_type> resourcesManager;

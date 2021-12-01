@@ -14,6 +14,7 @@
 #include "initializer/data_provider.h"
 #include "particle_pack.h"
 #include "core/utilities/algorithm.h"
+#include "core/utilities/types.h"
 
 namespace PHARE
 {
@@ -282,6 +283,45 @@ namespace core
 } // namespace core
 } // namespace PHARE
 
+namespace PHARE::core
+{
+template<typename ParticleArray, typename VecField, typename GridLayout_>
+struct IonPopulationView
+{
+    using This = IonPopulationView<ParticleArray, VecField, GridLayout_>;
 
+    using ParticleArray_t = ParticleArray;
+    using GridLayout      = GridLayout_;
+    using VecField_t      = VecField;
+    using VecFieldView_t  = typename VecField_t::view_t;
+
+    using Field_t     = typename VecField_t::field_type;
+    using FieldView_t = typename Field_t::view_t;
+
+    GridLayout const layout;
+    FieldView_t density;
+    VecFieldView_t flux;
+    ParticleArray_t* domain;
+    ParticleArray_t* patch_ghost;
+    ParticleArray_t* level_ghost;
+    double const mass;
+
+    auto& domainParticles() { return *domain; }
+
+    std::shared_ptr<This> static make_shared(
+        IonPopulation<ParticleArray_t, VecField, GridLayout>& pop, GridLayout const& layout)
+    {
+        return std::make_shared<aggregate_adapter<This>>(
+            layout, pop.density().view(), pop.flux().view(), &pop.domainParticles(),
+            &pop.patchGhostParticles(), &pop.levelGhostParticles(), pop.mass());
+    }
+
+    template<typename Ions>
+    auto static make_shared(Ions& ions, GridLayout const& layout)
+    {
+        return generate([&](auto& pop) { return make_shared(pop, layout); }, ions);
+    }
+};
+} // namespace PHARE::core
 
 #endif

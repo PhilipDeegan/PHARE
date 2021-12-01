@@ -293,10 +293,10 @@ auto generate(F&& f, std::size_t count)
 }
 
 
-template<typename F, template<typename...> typename Container, typename... Ts>
-auto generate(F&& f, Container<Ts...>& container)
+template<typename F, typename Container>
+auto generate(F&& f, Container& container)
 {
-    using T          = typename Container<Ts...>::value_type;
+    using T          = typename Container::value_type;
     using value_type = std::decay_t<std::result_of_t<F&(T&)>>;
     std::vector<value_type> v1;
     if (container.size() > 0)
