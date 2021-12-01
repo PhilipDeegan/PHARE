@@ -400,9 +400,13 @@ struct IonUpdaterTest : public ::testing::Test
     using Field    = typename PHARETypes::Field_t;
     using VecField = typename PHARETypes::VecField_t;
 
-    using IonPopView  = IonPopulationView<ParticleArray, VecField, GridLayout>;
-    using IonPopViews = std::vector<std::vector<std::shared_ptr<IonPopView>>>;
-    using IonUpdater  = typename PHARE::core::IonUpdater<Electromag, ParticleArray, GridLayout>;
+    using IonPopView = IonPopulationView<ParticleArray, VecField, GridLayout>;
+
+    using PatchView   = std::tuple<GridLayout, typename Electromag::view_t,
+                                 std::vector<std::shared_ptr<IonPopView>>>;
+    using IonPopViews = std::vector<PatchView>;
+
+    using IonUpdater = typename PHARE::core::IonUpdater<Electromag, ParticleArray, GridLayout>;
 
 
     double dt{0.01};
@@ -841,7 +845,7 @@ TYPED_TEST(IonUpdaterTest, particlesUntouchedInMomentOnlyMode)
 
     {
         typename TestFixture::IonPopViews views{
-            IonPopView_t::make_shared(this->ions, this->layout)};
+            std::make_tuple(this->layout, this->EM.view(), IonPopView_t::make_shared(this->ions))};
         auto units = PHARE::core::updater_ranges_per_thread(views);
         for (auto& pop : units[0])
             ionUpdater.updatePopulations(pop, this->EM, this->layout, this->dt,
@@ -920,7 +924,7 @@ TYPED_TEST(IonUpdaterTest, momentsAreChangedInParticlesAndMomentsMode)
 
     {
         typename TestFixture::IonPopViews views{
-            IonPopView_t::make_shared(this->ions, this->layout)};
+            {this->layout, this->EM.view(), IonPopView_t::make_shared(this->ions)}};
         auto units = PHARE::core::updater_ranges_per_thread(views);
         for (auto& pop : units[0])
             ionUpdater.updatePopulations(pop, this->EM, this->layout, this->dt, UpdaterMode::all);
@@ -947,8 +951,8 @@ TYPED_TEST(IonUpdaterTest, momentsAreChangedInMomentsOnlyMode)
     IonsBuffers ionsBufferCpy{this->ionsBuffers, this->layout};
 
     {
-        typename TestFixture::IonPopViews views{
-            IonPopView_t::make_shared(this->ions, this->layout)};
+        typename TestFixture::IonPopViews views{typename TestFixture::PatchView{
+            this->layout, this->EM.view(), IonPopView_t::make_shared(this->ions)}};
         auto units = PHARE::core::updater_ranges_per_thread(views);
         for (auto& pop : units[0])
             ionUpdater.updatePopulations(pop, this->EM, this->layout, this->dt,
@@ -974,8 +978,8 @@ TYPED_TEST(IonUpdaterTest, thatNoNaNsExistOnPhysicalNodesMoments)
         init_dict["simulation"]["algo"]["ion_updater"]};
 
     {
-        typename TestFixture::IonPopViews views{
-            IonPopView_t::make_shared(this->ions, this->layout)};
+        typename TestFixture::IonPopViews views{typename TestFixture::PatchView{
+            this->layout, this->EM.view(), IonPopView_t::make_shared(this->ions)}};
         auto units = PHARE::core::updater_ranges_per_thread(views);
         for (auto& pop : units[0])
             ionUpdater.updatePopulations(pop, this->EM, this->layout, this->dt,
@@ -1018,8 +1022,8 @@ TYPED_TEST(IonUpdaterTest, thatUnusedMomentNodesAreNaN)
         init_dict["simulation"]["algo"]["ion_updater"]};
 
     {
-        typename TestFixture::IonPopViews views{
-            IonPopView_t::make_shared(this->ions, this->layout)};
+        typename TestFixture::IonPopViews views{typename TestFixture::PatchView{
+            this->layout, this->EM.view(), IonPopView_t::make_shared(this->ions)}};
         auto units = PHARE::core::updater_ranges_per_thread(views);
 
         for (auto& pop : units[0])

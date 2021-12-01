@@ -35,7 +35,6 @@ public:
 
     using Box               = PHARE::core::Box<int, dimension>;
     using Interpolator      = PHARE::core::Interpolator<dimension, interp_order, atomic_interp>;
-    using VecField          = typename Electromag::vecfield_type;
     using PartIterator      = typename ParticleArray::iterator;
     using BoundaryCondition = PHARE::core::BoundaryCondition<dimension, interp_order>;
     using Pusher            = PHARE::core::Pusher<dimension, PartIterator, Electromag, Interpolator,
@@ -64,8 +63,7 @@ public:
 
 
     template<typename Ions>
-    void updatePopulations(Ions& ions, Electromag const& em, GridLayout const& layout, double dt,
-                           UpdaterMode = UpdaterMode::all);
+    void updatePopulations(Ions& ions, double dt, UpdaterMode = UpdaterMode::all);
 
 
     template<typename Ions>
@@ -117,24 +115,22 @@ private:
 
 
 template<typename Electromag, typename ParticleArray, typename GridLayout>
-template<typename ParticleRanges>
-void IonUpdater<Electromag, ParticleArray, GridLayout>::updatePopulations(ParticleRanges& particles,
-                                                                          Electromag const& em,
-                                                                          GridLayout const& layout,
-                                                                          double dt,
+template<typename Ions>
+void IonUpdater<Electromag, ParticleArray, GridLayout>::updatePopulations(Ions& ions, double dt,
                                                                           UpdaterMode mode)
 {
     PHARE_LOG_SCOPE("IonUpdater::updatePopulations");
 
-    pusher_->setMeshAndTimeStep(layout.meshSize(), dt);
+    for (auto& pairs : ions)
+        for (auto& [layout, particles] : pairs)
+        {
+            pusher_->setMeshAndTimeStep(layout.meshSize(), dt);
+            if (mode == UpdaterMode::domain_only)
+                updateAndDepositDomain_(particles, particles.domain.view->electromag, layout);
 
-    if (mode == UpdaterMode::domain_only)
-        for (auto& pair : particles)
-            updateAndDepositDomain_(pair.second, em, layout);
-
-    else
-        for (auto& pair : particles)
-            updateAndDepositAll_(pair.second, em, layout);
+            else
+                updateAndDepositAll_(particles, particles.domain.view->electromag, layout);
+        }
 }
 
 

@@ -7,28 +7,29 @@
 
 namespace PHARE::core
 {
-template<typename Iterator, typename PopulationView>
+template<typename Iterator, typename GridLayout, typename Electromag, typename PopulationView>
 struct ParticleRange : public Range<Iterator>
 {
     using Super    = Range<Iterator>;
     using iterator = Iterator;
 
-    ParticleRange(Range<Iterator>&& range, std::size_t pop_idx_,
-                  std::shared_ptr<PopulationView> view_)
-        : Super{std::forward<Range<Iterator>>(range)}
-        , pop_idx{pop_idx_}
-        , view{view_}
-    {
-    }
-    ParticleRange(Range<Iterator> const& range, std::size_t pop_idx_,
-                  std::shared_ptr<PopulationView> view_)
-        : Super{range}
-        , pop_idx{pop_idx_}
-        , view{view_}
-    {
-    }
+    // ParticleRange(Range<Iterator>&& range, std::size_t pop_idx_,
+    //               std::shared_ptr<PopulationView> view_)
+    //     : Super{std::forward<Range<Iterator>>(range)}
+    //     , pop_idx{pop_idx_}
+    //     , view{view_}
+    // {
+    // }
+    // ParticleRange(Range<Iterator> const& range, std::size_t pop_idx_,
+    //               std::shared_ptr<PopulationView> view_)
+    //     : Super{range}
+    //     , pop_idx{pop_idx_}
+    //     , view{view_}
+    // {
+    // }
 
-    std::size_t pop_idx = -1;
+    GridLayout layout;
+    Electromag em;
     std::shared_ptr<PopulationView> view;
 };
 

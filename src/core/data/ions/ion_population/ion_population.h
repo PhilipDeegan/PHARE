@@ -290,36 +290,34 @@ struct IonPopulationView
 {
     using This = IonPopulationView<ParticleArray, VecField, GridLayout_>;
 
-    using ParticleArray_t = ParticleArray;
-    using GridLayout      = GridLayout_;
-    using VecField_t      = VecField;
-    using VecFieldView_t  = typename VecField_t::view_t;
+    using particle_array_type = ParticleArray;
+    using VecFieldView_t      = typename VecField::view_t;
+    using Field_t             = typename VecField::field_type;
+    using FieldView_t         = typename Field_t::view_t;
 
-    using Field_t     = typename VecField_t::field_type;
-    using FieldView_t = typename Field_t::view_t;
-
-    GridLayout const layout;
     FieldView_t density;
     VecFieldView_t flux;
-    ParticleArray_t* domain;
-    ParticleArray_t* patch_ghost;
-    ParticleArray_t* level_ghost;
+    ParticleArray* domain;
+    ParticleArray* patch_ghost;
+    ParticleArray* level_ghost;
     double const mass;
+
 
     auto& domainParticles() { return *domain; }
 
+
     std::shared_ptr<This> static make_shared(
-        IonPopulation<ParticleArray_t, VecField, GridLayout>& pop, GridLayout const& layout)
+        IonPopulation<ParticleArray, VecField, GridLayout_>& pop)
     {
         return std::make_shared<aggregate_adapter<This>>(
-            layout, pop.density().view(), pop.flux().view(), &pop.domainParticles(),
+            pop.density().view(), pop.flux().view(), &pop.domainParticles(),
             &pop.patchGhostParticles(), &pop.levelGhostParticles(), pop.mass());
     }
 
     template<typename Ions>
-    auto static make_shared(Ions& ions, GridLayout const& layout)
+    auto static make_shared(Ions& ions)
     {
-        return generate([&](auto& pop) { return make_shared(pop, layout); }, ions);
+        return generate([&](auto& pop) { return make_shared(pop); }, ions);
     }
 };
 } // namespace PHARE::core

@@ -154,11 +154,13 @@ private:
     std::unordered_map<std::string, ParticleArray> tmpDomain;
     std::unordered_map<std::string, ParticleArray> patchGhost;
 
-    using IonUpdater_t       = core::IonUpdater<Electromag, ParticleArray, GridLayout>;
-    using IonPopView         = core::IonPopulationView<ParticleArray, VecFieldT, GridLayout>;
+    using IonPopView   = core::IonPopulationView<ParticleArray, VecFieldT, GridLayout>;
+    using IonUpdater_t = core::IonUpdater<typename Electromag::view_t, ParticleArray, GridLayout>;
     using RangeSynchrotron_t = PHARE::core::RangeSynchrotron<ParticleArray>;
 
-    std::vector<std::shared_ptr<IonPopView>> ion_pop_views;
+    using PatchView = std::tuple<GridLayout, typename Electromag::view_t,
+                                 std::vector<std::shared_ptr<IonPopView>>>;
+    std::vector<PatchView> ion_patch_views;
 }; // end solverPPC
 
 
@@ -263,15 +265,13 @@ void SolverPPC<HybridModel, AMR_Types>::advanceLevel(std::shared_ptr<hierarchy_t
         }
     };
 
-    ion_pop_views = core::generate(
-        [&](auto& patch) {
-            auto _      = resourcesManager.setOnPatch(*patch, hybridState);
-            auto layout = PHARE::amr::layoutFromPatch<GridLayout>(*patch);
-            return core::generate(
-                [&]() { return IonPopView::make_shared(hybridState.ions, layout); },
-                hybridState.ions);
-        },
-        *level);
+    for (auto& patch : *level)
+    {
+        auto _      = resourcesManager.setOnPatch(*patch, hybridState);
+        auto layout = PHARE::amr::layoutFromPatch<GridLayout>(*patch);
+        ion_patch_views.emplace_back(layout, hybridState.electromag.view(),
+                                     IonPopView::make_shared(hybridState.ions));
+    }
 
     predictor1_(*level, hybridModel, fromCoarser, currentTime, newTime);
     average_(*level, hybridModel);
@@ -590,11 +590,12 @@ void SolverPPC<HybridModel, AMR_Types>::moveIons_(level_t& level, Ions& ions,
         auto units = PHARE::core::updater_ranges_per_thread(ion_pop_views, n_threads);
         core::abort_if(units.size() != n_threads);
 
-        RangeSynchrotron_t synchrotron{static_cast<std::uint16_t>(n_threads)};
+        auto synchrotron
+            = std::make_shared<RangeSynchrotron_t>(static_cast<std::uint16_t>(n_threads));
 
         auto thread_fn = [&](std::uint16_t thread_idx) {
-            for (auto& pop : units[thread_idx])
-                IonUpdater_t{synchrotron, thread_idx, updaterDict}.updatePopulations(pop, dt, mode);
+            IonUpdater_t{updaterDict, thread_idx, synchrotron}.updatePopulations(units[thread_idx],
+                                                                                 dt, mode);
         };
         auto threads = PHARE::core::generate(
             [&](auto i) { return std::thread{[&, i]() { thread_fn(i); }}; }, 1, n_threads);
