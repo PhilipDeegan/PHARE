@@ -77,7 +77,7 @@ namespace core
 
 
 
-        ParticleArray& domainParticles()
+        auto& domainParticles() const
         {
             if (isUsable())
             {
@@ -89,9 +89,15 @@ namespace core
             }
         }
 
+        auto& domainParticles()
+        {
+            return const_cast<ParticleArray&>(
+                static_cast<IonPopulation const*>(this)->domainParticles());
+        }
 
 
-        ParticleArray& patchGhostParticles()
+
+        auto& patchGhostParticles() const
         {
             if (isUsable())
             {
@@ -103,9 +109,14 @@ namespace core
             }
         }
 
+        auto& patchGhostParticles()
+        {
+            return const_cast<ParticleArray&>(
+                static_cast<IonPopulation const*>(this)->patchGhostParticles());
+        }
 
 
-        ParticleArray& levelGhostParticles()
+        auto& levelGhostParticles() const
         {
             if (isUsable())
             {
@@ -115,6 +126,12 @@ namespace core
             {
                 throw std::runtime_error("Error - cannot provide access to particle buffers");
             }
+        }
+
+        auto& levelGhostParticles()
+        {
+            return const_cast<ParticleArray&>(
+                static_cast<IonPopulation const*>(this)->levelGhostParticles());
         }
 
 
@@ -264,5 +281,7 @@ namespace core
     };
 } // namespace core
 } // namespace PHARE
+
+
 
 #endif

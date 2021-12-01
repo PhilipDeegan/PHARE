@@ -132,6 +132,24 @@ namespace core
         auto end() const { return r.end(); }
 
 
+        auto operator+(Type value)
+        {
+            auto copy = *this;
+            for (auto iDim = 0u; iDim < dim; ++iDim)
+                copy[iDim] += value;
+            return copy;
+        }
+
+
+        auto operator-(Type value)
+        {
+            auto copy = *this;
+            for (auto iDim = 0u; iDim < dim; ++iDim)
+                copy[iDim] -= value;
+            return copy;
+        }
+
+
     private:
         std::array<Type, dim> r{};
     };
@@ -155,6 +173,14 @@ PHARE::core::Point<Type, dim> abs(PHARE::core::Point<Type, dim> const& point)
         postive[i] = std::abs(point[i]);
     return postive;
 }
+
+
+template<typename Type, std::size_t dim>
+auto to_string(PHARE::core::Point<Type, dim> const& point)
+{
+    return point.str();
+}
+
 
 } // namespace std
 

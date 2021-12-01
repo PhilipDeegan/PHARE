@@ -4,6 +4,8 @@ import sys
 import subprocess
 import numpy as np
 
+from pyphare.core.phare_utilities import is_scalar
+
 # This exists to allow a condition variable for when we are running PHARE from C++ via phare-exe
 #  It is configured to "True" in pyphare/pyphare/pharein/init.py::get_user_inputs(jobname)
 #    which is called from Pybind when phare-exe (or similar) is in use
@@ -33,13 +35,6 @@ def getSimulation():
     from .global_vars import sim
     return sim
 
-
-def is_ndarray(x):
-    return isinstance(x, np.ndarray)
-
-
-def is_scalar(x):
-    return not is_ndarray(x) and not isinstance(x, list)
 
 # converts scalars to array of expected size
 # converts lists to arrays
@@ -160,6 +155,7 @@ def populateDict():
     else:
         add_string("simulation/AMR/refinement/tagging/method","none") # integrator.h might want some looking at
 
+    add_size_t("simulation/algo/threads", simulation.threads)
     add_string("simulation/algo/ion_updater/pusher/name", simulation.particle_pusher)
     add_double("simulation/algo/ohm/resistivity", simulation.resistivity)
     add_double("simulation/algo/ohm/hyper_resistivity", simulation.hyper_resistivity)
