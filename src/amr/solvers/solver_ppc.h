@@ -3,6 +3,8 @@
 #ifndef PHARE_SOLVER_PPC_H
 #define PHARE_SOLVER_PPC_H
 
+#include <thread>
+
 #include <SAMRAI/hier/Patch.h>
 
 #include "initializer/data_provider.h"
@@ -30,7 +32,10 @@
 #include "core/data/grid/gridlayout_utils.h"
 
 
-#include <iomanip>
+#include "core/numerics/ion_updater/ion_range.h"
+#include "core/numerics/ion_updater/ion_updater.h"
+
+
 
 namespace PHARE::solver
 {
@@ -61,22 +66,27 @@ private:
     PHARE::core::Faraday<GridLayout> faraday_;
     PHARE::core::Ampere<GridLayout> ampere_;
     PHARE::core::Ohm<GridLayout> ohm_;
-    PHARE::core::IonUpdater<Ions, Electromag, GridLayout> ionUpdater_;
 
 
+    std::size_t static operating_n_threads(PHARE::initializer::PHAREDict const& dict)
+    {
+        if (dict.contains("threads"))
+            return dict["threads"].template to<std::size_t>();
+        return 1;
+    }
+
+    PHARE::initializer::PHAREDict updaterDict;
 
 public:
     using patch_t     = typename AMR_Types::patch_t;
     using level_t     = typename AMR_Types::level_t;
     using hierarchy_t = typename AMR_Types::hierarchy_t;
 
-
-
     explicit SolverPPC(PHARE::initializer::PHAREDict const& dict)
         : ISolver<AMR_Types>{"PPC"}
         , ohm_{dict["ohm"]}
-        , ionUpdater_{dict["ion_updater"]}
-
+        , updaterDict{dict["ion_updater"]}
+        , n_threads{operating_n_threads(dict)}
     {
     }
 
@@ -138,12 +148,19 @@ private:
         toCoarser.syncElectric(model_.electromag.E);
     }*/
 
+    std::size_t n_threads = 1;
 
     // extend lifespan
     std::unordered_map<std::string, ParticleArray> tmpDomain;
     std::unordered_map<std::string, ParticleArray> patchGhost;
 
+    using IonPopView   = core::IonPopulationView<ParticleArray, VecFieldT, GridLayout>;
+    using IonUpdater_t = core::IonUpdater<typename Electromag::view_t, ParticleArray, GridLayout>;
+    using RangeSynchrotron_t = PHARE::core::RangeSynchrotron<ParticleArray>;
 
+    using PatchView = std::tuple<GridLayout, typename Electromag::view_t,
+                                 std::vector<std::shared_ptr<IonPopView>>>;
+    std::vector<PatchView> ion_patch_views;
 }; // end solverPPC
 
 
@@ -239,29 +256,41 @@ void SolverPPC<HybridModel, AMR_Types>::advanceLevel(std::shared_ptr<hierarchy_t
     auto& resourcesManager = *hybridModel.resourcesManager;
     auto level             = hierarchy->getPatchLevel(levelNumber);
 
+    auto reset_moments = [&]() {
+        auto& ions = hybridState.ions;
+        for (auto& patch : *level)
+        {
+            auto _ = resourcesManager.setOnPatch(*patch, ions);
+            resetMoments(ions);
+        }
+    };
+
+    ion_patch_views.clear();
+    for (auto& patch : *level)
+    {
+        auto _      = resourcesManager.setOnPatch(*patch, hybridState);
+        auto layout = PHARE::amr::layoutFromPatch<GridLayout>(*patch);
+        ion_patch_views.emplace_back(layout, hybridState.electromag.view(),
+                                     IonPopView::make_shared(hybridState.ions));
+    }
 
     predictor1_(*level, hybridModel, fromCoarser, currentTime, newTime);
-
-
     average_(*level, hybridModel);
 
     saveState_(*level, hybridState.ions, resourcesManager);
+    reset_moments();
     moveIons_(*level, hybridState.ions, electromagAvg_, resourcesManager, fromCoarser, currentTime,
               newTime, core::UpdaterMode::domain_only);
 
     predictor2_(*level, hybridModel, fromCoarser, currentTime, newTime);
-
-
     average_(*level, hybridModel);
 
     restoreState_(*level, hybridState.ions, resourcesManager);
+    reset_moments();
     moveIons_(*level, hybridState.ions, electromagAvg_, resourcesManager, fromCoarser, currentTime,
               newTime, core::UpdaterMode::all);
 
     corrector_(*level, hybridModel, fromCoarser, currentTime, newTime);
-
-
-    // return newTime;
 }
 
 
@@ -555,21 +584,52 @@ void SolverPPC<HybridModel, AMR_Types>::moveIons_(level_t& level, Ions& ions,
         }
     }
 
+    auto total_particles = [&]() {
+        std::unordered_map<std::size_t, std::size_t> n_pop_domain_particle;
+        for (auto& patch : level)
+        {
+            auto _ = rm.setOnPatch(*patch, electromag, ions);
+            for (std::size_t pop_idx = 0; pop_idx < ions.nbrPopulations(); ++pop_idx)
+                n_pop_domain_particle[pop_idx]
+                    += (*(ions.begin() + pop_idx)).domainParticles().size();
+        }
+        std::cout << __FILE__ << " " << __LINE__ << " " << std::endl;
+        for (auto const& [key, val] : n_pop_domain_particle)
+            std::cout << __FILE__ << " " << __LINE__ << " " << key << " " << val << std::endl;
+        return n_pop_domain_particle;
+    };
+    std::cout << __FILE__ << " " << __LINE__ << " " << std::endl;
+    auto total_particles_before = total_particles();
 
 
+    core::abort_if(n_threads == 0);
     auto dt = newTime - currentTime;
+
+    { // syncs on destruct
+        auto units = PHARE::core::updater_ranges_per_thread(ion_patch_views, n_threads);
+        core::abort_if(units.size() != n_threads);
+
+        auto synchrotron
+            = std::make_shared<RangeSynchrotron_t>(static_cast<std::uint16_t>(n_threads));
+
+        auto thread_fn = [&](std::uint16_t thread_idx) {
+            IonUpdater_t{updaterDict, thread_idx, synchrotron}.updatePopulations(units[thread_idx],
+                                                                                 dt, mode);
+        };
+        auto threads = PHARE::core::generate(
+            [&](auto i) { return std::thread{[&, i]() { thread_fn(i); }}; }, 1, n_threads);
+        thread_fn(0);
+        for (auto& thread : threads)
+            if (thread.joinable())
+                thread.join();
+    }
 
     for (auto& patch : level)
     {
         auto _ = rm.setOnPatch(*patch, electromag, ions);
-
-        auto layout = PHARE::amr::layoutFromPatch<GridLayout>(*patch);
-        ionUpdater_.updatePopulations(ions, electromag, layout, dt, mode);
-
         // this needs to be done before calling the messenger
         rm.setTime(ions, *patch, newTime);
     }
-
 
     fromCoarser.fillIonGhostParticles(ions, level, newTime);
     fromCoarser.fillIonMomentGhosts(ions, level, currentTime, newTime);
@@ -578,9 +638,15 @@ void SolverPPC<HybridModel, AMR_Types>::moveIons_(level_t& level, Ions& ions,
     {
         auto _      = rm.setOnPatch(*patch, electromag, ions);
         auto layout = PHARE::amr::layoutFromPatch<GridLayout>(*patch);
-        ionUpdater_.updateIons(ions, layout);
-
+        IonUpdater_t::updateIons(ions, layout);
         // no need to update time, since it has been done before
+    }
+
+    std::cout << __FILE__ << " " << __LINE__ << " " << std::endl;
+    auto total_particles_after = total_particles();
+    if (level.getLevelNumber() == 0 and core::mpi::size() == 1)
+    {
+        core::abort_if(total_particles_before != total_particles_after);
     }
 }
 } // namespace PHARE::solver
