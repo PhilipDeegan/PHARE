@@ -16,7 +16,7 @@ import unittest
 import os
 import h5py
 import numpy as np
-from ddt import ddt, data
+from ddt import ddt, data, unpack
 
 from tests.simulator.config import project_root
 
@@ -93,19 +93,24 @@ def dup(dic):
     return dic
 
 
+interp_orders = [1, 2, 3]
+def per_dim_per_interp(dic):
+    return [(dim, interp, dic) for interp in interp_orders for dim in supported_dimensions()]
+
+
 @ddt
 class DiagnosticsTest(unittest.TestCase):
 
     _test_cases = (
-      dup({
+      *per_dim_per_interp(dup({
         "smallest_patch_size": 10,
-        "largest_patch_size": 20}),
-      dup({
+        "largest_patch_size": 20})),
+      *per_dim_per_interp(dup({
         "smallest_patch_size": 20,
-        "largest_patch_size": 20}),
-      dup({
+        "largest_patch_size": 20})),
+      *per_dim_per_interp(dup({
         "smallest_patch_size": 20,
-        "largest_patch_size": 40})
+        "largest_patch_size": 40}))
     )
 
     def __init__(self, *args, **kwargs):
@@ -124,11 +129,8 @@ class DiagnosticsTest(unittest.TestCase):
 
 
     @data(*_test_cases)
-    def test_dump_diags(self, simInput):
-        for ndim in supported_dimensions():
-            self._test_dump_diags(ndim, **simInput)
-
-    def _test_dump_diags(self, dim, **simInput):
+    @unpack
+    def test_dump_diags(self, dim, interp, simInput):
         test_id = self.ddt_test_id()
 
         # configure simulation dim sized values
@@ -156,7 +158,6 @@ class DiagnosticsTest(unittest.TestCase):
             refined_particle_nbr = simulation.refined_particle_nbr
 
             self.assertTrue(any([diagInfo.quantity.endswith("domain") for diagInfo in ph.global_vars.sim.diagnostics]))
-
 
 
             particle_files = 0

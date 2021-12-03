@@ -2,13 +2,14 @@ def decode_bytes(input):
     return input.decode("ascii", errors="ignore")
 
 class RunTimer:
-    def __init__(self, stmt, **kwargs):
+    def __init__(self, cmd, shell=True, capture_output=True, check=False, print_cmd=True, **kwargs):
         import time
         import subprocess
-        self.stmt = stmt
+        self.cmd = cmd
         start = time.time()
-        subprocess.run(self.stmt, **kwargs)
+        self.run = subprocess.run(self.cmd, shell=shell, capture_output=capture_output, check=check, **kwargs)
         self.t = time.time() - start
+
 
 
 def run(cmd, shell=True, capture_output=True, check=False, print_cmd=True, **kwargs):
@@ -44,7 +45,7 @@ def run_mp(cmds, N_CORES=None, **kwargs):
                 results += [proc]
                 if future.exception() is not None:
                     raise future.exception()
-                print(proc.stmt, f"finished in {proc.t:.2f} seconds")
+                print(proc.cmd, f"finished in {proc.t:.2f} seconds")
             except Exception as exc:
                 if kwargs.get("check", False):
                     executor.shutdown(wait=False, cancel_futures=True)
