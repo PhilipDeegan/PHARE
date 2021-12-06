@@ -12,9 +12,12 @@
 #include <optional>
 
 
+#include "core/logger.h"
+#include "core/utilities/types.h"
 #include "core/utilities/box/box.h"
 #include "core/utilities/bucketlist.h"
-#include "core/logger.h"
+#include "robin_hood.h"
+
 
 namespace PHARE::core
 {
@@ -26,7 +29,6 @@ private:
     using bucketlist_t = BucketList<bucket_size, Type>;
     using cell_t       = std::array<cell_index_t, dim>;
     using box_t        = Box<cell_index_t, dim>;
-
 
 public:
     CellMap() = default;
@@ -231,7 +233,10 @@ private:
 
     box_t box_;
     std::array<cell_index_t, dim> shape_;
-    std::unordered_map<key_t, bucketlist_t, CellHasher> bucketsLists_;
+    // using map_t        = std::unordered_map<key_t, bucketlist_t, CellHasher>;
+    using map_t = robin_hood::unordered_map<key_t, bucketlist_t, CellHasher>;
+
+    map_t bucketsLists_;
 };
 
 

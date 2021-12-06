@@ -82,8 +82,8 @@ std::ostream& operator<<(std::ostream& out, Particle<dim> const& particle)
         out << v << ",";
     }
     out << "), charge : " << particle.charge << ", weight : " << particle.weight;
-    out << ", Exyz : " << particle.Ex << "," << particle.Ey << "," << particle.Ez;
-    out << ", Bxyz : " << particle.Bx << "," << particle.By << "," << particle.Bz;
+    // out << ", Exyz : " << particle.Ex << "," << particle.Ey << "," << particle.Ez;
+    // out << ", Bxyz : " << particle.Bx << "," << particle.By << "," << particle.Bz;
     out << '\n';
     return out;
 }

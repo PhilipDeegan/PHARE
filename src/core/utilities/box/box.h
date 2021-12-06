@@ -27,7 +27,7 @@ struct Box
 {
     Point<Type, dim> lower;
     Point<Type, dim> upper;
-    std::array<Type, dim> shape;
+    // std::array<Type, dim> shape;
 
     Box() = default;
     // TODO Ctor with intializer_list would allow not {{},{}}
@@ -35,7 +35,6 @@ struct Box
         : lower{_lower}
         , upper{_upper}
     {
-        make_shape_();
     }
 
     template<typename T, std::size_t s>
@@ -43,7 +42,6 @@ struct Box
         : lower{_lower}
         , upper{_upper}
     {
-        make_shape_();
     }
 
     bool operator==(Box const& box) const { return box.lower == lower && box.upper == upper; }
@@ -65,14 +63,7 @@ struct Box
 
     auto nbrItems(std::size_t dir) const { return shape[dir]; }
 
-    auto size() const
-    {
-        return std::accumulate(std::begin(shape), std::end(shape), 1, std::multiplies<Type>{});
-    }
-
-
     auto copy() { return *this; }
-
 
     auto& grow(Type const& size)
 
@@ -195,15 +186,6 @@ struct Box
 
             return remains;
         }
-    }
-
-
-
-private:
-    void make_shape_()
-    { //
-        std::transform(std::begin(lower), std::end(lower), std::begin(upper), std::begin(shape),
-                       [](auto const& lo, auto const& up) { return up - lo + 1; });
     }
 };
 
