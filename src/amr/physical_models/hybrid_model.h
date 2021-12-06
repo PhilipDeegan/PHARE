@@ -41,9 +41,8 @@ public:
     using ParticleInitializerFactory
         = core::ParticleInitializerFactory<particle_array_type, gridlayout_type>;
 
-    using State_t = core::HybridState<Electromag, Ions, Electrons>;
 
-    State_t state;
+    core::HybridState<Electromag, Ions, Electrons> state;
     std::shared_ptr<resources_manager_type> resourcesManager;
 
 

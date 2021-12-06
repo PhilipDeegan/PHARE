@@ -6,7 +6,7 @@ cpp_lib("pybindlibs.cpp_sim_2_1_4")
 import pyphare.pharein as ph
 
 seed = 133333333337
-time_step_nbr=1000
+time_step_nbr=1
 time_step=0.001
 cells, dl, ppc = 400, .2, 100
 patch_sizes = [12, 100]
@@ -92,8 +92,6 @@ if __name__=="__main__":
     it= 0
     t = time_step * time_step_nbr
     B = r.GetB(t)
-    title="t = {:6.2f}".format(t)
-    print(title)
-    filename= "Bz018_{:04d}".format(it)
+    filename= f"Bz018_{it:04d}"
     B.plot(qty="Bz", filename=filename,  plot_patches=True, vmin=-0.5, vmax=0.5,
-           title=title)
+           title=f"t = {t:6.2f}")

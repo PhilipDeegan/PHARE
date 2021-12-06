@@ -121,13 +121,8 @@ void IonUpdater<Electromag, ParticleArray, GridLayout>::updatePopulations(Ions& 
 {
     PHARE_LOG_SCOPE("IonUpdater::updatePopulations");
 
-    // KLOG(INF) << ions.size();
-    std::cout << __FILE__ << " " << __LINE__ << " " << ions.size() << std::endl;
     for (auto& particles : ions)
     {
-        // KLOG(INF) << particles.domain.size();
-
-        std::cout << __FILE__ << " " << __LINE__ << " " << particles.domain.size() << std::endl;
         auto& layout = *particles.domain.layout;
         auto& em     = *particles.domain.em;
         pusher_->setMeshAndTimeStep(layout.meshSize(), dt);
@@ -159,7 +154,6 @@ auto& IonUpdater<Electromag, ParticleArray, GridLayout>::push_domain(ParticleRan
                                                                      GridLayout const& layout)
 {
     auto& pop = *particles.domain.view;
-    std::cout << __FILE__ << " " << __LINE__ << " " << pop.mass << std::endl;
 
     refiller = RangeReplacer_t::make_unique(*pop.domain, *synchrotron, thread_idx_);
 
@@ -216,7 +210,6 @@ void IonUpdater<Electromag, ParticleArray, GridLayout>::updateAndDepositDomain_(
     // deposit moments on those which leave to go inDomainBox
 
     auto pushAndAccumulateGhosts = [&](auto& inputArrayPtr, bool copyInDomain = false) {
-        // KLOG(INF) << inputArrayPtr;
         if (!inputArrayPtr)
             return;
 
@@ -290,7 +283,6 @@ void IonUpdater<Electromag, ParticleArray, GridLayout>::updateAndDepositAll_(
 
     auto pushAndCopyInDomain = [&](auto& ghostParticlesPtr, auto& ghost_src,
                                    bool clean_src = false) {
-        // KLOG(INF) << ghostParticlesPtr;
         if (!ghostParticlesPtr)
             return;
 

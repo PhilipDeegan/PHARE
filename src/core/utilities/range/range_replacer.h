@@ -31,15 +31,14 @@ struct SyncInfo
 template<typename Container>
 class RangeSynchrotron
 {
-public:
-    using value_type       = typename Container::value_type;
     using iterator         = typename Container::iterator;
+    using value_type       = typename Container::value_type;
     using RangeSyncInfo_t  = SyncInfo<Container, Range<iterator>>;
     using VectorSyncInfo_t = SyncInfo<Container, std::vector<value_type>>;
     using RangeSyncVec_t   = std::vector<std::unique_ptr<RangeSyncInfo_t>>;
     using VectorSyncVec_t  = std::vector<std::unique_ptr<VectorSyncInfo_t>>;
 
-
+public:
     ~RangeSynchrotron() { sync(); }
 
     void sync()
@@ -124,8 +123,9 @@ private:
 };
 
 template<typename Container>
-struct RangeReplacer
+class RangeReplacer
 {
+public:
     using RangeSynchrotron_t = RangeSynchrotron<Container>;
     using iterator           = typename Container::iterator;
     using Range_t            = Range<iterator>;
@@ -233,6 +233,7 @@ struct RangeReplacer
         replace_with(src, range, std::partition(range.begin(), range.end(), fn));
     }
 
+private:
     Container& dst;
     RangeSynchrotron_t& synchrotron_;
     std::uint16_t const thread_idx = -1;

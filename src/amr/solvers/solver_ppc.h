@@ -584,23 +584,6 @@ void SolverPPC<HybridModel, AMR_Types>::moveIons_(level_t& level, Ions& ions,
         }
     }
 
-    auto total_particles = [&]() {
-        std::unordered_map<std::size_t, std::size_t> n_pop_domain_particle;
-        for (auto& patch : level)
-        {
-            auto _ = rm.setOnPatch(*patch, electromag, ions);
-            for (std::size_t pop_idx = 0; pop_idx < ions.nbrPopulations(); ++pop_idx)
-                n_pop_domain_particle[pop_idx]
-                    += (*(ions.begin() + pop_idx)).domainParticles().size();
-        }
-        std::cout << __FILE__ << " " << __LINE__ << " " << std::endl;
-        for (auto const& [key, val] : n_pop_domain_particle)
-            std::cout << __FILE__ << " " << __LINE__ << " " << key << " " << val << std::endl;
-        return n_pop_domain_particle;
-    };
-    std::cout << __FILE__ << " " << __LINE__ << " " << std::endl;
-    auto total_particles_before = total_particles();
-
 
     core::abort_if(n_threads == 0);
     auto dt = newTime - currentTime;
@@ -640,13 +623,6 @@ void SolverPPC<HybridModel, AMR_Types>::moveIons_(level_t& level, Ions& ions,
         auto layout = PHARE::amr::layoutFromPatch<GridLayout>(*patch);
         IonUpdater_t::updateIons(ions, layout);
         // no need to update time, since it has been done before
-    }
-
-    std::cout << __FILE__ << " " << __LINE__ << " " << std::endl;
-    auto total_particles_after = total_particles();
-    if (level.getLevelNumber() == 0 and core::mpi::size() == 1)
-    {
-        core::abort_if(total_particles_before != total_particles_after);
     }
 }
 } // namespace PHARE::solver

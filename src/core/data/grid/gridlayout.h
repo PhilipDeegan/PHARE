@@ -145,7 +145,6 @@ namespace core
         GridLayout(GridLayout const& that) = default;
         GridLayout(GridLayout&& source)    = default;
 
-        bool operator==(GridLayout const& that) const { return this->AMRBox_ == that.AMRBox_; }
 
 
         /**
@@ -1499,20 +1498,5 @@ namespace core
 } // namespace core
 } // namespace PHARE
 
-namespace std
-{
-template<typename GridLayoutImpl>
-struct hash<PHARE::core::GridLayout<GridLayoutImpl>>
-{
-    std::size_t operator()(PHARE::core::GridLayout<GridLayoutImpl> const& that) const
-    {
-        auto const& lower = that.AMRBox().lower;
-        auto const& upper = that.AMRBox().upper;
-        std::string key   = std::to_string(lower) + "," + std::to_string(upper);
-        return std::hash<string>()(key);
-    }
-};
-
-} // namespace std
 
 #endif // GridLayout_H

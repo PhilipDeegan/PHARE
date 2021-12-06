@@ -20,19 +20,12 @@ struct IonUpdaterRange : public Range<Iterator>
 
     IonUpdaterRange(Range<Iterator> const& range, GridLayout& layout_, Electromag& em_,
                     std::shared_ptr<PopulationView>& view_)
-        : Super{/*std::forward<Range<Iterator>>(range)*/ range}
+        : Super{range}
         , layout{&layout_}
         , em{&em_}
         , view{view_}
     {
     }
-    // ParticleRange(Range<Iterator> const& range, std::size_t pop_idx_,
-    //               std::shared_ptr<PopulationView> view_)
-    //     : Super{range}
-    //     , pop_idx{pop_idx_}
-    //     , view{view_}
-    // {
-    // }
 
     GridLayout* layout;
     Electromag* em;
