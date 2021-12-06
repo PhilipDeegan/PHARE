@@ -1,4 +1,5 @@
-
+#ifndef PHARE_TEST_UTILITY_TEST_RANGES_H
+#define PHARE_TEST_UTILITY_TEST_RANGES_H
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -207,9 +208,4 @@ TEST(Ranges, test_range_builder_v3)
 
 } // namespace PHARE::core
 
-
-int main(int argc, char** argv)
-{
-    ::testing::InitGoogleTest(&argc, argv);
-    return RUN_ALL_TESTS();
-}
+#endif /*  PHARE_TEST_UTILITY_TEST_RANGES_H  */

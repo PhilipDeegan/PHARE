@@ -2,13 +2,14 @@ def decode_bytes(input):
     return input.decode("ascii", errors="ignore")
 
 class RunTimer:
-    def __init__(self, stmt, **kwargs):
+    def __init__(self, cmd, shell=True, capture_output=True, check=False, print_cmd=True, **kwargs):
         import time
         import subprocess
-        self.stmt = stmt
+        self.cmd = cmd
         start = time.time()
-        subprocess.run(self.stmt, **kwargs)
+        self.run = subprocess.run(self.cmd, shell=shell, capture_output=capture_output, check=check, **kwargs)
         self.t = time.time() - start
+
 
 
 def run(cmd, shell=True, capture_output=True, check=False, print_cmd=True, **kwargs):
@@ -47,7 +48,7 @@ def run_mp(cmds, N_CORES=None, **kwargs):
                 results += [proc]
                 if future.exception() is not None:
                     raise future.exception()
-                print(proc.stmt, f"finished in {proc.t:.2f} seconds")
+                print(proc.cmd, f"finished in {proc.t:.2f} seconds")
             except Exception as exc:
                 if kwargs.get("check", False):
                     executor.shutdown(wait=False, cancel_futures=True)
@@ -57,11 +58,20 @@ def run_mp(cmds, N_CORES=None, **kwargs):
         return results
 
 
+def find_on_path(file):
+    import os
+    for dir in os.environ["PATH"].split(os.pathsep):
+        full = os.path.join(dir, file)
+        if os.path.exists(full):
+            return full
+    return ""
+
+
 def binary_exists_on_path(bin):
     """
     https://linux.die.net/man/1/which
     """
-    return run(f"which {bin}").returncode == 0
+    return len(find_on_path(bin))
 
 
 def scan_dir(path, files_only=False, dirs_only=False, drop=[]):

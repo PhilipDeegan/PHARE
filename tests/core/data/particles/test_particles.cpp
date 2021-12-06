@@ -12,6 +12,7 @@
 
 
 #include <string>
+#include "test_interop.h"
 
 
 using namespace PHARE::core;

@@ -66,6 +66,9 @@ option(withCaliper "Use LLNL Caliper" OFF)
 # -DlowResourceTests=ON
 option(lowResourceTests "Disable heavy tests for CI (2d/3d/etc" OFF)
 
+# -DtestDuringBuild=ON # set to true if devMode=ON
+option(testDuringBuild "Runs C++ unit tests after they are built" OFF)
+
 
 # Controlling the activation of tests
 if (NOT DEFINED PHARE_EXEC_LEVEL_MIN)
