@@ -1,3 +1,5 @@
+#ifndef PHARE_TEST_UTILITY_TEST_RANGE_REPLACER_H
+#define PHARE_TEST_UTILITY_TEST_RANGE_REPLACER_H
 
 #include "core/utilities/range/range_replacer.h"
 
@@ -281,9 +283,4 @@ TEST(RangeReplacer, test_replacer_v7)
 } // namespace PHARE::core
 
 
-int main(int argc, char** argv)
-{
-    ::testing::InitGoogleTest(&argc, argv);
-
-    return RUN_ALL_TESTS();
-}
+#endif /*  PHARE_TEST_UTILITY_TEST_RANGE_REPLACER_H  */

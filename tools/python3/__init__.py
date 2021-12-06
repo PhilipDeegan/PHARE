@@ -55,11 +55,20 @@ def run_mp(cmds, N_CORES=None, **kwargs):
         return results
 
 
+def find_on_path(file):
+    import os
+    for dir in os.environ["PATH"].split(os.pathsep):
+        full = os.path.join(dir, file)
+        if os.path.exists(full):
+            return full
+    return ""
+
+
 def binary_exists_on_path(bin):
     """
     https://linux.die.net/man/1/which
     """
-    return run(f"which {bin}").returncode == 0
+    return len(find_on_path(bin))
 
 
 def scan_dir(path, files_only=False, dirs_only=False, drop=[]):
