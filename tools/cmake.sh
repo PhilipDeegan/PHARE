@@ -1,17 +1,20 @@
 #!/usr/bin/env bash
 
-# To ignore this file from git : git update-index --skip-worktree tools/cmake.sh
-#  to re-enable git indexing (changes) for this file use: git update-index --no-skip-worktree tools/cmake.sh
+# usage:
+#  copy this file to tools/cmake.sh - and edit as you wish
+#    tools/cmake.sh is ignored by git
 #
 
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 cd $SCRIPT_DIR && cd .. && CWD=$PWD # move to project root
 exec 19>$CWD/.cmake.sh.cmd # set -x redirect
 export BASH_XTRACEFD=19  # set -x redirect
-THREADS=${THREADS:="$(nproc --all)"}
+THREADS=${THREADS:="11"}
 BUILD_DIR=${BUILD_DIR:="$CWD/build"}
-SAMRAI=${SAMRAI:=""} # "" = as subproject
+SAMRAI=${SAMRAI:="/mkn/r/llnl/samrai/master"} # "" = as subproject
 FFF=("${BUILD_DIR}")
+CMAKE_CONFIG="-DdevMode=OFF -Dasan=OFF -Dbench=OFF -DwithCaliper=OFF -DtestMPI=OFF"
+CMAKE_CXX_FLAGS="-g3 -O3 -DPHARE_DIAG_DOUBLES=1" # -march=native -mtune=native
 set -xe
 time (
   date
@@ -20,8 +23,10 @@ time (
   [ ! -d "$CWD/subprojects/cppdict/include" ] && git submodule update --init
   mkdir -p ${BUILD_DIR}
   [[ -n "${SAMRAI}" ]] && SAMRAI=-DSAMRAI_ROOT="${SAMRAI}"
-  (cd ${BUILD_DIR} && cmake $CWD ${SAMRAI} -G Ninja -DdevMode=ON -Dasan=OFF \
-    -DCMAKE_CXX_FLAGS="-g3 -O3 -march=native -mtune=native -DPHARE_DIAG_DOUBLES=1")
-  ninja -C ${BUILD_DIR} -v -j${THREADS}
+  ( export CC=gcc CXX=g++
+    cd ${BUILD_DIR} && cmake $CWD ${SAMRAI} -G Ninja ${CMAKE_CONFIG} \
+    -DCMAKE_CXX_FLAGS="${CMAKE_CXX_FLAGS}" ) # -DCMAKE_BUILD_TYPE=Release
+  mold --run ninja -C ${BUILD_DIR} -v -j${THREADS} #cpp_etc dictator cpp_sim_2_1_4 phare-exe
+  # (cd build && ctest -j${THREADS})
   date
 ) 1> >(tee $CWD/.cmake.sh.out ) 2> >(tee $CWD/.cmake.sh.err >&2 )

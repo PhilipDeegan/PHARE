@@ -27,6 +27,32 @@
 using namespace PHARE::core;
 
 
+template<std::size_t dim, std::size_t interpOrder>
+struct TestablesBase
+{
+    static constexpr auto interp_order = interpOrder;
+    static constexpr auto dimension    = dim;
+
+    using Interpolator_t = Interpolator<dim, interp_order>;
+};
+
+template<std::size_t dim, std::size_t interpOrder>
+struct Testables : public TestablesBase<dim, interpOrder>
+{
+    using PHARE_TYPES     = PHARE::core::PHARE_Types<dim, interpOrder>;
+    using ParticleArray_t = typename PHARE_TYPES::ParticleArray_t;
+};
+
+template<std::size_t dim, std::size_t interpOrder, std::size_t version_ = 0>
+struct Testables_SOA : public TestablesBase<dim, interpOrder>
+{
+    static constexpr auto version = version_;
+
+    using PHARE_TYPES     = PHARE::core::PHARE_Types<dim, interpOrder>;
+    using ParticleArray_t = typename PHARE_TYPES::ParticleSoA_t;
+};
+
+
 
 template<typename Weighter>
 class AWeighter : public ::testing::Test
@@ -739,21 +765,35 @@ using MyTypes = ::testing::Types<Interpolator<1, 1>, Interpolator<1, 2>, Interpo
 INSTANTIATE_TYPED_TEST_SUITE_P(testInterpolator, ACollectionOfParticles_1d, MyTypes);
 
 
-template<typename Interpolator>
-struct ACollectionOfParticles_2d : public ::testing::Test
+template<typename Testables>
+struct ACollectionOfParticles_2d : public ::testing::Test /*, public Testables*/
 {
+    using Interpolator    = typename Testables::Interpolator_t;
+    using ParticleArray_t = typename Testables::ParticleArray_t;
+
     static constexpr auto interp_order = Interpolator::interp_order;
-    static constexpr std::size_t dim   = 2;
+    static constexpr std::size_t dim   = Testables::dimension;
     static constexpr std::uint32_t nx = 15, ny = 15;
     static constexpr int start = 0, end = 5;
 
-    using PHARE_TYPES     = PHARE::core::PHARE_Types<dim, interp_order>;
-    using NdArray_t       = typename PHARE_TYPES::Array_t;
-    using ParticleArray_t = typename PHARE_TYPES::ParticleArray_t;
-    using GridLayout_t    = typename PHARE_TYPES::GridLayout_t;
+    using PHARE_TYPES  = PHARE::core::PHARE_Types<dim, interp_order>;
+    using NdArray_t    = typename PHARE_TYPES::Array_t;
+    using GridLayout_t = typename PHARE_TYPES::GridLayout_t;
+
+    static PHARE::core::Particle<dim> particle()
+    {
+        return {
+            /*.weight = */ 1,
+            /*.charge = */ 1,
+            /*.iCell  = */ ConstArray<int, dim>(),
+            /*.delta  = */ ConstArray<double, dim>(.5),
+            /*.v      = */ {{2, -1, 1}},
+        };
+    }
 
     ACollectionOfParticles_2d()
-        : rho{"field", HybridQuantity::Scalar::rho, nx, ny}
+        : particles{end * end, particle()}
+        , rho{"field", HybridQuantity::Scalar::rho, nx, ny}
         , vx{"v_x", HybridQuantity::Scalar::Vx, nx, ny}
         , vy{"v_y", HybridQuantity::Scalar::Vy, nx, ny}
         , vz{"v_z", HybridQuantity::Scalar::Vz, nx, ny}
@@ -765,17 +805,12 @@ struct ACollectionOfParticles_2d : public ::testing::Test
 
         for (int i = start; i < end; i++)
             for (int j = start; j < end; j++)
-            {
-                auto& part  = particles.emplace_back();
-                part.iCell  = {i, j};
-                part.delta  = ConstArray<double, dim>(.5);
-                part.weight = 1.;
-                part.v[0]   = +2.;
-                part.v[1]   = -1.;
-                part.v[2]   = +1.;
-            }
+                particles.iCell((i * end) + j) = {i, j};
 
-        interpolator(std::begin(particles), std::end(particles), rho, v, layout);
+        if constexpr (!ParticleArray_t::is_contiguous)
+            interpolator(std::begin(particles), std::end(particles), rho, v, layout);
+        else
+            interpolator.template particleToMesh<Testables::version>(particles, rho, v, layout);
     }
 
     GridLayout_t layout{ConstArray<double, dim>(.1), {nx, ny}, ConstArray<double, dim>(0)};
@@ -801,7 +836,12 @@ TYPED_TEST_P(ACollectionOfParticles_2d, DepositCorrectlyTheirWeight_2d)
 REGISTER_TYPED_TEST_SUITE_P(ACollectionOfParticles_2d, DepositCorrectlyTheirWeight_2d);
 
 
-using My2dTypes = ::testing::Types<Interpolator<2, 1>, Interpolator<2, 2>, Interpolator<2, 3>>;
+using My2dTypes = ::testing::Types<                                         //
+    Testables<2, 1>, Testables<2, 2>, Testables<2, 3>,                      //
+    Testables_SOA<2, 1>, Testables_SOA<2, 2>, Testables_SOA<2, 3>,          //
+    Testables_SOA<2, 1, 1>, Testables_SOA<2, 2, 1>, Testables_SOA<2, 3, 1>, //
+    Testables_SOA<2, 1, 2>, Testables_SOA<2, 2, 2>, Testables_SOA<2, 3, 2>>;
+
 INSTANTIATE_TYPED_TEST_SUITE_P(testInterpolator, ACollectionOfParticles_2d, My2dTypes);
 
 

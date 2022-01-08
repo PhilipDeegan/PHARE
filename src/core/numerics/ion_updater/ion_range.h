@@ -15,6 +15,8 @@ namespace PHARE::core
 template<typename Iterator, typename GridLayout, typename Electromag, typename PopulationView>
 struct IonUpdaterRange : public Range<Iterator>
 {
+    auto static constexpr is_contiguous = Iterator::outer_type::is_contiguous;
+
     using Super    = Range<Iterator>;
     using iterator = Iterator;
 
@@ -36,6 +38,9 @@ struct IonUpdaterRange : public Range<Iterator>
 template<typename IonUpdaterRange_t>
 struct UpdaterParticleRanges
 {
+    using This        = UpdaterParticleRanges<IonUpdaterRange_t>;
+    using ThreadViews = std::vector<std::vector<This>>;
+
     UpdaterParticleRanges(IonUpdaterRange_t& domain_)
         : domain{domain_}
     {
@@ -125,7 +130,7 @@ auto updater_ranges_per_thread(
     using IonUpdaterRange_t
         = IonUpdaterRange<typename ParticleArray::iterator, GridLayout, Electromag, IonPopView>;
     using UpdaterRange_t = UpdaterParticleRanges<IonUpdaterRange_t>;
-    using ThreadViews    = std::vector<std::vector<UpdaterRange_t>>;
+    using ThreadViews    = typename UpdaterRange_t::ThreadViews;
 
     ThreadViews thread_views(n_threads);
     if (views.size() == 0)

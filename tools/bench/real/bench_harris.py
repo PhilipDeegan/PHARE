@@ -6,7 +6,7 @@ cpp_lib("pybindlibs.cpp_sim_2_1_4")
 import pyphare.pharein as ph
 
 seed = 133333333337
-time_step_nbr=1
+time_step_nbr=10
 time_step=0.001
 cells, dl, ppc = 400, .2, 100
 patch_sizes = [12, 100]

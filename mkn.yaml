@@ -26,13 +26,13 @@ profile:
 
 - name: samrai
   self: core
-  dep: llnl.samrai(https://github.com/dekken/llnl.samrai)
+  dep: llnl.samrai(https://github.com/PhilipDeegan/llnl.samrai)
   src: src/amr
   out: phare_amr
 
 - name: diagnostic
   self: samrai
-  dep: hpc.highfive(https://github.com/dekken/hpc.highfive)
+  dep: hpc.highfive(https://github.com/PhilipDeegan/hpc.highfive)
   inc: build/subprojects/highfive/include
        ${MPI_INC}
   lib: ${MPI_LIB}
@@ -42,6 +42,9 @@ profile:
   self: diagnostic
 
 - name: exe
+  parent: base
+  mode: none
+  dep: lang.pybind11
   self: simulator init
   main: src/phare/phare.cpp
   mod: lang.python3
@@ -140,8 +143,9 @@ profile:
 
 
 - name: solver_ppc_bench
+  mode: none
   inc: tools
   self: core
   dep: google.benchmark
-  main: tools/bench/amr/solver/solver_ppc_bench_parallel.cpp
+  main: tools/bench/amr/solver/particle2mesh.cpp #tools/bench/amr/solver/ion_updater_bench.cpp
   link: -pthread

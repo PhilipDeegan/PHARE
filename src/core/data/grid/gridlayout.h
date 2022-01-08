@@ -37,6 +37,7 @@ namespace core
     constexpr bool has_physicalQuantity_v = has_physicalQuantity<T>::value;
 
 
+    // unused now?
     constexpr int centering2int(QtyCentering c) { return static_cast<int>(c); }
 
 

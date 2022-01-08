@@ -255,7 +255,7 @@ public:
 
     auto getParticles(std::string userPopName)
     {
-        using Nested = std::vector<PatchData<core::ContiguousParticles<dimension>, dimension>>;
+        using Nested = std::vector<PatchData<core::ParticleArray_SOA<dimension>, dimension>>;
         using Inner  = std::unordered_map<std::string, Nested>;
 
         std::unordered_map<std::string, Inner> pop_particles;

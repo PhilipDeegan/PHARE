@@ -155,8 +155,8 @@ namespace core
 
         /** move the particle partIn of half a time step and store it in partOut
          */
-        template<typename ParticleIter>
-        void advancePosition_(ParticleIter const& partIn, ParticleIter& partOut)
+        template<typename Particle, typename ParticleIter>
+        void advancePosition_(Particle const& partIn, ParticleIter& partOut)
         {
             // push the particle
             for (std::size_t iDim = 0; iDim < dim; ++iDim)
@@ -169,8 +169,8 @@ namespace core
                 {
                     PHARE_LOG_ERROR("Error, particle moves more than 1 cell, delta >2");
                 }
-                partOut.delta[iDim] = delta - iCell;
-                partOut.iCell[iDim] = static_cast<int>(iCell + partIn.iCell[iDim]);
+                partOut->delta[iDim] = delta - iCell;
+                partOut->iCell[iDim] = static_cast<int>(iCell + partIn.iCell[iDim]);
             }
         }
 
@@ -203,7 +203,7 @@ namespace core
                     currentOut->v      = currentIn.v;
                 }
                 // push the particle
-                advancePosition_(currentIn, *currentOut);
+                advancePosition_(currentIn, currentOut);
                 ++currentOut;
             }
         }

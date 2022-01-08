@@ -58,7 +58,7 @@ def build_batches():
         batches += [load_test_cases_in([DiagnosticsTest], 3)]
         batches += [load_test_cases_in([DiagnosticsTest], 4)]
     else:
-        batches += [load_test_cases_in(test_classes_to_run), int(MPI_RUN)]
+        batches += [load_test_cases_in(test_classes_to_run, int(MPI_RUN))]
     return batches
 
 class CallableTest:
@@ -88,7 +88,7 @@ def print_tests(batches):
 
 if __name__ == "__main__":
     batches = build_batches()
-    batches = [TestBatch([batches[0].tests[0]])]
+    # batches = [TestBatch([batches[0].tests[0]])]
     if PRINT:
         print_tests(batches)
 

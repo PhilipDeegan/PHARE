@@ -1,22 +1,24 @@
 
-#ifndef PHARE_CELLMAP_H
-#define PHARE_CELLMAP_H
-#include <cstddef>
-#include <string>
-#include <iterator>
+#ifndef PHARE_CORE_UTILITIIES_CELLMAP_H
+#define PHARE_CORE_UTILITIIES_CELLMAP_H
+
 #include <array>
-#include <unordered_map>
+#include <string>
 #include <vector>
-#include <algorithm>
+#include <cstddef>
 #include <numeric>
+#include <iterator>
 #include <optional>
+#include <algorithm>
+#include <unordered_map>
 
 
 #include "core/logger.h"
 #include "core/utilities/types.h"
 #include "core/utilities/box/box.h"
 #include "core/utilities/bucketlist.h"
-#include "robin_hood.h"
+
+#include "robin_hood.h" // local directory
 
 
 namespace PHARE::core
@@ -238,8 +240,6 @@ private:
 
     map_t bucketsLists_;
 };
-
-
 
 
 } // namespace PHARE::core

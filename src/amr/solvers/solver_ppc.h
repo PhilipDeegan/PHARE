@@ -35,7 +35,7 @@
 #include "core/numerics/ion_updater/ion_range.h"
 #include "core/numerics/ion_updater/ion_updater.h"
 
-
+#include "core/utilities/thread_pool.hpp"
 
 namespace PHARE::solver
 {
@@ -88,6 +88,7 @@ public:
         , updaterDict{dict["ion_updater"]}
         , n_threads{operating_n_threads(dict)}
     {
+        thread_pool_ = std::make_unique<thread_pool>(n_threads);
     }
 
     virtual ~SolverPPC() = default;
@@ -152,7 +153,6 @@ private:
 
     // extend lifespan
     std::unordered_map<std::string, ParticleArray> tmpDomain;
-    std::unordered_map<std::string, ParticleArray> patchGhost;
 
     using IonPopView   = core::IonPopulationView<ParticleArray, VecFieldT, GridLayout>;
     using IonUpdater_t = core::IonUpdater<typename Electromag::view_t, ParticleArray, GridLayout>;
@@ -161,6 +161,8 @@ private:
     using PatchView = std::tuple<GridLayout, typename Electromag::view_t,
                                  std::vector<std::shared_ptr<IonPopView>>>;
     std::vector<PatchView> ion_patch_views;
+
+    std::unique_ptr<thread_pool> thread_pool_;
 }; // end solverPPC
 
 
@@ -216,10 +218,7 @@ void SolverPPC<HybridModel, AMR_Types>::saveState_(level_t& level, Ions& ions, R
 
         auto _ = rm.setOnPatch(*patch, ions);
         for (auto& pop : ions)
-        {
-            tmpDomain[ss.str() + "_" + pop.name()]  = pop.domainParticles();
-            patchGhost[ss.str() + "_" + pop.name()] = pop.patchGhostParticles();
-        }
+            tmpDomain[ss.str() + "_" + pop.name()] = pop.domainParticles();
     }
 }
 
@@ -234,10 +233,7 @@ void SolverPPC<HybridModel, AMR_Types>::restoreState_(level_t& level, Ions& ions
 
         auto _ = rm.setOnPatch(*patch, ions);
         for (auto& pop : ions)
-        {
-            pop.domainParticles()     = std::move(tmpDomain[ss.str() + "_" + pop.name()]);
-            pop.patchGhostParticles() = std::move(patchGhost[ss.str() + "_" + pop.name()]);
-        }
+            pop.domainParticles() = std::move(tmpDomain[ss.str() + "_" + pop.name()]);
     }
 }
 
@@ -599,12 +595,10 @@ void SolverPPC<HybridModel, AMR_Types>::moveIons_(level_t& level, Ions& ions,
             IonUpdater_t{updaterDict, thread_idx, synchrotron}.updatePopulations(units[thread_idx],
                                                                                  dt, mode);
         };
-        auto threads = PHARE::core::generate(
-            [&](auto i) { return std::thread{[&, i]() { thread_fn(i); }}; }, 1, n_threads);
+        for (std::size_t i = 1; i < n_threads; ++i)
+            thread_pool_->submit([&, i]() { thread_fn(i); });
         thread_fn(0);
-        for (auto& thread : threads)
-            if (thread.joinable())
-                thread.join();
+        thread_pool_->wait_for_tasks();
     }
 
     for (auto& patch : level)
@@ -614,7 +608,12 @@ void SolverPPC<HybridModel, AMR_Types>::moveIons_(level_t& level, Ions& ions,
         rm.setTime(ions, *patch, newTime);
     }
 
-    fromCoarser.fillIonGhostParticles(ions, level, newTime);
+    if (mode == core::UpdaterMode::all)
+    {
+        // during "mode == domain_only" we copy patch ghost so the original are not modified
+        fromCoarser.fillIonGhostParticles(ions, level, newTime);
+    }
+
     fromCoarser.fillIonMomentGhosts(ions, level, currentTime, newTime);
 
     for (auto& patch : level)

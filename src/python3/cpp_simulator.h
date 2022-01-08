@@ -46,11 +46,11 @@ void declarePatchData(py::module& m, std::string key)
 template<std::size_t dim>
 void declareDim(py::module& m)
 {
-    using CP         = core::ContiguousParticles<dim>;
-    std::string name = "ContiguousParticles_" + std::to_string(dim);
+    using CP         = core::ParticleArray_SOA<dim>;
+    std::string name = "ParticleArray_SOA_" + std::to_string(dim);
     py::class_<CP, std::shared_ptr<CP>>(m, name.c_str())
         .def(py::init<std::size_t>())
-        .def_readwrite("iCell", &CP::iCell)
+        .def_readwrite("iCell", &CP::iCell_)
         .def_readwrite("delta", &CP::delta)
         .def_readwrite("weight", &CP::weight)
         .def_readwrite("charge", &CP::charge)

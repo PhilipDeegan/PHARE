@@ -1,12 +1,11 @@
 #ifndef PHARE_CORE_DATA_PARTICLE_PACKER_H
 #define PHARE_CORE_DATA_PARTICLE_PACKER_H
 
-
 #include <cstddef>
-#include <vector>
 
-#include "particle.h"
-#include "particle_array.h"
+#include "core/data/particles/particle.h"
+#include "core/data/particles/particle_array.h"
+#include "core/data/particles/particle_array_soa.h"
 
 namespace PHARE::core
 {
@@ -37,10 +36,11 @@ public:
     bool hasNext() const { return it_ < particles_.size(); }
     auto next() { return get(it_++); }
 
-    void pack(ContiguousParticles<dim>& copy)
+    template<typename ParticleArray_SOA_t>
+    void pack(ParticleArray_SOA_t& copy)
     {
         auto copyTo = [](auto& a, auto& idx, auto size, auto& v) {
-            std::copy(a.begin(), a.begin() + size, v.begin() + (idx * size));
+            std::copy(a.begin(), a.begin() + size, &v[idx]);
         };
         std::size_t idx = 0;
         while (this->hasNext())
@@ -48,9 +48,9 @@ public:
             auto next        = this->next();
             copy.weight[idx] = std::get<0>(next);
             copy.charge[idx] = std::get<1>(next);
-            copyTo(std::get<2>(next), idx, dim, copy.iCell);
-            copyTo(std::get<3>(next), idx, dim, copy.delta);
-            copyTo(std::get<4>(next), idx, 3, copy.v);
+            copy.iCell_[idx] = std::get<2>(next);
+            copy.delta[idx]  = std::get<3>(next);
+            copy.v[idx]      = std::get<4>(next);
             idx++;
         }
     }
@@ -60,6 +60,16 @@ private:
     std::size_t it_ = 0;
     static inline std::array<std::string, 5> keys_{"weight", "charge", "iCell", "delta", "v"};
 };
+
+
+
+template<std::size_t dim, bool _const_, bool OwnedState>
+template<bool OS, typename /*enable_if_t*/>
+ParticleArray_SOA<dim, _const_, OwnedState>::ParticleArray_SOA(ParticleArray<dim> const& particles)
+    : ParticleArray_SOA{particles.size()}
+{
+    ParticlePacker<dim>{particles}.pack(*this);
+}
 
 
 } // namespace PHARE::core

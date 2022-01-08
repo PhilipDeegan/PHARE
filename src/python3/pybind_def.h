@@ -64,6 +64,14 @@ core::Span<T> makeSpan(py_array_t<T> const& py_array)
     return {static_cast<T*>(ar_info.ptr), ndSize(ar_info)};
 }
 
+template<typename T>
+core::Span<T> makeSpan(py_array_t<T>& py_array)
+{
+    auto ar_info = py_array.request();
+    assert(ar_info.ptr);
+    return {static_cast<T*>(ar_info.ptr), ndSize(ar_info)};
+}
+
 
 } // namespace PHARE::pydata
 

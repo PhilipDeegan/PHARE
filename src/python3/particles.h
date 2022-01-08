@@ -7,14 +7,15 @@
 #include "amr/data/particles/refine/particles_data_split.h"
 #include "core/data/particles/particle_packer.h"
 #include "core/data/particles/particle.h"
+#include "core/data/particles/particles.h"
 #include "core/utilities/types.h"
 
 #include "python3/pybind_def.h"
 
 namespace PHARE::pydata
 {
-template<std::size_t dim, typename PyArrayTuple>
-core::ContiguousParticlesView<dim> contiguousViewFrom(PyArrayTuple const& py_particles)
+template<std::size_t dim, bool _const_ = false, typename PyArrayTuple>
+core::ParticleArray_SOAView<dim, _const_> contiguousViewFrom(PyArrayTuple& py_particles)
 {
     return {makeSpan<int>(std::get<0>(py_particles)),     // iCell
             makeSpan<double>(std::get<1>(py_particles)),  // delta
@@ -67,7 +68,7 @@ pyarray_particles_t splitPyArrayParticles(pyarray_particles_crt const& py_partic
 
     PHARE_DEBUG_DO(assertParticlePyArraySizes<dim>(py_particles));
 
-    auto particlesInView  = contiguousViewFrom<dim>(py_particles);
+    auto particlesInView  = contiguousViewFrom<dim, true>(py_particles);
     auto particlesOut     = makePyArrayTuple<dim>(particlesInView.size() * nbRefinedPart);
     auto particlesOutView = contiguousViewFrom<dim>(particlesOut);
 

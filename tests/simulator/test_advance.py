@@ -155,7 +155,7 @@ class AdvanceTestBase(SimulatorTest):
                                     write_timestamps=timestamps,
                                     population_name=pop)
 
-        Simulator(global_vars.sim).run()
+        Simulator(global_vars.sim).run().reset()
 
         eb_hier = None
         if qty in ["e", "eb", "fields"]:
@@ -264,6 +264,7 @@ class AdvanceTestBase(SimulatorTest):
         diag_outputs=f"phare_overlapped_particledatas_have_identical_particles/{ndim}/{interp_order}/{self.ddt_test_id()}"
         datahier = self.getHierarchy(interp_order, refinement_boxes, "particles", diag_outputs=diag_outputs, ndim=ndim,
                                       time_step=time_step, time_step_nbr=time_step_nbr, nbr_part_per_cell=ppc, **kwargs)
+        if cpp.mpi_rank() > 0: return
 
         for time_step_idx in range(time_step_nbr + 1):
             coarsest_time =  time_step_idx * time_step
@@ -311,6 +312,7 @@ class AdvanceTestBase(SimulatorTest):
         datahier = self.getHierarchy(interp_order, None, "particles", diag_outputs=diag_outputs,
                                   time_step=time_step, time_step_nbr=time_step_nbr,
                                   nbr_part_per_cell=ppc, cells=cells, ndim=ndim)
+        if cpp.mpi_rank() > 0: return
 
         for time_step_idx in range(time_step_nbr + 1):
             coarsest_time =  time_step_idx * time_step
@@ -337,6 +339,7 @@ class AdvanceTestBase(SimulatorTest):
                                       extra_diag_options={"fine_dump_lvl_max": 10},
                                       time_step_nbr=time_step_nbr, model_init={"seed": 222},
                                       largest_patch_size=30, ndim=dim, **kwargs)
+        if cpp.mpi_rank() > 0: return
 
         lvl_steps = global_vars.sim.level_time_steps
         print("LEVELSTEPS === ", lvl_steps)
@@ -523,6 +526,7 @@ class AdvanceTestBase(SimulatorTest):
         L0L1_datahier = _getHier(
           f"phare_lvl_ghost_interpolation_L0L1_diags/{ndim}/{interp_order}/{self.ddt_test_id()}", refinement_boxes
         )
+        if cpp.mpi_rank() > 0: return
 
         quantities = [f"{EM}{xyz}" for EM in ["E", "B"] for xyz in ["x", "y", "z"]]
         checks = self.base_test_field_level_ghosts_via_subcycles_and_coarser_interpolation(L0_datahier, L0L1_datahier, quantities)

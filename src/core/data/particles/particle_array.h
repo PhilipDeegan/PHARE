@@ -9,6 +9,7 @@
 #include "particle.h"
 #include "core/utilities/point/point.h"
 #include "core/utilities/cellmap.h"
+#include "core/utilities/iterators.h"
 #include "core/logger.h"
 
 namespace PHARE::core
@@ -20,14 +21,23 @@ public:
     static constexpr bool is_contiguous              = false;
     static constexpr auto dimension                  = dim;
     static constexpr std::size_t cellmap_bucket_size = 100;
+    using This                                       = ParticleArray<dim>;
     using Particle_t                                 = Particle<dim>;
     using Vector                                     = std::vector<Particle_t>;
-    using iterator                                   = typename Vector::iterator;
     using value_type                                 = Particle_t;
     using box_t                                      = Box<int, dim>;
 
+    using iterator       = wrapped_iterator<This, Vector>;
+    using const_iterator = wrapped_iterator<This const, Vector>;
+
 private:
     using cell_map_t = CellMap<dim, Particle_t, cellmap_bucket_size, int, Point<int, dim>>;
+
+    template<typename S>
+    bool _check(S i) // templated so doesn't exist in release mode
+    {
+        return i < size();
+    }
 
 public:
     ParticleArray() {}
@@ -40,6 +50,18 @@ public:
         : particles_(size, particle)
     {
     }
+
+    auto& iCell(std::size_t i) const
+    {
+        assert(_check(i));
+        return particles_[i].iCell;
+    }
+    auto& iCell(std::size_t i)
+    {
+        assert(_check(i));
+        return particles_[i].iCell;
+    }
+
 
     std::size_t size() const { return particles_.size(); }
     std::size_t capacity() const { return particles_.capacity(); }
@@ -60,25 +82,26 @@ public:
         return particles_.resize(newSize);
     }
 
-    auto const& operator[](std::size_t i) const { return particles_[i]; }
+    auto& operator[](std::size_t i) const { return particles_[i]; }
+    auto& operator[](std::size_t i) { return particles_[i]; }
 
     bool operator==(ParticleArray<dim> const& that) const
     {
         return (this->particles_ == that.particles_);
     }
 
-    auto begin() const { return particles_.begin(); }
+    auto begin() const { return const_iterator{particles_.begin(), this}; }
     auto begin()
     {
         clean_ = false;
-        return particles_.begin();
+        return iterator{particles_.begin(), this};
     }
 
-    auto end() const { return particles_.end(); }
+    auto end() const { return const_iterator{particles_.end(), this}; }
     auto end()
     {
         clean_ = false;
-        return particles_.end();
+        return iterator{particles_.end(), this};
     }
 
     template<class InputIterator>
@@ -104,10 +127,11 @@ public:
         clean_ = false;
         return particles_.erase(position);
     }
-    iterator erase(iterator first, iterator last)
+    iterator erase(typename iterator::iterator_t first, typename iterator::iterator_t last)
     {
         clean_ = false;
-        return particles_.erase(first, last);
+        // return particles_.erase(first, last);
+        return iterator{particles_.erase(first, last), this};
     }
 
     Particle_t& emplace_back()
@@ -242,6 +266,7 @@ namespace core
 
 } // namespace core
 } // namespace PHARE
+
 
 
 #endif

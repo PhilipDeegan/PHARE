@@ -27,7 +27,6 @@ struct Box
 {
     Point<Type, dim> lower;
     Point<Type, dim> upper;
-    // std::array<Type, dim> shape;
 
     Box() = default;
     // TODO Ctor with intializer_list would allow not {{},{}}
@@ -60,8 +59,6 @@ struct Box
     }
 
     bool isEmpty() const { return (*this) == Box{}; }
-
-    auto nbrItems(std::size_t dir) const { return shape[dir]; }
 
     auto copy() { return *this; }
 
@@ -199,11 +196,8 @@ public:
     {
     }
 
-public:
-    Point<Type, dim> operator*() { return index_; }
 
-
-    void increment(std::size_t idim)
+    void increment(std::size_t const idim)
     {
         index_[idim]++;
         if (idim == 0)
@@ -237,6 +231,7 @@ public:
         return box_ != other.box_ or index_ != other.index_;
     }
 
+    Point<Type, dim> operator*() const { return index_; }
 
 private:
     Box<Type, dim> const* box_;

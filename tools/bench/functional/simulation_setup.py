@@ -27,6 +27,7 @@ def setup(**kwargs):
     _, time_step, final_time = ph.simulation.check_time(**kwargs)
 
     sim = ph.Simulation(
+        threads=kwargs.get("threads", 1),
         interp_order=kwargs.get("interp_order", 1),
         smallest_patch_size=smallest_patch_size,
         largest_patch_size=largest_patch_size,

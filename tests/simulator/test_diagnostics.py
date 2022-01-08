@@ -130,14 +130,15 @@ class DiagnosticsTest(unittest.TestCase):
 
     @data(*_test_cases)
     @unpack
-    def test_dump_diags(self, dim, interp, simInput):
+    def test_dump_diags(self, dim, interp, simInput_original):
         test_id = self.ddt_test_id()
+        simInput = simInput_original.copy() # save backup as we modify it below
 
         # configure simulation dim sized values
         for key in ["cells", "dl", "boundary_types"]:
-            simInput[key] = [simInput[key] for d in range(dim)]
+            simInput[key] = [simInput[key]]  * dim
 
-        b0 = [[10 for i in range(dim)], [19 for i in range(dim)]]
+        b0 = [[10] * dim, [19] * dim]
         simInput["refinement_boxes"] = {"L0": {"B0": b0}}
 
         py_attrs = [f"{dep}_version" for dep in ["samrai", "highfive", "pybind"] ]
@@ -149,6 +150,8 @@ class DiagnosticsTest(unittest.TestCase):
             local_out = f"{out}_dim{dim}_interp{interp}_mpi_n_{cpp.mpi_size()}_id{test_id}"
             simInput["diag_options"]["options"]["dir"] = local_out
 
+            print("test cells", simInput["cells"])
+            print("test dl", simInput["dl"])
             simulation = ph.Simulation(**simInput)
             self.assertTrue(len(simulation.cells) == dim)
 

@@ -23,18 +23,17 @@ namespace PHARE::core
 {
 enum class UpdaterMode { domain_only = 1, all = 2 };
 
-template<typename Electromag, typename ParticleArray, typename GridLayout>
+template<typename Electromag, typename ParticleArray, typename GridLayout, bool atomic = true>
 class IonUpdater
 {
 public:
-    static constexpr bool atomic_interp      = true;
     static constexpr std::size_t def_op_size = 1e6;
 
     static constexpr auto dimension    = GridLayout::dimension;
     static constexpr auto interp_order = GridLayout::interp_order;
 
     using Box               = PHARE::core::Box<int, dimension>;
-    using Interpolator      = PHARE::core::Interpolator<dimension, interp_order, atomic_interp>;
+    using Interpolator      = PHARE::core::Interpolator<dimension, interp_order, atomic>;
     using PartIterator      = typename ParticleArray::iterator;
     using BoundaryCondition = PHARE::core::BoundaryCondition<dimension, interp_order>;
     using Pusher            = PHARE::core::Pusher<dimension, PartIterator, Electromag, Interpolator,
@@ -114,10 +113,11 @@ private:
 
 
 
-template<typename Electromag, typename ParticleArray, typename GridLayout>
+template<typename Electromag, typename ParticleArray, typename GridLayout, bool atomic>
 template<typename Ions>
-void IonUpdater<Electromag, ParticleArray, GridLayout>::updatePopulations(Ions& ions, double dt,
-                                                                          UpdaterMode mode)
+void IonUpdater<Electromag, ParticleArray, GridLayout, atomic>::updatePopulations(Ions& ions,
+                                                                                  double dt,
+                                                                                  UpdaterMode mode)
 {
     PHARE_LOG_SCOPE("IonUpdater::updatePopulations");
 
@@ -135,10 +135,10 @@ void IonUpdater<Electromag, ParticleArray, GridLayout>::updatePopulations(Ions& 
 
 
 
-template<typename Electromag, typename ParticleArray, typename GridLayout>
+template<typename Electromag, typename ParticleArray, typename GridLayout, bool atomic>
 template<typename Ions>
-void IonUpdater<Electromag, ParticleArray, GridLayout>::updateIons(Ions& ions,
-                                                                   GridLayout const& layout)
+void IonUpdater<Electromag, ParticleArray, GridLayout, atomic>::updateIons(Ions& ions,
+                                                                           GridLayout const& layout)
 {
     fixMomentGhosts(ions, layout);
     ions.computeDensity();
@@ -146,12 +146,10 @@ void IonUpdater<Electromag, ParticleArray, GridLayout>::updateIons(Ions& ions,
 }
 
 
-template<typename Electromag, typename ParticleArray, typename GridLayout>
+template<typename Electromag, typename ParticleArray, typename GridLayout, bool atomic>
 template<typename ParticleRanges, typename Selector>
-auto& IonUpdater<Electromag, ParticleArray, GridLayout>::push_domain(ParticleRanges& particles,
-                                                                     Selector& selector,
-                                                                     Electromag const& em,
-                                                                     GridLayout const& layout)
+auto& IonUpdater<Electromag, ParticleArray, GridLayout, atomic>::push_domain(
+    ParticleRanges& particles, Selector& selector, Electromag const& em, GridLayout const& layout)
 {
     auto& pop = *particles.domain.view;
 
@@ -174,13 +172,13 @@ auto& IonUpdater<Electromag, ParticleArray, GridLayout>::push_domain(ParticleRan
 
 
 
-template<typename Electromag, typename ParticleArray, typename GridLayout>
+template<typename Electromag, typename ParticleArray, typename GridLayout, bool atomic>
 template<typename ParticleRanges>
 /**
- * @brief IonUpdater<Electromag, ParticleArray, GridLayout>::updateAndDepositDomain_
+ * @brief IonUpdater<Electromag, ParticleArray, GridLayout, atomic>::updateAndDepositDomain_
    evolves moments from time n to n+1 without updating particles, which stay at time n
  */
-void IonUpdater<Electromag, ParticleArray, GridLayout>::updateAndDepositDomain_(
+void IonUpdater<Electromag, ParticleArray, GridLayout, atomic>::updateAndDepositDomain_(
     ParticleRanges& particles, Electromag const& em, GridLayout const& layout)
 {
     PHARE_LOG_SCOPE("IonUpdater::updateAndDepositDomain_");
@@ -249,13 +247,13 @@ void IonUpdater<Electromag, ParticleArray, GridLayout>::updateAndDepositDomain_(
 }
 
 
-template<typename Electromag, typename ParticleArray, typename GridLayout>
+template<typename Electromag, typename ParticleArray, typename GridLayout, bool atomic>
 template<typename ParticleRanges>
 /**
- * @brief IonUpdater<Electromag, ParticleArray, GridLayout>::updateAndDepositDomain_
+ * @brief IonUpdater<Electromag, ParticleArray, GridLayout, atomic>::updateAndDepositDomain_
    evolves moments and particles from time n to n+1
  */
-void IonUpdater<Electromag, ParticleArray, GridLayout>::updateAndDepositAll_(
+void IonUpdater<Electromag, ParticleArray, GridLayout, atomic>::updateAndDepositAll_(
     ParticleRanges& particles, Electromag const& em, GridLayout const& layout)
 {
     PHARE_LOG_SCOPE("IonUpdater::updateAndDepositAll_");

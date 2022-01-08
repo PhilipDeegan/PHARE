@@ -69,6 +69,7 @@ def check_domain(**kwargs):
         domain_size = phare_utilities.listify(kwargs['domain_size'])
         dl = [dom_size / float(n) for dom_size, n in zip(domain_size, cells)]
 
+
     for n, d in zip(cells, dl):
         if n != 0 and n < 10:
             raise ValueError("Error: number of cells in non-invariant directions should be >= 10")
@@ -300,7 +301,7 @@ def check_refinement_boxes(ndim, **kwargs):
                 raise ValueError(f"Box({box}) is incompatible with coarser boxes({refined_coarser_boxes}) and nest_buffer({nesting_buffer})")
 
             if box.ndim != ndim:
-                raise ValueError(f"Box({box}) has incorrect dimensions for simulation")
+                raise ValueError(f"Box({box}) has incorrect dimensions for simulation {ndim}")
             for l in boxm.refine(box, refinement_ratio).shape:
                 if (l < smallest_patch_size).any():
                     raise ValueError("Invalid box incompatible with smallest_patch_size")
@@ -341,9 +342,6 @@ def check_patch_size(ndim, **kwargs):
 
         if largest_patch_size.size != ndim:
             raise ValueError(f"Error: largest_patch_size({largest_patch_size.size}) must be size {ndim}")
-
-        if (largest_patch_size > cells).any():
-            raise ValueError("Error - largest_patch_size should be less than nbr of cells in all directions")
 
         if (largest_patch_size <= 0).any():
             raise ValueError("Error - largest_patch_size cannot be <= 0")
@@ -402,11 +400,7 @@ def check_nesting_buffer(ndim, **kwargs):
 
     cells = np.asarray(kwargs["cells"])
 
-    if largest_patch_size is not None and (nesting_buffer > (cells - largest_patch_size)).any():
-      raise ValueError(f"Error: nesting_buffer({nesting_buffer})"
-                        + f"incompatible with number of domain cells ({cells}) and largest_patch_size({largest_patch_size})")
-
-    elif (nesting_buffer > cells).any():
+    if (nesting_buffer > cells).any():
         raise ValueError(f"Error: nesting_buffer({nesting_buffer}) incompatible with number of domain cells ({cells})")
 
     return nesting_buffer

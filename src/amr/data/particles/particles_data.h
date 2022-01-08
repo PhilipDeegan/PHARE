@@ -161,9 +161,9 @@ namespace amr
             // throws if fails
             auto& pSource = dynamic_cast<ParticlesData const&>(source);
 
-            SAMRAI::hier::Box const& sourceBox  = pSource.getBox();
-            SAMRAI::hier::Box const& myGhostBox = getGhostBox();
-            const SAMRAI::hier::Box intersectionBox{sourceBox * myGhostBox};
+            auto const& sourceBox  = pSource.getBox();
+            auto const& myGhostBox = getGhostBox();
+            auto const intersectionBox{sourceBox * myGhostBox};
 
             if (!intersectionBox.empty())
             {
@@ -197,8 +197,8 @@ namespace amr
             auto& pSource  = dynamic_cast<ParticlesData const&>(source);
             auto& pOverlap = dynamic_cast<SAMRAI::pdat::CellOverlap const&>(overlap);
 
-            SAMRAI::hier::Transformation const& transformation = pOverlap.getTransformation();
-            SAMRAI::hier::BoxContainer const& boxList = pOverlap.getDestinationBoxContainer();
+            auto const& transformation = pOverlap.getTransformation();
+            auto const& boxList        = pOverlap.getDestinationBoxContainer();
             for (auto const& overlapBox : boxList)
             {
                 copy_(overlapBox, pSource, transformation);
@@ -261,9 +261,8 @@ namespace amr
             }
             else
             {
-                SAMRAI::hier::Transformation const& transformation = pOverlap.getTransformation();
-                SAMRAI::hier::BoxContainer const& boxContainer
-                    = pOverlap.getDestinationBoxContainer();
+                auto const& transformation = pOverlap.getTransformation();
+                auto const& boxContainer   = pOverlap.getDestinationBoxContainer();
                 pack_(pOverlap, transformation, outBuffer);
                 stream << outBuffer.size();
                 stream.growBufferAsNeeded();
@@ -303,18 +302,17 @@ namespace amr
                 // ok now our goal is to put the particles we have just unpacked
                 // into the particleData and in the proper particleArray : interior or ghost
 
-                SAMRAI::hier::Transformation const& transformation = pOverlap.getTransformation();
+                auto const& transformation = pOverlap.getTransformation();
                 if (transformation.getRotation() == SAMRAI::hier::Transformation::NO_ROTATE)
                 {
                     // we loop over all boxes in the overlap
                     // we have to first take the intersection of each of these boxes
                     // with our ghostBox. This is where unpacked particles should go.
 
-                    SAMRAI::hier::BoxContainer const& overlapBoxes
-                        = pOverlap.getDestinationBoxContainer();
+                    auto const& overlapBoxes = pOverlap.getDestinationBoxContainer();
 
-                    auto myBox      = getBox();
-                    auto myGhostBox = getGhostBox();
+                    auto const myBox      = getBox();
+                    auto const myGhostBox = getGhostBox();
 
                     for (auto const& overlapBox : overlapBoxes)
                     {
@@ -372,19 +370,19 @@ namespace amr
 
         void copy_(SAMRAI::hier::Box const& overlapBox, ParticlesData const& sourceData)
         {
-            auto myDomainBox         = this->getBox();
+            auto const myDomainBox   = this->getBox();
             auto& srcDomainParticles = sourceData.domainParticles;
 
             PHARE_LOG_START("ParticleData::copy_ DomainToDomain");
 
             // first copy particles that fall into our domain array
             // they can come from the source domain or patch ghost
-            auto destBox  = myDomainBox * overlapBox;
-            auto new_size = domainParticles.size();
+            auto const destBox = myDomainBox * overlapBox;
+            auto new_size      = domainParticles.size();
 
             if (!destBox.empty())
             {
-                Box<int, dim> destBox_p{destBox};
+                Box<int, dim> const destBox_p{destBox};
                 new_size += srcDomainParticles.nbr_particles_in(destBox_p);
                 if (domainParticles.capacity() < new_size)
                     domainParticles.reserve(new_size);
@@ -407,7 +405,7 @@ namespace amr
             {
                 if (!selectionBox.empty())
                 {
-                    Box<int, dim> selectionBox_p{selectionBox};
+                    Box<int, dim> const selectionBox_p{selectionBox};
                     new_size += srcDomainParticles.nbr_particles_in(selectionBox_p);
                 }
             }
@@ -419,7 +417,7 @@ namespace amr
             {
                 if (!selectionBox.empty())
                 {
-                    Box<int, dim> selectionBox_p{selectionBox};
+                    Box<int, dim> const selectionBox_p{selectionBox};
                     srcDomainParticles.export_particles(selectionBox_p, patchGhostParticles);
                 }
             }
@@ -429,17 +427,17 @@ namespace amr
         void copy_(SAMRAI::hier::Box const& overlapBox, ParticlesData const& sourceData,
                    SAMRAI::hier::Transformation const& transformation)
         {
-            auto myDomainBox         = this->getBox();
+            auto const myDomainBox   = this->getBox();
             auto& srcDomainParticles = sourceData.domainParticles;
 
             PHARE_LOG_START("ParticleData::copy_ (transform)");
 
             // first copy particles that fall into our domain array
             // they can come from the source domain or patch ghost
-            auto destBox  = myDomainBox * overlapBox;
-            auto new_size = domainParticles.size();
-            auto offset   = transformation.getOffset();
-            auto offseter = [&](auto const& particle) {
+            auto destBox        = myDomainBox * overlapBox;
+            auto const offset   = transformation.getOffset();
+            auto new_size       = domainParticles.size();
+            auto const offseter = [&](auto const& particle) {
                 // we make a copy because we do not want to
                 // shift the original particle...
                 auto shiftedParticle{particle};
@@ -463,7 +461,7 @@ namespace amr
                 // since a *transformation* is from source to destination.
 
                 transformation.inverseTransform(destBox);
-                Box<int, dim> destBox_p{destBox};
+                Box<int, dim> const destBox_p{destBox};
                 new_size += srcDomainParticles.nbr_particles_in(destBox_p);
 
                 if (domainParticles.capacity() < new_size)
@@ -487,7 +485,7 @@ namespace amr
                 if (!selectionBox.empty())
                 {
                     transformation.inverseTransform(selectionBox);
-                    Box<int, dim> selectionBox_p{selectionBox};
+                    Box<int, dim> const selectionBox_p{selectionBox};
                     new_size += srcDomainParticles.nbr_particles_in(selectionBox_p);
                 }
             }

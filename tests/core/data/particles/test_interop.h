@@ -2,6 +2,7 @@
 
 #include "core/utilities/types.h"
 #include "core/data/particles/particle.h"
+#include "core/data/particles/particles.h"
 #include "core/data/particles/particle_array.h"
 #include "core/data/particles/particle_packer.h"
 
@@ -25,7 +26,7 @@ TYPED_TEST(ParticleListTest, SoAandAoSInterop)
     constexpr auto dim         = Particle::dimension;
     constexpr std::size_t size = 10;
 
-    ContiguousParticles<dim> contiguous{size};
+    ParticleArray_SOA<dim> contiguous{size};
     for (std::size_t i = 0; i < size; i++)
     {
         auto view   = contiguous[i];
@@ -55,7 +56,7 @@ TYPED_TEST(ParticleListTest, SoAandAoSInterop)
     EXPECT_EQ(particleArray.size(), size);
     EXPECT_EQ(contiguous.size(), particleArray.size());
 
-    ContiguousParticles<dim> AoSFromSoA{particleArray.size()};
+    ParticleArray_SOA<dim> AoSFromSoA{particleArray.size()};
     ParticlePacker<dim>{particleArray}.pack(AoSFromSoA);
 
     std::size_t i = 0;

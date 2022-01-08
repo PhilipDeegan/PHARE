@@ -9,6 +9,8 @@ class RunTimer:
         start = time.time()
         self.run = subprocess.run(self.cmd, shell=shell, capture_output=capture_output, check=check, **kwargs)
         self.t = time.time() - start
+        self.stdout = self.run.stdout
+        self.stderr = self.run.stderr
 
 
 
@@ -99,3 +101,4 @@ def pushd(new_cwd):
         yield
     finally:
         os.chdir(cwd)
+

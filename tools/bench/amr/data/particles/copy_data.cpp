@@ -3,11 +3,9 @@
 #define PHARE_HAS_HIGHFIVE 0
 #endif
 
-
 #include "bench/core/bench.h"
 
 #include "amr/data/particles/particles_data.h"
-
 #include "amr/utilities/box/amr_box.h"
 
 #include "phare/phare.h" // samrai lifecycle

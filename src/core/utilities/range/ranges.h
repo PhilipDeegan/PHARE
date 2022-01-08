@@ -15,20 +15,25 @@ namespace PHARE::core
 template<typename Container, typename Iterator = typename Container::iterator>
 auto ranges(Container& container, std::size_t batch_size, std::size_t offset = 0)
 {
-    auto size            = container.size() - offset;
-    auto modulo          = size % batch_size;
+    // using Iterator = std::conditional_t<std::is_const_v<decltype(container)>, typename
+    // Container::const_iterator, typename Container::iterator>;
+
+    std::size_t size     = container.size() - offset;
+    std::size_t modulo   = size % batch_size;
     std::size_t n_ranges = size / batch_size;
-    std::vector<Range<Iterator>> ranges(n_ranges + (modulo > 0 ? 1 : 0));
+    std::vector<Range<Iterator>> ranges;
+    ;
+    ranges.reserve(n_ranges + (modulo > 0 ? 1 : 0));
     auto begin = container.begin();
     for (std::size_t i = 0; i < n_ranges; ++i)
     {
-        begin     = container.begin() + offset + i * batch_size;
-        ranges[i] = makeRange(begin, begin + batch_size);
+        begin = container.begin() + offset + i * batch_size;
+        ranges.emplace_back(makeRange(begin, begin + batch_size));
     }
     if (modulo > 0)
     {
-        begin                     = container.begin() + offset + n_ranges * batch_size;
-        ranges[ranges.size() - 1] = makeRange(begin, begin + modulo);
+        begin = container.begin() + offset + n_ranges * batch_size;
+        ranges.emplace_back(makeRange(begin, begin + modulo));
     }
     return ranges;
 }

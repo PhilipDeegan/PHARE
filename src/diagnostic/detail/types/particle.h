@@ -153,7 +153,6 @@ void ParticlesDiagnosticWriter<H5Writer>::initDataSets(
         });
         this->writeGhostsAttr_(h5file, path, core::ghostWidthForParticles<interpOrder>(), null);
     };
-
     auto initIfActive = [&](auto& lvl, auto& tree, auto& attr, auto& pop, auto& patch, auto var) {
         if (diagnostic.quantity == tree + var)
             initDataSet(lvl, patch, patch.empty() ? attr : attr[pop][var]);
@@ -184,15 +183,19 @@ void ParticlesDiagnosticWriter<H5Writer>::write(DiagnosticProperties& diagnostic
 
         auto& h5file = *fileData_.at(diagnostic.quantity);
         Packer packer(particles);
-        core::ContiguousParticles<dimension> copy{particles.size()};
+        core::ParticleArray_SOA<dimension> copy{particles.size()};
         packer.pack(copy);
 
 
         h5file.template write_data_set_flat<2>(path + packer.keys()[0], copy.weight.data());
         h5file.template write_data_set_flat<2>(path + packer.keys()[1], copy.charge.data());
-        h5file.template write_data_set_flat<2>(path + packer.keys()[2], copy.iCell.data());
-        h5file.template write_data_set_flat<2>(path + packer.keys()[3], copy.delta.data());
-        h5file.template write_data_set_flat<2>(path + packer.keys()[4], copy.v.data());
+        // h5file.template write_data_set_flat<2>(path + packer.keys()[2], &copy.iCell_.data()[0]);
+        // h5file.template write_data_set_flat<2>(path + packer.keys()[3], &copy.delta.data()[0]);
+        // h5file.template write_data_set_flat<2>(path + packer.keys()[4], &copy.v.data()[0]);
+
+        h5file.template write_data_set(path + packer.keys()[2], copy.iCell_.data());
+        h5file.template write_data_set(path + packer.keys()[3], copy.delta.data());
+        h5file.template write_data_set(path + packer.keys()[4], copy.v.data());
     };
 
     auto checkWrite = [&](auto& tree, auto pType, auto& ps) {

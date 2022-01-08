@@ -10,7 +10,7 @@
 #include "core/data/ions/ions.h"
 #include "core/data/ions/particle_initializers/maxwellian_particle_initializer.h"
 #include "core/data/ndarray/ndarray_vector.h"
-#include "core/data/particles/particle_array.h"
+#include "core/data/particles/particles.h"
 #include "core/data/vecfield/vecfield.h"
 #include "core/models/physical_state.h"
 #include "core/utilities/meta/meta_utilities.h"
@@ -43,7 +43,7 @@ struct PHARE_Types
     using Particle_t      = PHARE::core::Particle<dimension>;
     using ParticleAoS_t   = PHARE::core::ParticleArray<dimension>;
     using ParticleArray_t = ParticleAoS_t;
-    using ParticleSoA_t   = PHARE::core::ContiguousParticles<dimension>;
+    using ParticleSoA_t   = PHARE::core::ParticleArray_SOA_t<dimension>;
 
 
     using MaxwellianParticleInitializer_t
