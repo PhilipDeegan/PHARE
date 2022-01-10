@@ -13,7 +13,7 @@ THREADS=${THREADS:="11"}
 BUILD_DIR=${BUILD_DIR:="$CWD/build"}
 SAMRAI=${SAMRAI:="/mkn/r/llnl/samrai/master"} # "" = as subproject
 FFF=("${BUILD_DIR}")
-CMAKE_CONFIG="-DdevMode=OFF -Dasan=OFF -Dbench=OFF -DwithCaliper=OFF -DtestMPI=OFF"
+CMAKE_CONFIG="-DdevMode=ON -Dasan=OFF -Dbench=OFF -DwithCaliper=OFF -DtestMPI=OFF"
 CMAKE_CXX_FLAGS="-g3 -O3 -DPHARE_DIAG_DOUBLES=1" # -march=native -mtune=native
 set -xe
 time (

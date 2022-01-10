@@ -127,7 +127,7 @@ public:
         clean_ = false;
         return particles_.erase(position);
     }
-    iterator erase(typename iterator::iterator_t first, typename iterator::iterator_t last)
+    iterator erase(iterator first, iterator last)
     {
         clean_ = false;
         // return particles_.erase(first, last);

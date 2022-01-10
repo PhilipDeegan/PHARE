@@ -20,6 +20,7 @@ endif(withIPO)
 set (PHARE_WITH_CCACHE FALSE)
 if(devMode) # -DdevMode=ON
   set(testDuringBuild ON)
+
   # Having quotes on strings here has lead to quotes being added to the compile string, so avoid.
 
   set (_Werr ${PHARE_WERROR_FLAGS} -Wall -Wextra -pedantic -Werror -Wno-unused-variable -Wno-unused-parameter)
@@ -58,9 +59,12 @@ endfunction(phare_sanitize_)
 if (asan)   # -Dasan=ON
   if("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
     phare_sanitize_("-fsanitize=address" "-fno-omit-frame-pointer" )
-  elseif("${CMAKE_CXX_COMPILER_ID}" STREQUAL "llvl")
+  elseif("${CMAKE_CXX_COMPILER_ID}" STREQUAL "Clang")
     phare_sanitize_("-fsanitize=address -shared-libsan" "-fno-omit-frame-pointer" )
+  else()
+    message(FATAL_ERROR "ASAN Unhandled compiler: ${CMAKE_CXX_COMPILER_ID}")
   endif()
+  set(testDuringBuild OFF) # can need LD_PRELOAD/etc
 endif(asan)
 
 if (ubsan)  # -Dubsan=ON

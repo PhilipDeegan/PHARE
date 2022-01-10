@@ -10,10 +10,9 @@
 namespace PHARE::core
 {
 template<std::size_t dim, typename T>
-inline constexpr auto is_phare_particle_type
-    = std::
-          is_same_v<Particle<dim>,
-                    T> or std::is_same_v<ParticleView<dim>, T> or std::is_same_v<ParticleView<dim, /*const = */ true>, T>;
+inline constexpr auto is_phare_particle_type = //
+    std::is_same_v<Particle<dim>, T> or        //
+    is_phare_particle_view_type<dim, T>;
 
 
 template<std::size_t dim, template<std::size_t> typename ParticleA,
@@ -38,7 +37,7 @@ namespace std
 using namespace PHARE::core;
 
 template<std::size_t dim, bool _const_>
-Particle<dim> copy(ParticleView<dim, _const_> const& from)
+Particle<dim> copy(ParticleViewBase<dim, _const_> const& from)
 {
     return {from.weight, from.charge, from.iCell, from.delta, from.v};
 }

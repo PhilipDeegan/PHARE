@@ -17,14 +17,14 @@ struct Span
 
     auto& operator[](SIZE i) { return ptr[i]; }
     auto& operator[](SIZE i) const { return ptr[i]; }
-    T const* const& data() const { return ptr; }
-    T* data() { return ptr; }
-    T const* const& begin() const { return ptr; }
-    T* end() const { return ptr + s; }
+    auto data() const { return ptr; }
+    auto data() { return ptr; }
+    auto begin() const { return ptr; }
+    auto end() const { return ptr + s; }
     SIZE const& size() const { return s; }
 
-    T* ptr = nullptr;
-    SIZE s = 0;
+    T* const ptr = nullptr;
+    SIZE s       = 0;
 };
 
 

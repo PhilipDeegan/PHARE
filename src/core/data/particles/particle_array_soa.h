@@ -12,19 +12,20 @@ class ParticleArray;
 
 
 template<std::size_t dim, bool _const_ = false>
-struct ParticleView
+struct ParticleViewBase
 {
     static constexpr std::size_t dimension = dim;
     static_assert(dim > 0 and dim < 4, "Only dimensions 1,2,3 are supported.");
 
-    using This = ParticleView<dim, _const_>;
+    using This = ParticleViewBase<dim, _const_>;
 
     template<typename T>
     using if_const_t = std::conditional_t<_const_, T const, T>;
 
-    ParticleView(if_const_t<double>& weight_, if_const_t<double>& charge_,
-                 if_const_t<std::array<int, dim>>& iCell_,
-                 if_const_t<std::array<double, dim>>& delta_, if_const_t<std::array<double, 3>>& v_)
+    ParticleViewBase(if_const_t<double>& weight_, if_const_t<double>& charge_,
+                     if_const_t<std::array<int, dim>>& iCell_,
+                     if_const_t<std::array<double, dim>>& delta_,
+                     if_const_t<std::array<double, 3>>& v_)
         : weight{weight_}
         , charge{charge_}
         , iCell{iCell_}
@@ -33,7 +34,7 @@ struct ParticleView
     {
     }
 
-    ParticleView(ParticleView const& that)
+    ParticleViewBase(ParticleViewBase const& that)
         : weight{that.weight}
         , charge{that.charge}
         , iCell{that.iCell}
@@ -41,18 +42,6 @@ struct ParticleView
         , v{that.v}
     {
     }
-
-    // auto& operator=(This const& that)
-    // {
-    //     weight = that.weight;
-    //     charge = that.charge;
-    //     iCell  = that.iCell;
-    //     delta  = that.delta;
-    //     v      = that.v;
-    //     return *this;
-    // };
-
-    // auto& operator=(This&& that) { return (*this) = that; };
 
     auto operator<(This const& that) const { return iCell < that.iCell; }
 
@@ -63,6 +52,22 @@ struct ParticleView
     if_const_t<std::array<double, 3>>& v;
 };
 
+template<std::size_t dim>
+struct ParticleView : ParticleViewBase<dim>
+{
+};
+
+template<std::size_t dim>
+struct ParticleView_const : ParticleViewBase<dim, true>
+{
+};
+
+template<std::size_t dim, typename T>
+inline constexpr auto is_phare_particle_view_type =   //
+    std::is_same_v<ParticleViewBase<dim>, T> or       //
+    std::is_same_v<ParticleViewBase<dim, true>, T> or //
+    std::is_same_v<ParticleView<dim>, T> or           //
+    std::is_same_v<ParticleView_const<dim>, T>;
 
 
 template<std::size_t dim, bool OwnedState = true, bool _const_ = false>
@@ -70,9 +75,15 @@ struct ParticleArray_SOA
 {
     using This       = ParticleArray_SOA<dim, OwnedState>;
     using value_type = ParticleView<dim>;
+    using view_t     = std::conditional_t<_const_, ParticleView_const<dim>, ParticleView<dim>>;
 
     static constexpr bool is_contiguous    = true;
     static constexpr std::size_t dimension = dim;
+
+    auto make_views()
+    {
+        views = generate([&](auto i) { return this->_to<view_t>(i); }, size_);
+    }
 
     template<bool OS = OwnedState, typename = std::enable_if_t<OS>>
     ParticleArray_SOA(std::size_t s)
@@ -83,7 +94,7 @@ struct ParticleArray_SOA
         , delta(s)
         , v(s)
     {
-        views = generate([&](auto i) { return this->_to<ParticleView<dim, _const_>>(i); }, size_);
+        make_views();
     }
 
     template<bool OS = OwnedState, typename = std::enable_if_t<OS>>
@@ -100,7 +111,7 @@ struct ParticleArray_SOA
         , delta(s, from.delta)
         , v(s, from.v)
     {
-        views = generate([&](auto i) { return this->_to<ParticleView<dim, _const_>>(i); }, size_);
+        make_views();
     }
 
     template<bool OS = OwnedState, typename = std::enable_if_t<OS>>
@@ -113,7 +124,7 @@ struct ParticleArray_SOA
         , v{std::move(that.v)}
         , views{}
     {
-        views = generate([&](auto i) { return this->_to<ParticleView<dim, _const_>>(i); }, size_);
+        make_views();
     }
 
     template<bool OS = OwnedState, typename = std::enable_if_t<OS>>
@@ -126,7 +137,7 @@ struct ParticleArray_SOA
         , v{std::move(that.v)}
         , views{}
     {
-        views = generate([&](auto i) { return this->_to<ParticleView<dim, _const_>>(i); }, size_);
+        make_views();
     }
 
 
@@ -142,7 +153,7 @@ struct ParticleArray_SOA
         , delta{reinterpret_cast<std::array<double, dim> const*>(_delta.data())}
         , v{reinterpret_cast<std::array<double, 3> const*>(_v.data())}
     {
-        views = generate([&](auto i) { return this->_to<ParticleView<dim, _const_>>(i); }, size_);
+        make_views();
     }
     template<typename Container_int, typename Container_double, bool const__ = _const_,
              typename = std::enable_if_t<!const__>>
@@ -155,7 +166,7 @@ struct ParticleArray_SOA
         , delta{reinterpret_cast<std::array<double, dim>* const>(_delta.data())}
         , v{reinterpret_cast<std::array<double, 3>* const>(_v.data())}
     {
-        views = generate([&](auto i) { return this->_to<ParticleView<dim, _const_>>(i); }, size_);
+        make_views();
     }
 
     auto mem_size() const
@@ -189,17 +200,17 @@ struct ParticleArray_SOA
     template<typename Return>
     Return _to(std::size_t i)
     {
-        return {weight[i], charge[i], iCell_[i], delta[i], v[i]};
+        return {{weight[i], charge[i], iCell_[i], delta[i], v[i]}};
     }
     template<typename Return>
     Return _to(std::size_t i) const
     {
-        return {weight[i], charge[i], iCell_[i], delta[i], v[i]};
+        return {{weight[i], charge[i], iCell_[i], delta[i], v[i]}};
     }
 
     auto copy(std::size_t i) { return _to<Particle<dim>>(i); }
     auto& view(std::size_t i) { return views[i]; }
-    auto view(std::size_t i) const { return _to<ParticleView<dim, true> const>(i); }
+    auto view(std::size_t i) const { return _to<ParticleView_const<dim>>(i); }
 
     auto& operator[](std::size_t i) { return view(i); }
     auto operator[](std::size_t i) const { return view(i); }
@@ -381,7 +392,7 @@ struct ParticleArray_SOA
     container_t<std::array<double, dim>> delta;
     container_t<std::array<double, 3>> v;
 
-    std::vector<ParticleView<dim, _const_>> views;
+    std::vector<view_t> views;
 };
 
 
@@ -393,7 +404,7 @@ using ParticleArray_SOAView = ParticleArray_SOA<dim, /*OwnedState=*/false, _cons
 
 
 template<std::size_t dim>
-void swap(ParticleView<dim, false>& a, ParticleView<dim, false>& b)
+void swap(ParticleView<dim>& a, ParticleView<dim>& b)
 {
     std::swap(a.weight, b.weight);
     std::swap(a.charge, b.charge);
