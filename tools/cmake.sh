@@ -25,7 +25,7 @@ time (
   [[ -n "${SAMRAI}" ]] && SAMRAI=-DSAMRAI_ROOT="${SAMRAI}"
   ( export CC=gcc CXX=g++
     cd ${BUILD_DIR} && cmake $CWD ${SAMRAI} -G Ninja ${CMAKE_CONFIG} \
-    -DCMAKE_CXX_FLAGS="${CMAKE_CXX_FLAGS}" ) # -DCMAKE_BUILD_TYPE=Release
+    -DCMAKE_CXX_FLAGS="${CMAKE_CXX_FLAGS}" -DCMAKE_BUILD_TYPE=Release)
   mold --run ninja -C ${BUILD_DIR} -v -j${THREADS} #cpp_etc dictator cpp_sim_2_1_4 phare-exe
   # (cd build && ctest -j${THREADS})
   date

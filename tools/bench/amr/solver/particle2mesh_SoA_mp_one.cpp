@@ -51,7 +51,7 @@ public:
                         n_parts, PHARE::core::ConstArray<std::uint32_t, dim>(0),
                         PHARE::core::ConstArray<std::uint32_t, dim>(cells - 1), disperse);
                 },
-                n_threads);
+                n_patches);
 
             for (auto& patch : patches)
                 for (auto& pop : patch->ions)
@@ -181,10 +181,7 @@ BENCHMARK_REGISTER_F(Part2MeshFixture, _2_1_3)
     // ->Threads(10)
     // ->Threads(15)
     ->Threads(20)
-    // ->Threads(25)
-    // ->Threads(30)
     ->ArgsProduct({TOT, CELLS});
-
 
 
 } // namespace PHARE::amr::bench

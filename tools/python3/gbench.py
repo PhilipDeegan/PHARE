@@ -94,19 +94,19 @@ class split_adder:
         self.vals = {}
 
     def __call__(self, bits):
-        for i, k in enumerate(bits[-(len(self.before_keys) + 1)][1:].split("_")):
+        for i, k in enumerate(bits[1][1:].split("_")):
             self.vals[self.val_keys[i]] = k
         return self.vals
 
-care_keys = ["n_parts","cells", "ig0", "ig1", "threads"]
+care_keys = ["ig0", "ig1", "n_parts","cells", "threads"]
 del_keys = ["ig0","ig1","family_index","per_family_instance_index","run_name","run_type"]
 adder = split_adder(care_keys, ["dim", "interp", "version"])
 
 key_manips= {
   0 : lambda x : None,
-  1 : lambda x : int(x),
+  1 : lambda x : None,
   2 : lambda x : int(x),
-  3 : lambda x : None,
+  3 : lambda x : int(x),
   4 : lambda x : int(x.split(":")[1])}
 
 def main():
