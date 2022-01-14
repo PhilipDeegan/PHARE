@@ -69,18 +69,39 @@ private:
             for (size_t rpIndex = 0; rpIndex < pattern.deltas_.size(); rpIndex++)
             {
                 auto fineParticle = particles.begin() + idx++;
-                fineParticle.weight(particle.weight() * pattern.weight_ * power[dimension - 1]);
-                fineParticle.charge(particle.charge());
-                fineParticle.iCell(iCell);
-                fineParticle.delta(delta);
-                fineParticle.v(particle.v());
 
-                for (size_t iDim = 0; iDim < dimension; iDim++)
+                if constexpr (ParticleIt::is_contiguous)
                 {
-                    fineParticle.delta()[iDim] += pattern.deltas_[rpIndex][iDim];
-                    float integra = std::floor(fineParticle.delta()[iDim]);
-                    fineParticle.delta()[iDim] -= integra;
-                    fineParticle.iCell()[iDim] += static_cast<int32_t>(integra);
+                    fineParticle.weight(particle.weight() * pattern.weight_ * power[dimension - 1]);
+                    fineParticle.charge(particle.charge());
+                    fineParticle.iCell(iCell);
+                    fineParticle.delta(delta);
+                    fineParticle.v(particle.v());
+
+                    for (size_t iDim = 0; iDim < dimension; iDim++)
+                    {
+                        fineParticle.delta()[iDim] += pattern.deltas_[rpIndex][iDim];
+                        float integra = std::floor(fineParticle.delta()[iDim]);
+                        fineParticle.delta()[iDim] -= integra;
+                        fineParticle.iCell()[iDim] += static_cast<int32_t>(integra);
+                    }
+                }
+                else
+                { // std::array::iterator = std::array::value_type*
+                    fineParticle->weight_
+                        = particle.weight() * pattern.weight_ * power[dimension - 1];
+                    fineParticle->charge_ = particle.charge();
+                    fineParticle->iCell_  = iCell;
+                    fineParticle->delta_  = delta;
+                    fineParticle->v_      = particle.v();
+
+                    for (size_t iDim = 0; iDim < dimension; iDim++)
+                    {
+                        fineParticle->delta_[iDim] += pattern.deltas_[rpIndex][iDim];
+                        float integra = std::floor(fineParticle->delta_[iDim]);
+                        fineParticle->delta_[iDim] -= integra;
+                        fineParticle->iCell_[iDim] += static_cast<int32_t>(integra);
+                    }
                 }
             }
         });

@@ -83,6 +83,22 @@ struct SoAArray
 };
 
 template<std::size_t dim>
+using SoAParticle_rt = std::tuple<double&,                  // weight
+                                  double&,                  // charge
+                                  std::array<int, dim>&,    // iCell
+                                  std::array<double, dim>&, // delta
+                                  std::array<double, 3>&    // v
+                                  >;
+template<std::size_t dim>
+using SoAParticle_crt = std::tuple<double const&,                  // weight
+                                   double const&,                  // charge
+                                   std::array<int, dim> const&,    // iCell
+                                   std::array<double, dim> const&, // delta
+                                   std::array<double, 3> const&    // v
+                                   >;
+
+
+template<std::size_t dim>
 struct SoAVector
 {
     using container_type = std::vector<Particle<dim>>;
@@ -223,8 +239,19 @@ struct SoAParticles : public Super_
     auto& iCell(std::size_t i) const { return iCell_[i]; }
     auto& iCell(std::size_t i) { return iCell_[i]; }
 
-    auto operator[](std::size_t i) { return std::make_pair(this, i); }
-    auto operator[](std::size_t i) const { return std::make_pair(this, i); }
+    auto as_tuple(std::size_t i) const
+    {
+        return std::forward_as_tuple(this->weight[i], this->charge[i], this->iCell_[i],
+                                     this->delta[i], this->v[i]);
+    }
+    auto as_tuple(std::size_t i)
+    {
+        return std::forward_as_tuple(this->weight[i], this->charge[i], this->iCell_[i],
+                                     this->delta[i], this->v[i]);
+    }
+
+    auto operator[](std::size_t i) { return as_tuple(i); }
+    auto operator[](std::size_t i) const { return as_tuple(i); }
 
     template<typename T>
     struct iterator_t; //
@@ -247,18 +274,6 @@ struct SoAParticles : public Super_
         this->delta.push_back(it.delta());
         this->v.push_back(it.v());
     }
-
-    template<typename This_, typename Size, //
-             typename S = Super, std::enable_if_t<is_vector<S>(), int> = 0>
-    void push_back(std::pair<This_, Size> const& particle)
-    {
-        auto [that, idx] = particle;
-        this->weight.push_back(that->weight[idx]);
-        this->charge.push_back(that->charge[idx]);
-        this->iCell_.push_back(that->iCell_[idx]);
-        this->delta.push_back(that->delta[idx]);
-        this->v.push_back(that->v[idx]);
-    }
 };
 
 
@@ -270,11 +285,8 @@ struct SoAParticles<dim, Super_>::iterator_t
     auto static constexpr is_const      = std::is_const_v<T>;
     auto static constexpr is_contiguous = true;
 
-    using outer_type      = std::decay_t<T>;
-    using difference_type = std::size_t;
-    // using value_type        = ParticleView<dim>;
-    // using pointer           = ParticleView<dim>*;
-    // using reference         = ParticleView<dim>&;
+    using outer_type        = std::decay_t<T>;
+    using difference_type   = std::size_t;
     using iterator_category = std::output_iterator_tag;
 
     iterator_t(T& particles_)
@@ -328,8 +340,6 @@ struct SoAParticles<dim, Super_>::iterator_t
     auto operator==(iterator_t const& that) const { return curr_pos == that.curr_pos; }
     auto operator!=(iterator_t const& that) const { return curr_pos != that.curr_pos; }
     auto operator<(iterator_t const& that) const { return curr_pos < that.curr_pos; }
-    // auto& operator*() { return particles.view(curr_pos); }
-    // auto operator*() const { return particles.view(curr_pos); }
     auto& operator()() const { return curr_pos; }
 
     auto& container() { return particles; }
@@ -382,6 +392,7 @@ struct SoAParticles<dim, Super_>::iterator_t
 };
 
 
+
 template<std::size_t dim>
 struct ParticleArray_SOA : public SoAParticles<dim, SoAVector<dim>>
 {
@@ -390,7 +401,7 @@ struct ParticleArray_SOA : public SoAParticles<dim, SoAVector<dim>>
 
     using This       = ParticleArray_SOA<dim>;
     using Super      = SoAParticles<dim, SoAVector<dim>>;
-    using Particle_t = std::pair<Super*, std::size_t>;
+    using Particle_t = SoAParticle_crt<dim>;
     using value_type = Particle_t;
     // using view_t     = std::conditional_t<_const_, ParticleView_const<dim>, ParticleView<dim>>;
 
@@ -412,8 +423,6 @@ struct ParticleArray_SOA : public SoAParticles<dim, SoAVector<dim>>
     auto end() { return iterator(*this) + size(); }
     auto end() const { return const_iterator(*this) + size(); }
 
-    // using iterator       = typename Super::iterator;
-    // using const_iterator = typename Super::const_iterator;
 
     template<std::size_t size>
     using array_type = SoAParticles<dim, SoAArray<dim, size>>;
@@ -430,80 +439,8 @@ struct ParticleArray_SOA : public SoAParticles<dim, SoAVector<dim>>
     ParticleArray_SOA(std::size_t s, Particle<dim> from)
         : Super{s, std::forward<Particle<dim>>(from)}
     {
-        // make_views();
     }
 
-    // template<bool OS = OwnedState, typename = std::enable_if_t<OS>>
-    // ParticleArray_SOA(ParticleArray_SOA const& that)
-    //     : size_{that.size_}
-    //     , weight{std::move(that.weight)}
-    //     , charge{std::move(that.charge)}
-    //     , iCell_{std::move(that.iCell_)}
-    //     , delta{std::move(that.delta)}
-    //     , v{std::move(that.v)}
-    //     , views{}
-    // {
-    //     // make_views();
-    // }
-
-    // template<bool OS = OwnedState, typename = std::enable_if_t<OS>>
-    // ParticleArray_SOA(ParticleArray_SOA&& that)
-    //     : size_{that.size_}
-    //     , weight{std::move(that.weight)}
-    //     , charge{std::move(that.charge)}
-    //     , iCell_{std::move(that.iCell_)}
-    //     , delta{std::move(that.delta)}
-    //     , v{std::move(that.v)}
-    //     , views{}
-    // {
-    //     // make_views();
-    // }
-
-
-
-
-    template<typename Return>
-    Return _to(std::size_t i)
-    {
-        return {{weight[i], charge[i], iCell_[i], delta[i], v[i]}};
-    }
-    template<typename Return>
-    Return _to(std::size_t i) const
-    {
-        return {{weight[i], charge[i], iCell_[i], delta[i], v[i]}};
-    }
-
-    auto copy(std::size_t i) { return _to<Particle<dim>>(i); }
-    // auto& view(std::size_t i) { return views[i]; }
-    auto view(std::size_t i) const { return _to<ParticleView_const<dim>>(i); }
-
-    // auto& operator[](std::size_t i) { return view(i); }
-    // auto operator[](std::size_t i) const { return view(i); }
-
-    // auto super() { return static_cast<Super*>(this); }
-    // auto super() const { return const_cast<Super*>(static_cast<Super const*>(this)); }
-
-    auto operator[](std::size_t i) { return std::make_pair(this, i); }
-    auto operator[](std::size_t i) const { return std::make_pair(this, i); }
-
-    // void push_back(iterator const& it)
-    // {
-    //     this->weight.push_back(it.weight());
-    //     this->charge.push_back(it.charge());
-    //     this->iCell_.push_back(it.iCell_());
-    //     this->delta.push_back(it.delta());
-    //     this->v.push_back(it.v());
-    // }
-
-
-    void push_back(This const& that, std::size_t idx)
-    {
-        this->weight.push_back(that.weight[idx]);
-        this->charge.push_back(that.charge[idx]);
-        this->iCell_.push_back(that.iCell_[idx]);
-        this->delta.push_back(that.delta[idx]);
-        this->v.push_back(that.v[idx]);
-    }
 
 
     void push_back(Particle<dim> const& particle)
@@ -516,15 +453,14 @@ struct ParticleArray_SOA : public SoAParticles<dim, SoAVector<dim>>
     }
 
 
-    template<typename This_, typename Size>
-    void push_back(std::pair<This_, Size> const& particle)
+    void push_back(Particle_t const& particle)
     {
-        auto [that, idx] = particle;
-        this->weight.push_back(that->weight[idx]);
-        this->charge.push_back(that->charge[idx]);
-        this->iCell_.push_back(that->iCell_[idx]);
-        this->delta.push_back(that->delta[idx]);
-        this->v.push_back(that->v[idx]);
+        auto const& [w, c, i, d, v] = particle;
+        this->weight.push_back(w);
+        this->charge.push_back(c);
+        this->iCell_.push_back(i);
+        this->delta.push_back(d);
+        this->v.push_back(v);
     }
 
     template<typename... Args>
@@ -567,32 +503,29 @@ struct ParticleArray_SOA : public SoAParticles<dim, SoAVector<dim>>
     }
 
 
-    template<typename V>
-    void swap_(V& a, V& b)
-    {
-        std::swap(a, b);
-    }
-
     void swap(std::size_t const& a, std::size_t const& b)
     {
-        // if (a == b)
-        //     return;
-        swap_(weight[a], weight[b]);
-        swap_(charge[a], charge[b]);
-        swap_(iCell_[a], iCell_[b]);
-        swap_(delta[a], delta[b]);
-        swap_(v[a], v[b]);
+        if (a == b)
+            return;
+        std::swap(weight[a], weight[b]);
+        std::swap(charge[a], charge[b]);
+        std::swap(iCell_[a], iCell_[b]);
+        std::swap(delta[a], delta[b]);
+        std::swap(v[a], v[b]);
     }
 
 
     ParticleArray_SOA(iterator start, iterator end);
 
-    iterator erase(iterator first, iterator last)
+    void erase(iterator first, iterator last)
     {
-        throw std::runtime_error("fix me");
-        // clean_ = false;
-        // // return particles_.erase(first, last);
-        // return iterator{particles_.erase(first, last), this};
+        std::apply(
+            [&](auto&... container) {
+                ((container.erase(container.begin() + first.curr_pos,
+                                  container.begin() + last.curr_pos)),
+                 ...);
+            },
+            as_tuple());
     }
 
     struct Sorter;
@@ -705,12 +638,32 @@ Particle<dim> copy(std::pair<ParticleArray_SOA<dim>*, std::size_t> const& pair)
 
 
 
+template<template<typename> typename Iterator, typename O>
+// SFINAE to support const iterators
+typename std::enable_if_t<Iterator<O>::is_contiguous, void> copy(Iterator<O> src_begin, //
+                                                                 Iterator<O> src_end,
+                                                                 Iterator<O> dst_begin)
+{
+    auto src_tuple = src_begin.particles.as_tuple();
+    auto dst_tuple = dst_begin.particles.as_tuple();
+    for_N<std::tuple_size_v<decltype(src_tuple)>>([&](auto ic) {
+        auto constexpr i = ic();
+        auto& src        = std::get<i>(src_tuple);
+        auto& dst        = std::get<i>(dst_tuple);
+        std::copy(&src[src_begin.curr_pos], &src[src_end.curr_pos], &dst[dst_begin.curr_pos]);
+    });
+}
+
+
 template<template<typename> typename Iterator, typename O, typename Inserter>
 // SFINAE to support const iterators
-typename std::enable_if_t<Iterator<O>::is_contiguous, void> copy(Iterator<O> const& a,
-                                                                 Iterator<O> const& b, Inserter i)
+typename std::enable_if_t<Iterator<O>::is_contiguous, void> copy(Iterator<O> src_begin, //
+                                                                 Iterator<O> src_end, Inserter i)
 {
-    throw std::runtime_error("Fix me");
+    auto const& particles = src_begin.particles;
+
+    for (; src_begin != src_end; ++src_begin, ++i)
+        *i = particles[src_begin.curr_pos];
 }
 
 template<template<typename> typename Iterator, typename O, typename Inserter, typename Fn>
@@ -718,26 +671,56 @@ template<template<typename> typename Iterator, typename O, typename Inserter, ty
 typename std::enable_if_t<Iterator<O>::is_contiguous, void>
 copy_if(Iterator<O> src_begin, Iterator<O> src_end, Inserter i, Fn check)
 {
-    auto& particles = src_begin.particles;
+    auto const& particles = src_begin.particles;
 
     for (; src_begin != src_end; ++src_begin)
         if (check(src_begin))
         {
-            // auto const& [_, idx] = particles[src_begin.curr_pos];
-            // auto pair            = std::make_pair(&particles, idx);
             *i = particles[src_begin.curr_pos];
             ++i;
         }
 }
 
+template<template<typename> typename Iterator, typename O>
+// SFINAE to support const iterators
+typename std::enable_if_t<Iterator<O>::is_contiguous, void> iter_swap(Iterator<O>& a,
+                                                                      Iterator<O>& b)
+{
+    assert(&a.particles == &b.particles);
 
-template<template<typename> typename Iterator, typename O, typename Fn>
+    a.particles.swap(a.curr_pos, b.curr_pos);
+}
+
+template<template<typename> typename Iterator, typename O, typename Predicate>
 // SFINAE to support const iterators
 typename std::enable_if_t<Iterator<O>::is_contiguous, Iterator<O>>
-partition(Iterator<O> a, Iterator<O> b, Fn check)
-{
-    throw std::runtime_error("Fix me");
-    return a;
+find_if_not(Iterator<O> first, Iterator<O> last, Predicate q)
+{ // https://en.cppreference.com/w/cpp/algorithm/find
+    for (; first != last; ++first)
+        if (!q(first)) // pass iterator!
+            return first;
+    return last;
+}
+
+
+template<template<typename> typename Iterator, typename O, typename Predicate>
+// SFINAE to support const iterators
+typename std::enable_if_t<Iterator<O>::is_contiguous, Iterator<O>>
+partition(Iterator<O> first, Iterator<O> last, Predicate p)
+{ // https://en.cppreference.com/w/cpp/algorithm/partition
+    first = std::find_if_not(first, last, p);
+    if (first == last)
+        return first;
+
+    for (auto i = first + 1; i != last; ++i)
+    {
+        if (p(i)) // pass iterator!
+        {
+            std::iter_swap(i, first);
+            ++first;
+        }
+    }
+    return first;
 }
 
 template<template<typename> typename Iterator, typename O, typename Fn>
@@ -782,26 +765,18 @@ void sort(ParticleArray_SOA<dim>& particles)
     particles.sort();
 }
 
-
 } // namespace std
+
 
 
 namespace PHARE::core
 {
 template<std::size_t dim>
-// template<bool OS /*enable_if_t*/>
 ParticleArray_SOA<dim>::ParticleArray_SOA(ParticleArray_SOA<dim>::iterator start,
                                           ParticleArray_SOA<dim>::iterator end)
     : Super{std::distance(start, end)}
-// , weight(size_)
-// , charge(size_)
-// , iCell_(size_)
-// , delta(size_)
-// , v(size_)
-// , views{}
 {
-    // // make_views();
-    throw std::runtime_error("fix me");
+    std::copy(start, end, this->begin()); // impl above
 }
 
 } // namespace PHARE::core

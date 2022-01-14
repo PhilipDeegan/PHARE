@@ -791,7 +791,7 @@ TYPED_TEST(IonUpdaterTest, loadsPatchGhostParticlesOnRightGhostArea)
             }
             else if constexpr (TypeParam::interp_order == 2 or TypeParam::interp_order == 3)
             {
-                typename IonUpdaterTest<TypeParam>::ParticleArray copy{pop.patchGhostParticles()};
+                auto copy{pop.patchGhostParticles()};
                 auto firstInOuterMostCell = std::partition(
                     std::begin(copy), std::end(copy), [&lastAMRCell](auto const& particle) {
                         return particle.iCell()[0] == lastAMRCell[0] + 1;
@@ -817,10 +817,10 @@ TYPED_TEST(IonUpdaterTest, loadsLevelGhostParticlesOnLeftGhostArea)
         {
             if constexpr (TypeParam::interp_order == 1)
             {
-                auto& ghost = pop.patchGhostParticles();
+                auto& ghost = pop.levelGhostParticles();
                 for (auto it = ghost.begin(); it != ghost.end(); ++it)
                 {
-                    EXPECT_EQ(firstAMRCell[0] + 1, it.iCell()[0]);
+                    EXPECT_EQ(firstAMRCell[0] - 1, it.iCell()[0]);
                 }
             }
             else if constexpr (TypeParam::interp_order == 2 or TypeParam::interp_order == 3)
@@ -873,10 +873,10 @@ TYPED_TEST(IonUpdaterTest, particlesUntouchedInMomentOnlyMode)
 
             if constexpr (!ParticleArray_t::is_contiguous)
             {
-                EXPECT_DOUBLE_EQ(cpy[iPart].delta[0], original[iPart].delta[0]);
+                EXPECT_DOUBLE_EQ(cpy[iPart].delta()[0], original[iPart].delta()[0]);
                 for (std::size_t iDir = 0; iDir < 3; ++iDir)
                 {
-                    EXPECT_DOUBLE_EQ(cpy[iPart].v[iDir], original[iPart].v[iDir]);
+                    EXPECT_DOUBLE_EQ(cpy[iPart].v()[iDir], original[iPart].v()[iDir]);
                 }
             }
             else

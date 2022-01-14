@@ -234,7 +234,8 @@ void validateElectromagDump(Simulator& sim, Hi5Diagnostic& hi5)
 template<typename Simulator, typename Hi5Diagnostic>
 void validateParticleDump(Simulator& sim, Hi5Diagnostic& hi5)
 {
-    using GridLayout = typename Simulator::PHARETypes::GridLayout_t;
+    using GridLayout   = typename Simulator::PHARETypes::GridLayout_t;
+    auto constexpr dim = GridLayout::dimension;
 
     auto& hybridModel = *sim.getHybridModel();
 
@@ -243,15 +244,29 @@ void validateParticleDump(Simulator& sim, Hi5Diagnostic& hi5)
 
         if (!particles.size())
             return;
+
         auto weightV = hifile.template read_data_set_flat<float, 2>(path + "weight");
         auto chargeV = hifile.template read_data_set_flat<float, 2>(path + "charge");
-        auto vV      = hifile.template read_data_set_flat<float, 2>(path + "v");
-        auto iCellV  = hifile.template read_data_set_flat<float, 2>(path + "iCell");
-        auto deltaV  = hifile.template read_data_set_flat<float, 2>(path + "delta");
+        auto vV      = hifile.template read_data_set<float, 2>(path + "v");
+        auto iCellV  = hifile.template read_data_set<float, 2>(path + "iCell");
+        auto deltaV  = hifile.template read_data_set<float, 2>(path + "delta");
 
         if constexpr (ParticleArray_t::is_contiguous)
         {
-            throw std::runtime_error("fix me");
+            for (std::size_t pi = 0; pi < particles.size(); ++pi)
+            {
+                auto& iCell = particles.iCell(pi);
+                for (std::size_t i = 0; i < iCell.size(); i++)
+                    EXPECT_EQ(iCellV[pi][i], iCell[i]);
+
+                auto& delta = particles.delta[pi];
+                for (std::size_t i = 0; i < delta.size(); i++)
+                    EXPECT_FLOAT_EQ(deltaV[pi][i], delta[i]);
+
+                auto& v = particles.v[pi];
+                for (std::size_t i = 0; i < v.size(); i++)
+                    EXPECT_FLOAT_EQ(vV[pi][i], v[i]);
+            }
         }
         else
         {
@@ -267,13 +282,13 @@ void validateParticleDump(Simulator& sim, Hi5Diagnostic& hi5)
                 auto next = packer.next();
 
                 for (std::size_t i = 0; i < iCellSize; i++)
-                    EXPECT_EQ(iCellV[(part_idx * iCellSize) + i], std::get<2>(next)[i]);
+                    EXPECT_EQ(iCellV[part_idx][i], std::get<2>(next)[i]);
 
                 for (std::size_t i = 0; i < deltaSize; i++)
-                    EXPECT_FLOAT_EQ(deltaV[(part_idx * deltaSize) + i], std::get<3>(next)[i]);
+                    EXPECT_FLOAT_EQ(deltaV[part_idx][i], std::get<3>(next)[i]);
 
                 for (std::size_t i = 0; i < vSize; i++)
-                    EXPECT_FLOAT_EQ(vV[(part_idx * vSize) + i], std::get<4>(next)[i]);
+                    EXPECT_FLOAT_EQ(vV[part_idx][i], std::get<4>(next)[i]);
 
                 part_idx++;
             }

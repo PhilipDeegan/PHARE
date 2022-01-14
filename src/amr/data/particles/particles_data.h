@@ -62,7 +62,7 @@ namespace amr
     template<typename Particle>
     inline bool isInBox(SAMRAI::hier::Box const& box, Particle const& particle)
     {
-        return isInBox(box, particle.iCell);
+        return isInBox(box, particle.iCell_);
     }
 
 

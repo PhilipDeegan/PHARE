@@ -683,8 +683,8 @@ public:
         {
             for (auto currPart = begin; currPart != end; ++currPart)
             {
-                auto& iCell = currPart->iCell;
-                auto& delta = currPart->delta;
+                auto& iCell = currPart.iCell();
+                auto& delta = currPart.delta();
                 indexAndWeights_<QtyCentering, QtyCentering::dual>(layout, iCell, delta);
                 indexAndWeights_<QtyCentering, QtyCentering::primal>(layout, iCell, delta);
 

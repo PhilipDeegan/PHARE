@@ -4,7 +4,7 @@
 #  copy this file to tools/cmake.sh - and edit as you wish
 #    tools/cmake.sh is ignored by git
 #
-
+set -ex
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 cd $SCRIPT_DIR && cd .. && CWD=$PWD # move to project root
 exec 19>$CWD/.cmake.sh.cmd # set -x redirect
@@ -14,7 +14,7 @@ BUILD_DIR=${BUILD_DIR:="$CWD/build"}
 SAMRAI=${SAMRAI:="/mkn/r/llnl/samrai/master"} # "" = as subproject
 FFF=("${BUILD_DIR}")
 CMAKE_CONFIG="-DdevMode=ON -Dasan=OFF -Dbench=OFF -DwithCaliper=OFF -DtestMPI=OFF"
-CMAKE_CXX_FLAGS="-g3 -O0 -DPHARE_DIAG_DOUBLES=1" # -O3  -march=native -mtune=native
+CMAKE_CXX_FLAGS="-g3 -DPHARE_DIAG_DOUBLES=1 -O3 -march=native -mtune=native"
 set -xe
 time (
   date

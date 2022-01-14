@@ -238,20 +238,22 @@ TYPED_TEST(AWeighter, computesDualBSplineWeightsForAnyParticlePosition)
 }
 
 
-template<typename InterpolatorT>
+template<typename Testables>
 class A1DInterpolator : public ::testing::Test
 {
 public:
+    using InterpolatorT   = typename Testables::Interpolator_t;
+    using ParticleArray_t = typename Testables::ParticleArray_t;
+
     static constexpr auto dimension    = InterpolatorT::dimension;
     static constexpr auto interp_order = InterpolatorT::interp_order;
     // arbitrary number of cells
     static constexpr std::uint32_t nx = 50;
 
-    using PHARE_TYPES     = PHARE::core::PHARE_Types<dimension, interp_order>;
-    using GridLayout_t    = typename PHARE_TYPES::GridLayout_t;
-    using NdArray_t       = typename PHARE_TYPES::Array_t;
-    using ParticleArray_t = typename PHARE_TYPES::ParticleArray_t;
-    using VF              = VecField<NdArray_t, HybridQuantity>;
+    using PHARE_TYPES  = PHARE::core::PHARE_Types<dimension, interp_order>;
+    using GridLayout_t = typename PHARE_TYPES::GridLayout_t;
+    using NdArray_t    = typename PHARE_TYPES::Array_t;
+    using VF           = VecField<NdArray_t, HybridQuantity>;
 
     Electromag<VF> em;
     ParticleArray_t particles;
@@ -304,7 +306,7 @@ public:
             if constexpr (ParticleArray_t::is_contiguous)
                 set(particles.iCell(i), particles.delta[i]);
             else
-                set(particles.iCell(i), particles[i].delta);
+                set(particles.iCell(i), particles[i].delta());
         }
     }
 };
@@ -313,7 +315,8 @@ public:
 
 
 using Interpolators1D
-    = ::testing::Types<Interpolator<1, 1>, Interpolator<1, 2>, Interpolator<1, 3>>;
+    = ::testing::Types<Testables<1, 1>, Testables<1, 2>, Testables<1, 3>, //
+                       Testables_SOA<1, 1>, Testables_SOA<1, 2>, Testables_SOA<1, 3>>;
 
 TYPED_TEST_SUITE(A1DInterpolator, Interpolators1D);
 
@@ -357,21 +360,23 @@ TYPED_TEST(A1DInterpolator, canComputeAllEMfieldsAtParticle)
 
 
 
-template<typename InterpolatorT>
+template<typename Testables>
 class A2DInterpolator : public ::testing::Test
 {
 public:
+    using InterpolatorT   = typename Testables::Interpolator_t;
+    using ParticleArray_t = typename Testables::ParticleArray_t;
+
     static constexpr auto dimension    = InterpolatorT::dimension;
     static constexpr auto interp_order = InterpolatorT::interp_order;
     // arbitrary number of cells
     static constexpr std::uint32_t nx = 50;
     static constexpr std::uint32_t ny = 50;
 
-    using PHARE_TYPES     = PHARE::core::PHARE_Types<dimension, interp_order>;
-    using GridLayoutImpl  = GridLayoutImplYee<dimension, interp_order>;
-    using NdArray_t       = typename PHARE_TYPES::Array_t;
-    using ParticleArray_t = typename PHARE_TYPES::ParticleArray_t;
-    using VF              = VecField<NdArray_t, HybridQuantity>;
+    using PHARE_TYPES    = PHARE::core::PHARE_Types<dimension, interp_order>;
+    using GridLayoutImpl = GridLayoutImplYee<dimension, interp_order>;
+    using NdArray_t      = typename PHARE_TYPES::Array_t;
+    using VF             = VecField<NdArray_t, HybridQuantity>;
 
     Electromag<VF> em;
     ParticleArray_t particles;
@@ -425,7 +430,7 @@ public:
             if constexpr (ParticleArray_t::is_contiguous)
                 set(particles.iCell(i), particles.delta[i]);
             else
-                set(particles.iCell(i), particles[i].delta);
+                set(particles.iCell(i), particles[i].delta());
         }
     }
 };
@@ -434,7 +439,8 @@ public:
 
 
 using Interpolators2D
-    = ::testing::Types<Interpolator<2, 1>, Interpolator<2, 2>, Interpolator<2, 3>>;
+    = ::testing::Types<Testables<2, 1>, Testables<2, 2>, Testables<2, 3>, //
+                       Testables_SOA<2, 1>, Testables_SOA<2, 2>, Testables_SOA<2, 3>>;
 
 TYPED_TEST_SUITE(A2DInterpolator, Interpolators2D);
 
@@ -479,10 +485,13 @@ TYPED_TEST(A2DInterpolator, canComputeAllEMfieldsAtParticle)
 
 
 
-template<typename InterpolatorT>
+template<typename Testables>
 class A3DInterpolator : public ::testing::Test
 {
 public:
+    using InterpolatorT   = typename Testables::Interpolator_t;
+    using ParticleArray_t = typename Testables::ParticleArray_t;
+
     static constexpr auto dimension    = InterpolatorT::dimension;
     static constexpr auto interp_order = InterpolatorT::interp_order;
     // arbitrary number of cells
@@ -490,11 +499,10 @@ public:
     static constexpr std::uint32_t ny = 50;
     static constexpr std::uint32_t nz = 50;
 
-    using PHARE_TYPES     = PHARE::core::PHARE_Types<dimension, interp_order>;
-    using GridLayoutImpl  = GridLayoutImplYee<dimension, interp_order>;
-    using NdArray_t       = typename PHARE_TYPES::Array_t;
-    using ParticleArray_t = typename PHARE_TYPES::ParticleArray_t;
-    using VF              = VecField<NdArray_t, HybridQuantity>;
+    using PHARE_TYPES    = PHARE::core::PHARE_Types<dimension, interp_order>;
+    using GridLayoutImpl = GridLayoutImplYee<dimension, interp_order>;
+    using NdArray_t      = typename PHARE_TYPES::Array_t;
+    using VF             = VecField<NdArray_t, HybridQuantity>;
 
     Electromag<VF> em;
     ParticleArray_t particles;
@@ -560,7 +568,8 @@ public:
 
 
 using Interpolators3D
-    = ::testing::Types<Interpolator<3, 1>, Interpolator<3, 2>, Interpolator<3, 3>>;
+    = ::testing::Types<Testables<3, 1>, Testables<3, 2>, Testables<3, 3>, //
+                       Testables_SOA<3, 1>, Testables_SOA<3, 2>, Testables_SOA<3, 3>>;
 
 TYPED_TEST_SUITE(A3DInterpolator, Interpolators3D);
 
@@ -611,17 +620,19 @@ TYPED_TEST(A3DInterpolator, canComputeAllEMfieldsAtParticle)
 
 
 
-template<typename Interpolator>
+template<typename Testables>
 class ACollectionOfParticles_1d : public ::testing::Test
 {
+    using Interpolator    = typename Testables::Interpolator_t;
+    using ParticleArray_t = typename Testables::ParticleArray_t;
+
     static constexpr auto dimension    = Interpolator::dimension;
     static constexpr auto interp_order = Interpolator::interp_order;
 
-    using PHARE_TYPES     = PHARE::core::PHARE_Types<dimension, interp_order>;
-    using NdArray_t       = typename PHARE_TYPES::Array_t;
-    using ParticleArray_t = typename PHARE_TYPES::ParticleArray_t;
-    using GridLayout_t    = typename PHARE_TYPES::GridLayout_t;
-    using Particle_t      = Particle<1>;
+    using PHARE_TYPES  = PHARE::core::PHARE_Types<dimension, interp_order>;
+    using NdArray_t    = typename PHARE_TYPES::Array_t;
+    using GridLayout_t = typename PHARE_TYPES::GridLayout_t;
+    using Particle_t   = Particle<1>;
 
 public:
     static constexpr std::uint32_t nx        = 30;
@@ -782,7 +793,8 @@ TYPED_TEST_P(ACollectionOfParticles_1d, DepositCorrectlyTheirWeight_1d)
 }
 REGISTER_TYPED_TEST_SUITE_P(ACollectionOfParticles_1d, DepositCorrectlyTheirWeight_1d);
 
-using MyTypes = ::testing::Types<Interpolator<1, 1>, Interpolator<1, 2>, Interpolator<1, 3>>;
+using MyTypes = ::testing::Types<Testables<1, 1>, Testables<1, 2>, Testables<1, 3>, //
+                                 Testables_SOA<1, 1>, Testables_SOA<1, 2>, Testables_SOA<1, 3>>;
 INSTANTIATE_TYPED_TEST_SUITE_P(testInterpolator, ACollectionOfParticles_1d, MyTypes);
 
 

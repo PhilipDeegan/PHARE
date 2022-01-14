@@ -42,8 +42,8 @@ struct PHARE_Types
 
     using Particle_t    = PHARE::core::Particle<dimension>;
     using ParticleAoS_t = PHARE::core::ParticleArray<dimension>;
+    using ParticleSoA_t = PHARE::core::ParticleArray_SOA_t<dimension>;
     // using ParticleArray_t = ParticleAoS_t;
-    using ParticleSoA_t   = PHARE::core::ParticleArray_SOA_t<dimension>;
     using ParticleArray_t = ParticleSoA_t;
 
 

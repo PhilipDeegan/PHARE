@@ -20,8 +20,8 @@ public:
 
     static auto get(Particle<dim> const& particle)
     {
-        return std::forward_as_tuple(particle.weight, particle.charge, particle.iCell,
-                                     particle.delta, particle.v);
+        return std::forward_as_tuple(particle.weight_, particle.charge_, particle.iCell_,
+                                     particle.delta_, particle.v_);
     }
 
     static auto empty()

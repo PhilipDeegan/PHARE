@@ -14,12 +14,14 @@
 
 namespace PHARE::core
 {
-template<std::size_t dim, std::size_t size>
+template<std::size_t dim, std::size_t size_>
 struct AoSArray
 {
-    using container_type = std::array<Particle<dim>, size>;
+    using container_type = std::array<Particle<dim>, size_>;
 
     container_type particles_;
+
+    auto constexpr static size() { return size_; }
 };
 
 template<std::size_t dim>
@@ -40,6 +42,8 @@ struct AoSVector
     {
     }
 
+    auto size() const { return particles_.size(); }
+
     container_type particles_;
 };
 
@@ -53,6 +57,7 @@ struct AoSParticles : public Super_
     using This  = AoSParticles<dim, Super_>;
     using Super = Super_;
     using Super::particles_;
+    using typename Super::container_type;
 
     template<typename T>
     auto static constexpr is_vector()
@@ -74,72 +79,14 @@ struct AoSParticles : public Super_
     {
     }
 
-    template<typename T>
-    struct iterator_t;
-    using iterator       = iterator_t<This>;
-    using const_iterator = iterator_t<This const>;
+
+    auto begin() const { return particles_.begin(); }
+    auto begin() { return particles_.begin(); }
+
+    auto end() const { return particles_.end(); }
+    auto end() { return particles_.end(); }
 };
 
-template<std::size_t dim, typename OuterSuper>
-template<typename T>
-struct AoSParticles<dim, OuterSuper>::iterator_t
-    : wrapped_iterator<T, typename OuterSuper::container_type>
-{
-    static constexpr auto is_contiguous = false;
-    static constexpr auto dimension     = dim;
-
-    using Super = wrapped_iterator<T, typename OuterSuper::container_type>;
-
-    template<typename Iterator>
-    iterator_t(Iterator iter, T* container)
-        : Super{iter, container}
-    {
-    }
-    iterator_t(iterator_t const& that) = default;
-
-    iterator_t& operator=(iterator_t const& other) = default;
-
-    auto& weight() { return (*this)->weight(); }
-    auto& weight() const { return (*this)->weight(); }
-    auto& charge() { return (*this)->charge(); }
-    auto& charge() const { return (*this)->charge(); }
-    auto& iCell() { return (*this)->iCell(); }
-    auto& iCell() const { return (*this)->iCell(); }
-    auto& delta() { return (*this)->delta(); }
-    auto& delta() const { return (*this)->delta(); }
-    auto& v() { return (*this)->v(); }
-    auto& v() const { return (*this)->v(); }
-
-    template<typename Weight>
-    void weight(Weight weight)
-    {
-        (*this)->weight_ = weight;
-    }
-
-    template<typename Charge>
-    void charge(Charge charge)
-    {
-        (*this)->charge_ = charge;
-    }
-
-    template<typename ICell>
-    void iCell(ICell iCell)
-    {
-        (*this)->iCell_ = iCell;
-    }
-
-    template<typename Delta>
-    void delta(Delta delta)
-    {
-        (*this)->delta_ = delta;
-    }
-
-    template<typename V>
-    void v(V v)
-    {
-        (*this)->v_ = v;
-    }
-};
 
 
 template<std::size_t dim>
@@ -153,6 +100,7 @@ public:
     using Super                                      = AoSParticles<dim, AoSVector<dim>>;
     using Particle_t                                 = Particle<dim>;
     using Vector                                     = typename Super::container_type;
+    using Super::container_type;
     using Super::particles_;
 
     template<std::size_t size>
@@ -162,6 +110,14 @@ public:
 private:
     using cell_map_t = CellMap<dim, Particle_t, cellmap_bucket_size, int, Point<int, dim>>;
 
+    template<typename Iterator>
+    auto check_distance_size_t(Iterator const& start, Iterator const& end)
+    {
+        auto dist = std::distance(start, end);
+        if (dist < 0)
+            throw std::runtime_error("Error, number must be postive");
+        return static_cast<std::size_t>(dist);
+    }
 
 public:
     using value_type = Particle_t;
@@ -172,6 +128,14 @@ public:
 
     using iterator       = ParticleArrayIterator<This, cell_map_t>;
     using const_iterator = ParticleArrayIterator<This const, cell_map_t>;
+
+
+
+    ParticleArray(iterator start, iterator end)
+        : Super{check_distance_size_t(start, end)}
+    {
+        std::copy(start, end, this->begin());
+    }
 
 
     ParticleArray() {}
@@ -244,11 +208,12 @@ public:
         clean_ = false;
         return particles_.erase(position);
     }
-    iterator erase(iterator first, iterator last)
+
+    template<typename It0, typename It1>
+    iterator erase(It0 first, It1 last)
     {
         clean_ = false;
-        // return particles_.erase(first, last);
-        return iterator{particles_.erase(first, last), this};
+        return iterator{particles_.erase(first, last), *this, cell_map_};
     }
 
     Particle_t& emplace_back()
@@ -383,12 +348,12 @@ private:
 template<std::size_t dim>
 template<typename T, typename cell_map_t>
 struct ParticleArray<dim>::ParticleArrayIterator
-    : public std::decay_t<T>::Super::template iterator_t<T>
+    : public wrapped_iterator<T, typename std::decay_t<T>::container_type>
 {
     static constexpr auto is_contiguous = false;
     static constexpr auto dimension     = dim;
 
-    using Super = typename std::decay_t<T>::Super::template iterator_t<T>;
+    using Super = wrapped_iterator<T, typename std::decay_t<T>::container_type>;
 
     template<typename Iterator>
     ParticleArrayIterator(Iterator iter, T& container, cell_map_t& cellmap)
@@ -397,6 +362,9 @@ struct ParticleArray<dim>::ParticleArrayIterator
     {
     }
     ParticleArrayIterator(ParticleArrayIterator const& that) = default;
+
+    ParticleArrayIterator& operator=(ParticleArrayIterator const& other) = default;
+
 
     template<typename Cell>
     void change_icell(Cell const& newCell)
@@ -412,7 +380,55 @@ struct ParticleArray<dim>::ParticleArrayIterator
         bool cmb       = (cm == other.cm);
         return superbool and cmb;
     }
-    ParticleArrayIterator& operator=(ParticleArrayIterator const& other) = default;
+
+    auto operator+(std::size_t i)
+    {
+        ParticleArrayIterator copy = *this;
+        static_cast<Super&>(copy) += i;
+        return copy;
+    }
+
+    auto& weight() { return (*this)->weight(); }
+    auto& weight() const { return (*this)->weight(); }
+    auto& charge() { return (*this)->charge(); }
+    auto& charge() const { return (*this)->charge(); }
+    auto& iCell() { return (*this)->iCell(); }
+    auto& iCell() const { return (*this)->iCell(); }
+    auto& delta() { return (*this)->delta(); }
+    auto& delta() const { return (*this)->delta(); }
+    auto& v() { return (*this)->v(); }
+    auto& v() const { return (*this)->v(); }
+
+    template<typename Weight>
+    void weight(Weight weight)
+    {
+        (*this)->weight_ = weight;
+    }
+
+    template<typename Charge>
+    void charge(Charge charge)
+    {
+        (*this)->charge_ = charge;
+    }
+
+    template<typename ICell>
+    void iCell(ICell iCell)
+    {
+        (*this)->iCell_ = iCell;
+    }
+
+    template<typename Delta>
+    void delta(Delta delta)
+    {
+        (*this)->delta_ = delta;
+    }
+
+    template<typename V>
+    void v(V v)
+    {
+        (*this)->v_ = v;
+    }
+
 
     cell_map_t* cm;
 };
