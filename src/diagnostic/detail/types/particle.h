@@ -178,24 +178,34 @@ void ParticlesDiagnosticWriter<H5Writer>::write(DiagnosticProperties& diagnostic
     auto& h5Writer = this->h5Writer_;
 
     auto writeParticles = [&](auto path, auto& particles) {
+        using ParticleArray_t = std::decay_t<decltype(particles)>;
+
         if (particles.size() == 0)
             return;
 
         auto& h5file = *fileData_.at(diagnostic.quantity);
-        Packer packer(particles);
-        core::ParticleArray_SOA<dimension> copy{particles.size()};
-        packer.pack(copy);
 
+        auto static packer_keys = Packer::keys();
 
-        h5file.template write_data_set_flat<2>(path + packer.keys()[0], copy.weight.data());
-        h5file.template write_data_set_flat<2>(path + packer.keys()[1], copy.charge.data());
-        // h5file.template write_data_set_flat<2>(path + packer.keys()[2], &copy.iCell_.data()[0]);
-        // h5file.template write_data_set_flat<2>(path + packer.keys()[3], &copy.delta.data()[0]);
-        // h5file.template write_data_set_flat<2>(path + packer.keys()[4], &copy.v.data()[0]);
+        auto write_ = [&](auto& contiguous) {
+            h5file.template write_data_set_flat<2>(path + packer_keys[0], contiguous.weight.data());
+            h5file.template write_data_set_flat<2>(path + packer_keys[1], contiguous.charge.data());
+            h5file.template write_data_set(path + packer_keys[2], contiguous.iCell_.data());
+            h5file.template write_data_set(path + packer_keys[3], contiguous.delta.data());
+            h5file.template write_data_set(path + packer_keys[4], contiguous.v.data());
+        };
 
-        h5file.template write_data_set(path + packer.keys()[2], copy.iCell_.data());
-        h5file.template write_data_set(path + packer.keys()[3], copy.delta.data());
-        h5file.template write_data_set(path + packer.keys()[4], copy.v.data());
+        if constexpr (ParticleArray_t::is_contiguous)
+        {
+            write_(particles);
+        }
+        else
+        {
+            Packer packer(particles);
+            core::ParticleArray_SOA<dimension> copy{particles.size()};
+            packer.pack(copy);
+            write_(copy);
+        }
     };
 
     auto checkWrite = [&](auto& tree, auto pType, auto& ps) {

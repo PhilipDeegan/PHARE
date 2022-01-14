@@ -14,53 +14,179 @@
 
 namespace PHARE::core
 {
+template<std::size_t dim, std::size_t size>
+struct AoSArray
+{
+    using container_type = std::array<Particle<dim>, size>;
+
+    container_type particles_;
+};
+
 template<std::size_t dim>
-class ParticleArray
+struct AoSVector
+{
+    using container_type = std::vector<Particle<dim>>;
+    using value_type     = typename container_type::value_type;
+
+    AoSVector() {}
+
+    AoSVector(std::size_t size)
+        : particles_(size)
+    {
+    }
+
+    AoSVector(std::size_t size, value_type&& particle)
+        : particles_(size, particle)
+    {
+    }
+
+    container_type particles_;
+};
+
+
+template<std::size_t dim, typename Super_ = AoSVector<dim>>
+struct AoSParticles : public Super_
+{
+    static constexpr bool is_contiguous = false;
+    static constexpr auto dimension     = dim;
+
+    using This  = AoSParticles<dim, Super_>;
+    using Super = Super_;
+    using Super::particles_;
+
+    template<typename T>
+    auto static constexpr is_vector()
+    {
+        return std::is_same_v<T, AoSVector<dim>>;
+    }
+
+    AoSParticles() {}
+
+    template<typename S = Super, typename = std::enable_if_t<is_vector<S>()>>
+    AoSParticles(std::size_t size)
+        : Super(size)
+    {
+    }
+
+    template<typename Particle_t, typename S = Super, typename = std::enable_if_t<is_vector<S>()>>
+    AoSParticles(std::size_t size, Particle_t&& particle)
+        : Super(size, std::forward<Particle_t>(particle))
+    {
+    }
+
+    template<typename T>
+    struct iterator_t;
+    using iterator       = iterator_t<This>;
+    using const_iterator = iterator_t<This const>;
+};
+
+template<std::size_t dim, typename OuterSuper>
+template<typename T>
+struct AoSParticles<dim, OuterSuper>::iterator_t
+    : wrapped_iterator<T, typename OuterSuper::container_type>
+{
+    static constexpr auto is_contiguous = false;
+    static constexpr auto dimension     = dim;
+
+    using Super = wrapped_iterator<T, typename OuterSuper::container_type>;
+
+    template<typename Iterator>
+    iterator_t(Iterator iter, T* container)
+        : Super{iter, container}
+    {
+    }
+    iterator_t(iterator_t const& that) = default;
+
+    iterator_t& operator=(iterator_t const& other) = default;
+
+    auto& weight() { return (*this)->weight(); }
+    auto& weight() const { return (*this)->weight(); }
+    auto& charge() { return (*this)->charge(); }
+    auto& charge() const { return (*this)->charge(); }
+    auto& iCell() { return (*this)->iCell(); }
+    auto& iCell() const { return (*this)->iCell(); }
+    auto& delta() { return (*this)->delta(); }
+    auto& delta() const { return (*this)->delta(); }
+    auto& v() { return (*this)->v(); }
+    auto& v() const { return (*this)->v(); }
+
+    template<typename Weight>
+    void weight(Weight weight)
+    {
+        (*this)->weight_ = weight;
+    }
+
+    template<typename Charge>
+    void charge(Charge charge)
+    {
+        (*this)->charge_ = charge;
+    }
+
+    template<typename ICell>
+    void iCell(ICell iCell)
+    {
+        (*this)->iCell_ = iCell;
+    }
+
+    template<typename Delta>
+    void delta(Delta delta)
+    {
+        (*this)->delta_ = delta;
+    }
+
+    template<typename V>
+    void v(V v)
+    {
+        (*this)->v_ = v;
+    }
+};
+
+
+template<std::size_t dim>
+class ParticleArray : public AoSParticles<dim, AoSVector<dim>>
 {
 public:
     static constexpr bool is_contiguous              = false;
     static constexpr auto dimension                  = dim;
     static constexpr std::size_t cellmap_bucket_size = 100;
     using This                                       = ParticleArray<dim>;
+    using Super                                      = AoSParticles<dim, AoSVector<dim>>;
     using Particle_t                                 = Particle<dim>;
-    using Vector                                     = std::vector<Particle_t>;
-    using value_type                                 = Particle_t;
-    using box_t                                      = Box<int, dim>;
+    using Vector                                     = typename Super::container_type;
+    using Super::particles_;
 
-    using iterator       = wrapped_iterator<This, Vector>;
-    using const_iterator = wrapped_iterator<This const, Vector>;
+    template<std::size_t size>
+    using array_type = AoSParticles<dim, AoSArray<dim, size>>;
+
 
 private:
     using cell_map_t = CellMap<dim, Particle_t, cellmap_bucket_size, int, Point<int, dim>>;
 
-    template<typename S>
-    bool _check(S i) // templated so doesn't exist in release mode
-    {
-        return i < size();
-    }
 
 public:
+    using value_type = Particle_t;
+    using box_t      = Box<int, dim>;
+
+    template<typename T, typename cell_map_t>
+    struct ParticleArrayIterator;
+
+    using iterator       = ParticleArrayIterator<This, cell_map_t>;
+    using const_iterator = ParticleArrayIterator<This const, cell_map_t>;
+
+
     ParticleArray() {}
     ParticleArray(std::size_t size)
-        : particles_(size)
+        : Super{size}
     {
     }
 
     ParticleArray(std::size_t size, Particle_t&& particle)
-        : particles_(size, particle)
+        : Super{size, std::forward<Particle_t>(particle)}
     {
     }
 
-    auto& iCell(std::size_t i) const
-    {
-        assert(_check(i));
-        return particles_[i].iCell;
-    }
-    auto& iCell(std::size_t i)
-    {
-        assert(_check(i));
-        return particles_[i].iCell;
-    }
+    auto& iCell(std::size_t i) const { return particles_[i].iCell(); }
+    auto& iCell(std::size_t i) { return particles_[i].iCell(); }
 
 
     std::size_t size() const { return particles_.size(); }
@@ -90,24 +216,15 @@ public:
         return (this->particles_ == that.particles_);
     }
 
-    auto begin() const { return const_iterator{particles_.begin(), this}; }
-    auto begin()
-    {
-        clean_ = false;
-        return iterator{particles_.begin(), this};
-    }
+    auto begin() const { return const_iterator{particles_.begin(), *this, cell_map_}; }
+    auto begin() { return iterator{particles_.begin(), *this, cell_map_}; }
 
-    auto end() const { return const_iterator{particles_.end(), this}; }
-    auto end()
-    {
-        clean_ = false;
-        return iterator{particles_.end(), this};
-    }
+    auto end() const { return const_iterator{particles_.end(), *this, cell_map_}; }
+    auto end() { return iterator{particles_.end(), *this, cell_map_}; }
 
     template<class InputIterator>
     void insert(iterator position, InputIterator first, InputIterator last)
     {
-        clean_ = false;
         particles_.insert(position, first, last);
     }
 
@@ -148,6 +265,19 @@ public:
     {
         clean_ = false;
         return particles_.emplace_back(p);
+    }
+
+    template<typename... Args>
+    Particle_t& emplace_back(Args const&... args)
+    {
+        clean_ = false;
+        return particles_.emplace_back(args...);
+    }
+    template<typename... Args>
+    Particle_t& emplace_back(Args&&... args)
+    {
+        clean_ = false;
+        return particles_.emplace_back(Particle_t{args...});
     }
 
     void push_back(Particle_t const& p)
@@ -239,10 +369,52 @@ public:
         cell_map_.print(cell);
     }
 
+    auto data() const { return particles_.data(); }
+    auto data() { return particles_.data(); }
+
+    auto constexpr static size_of() { return sizeof(Particle_t); }
+
 private:
     bool mutable clean_{false};
-    Vector particles_;
     mutable cell_map_t cell_map_;
+};
+
+
+template<std::size_t dim>
+template<typename T, typename cell_map_t>
+struct ParticleArray<dim>::ParticleArrayIterator
+    : public std::decay_t<T>::Super::template iterator_t<T>
+{
+    static constexpr auto is_contiguous = false;
+    static constexpr auto dimension     = dim;
+
+    using Super = typename std::decay_t<T>::Super::template iterator_t<T>;
+
+    template<typename Iterator>
+    ParticleArrayIterator(Iterator iter, T& container, cell_map_t& cellmap)
+        : Super{iter, &container}
+        , cm{&cellmap}
+    {
+    }
+    ParticleArrayIterator(ParticleArrayIterator const& that) = default;
+
+    template<typename Cell>
+    void change_icell(Cell const& newCell)
+    {
+        auto particleIndex = std::distance(this->container->begin(), *this);
+        cm->update(*(this->container), particleIndex, newCell);
+        (*this)->iCell = newCell;
+    }
+
+    bool operator==(ParticleArrayIterator const& other) const
+    {
+        bool superbool = (static_cast<Super const&>(*this) == static_cast<Super const&>(other));
+        bool cmb       = (cm == other.cm);
+        return superbool and cmb;
+    }
+    ParticleArrayIterator& operator=(ParticleArrayIterator const& other) = default;
+
+    cell_map_t* cm;
 };
 
 } // namespace PHARE::core

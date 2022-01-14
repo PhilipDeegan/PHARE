@@ -15,7 +15,7 @@ namespace PHARE::core
 template<typename Iterator, typename GridLayout, typename Electromag, typename PopulationView>
 struct IonUpdaterRange : public Range<Iterator>
 {
-    auto static constexpr is_contiguous = Iterator::outer_type::is_contiguous;
+    auto static constexpr is_contiguous = Iterator::is_contiguous;
 
     using Super    = Range<Iterator>;
     using iterator = Iterator;

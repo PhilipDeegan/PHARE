@@ -262,6 +262,8 @@ public:
 
         auto getParticleData = [&](Inner& inner, GridLayout& grid, std::string patchID,
                                    std::string key, auto& particles) {
+            using ParticleArray_t = std::decay_t<decltype(particles)>;
+
             if (particles.size() == 0)
                 return;
 
@@ -270,7 +272,10 @@ public:
 
             auto& patch_data = inner[key].emplace_back(particles.size());
             setPatchDataFromGrid(patch_data, grid, patchID);
-            core::ParticlePacker<dimension>{particles}.pack(patch_data.data);
+            if constexpr (ParticleArray_t::is_contiguous)
+                patch_data.data = particles;
+            else
+                core::ParticlePacker<dimension>{particles}.pack(patch_data.data);
         };
 
         auto& ions = model_.state.ions;

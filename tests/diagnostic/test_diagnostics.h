@@ -239,6 +239,8 @@ void validateParticleDump(Simulator& sim, Hi5Diagnostic& hi5)
     auto& hybridModel = *sim.getHybridModel();
 
     auto checkParticles = [&](auto& hifile, auto& particles, auto path) {
+        using ParticleArray_t = std::decay_t<decltype(particles)>;
+
         if (!particles.size())
             return;
         auto weightV = hifile.template read_data_set_flat<float, 2>(path + "weight");
@@ -247,27 +249,34 @@ void validateParticleDump(Simulator& sim, Hi5Diagnostic& hi5)
         auto iCellV  = hifile.template read_data_set_flat<float, 2>(path + "iCell");
         auto deltaV  = hifile.template read_data_set_flat<float, 2>(path + "delta");
 
-        core::ParticlePacker packer{particles};
-
-        auto first            = packer.empty();
-        std::size_t iCellSize = std::get<2>(first).size();
-        std::size_t deltaSize = std::get<3>(first).size();
-        std::size_t vSize     = std::get<4>(first).size();
-        std::size_t part_idx  = 0;
-        while (packer.hasNext())
+        if constexpr (ParticleArray_t::is_contiguous)
         {
-            auto next = packer.next();
+            throw std::runtime_error("fix me");
+        }
+        else
+        {
+            core::ParticlePacker packer{particles};
 
-            for (std::size_t i = 0; i < iCellSize; i++)
-                EXPECT_EQ(iCellV[(part_idx * iCellSize) + i], std::get<2>(next)[i]);
+            auto first            = packer.empty();
+            std::size_t iCellSize = std::get<2>(first).size();
+            std::size_t deltaSize = std::get<3>(first).size();
+            std::size_t vSize     = std::get<4>(first).size();
+            std::size_t part_idx  = 0;
+            while (packer.hasNext())
+            {
+                auto next = packer.next();
 
-            for (std::size_t i = 0; i < deltaSize; i++)
-                EXPECT_FLOAT_EQ(deltaV[(part_idx * deltaSize) + i], std::get<3>(next)[i]);
+                for (std::size_t i = 0; i < iCellSize; i++)
+                    EXPECT_EQ(iCellV[(part_idx * iCellSize) + i], std::get<2>(next)[i]);
 
-            for (std::size_t i = 0; i < vSize; i++)
-                EXPECT_FLOAT_EQ(vV[(part_idx * vSize) + i], std::get<4>(next)[i]);
+                for (std::size_t i = 0; i < deltaSize; i++)
+                    EXPECT_FLOAT_EQ(deltaV[(part_idx * deltaSize) + i], std::get<3>(next)[i]);
 
-            part_idx++;
+                for (std::size_t i = 0; i < vSize; i++)
+                    EXPECT_FLOAT_EQ(vV[(part_idx * vSize) + i], std::get<4>(next)[i]);
+
+                part_idx++;
+            }
         }
     };
 

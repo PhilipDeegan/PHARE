@@ -14,7 +14,7 @@ BUILD_DIR=${BUILD_DIR:="$CWD/build"}
 SAMRAI=${SAMRAI:="/mkn/r/llnl/samrai/master"} # "" = as subproject
 FFF=("${BUILD_DIR}")
 CMAKE_CONFIG="-DdevMode=ON -Dasan=OFF -Dbench=OFF -DwithCaliper=OFF -DtestMPI=OFF"
-CMAKE_CXX_FLAGS="-g3 -O3 -DPHARE_DIAG_DOUBLES=1" # -march=native -mtune=native
+CMAKE_CXX_FLAGS="-g3 -O0 -DPHARE_DIAG_DOUBLES=1" # -O3  -march=native -mtune=native
 set -xe
 time (
   date
@@ -25,8 +25,9 @@ time (
   [[ -n "${SAMRAI}" ]] && SAMRAI=-DSAMRAI_ROOT="${SAMRAI}"
   ( export CC=gcc CXX=g++
     cd ${BUILD_DIR} && cmake $CWD ${SAMRAI} -G Ninja ${CMAKE_CONFIG} \
-    -DCMAKE_CXX_FLAGS="${CMAKE_CXX_FLAGS}" -DCMAKE_BUILD_TYPE=Release)
-  mold --run ninja -C ${BUILD_DIR} -v -j${THREADS} #cpp_etc dictator cpp_sim_2_1_4 phare-exe
+    -DCMAKE_CXX_FLAGS="${CMAKE_CXX_FLAGS}" ) # -DCMAKE_BUILD_TYPE=Release
+  # mold --run \
+    ninja -C ${BUILD_DIR} -v -j${THREADS} #cpp_etc dictator cpp_sim_2_1_4 phare-exe
   # (cd build && ctest -j${THREADS})
   date
 ) 1> >(tee $CWD/.cmake.sh.out ) 2> >(tee $CWD/.cmake.sh.err >&2 )

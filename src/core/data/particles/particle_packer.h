@@ -63,9 +63,8 @@ private:
 
 
 
-template<std::size_t dim, bool _const_, bool OwnedState>
-template<bool OS, typename /*enable_if_t*/>
-ParticleArray_SOA<dim, _const_, OwnedState>::ParticleArray_SOA(ParticleArray<dim> const& particles)
+template<std::size_t dim>
+ParticleArray_SOA<dim>::ParticleArray_SOA(ParticleArray<dim> const& particles)
     : ParticleArray_SOA{particles.size()}
 {
     ParticlePacker<dim>{particles}.pack(*this);

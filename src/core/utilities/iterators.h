@@ -27,7 +27,7 @@ struct wrapped_iterator : public std::conditional_t<is_const, typename Vector::c
         return copy;
     }
 
-    wrapped_iterator& operator=(wrapped_iterator const& src) = default;
+    // wrapped_iterator& operator=(wrapped_iterator const& src) = default;
 
     // auto operator-(wrapped_iterator const& that) const
     // {

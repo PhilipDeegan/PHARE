@@ -40,10 +40,11 @@ struct PHARE_Types
     using YeeLayout_t  = PHARE::core::GridLayoutImplYee<dimension, interp_order>;
     using GridLayout_t = PHARE::core::GridLayout<YeeLayout_t>;
 
-    using Particle_t      = PHARE::core::Particle<dimension>;
-    using ParticleAoS_t   = PHARE::core::ParticleArray<dimension>;
-    using ParticleArray_t = ParticleAoS_t;
+    using Particle_t    = PHARE::core::Particle<dimension>;
+    using ParticleAoS_t = PHARE::core::ParticleArray<dimension>;
+    // using ParticleArray_t = ParticleAoS_t;
     using ParticleSoA_t   = PHARE::core::ParticleArray_SOA_t<dimension>;
+    using ParticleArray_t = ParticleSoA_t;
 
 
     using MaxwellianParticleInitializer_t

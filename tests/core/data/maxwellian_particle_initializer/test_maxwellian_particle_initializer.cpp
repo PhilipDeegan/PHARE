@@ -64,7 +64,7 @@ TEST_F(AMaxwellianParticleInitializer1D, loadsParticlesInTheDomain)
     auto i = 0u;
     for (auto const& particle : particles)
     {
-        EXPECT_TRUE(particle.iCell[0] >= 50 && particle.iCell[0] <= 99);
+        EXPECT_TRUE(particle.iCell()[0] >= 50 && particle.iCell()[0] <= 99);
         auto pos       = positionAsPoint(particle, layout);
         auto endDomain = layout.origin()[0] + layout.nbrCells()[0] * layout.meshSize()[0];
 

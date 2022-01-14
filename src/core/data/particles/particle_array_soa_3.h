@@ -194,7 +194,7 @@ struct ParticleArray_SOA_3
 
 template<template<typename> typename Iterator, typename O>
 // SFINAE to support const iterators
-typename std::enable_if_t<Iterator<O>::outer_type::is_contiguous, // bleh
+typename std::enable_if_t<Iterator<O>::is_contiguous, // bleh
                           std::array<int, Iterator<O>::outer_type::dimension> const&>
 to_radix_sort_key(Iterator<O> const& it)
 {
@@ -219,8 +219,7 @@ using ParticleArray_SOA_3View = ParticleArray_SOA_3<dim, /*OwnedState=*/false>;
 
 template<template<typename> typename Iterator, typename O>
 // SFINAE to support const iterators
-typename std::enable_if_t<Iterator<O>::outer_type::is_contiguous> swap(Iterator<O>& a,
-                                                                       Iterator<O>& b)
+typename std::enable_if_t<Iterator<O>::is_contiguous> swap(Iterator<O>& a, Iterator<O>& b)
 {
     assert(&a.particles == &b.particles);
 
@@ -229,7 +228,7 @@ typename std::enable_if_t<Iterator<O>::outer_type::is_contiguous> swap(Iterator<
 
 // template<template<typename> typename Iterator, typename O>
 // // SFINAE to support const iterators
-// typename std::enable_if_t<Iterator<O>::outer_type::is_contiguous, std::size_t>
+// typename std::enable_if_t<Iterator<O>::is_contiguous, std::size_t>
 // operator-(Iterator<O> const& a, Iterator<O> const& b)
 // {
 //     assert(&a.particles == &b.particles);
@@ -247,7 +246,7 @@ using namespace PHARE::core;
 
 // template<template<typename> typename Iterator, typename O>
 // // SFINAE to support const iterators
-// typename std::enable_if_t<Iterator<O>::outer_type::is_contiguous, std::size_t>
+// typename std::enable_if_t<Iterator<O>::is_contiguous, std::size_t>
 // distance(Iterator<O> const& a, Iterator<O> const& b)
 // {
 //     assert(&a.particles == &b.particles);
@@ -258,7 +257,7 @@ using namespace PHARE::core;
 
 // template<template<typename> typename Iterator, typename O>
 // // SFINAE to support const iterators
-// typename std::enable_if_t<Iterator<O>::outer_type::is_contiguous, std::size_t>
+// typename std::enable_if_t<Iterator<O>::is_contiguous, std::size_t>
 // operator-(Iterator<O> const& a, Iterator<O> const& b)
 // {
 //     assert(&a.particles == &b.particles);

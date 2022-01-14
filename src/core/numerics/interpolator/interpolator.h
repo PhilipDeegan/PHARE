@@ -136,8 +136,7 @@ class MeshToParticle
 };
 
 
-template<std::size_t dimdex, typename GridLayout, typename Quantity, Quantity quantity,
-         typename IndexWeights>
+template<std::size_t dimdex, typename GridLayout, auto quantity, typename IndexWeights>
 auto static resolve_start_index_and_weights(IndexWeights const& indexWeights)
 {
     auto constexpr centerings                              = GridLayout::centering(quantity);
@@ -161,12 +160,11 @@ public:
      * \param[in] startIndex is the first of the nbrPointsSupport indices where to interpolate
      * the field \param[in] weights are the nbrPointsSupport weights used for the interpolation
      */
-    template<typename GridLayout, typename Quantity, Quantity quantity, typename Field,
-             typename IndexWeights>
+    template<typename GridLayout, auto quantity, typename Field, typename IndexWeights>
     inline auto op(Field const& field, IndexWeights const& indexWeights)
     {
         auto const& [xStartIndex, xWeights]
-            = resolve_start_index_and_weights<0, GridLayout, Quantity, quantity>(indexWeights);
+            = resolve_start_index_and_weights<0, GridLayout, quantity>(indexWeights);
 
         auto const& order_size = xWeights.size();
         auto fieldAtParticle   = 0.;
@@ -193,14 +191,13 @@ public:
      * interpolate the field in both directions \param[in] weights are the nbrPointsSupport
      * weights used for the interpolation in both directions
      */
-    template<typename GridLayout, typename Quantity, Quantity quantity, typename Field,
-             typename IndexWeights>
+    template<typename GridLayout, auto quantity, typename Field, typename IndexWeights>
     inline auto op(Field const& field, IndexWeights const& indexWeights)
     {
         auto const& [xStartIndex, xWeights]
-            = resolve_start_index_and_weights<0, GridLayout, Quantity, quantity>(indexWeights);
+            = resolve_start_index_and_weights<0, GridLayout, quantity>(indexWeights);
         auto const& [yStartIndex, yWeights]
-            = resolve_start_index_and_weights<1, GridLayout, Quantity, quantity>(indexWeights);
+            = resolve_start_index_and_weights<1, GridLayout, quantity>(indexWeights);
 
         auto const& order_size = xWeights.size();
 
@@ -235,16 +232,15 @@ public:
      * interpolate the field in the 3 directions \param[in] weights are the nbrPointsSupport
      * weights used for the interpolation in the 3 directions
      */
-    template<typename GridLayout, typename Quantity, Quantity quantity, typename Field,
-             typename IndexWeights>
+    template<typename GridLayout, auto quantity, typename Field, typename IndexWeights>
     inline auto op(Field const& field, IndexWeights const& indexWeights)
     {
         auto const& [xStartIndex, xWeights]
-            = resolve_start_index_and_weights<0, GridLayout, Quantity, quantity>(indexWeights);
+            = resolve_start_index_and_weights<0, GridLayout, quantity>(indexWeights);
         auto const& [yStartIndex, yWeights]
-            = resolve_start_index_and_weights<1, GridLayout, Quantity, quantity>(indexWeights);
+            = resolve_start_index_and_weights<1, GridLayout, quantity>(indexWeights);
         auto const& [zStartIndex, zWeights]
-            = resolve_start_index_and_weights<2, GridLayout, Quantity, quantity>(indexWeights);
+            = resolve_start_index_and_weights<2, GridLayout, quantity>(indexWeights);
 
         auto const& order_size = xWeights.size();
 
@@ -304,10 +300,34 @@ public: /** Performs the 1D interpolation
         auto const& [xWeights]            = weights;
         auto const& order_size            = xWeights.size();
 
-        auto const partRho   = particle.weight;
-        auto const xPartFlux = particle.v[0] * particle.weight;
-        auto const yPartFlux = particle.v[1] * particle.weight;
-        auto const zPartFlux = particle.v[2] * particle.weight;
+        auto const partRho   = particle.weight();
+        auto const xPartFlux = particle.v()[0] * particle.weight();
+        auto const yPartFlux = particle.v()[1] * particle.weight();
+        auto const zPartFlux = particle.v()[2] * particle.weight();
+
+        for (auto ik = 0u; ik < order_size; ++ik)
+        {
+            Op{density(xStartIndex + ik)} += partRho * xWeights[ik] * coef;
+            Op{xFlux(xStartIndex + ik)} += xPartFlux * xWeights[ik] * coef;
+            Op{yFlux(xStartIndex + ik)} += yPartFlux * xWeights[ik] * coef;
+            Op{zFlux(xStartIndex + ik)} += zPartFlux * xWeights[ik] * coef;
+        }
+    }
+
+    template<typename Particles, typename Field, typename VecField, typename Indexes,
+             typename Weights>
+    inline void op_0(Particles const& particles, std::size_t pi, Field& density, VecField& flux,
+                     Indexes const& startIndex, Weights const& weights, double coef = 1.)
+    {
+        auto const& [xFlux, yFlux, zFlux] = flux();
+        auto const& [xStartIndex]         = startIndex;
+        auto const& [xWeights]            = weights;
+        auto const& order_size            = xWeights.size();
+
+        auto const partRho   = particles.weight[pi];
+        auto const xPartFlux = particles.v[pi][0] * particles.weight[pi];
+        auto const yPartFlux = particles.v[pi][1] * particles.weight[pi];
+        auto const zPartFlux = particles.v[pi][2] * particles.weight[pi];
 
         for (auto ik = 0u; ik < order_size; ++ik)
         {
@@ -347,10 +367,10 @@ public: /** Performs the 2D interpolation
         auto const& [xWeights, yWeights]       = weights;
         auto const& order_size                 = xWeights.size();
 
-        auto const partRho   = particle.weight * coef;
-        auto const xPartFlux = particle.v[0] * particle.weight * coef;
-        auto const yPartFlux = particle.v[1] * particle.weight * coef;
-        auto const zPartFlux = particle.v[2] * particle.weight * coef;
+        auto const partRho   = particle.weight() * coef;
+        auto const xPartFlux = particle.v()[0] * particle.weight() * coef;
+        auto const yPartFlux = particle.v()[1] * particle.weight() * coef;
+        auto const zPartFlux = particle.v()[2] * particle.weight() * coef;
 
         for (auto ix = 0u; ix < order_size; ++ix)
         {
@@ -554,10 +574,10 @@ public: /** Performs the 3D interpolation
         auto const& [xWeights, yWeights, zWeights]          = weights;
         auto const& order_size                              = xWeights.size();
 
-        auto const partRho   = particle.weight * coef;
-        auto const xPartFlux = particle.v[0] * particle.weight * coef;
-        auto const yPartFlux = particle.v[1] * particle.weight * coef;
-        auto const zPartFlux = particle.v[2] * particle.weight * coef;
+        auto const partRho   = particle.weight() * coef;
+        auto const xPartFlux = particle.v()[0] * particle.weight() * coef;
+        auto const yPartFlux = particle.v()[1] * particle.weight() * coef;
+        auto const zPartFlux = particle.v()[2] * particle.weight() * coef;
 
         for (auto ix = 0u; ix < order_size; ++ix)
         {
@@ -659,29 +679,60 @@ public:
 
         PHARE_LOG_START("MeshToParticle::operator()");
         std::size_t eb_idx = 0;
-        for (auto currPart = begin; currPart != end; ++currPart)
+        if constexpr (!PartIterator::is_contiguous)
         {
-            auto& iCell = currPart->iCell;
-            auto& delta = currPart->delta;
-            indexAndWeights_<QtyCentering, QtyCentering::dual>(layout, iCell, delta);
-            indexAndWeights_<QtyCentering, QtyCentering::primal>(layout, iCell, delta);
+            for (auto currPart = begin; currPart != end; ++currPart)
+            {
+                auto& iCell = currPart->iCell;
+                auto& delta = currPart->delta;
+                indexAndWeights_<QtyCentering, QtyCentering::dual>(layout, iCell, delta);
+                indexAndWeights_<QtyCentering, QtyCentering::primal>(layout, iCell, delta);
 
-            auto indexWeights = std::forward_as_tuple(dual_startIndex_, dual_weights_,
-                                                      primal_startIndex_, primal_weights_);
+                auto indexWeights = std::forward_as_tuple(dual_startIndex_, dual_weights_,
+                                                          primal_startIndex_, primal_weights_);
 
-            auto& [pE, pB]        = particleEBs[eb_idx++];
-            auto& [pEx, pEy, pEz] = pE;
-            auto& [pBx, pBy, pBz] = pB;
+                auto& [pE, pB]        = particleEBs[eb_idx++];
+                auto& [pEx, pEy, pEz] = pE;
+                auto& [pBx, pBy, pBz] = pB;
 
-            pEx = meshToParticle_.template op<GridLayout, Scalar, Scalar::Ex>(Ex, indexWeights);
-            pEy = meshToParticle_.template op<GridLayout, Scalar, Scalar::Ey>(Ey, indexWeights);
-            pEz = meshToParticle_.template op<GridLayout, Scalar, Scalar::Ez>(Ez, indexWeights);
-            pBx = meshToParticle_.template op<GridLayout, Scalar, Scalar::Bx>(Bx, indexWeights);
-            pBy = meshToParticle_.template op<GridLayout, Scalar, Scalar::By>(By, indexWeights);
-            pBz = meshToParticle_.template op<GridLayout, Scalar, Scalar::Bz>(Bz, indexWeights);
+                pEx = meshToParticle_.template op<GridLayout, Scalar::Ex>(Ex, indexWeights);
+                pEy = meshToParticle_.template op<GridLayout, Scalar::Ey>(Ey, indexWeights);
+                pEz = meshToParticle_.template op<GridLayout, Scalar::Ez>(Ez, indexWeights);
+                pBx = meshToParticle_.template op<GridLayout, Scalar::Bx>(Bx, indexWeights);
+                pBy = meshToParticle_.template op<GridLayout, Scalar::By>(By, indexWeights);
+                pBz = meshToParticle_.template op<GridLayout, Scalar::Bz>(Bz, indexWeights);
+            }
+        }
+        else
+        {
+            auto& particles = begin.particles;
+            auto start      = std::distance(particles.begin(), begin);
+            for (std::size_t pi = start; pi < particles.size(); ++pi)
+            {
+                auto& iCell = particles.iCell(pi);
+                auto& delta = particles.delta[pi];
+
+                indexAndWeights_<QtyCentering, QtyCentering::dual>(layout, iCell, delta);
+                indexAndWeights_<QtyCentering, QtyCentering::primal>(layout, iCell, delta);
+
+                auto indexWeights = std::forward_as_tuple(dual_startIndex_, dual_weights_,
+                                                          primal_startIndex_, primal_weights_);
+
+                auto& [pE, pB]        = particleEBs[eb_idx++];
+                auto& [pEx, pEy, pEz] = pE;
+                auto& [pBx, pBy, pBz] = pB;
+
+                pEx = meshToParticle_.template op<GridLayout, Scalar::Ex>(Ex, indexWeights);
+                pEy = meshToParticle_.template op<GridLayout, Scalar::Ey>(Ey, indexWeights);
+                pEz = meshToParticle_.template op<GridLayout, Scalar::Ez>(Ez, indexWeights);
+                pBx = meshToParticle_.template op<GridLayout, Scalar::Bx>(Bx, indexWeights);
+                pBy = meshToParticle_.template op<GridLayout, Scalar::By>(By, indexWeights);
+                pBz = meshToParticle_.template op<GridLayout, Scalar::Bz>(Bz, indexWeights);
+            }
         }
         PHARE_LOG_STOP("MeshToParticle::operator()");
     }
+
 
     // container version of above
     template<typename Particles, typename Electromag, typename GridLayout>
@@ -701,8 +752,7 @@ public:
      *  - then it uses Interpol<> to calculate the interpolation of E and B components
      * onto the particle.
      */
-    template<std::size_t version = 0, typename PartIterator, typename VecField, typename GridLayout,
-             typename Field>
+    template<typename PartIterator, typename VecField, typename GridLayout, typename Field>
     inline void operator()(PartIterator begin, PartIterator end, Field& density, VecField& flux,
                            GridLayout const& layout, double coef = 1.)
     {
@@ -718,14 +768,28 @@ public:
 
         PHARE_LOG_START("ParticleToMesh::operator()");
 
-
-        for (auto currPart = begin; currPart != end; ++currPart)
+        // TODO #3375
+        if constexpr (!PartIterator::is_contiguous)
         {
-            // TODO #3375
-            indexAndWeights_<QtyCentering, QtyCentering::primal>(layout, currPart->iCell,
-                                                                 currPart->delta);
+            for (auto currPart = begin; currPart != end; ++currPart)
+            {
+                indexAndWeights_<QtyCentering, QtyCentering::primal>(layout, currPart.iCell(),
+                                                                     currPart.delta());
 
-            particleToMesh_(density, flux, *currPart, startIndex_, weights_, coef);
+                particleToMesh_(density, flux, *currPart, startIndex_, weights_, coef);
+            }
+        }
+        else
+        {
+            auto& particles = begin.particles;
+            auto start      = std::distance(particles.begin(), begin);
+            for (std::size_t pi = start; pi < particles.size(); ++pi)
+            {
+                indexAndWeights_<QtyCentering, QtyCentering::primal>(layout, particles.iCell(pi),
+                                                                     particles.delta[pi]);
+
+                particleToMesh_.op_0(particles, pi, density, flux, startIndex_, weights_, coef);
+            }
         }
         PHARE_LOG_STOP("ParticleToMesh::operator()");
     }

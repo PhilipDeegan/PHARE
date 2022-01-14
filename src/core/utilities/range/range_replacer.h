@@ -34,7 +34,7 @@ class RangeSynchrotron
     using iterator         = typename Container::iterator;
     using value_type       = typename Container::value_type;
     using RangeSyncInfo_t  = SyncInfo<Container, Range<iterator>>;
-    using VectorSyncInfo_t = SyncInfo<Container, std::vector<value_type>>;
+    using VectorSyncInfo_t = SyncInfo<Container, Container>;
     using RangeSyncVec_t   = std::vector<std::unique_ptr<RangeSyncInfo_t>>;
     using VectorSyncVec_t  = std::vector<std::unique_ptr<VectorSyncInfo_t>>;
 
@@ -63,7 +63,7 @@ public:
     {
         if (copy)
             to_add_copy_list_per_thread[thread_idx].emplace_back(std::make_unique<VectorSyncInfo_t>(
-                container, std::vector<value_type>{range.begin(), range.end()}));
+                container, Container{range.begin(), range.end()}));
         else
             to_add_list_per_thread[thread_idx].emplace_back(
                 std::make_unique<RangeSyncInfo_t>(container, std::forward<Range<iterator>>(range)));

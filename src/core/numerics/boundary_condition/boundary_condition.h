@@ -20,8 +20,7 @@ namespace core
         }
 
         template<typename ParticleIterator>
-        ParticleIterator applyOutgoingParticleBC(ParticleIterator /*begin*/,
-                                                 ParticleIterator /*end*/)
+        ParticleIterator applyOutgoingParticleBC(ParticleIterator begin, ParticleIterator /*end*/)
         {
             // TODO loop while last partition not equel to begin.
             //            auto partitions = partitionner(begin, end, boundaryBoxes_);
@@ -32,7 +31,7 @@ namespace core
             // particles to delete are between te last iterator
             // of 'partitions' and the end.
             //          return partitions[boundaryBoxes_.size()];
-            return ParticleIterator{};
+            return ParticleIterator{begin};
         }
 
 

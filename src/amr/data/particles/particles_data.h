@@ -1,11 +1,8 @@
 #ifndef PHARE_SRC_AMR_DATA_PARTICLES_PARTICLES_DATA_H
 #define PHARE_SRC_AMR_DATA_PARTICLES_PARTICLES_DATA_H
 
-#include <iterator>
-#include <cstddef>
 #include <numeric>
 #include <stdexcept>
-#include <vector>
 
 #include <SAMRAI/hier/BoxOverlap.h>
 #include <SAMRAI/hier/IntVector.h>
@@ -14,72 +11,58 @@
 #include <SAMRAI/tbox/MemoryUtilities.h>
 
 
-#include "SAMRAI/hier/Transformation.h"
 #include "core/data/ions/ion_population/particle_pack.h"
 #include "core/data/particles/particle.h"
+#include "core/data/particles/particles.h"
 #include "core/data/particles/particle_array.h"
 #include "amr/resources_manager/amr_utils.h"
-#include "core/utilities/point/point.h"
-
-#include "amr/utilities/box/amr_box.h"
 
 #include "core/logger.h"
+
+namespace PHARE::amr
+{
+template<std::size_t dim>
+inline bool isInBox(SAMRAI::hier::Box const& box, std::array<int, dim> const& iCell)
+{
+    auto const& lower = box.lower();
+    auto const& upper = box.upper();
+
+    if (iCell[0] >= lower(0) && iCell[0] <= upper(0))
+    {
+        if constexpr (dim > 1)
+        {
+            if (iCell[1] >= lower(1) && iCell[1] <= upper(1))
+            {
+                if constexpr (dim > 2)
+                {
+                    if (iCell[2] >= lower(2) && iCell[2] <= upper(2))
+                    {
+                        return true;
+                    }
+                }
+                else
+                {
+                    return true;
+                }
+            }
+        }
+        else
+        {
+            return true;
+        }
+    }
+    return false;
+}
+} // namespace PHARE::amr
 
 namespace PHARE
 {
 namespace amr
 {
-    inline bool operator==(SAMRAI::hier::Box const& b1, SAMRAI::hier::Box const& b2)
-    {
-        auto dim1 = b1.getDim().getValue();
-        auto dim2 = b2.getDim().getValue();
-
-        bool boxesAreEqual = true;
-        for (auto i = 0u; i < dim1; ++i)
-        {
-            boxesAreEqual &= b1.lower(i) == b2.lower(i);
-            boxesAreEqual &= b1.upper(i) == b2.upper(i);
-        }
-        return boxesAreEqual;
-    }
-
-
     template<typename Particle>
     inline bool isInBox(SAMRAI::hier::Box const& box, Particle const& particle)
     {
-        constexpr auto dim = Particle::dimension;
-
-        auto const& iCell = particle.iCell;
-
-        auto const& lower = box.lower();
-        auto const& upper = box.upper();
-
-
-        if (iCell[0] >= lower(0) && iCell[0] <= upper(0))
-        {
-            if constexpr (dim > 1)
-            {
-                if (iCell[1] >= lower(1) && iCell[1] <= upper(1))
-                {
-                    if constexpr (dim > 2)
-                    {
-                        if (iCell[2] >= lower(2) && iCell[2] <= upper(2))
-                        {
-                            return true;
-                        }
-                    }
-                    else
-                    {
-                        return true;
-                    }
-                }
-            }
-            else
-            {
-                return true;
-            }
-        }
-        return false;
+        return isInBox(box, particle.iCell);
     }
 
 
@@ -111,9 +94,7 @@ namespace amr
     template<typename ParticleArray>
     class ParticlesData : public SAMRAI::hier::PatchData
     {
-        using Particle_t          = typename ParticleArray::Particle_t;
         static constexpr auto dim = ParticleArray::dimension;
-
 
     public:
         ParticlesData(SAMRAI::hier::Box const& box, SAMRAI::hier::IntVector const& ghost)
@@ -134,6 +115,7 @@ namespace amr
 
 
         ParticlesData& operator=(ParticlesData const&) = delete;
+
 
 
 
@@ -161,13 +143,13 @@ namespace amr
             // throws if fails
             auto& pSource = dynamic_cast<ParticlesData const&>(source);
 
-            auto const& sourceBox  = pSource.getBox();
-            auto const& myGhostBox = getGhostBox();
-            auto const intersectionBox{sourceBox * myGhostBox};
+            SAMRAI::hier::Box const& sourceGhostBox = pSource.getGhostBox();
+            SAMRAI::hier::Box const& myGhostBox     = getGhostBox();
+            const SAMRAI::hier::Box intersectionBox{sourceGhostBox * myGhostBox};
 
             if (!intersectionBox.empty())
             {
-                copy_(intersectionBox, pSource);
+                copy_(sourceGhostBox, myGhostBox, intersectionBox, pSource);
             }
         }
 
@@ -197,11 +179,50 @@ namespace amr
             auto& pSource  = dynamic_cast<ParticlesData const&>(source);
             auto& pOverlap = dynamic_cast<SAMRAI::pdat::CellOverlap const&>(overlap);
 
-            auto const& transformation = pOverlap.getTransformation();
-            auto const& boxList        = pOverlap.getDestinationBoxContainer();
-            for (auto const& overlapBox : boxList)
+            SAMRAI::hier::Transformation const& transformation = pOverlap.getTransformation();
+            if (transformation.getRotation() == SAMRAI::hier::Transformation::NO_ROTATE)
             {
-                copy_(overlapBox, pSource, transformation);
+                SAMRAI::hier::BoxContainer const& boxList = pOverlap.getDestinationBoxContainer();
+                for (auto const& overlapBox : boxList)
+                {
+                    SAMRAI::hier::Box sourceGhostBox = pSource.getGhostBox();
+                    SAMRAI::hier::Box myGhostBox     = this->getGhostBox();
+                    SAMRAI::hier::Box intersectionBox{sourceGhostBox.getDim()};
+
+                    if (isSameBlock(transformation))
+                    {
+                        if (offsetIsZero(transformation))
+                        {
+                            intersectionBox = overlapBox * sourceGhostBox * myGhostBox;
+
+                            if (!intersectionBox.empty())
+                            {
+                                copy_(sourceGhostBox, myGhostBox, intersectionBox, pSource);
+                            }
+                        }
+                        else
+                        {
+                            SAMRAI::hier::Box shiftedSourceBox{sourceGhostBox};
+                            transformation.transform(shiftedSourceBox);
+                            intersectionBox = overlapBox * shiftedSourceBox * myGhostBox;
+
+
+                            if (!intersectionBox.empty())
+                            {
+                                copyWithTransform_(sourceGhostBox, intersectionBox, transformation,
+                                                   pSource);
+                            }
+                        }
+                    }
+                    else
+                    {
+                        std::runtime_error("Error - multiblock hierarchies not handled");
+                    }
+                } // end loop over boxes
+            }     // end no rotate
+            else
+            {
+                throw std::runtime_error("copy with rotate not implemented");
             }
         }
 
@@ -223,7 +244,7 @@ namespace amr
         {
             auto const& pOverlap{dynamic_cast<SAMRAI::pdat::CellOverlap const&>(overlap)};
 
-            return countNumberParticlesIn_(pOverlap) * sizeof(Particle_t);
+            return countNumberParticlesIn_(pOverlap) * ParticleArray::size_of();
         }
 
 
@@ -248,11 +269,11 @@ namespace amr
         void packStream(SAMRAI::tbox::MessageStream& stream,
                         SAMRAI::hier::BoxOverlap const& overlap) const override
         {
-            PHARE_LOG_SCOPE("ParticleData::packStream");
+            PHARE_LOG_SCOPE("packStream");
 
             auto const& pOverlap{dynamic_cast<SAMRAI::pdat::CellOverlap const&>(overlap)};
 
-            std::vector<Particle_t> outBuffer;
+            ParticleArray specie;
 
             if (pOverlap.isOverlapEmpty())
             {
@@ -261,15 +282,56 @@ namespace amr
             }
             else
             {
-                auto const& transformation = pOverlap.getTransformation();
-                auto const& boxContainer   = pOverlap.getDestinationBoxContainer();
-                pack_(pOverlap, transformation, outBuffer);
-                stream << outBuffer.size();
+                SAMRAI::hier::Transformation const& transformation = pOverlap.getTransformation();
+                if (transformation.getRotation() == SAMRAI::hier::Transformation::NO_ROTATE)
+                {
+                    SAMRAI::hier::BoxContainer const& boxContainer
+                        = pOverlap.getDestinationBoxContainer();
+
+                    auto const& sourceGhostBox = getGhostBox();
+
+                    // sourceBox + offset = source on destination
+                    // we are given boxes in the Overlap in destination
+                    // index space. And we want to select all particles
+                    // in the ghost source box that lie in this overlapBox
+                    // we thus need to first shift the sourceGhostBox to the
+                    // destination index space so that its cells (partly) overlap the one
+                    // of the given overlap boxes.
+                    // Then pack_ will take all particles which iCell, shifted by the
+                    // transformation offset onto the overlapBox index space,
+                    // lie in the overlap box.
+                    SAMRAI::hier::Box transformedSource{sourceGhostBox};
+                    transformation.transform(transformedSource);
+
+                    for (auto const& overlapBox : boxContainer)
+                    {
+                        SAMRAI::hier::Box intersectionBox{transformedSource * overlapBox};
+
+                        pack_(specie, intersectionBox, sourceGhostBox, transformation);
+                    }
+                }
+                else
+                {
+                    throw std::runtime_error("Error - rotations not handled in PHARE");
+                }
+                stream << specie.size();
                 stream.growBufferAsNeeded();
-                stream.pack(outBuffer.data(), outBuffer.size());
+                this->pack_(stream, specie);
             }
         }
 
+
+        void pack_(SAMRAI::tbox::MessageStream& stream, ParticleArray const& specie) const
+        {
+            if constexpr (ParticleArray::is_contiguous)
+                std::apply(
+                    [&](auto const&... container) {
+                        ((stream.pack(container.data(), specie.size())), ...);
+                    },
+                    specie.as_tuple());
+            else
+                stream.pack(specie.data(), specie.size());
+        }
 
 
         /**
@@ -287,7 +349,7 @@ namespace amr
         void unpackStream(SAMRAI::tbox::MessageStream& stream,
                           SAMRAI::hier::BoxOverlap const& overlap) override
         {
-            PHARE_LOG_SCOPE("ParticleData::unpackStream");
+            PHARE_LOG_SCOPE("unpackStream");
 
             auto const& pOverlap{dynamic_cast<SAMRAI::pdat::CellOverlap const&>(overlap)};
 
@@ -296,23 +358,24 @@ namespace amr
                 // unpack particles into a particle array
                 std::size_t numberParticles = 0;
                 stream >> numberParticles;
-                std::vector<Particle_t> particleArray(numberParticles);
-                stream.unpack(particleArray.data(), numberParticles);
+                ParticleArray particleArray(numberParticles);
+                unpack_(stream, particleArray);
 
                 // ok now our goal is to put the particles we have just unpacked
                 // into the particleData and in the proper particleArray : interior or ghost
 
-                auto const& transformation = pOverlap.getTransformation();
+                SAMRAI::hier::Transformation const& transformation = pOverlap.getTransformation();
                 if (transformation.getRotation() == SAMRAI::hier::Transformation::NO_ROTATE)
                 {
                     // we loop over all boxes in the overlap
                     // we have to first take the intersection of each of these boxes
                     // with our ghostBox. This is where unpacked particles should go.
 
-                    auto const& overlapBoxes = pOverlap.getDestinationBoxContainer();
+                    SAMRAI::hier::BoxContainer const& overlapBoxes
+                        = pOverlap.getDestinationBoxContainer();
 
-                    auto const myBox      = getBox();
-                    auto const myGhostBox = getGhostBox();
+                    auto myBox      = getBox();
+                    auto myGhostBox = getGhostBox();
 
                     for (auto const& overlapBox : overlapBoxes)
                     {
@@ -322,17 +385,17 @@ namespace amr
                         // interior array or ghost array
                         auto const intersect = getGhostBox() * overlapBox;
 
-                        for (auto const& particle : particleArray)
+                        for (std::size_t p_idx = 0; p_idx < particleArray.size(); ++p_idx)
                         {
-                            if (isInBox(intersect, particle))
+                            if (isInBox(intersect, particleArray.iCell(p_idx)))
                             {
-                                if (isInBox(myBox, particle))
+                                if (isInBox(myBox, particleArray.iCell(p_idx)))
                                 {
-                                    domainParticles.push_back(std::move(particle));
+                                    domainParticles.push_back(particleArray[p_idx]);
                                 }
                                 else
                                 {
-                                    patchGhostParticles.push_back(std::move(particle));
+                                    patchGhostParticles.push_back(particleArray[p_idx]);
                                 }
                             }
                         } // end species loop
@@ -341,6 +404,17 @@ namespace amr
             }             // end overlap not empty
         }
 
+        void unpack_(SAMRAI::tbox::MessageStream& stream, ParticleArray& specie) const
+        {
+            if constexpr (ParticleArray::is_contiguous)
+                std::apply(
+                    [&](auto&... container) {
+                        ((stream.unpack(container.data(), specie.size())), ...);
+                    },
+                    specie.as_tuple());
+            else
+                stream.unpack(specie.data(), specie.size());
+        }
 
 
         core::ParticlesPack<ParticleArray>* getPointer() { return &pack; }
@@ -368,145 +442,96 @@ namespace amr
         //! end index"
         SAMRAI::hier::Box interiorLocalBox_;
 
-        void copy_(SAMRAI::hier::Box const& overlapBox, ParticlesData const& sourceData)
+
+
+        void copy_(SAMRAI::hier::Box const& /*sourceGhostBox*/,
+                   SAMRAI::hier::Box const& /*destinationGhostBox*/,
+                   SAMRAI::hier::Box const& intersectionBox, ParticlesData const& sourceData)
         {
-            auto const myDomainBox   = this->getBox();
-            auto& srcDomainParticles = sourceData.domainParticles;
+            std::array<ParticleArray const*, 2> particlesArrays{&sourceData.domainParticles,
+                                                                &sourceData.patchGhostParticles};
 
-            PHARE_LOG_START("ParticleData::copy_ DomainToDomain");
+            auto myDomainBox = this->getBox();
 
-            // first copy particles that fall into our domain array
-            // they can come from the source domain or patch ghost
-            auto const destBox = myDomainBox * overlapBox;
-            auto new_size      = domainParticles.size();
-
-            if (!destBox.empty())
+            // for each particles in the source ghost and domain particle arrays
+            // we check if it is in the intersectionBox
+            // if it is, is it in my domain box ?
+            //      - if so, let's add it to my domain particle array
+            //      - if not, let's add it to my ghost particle array
+            for (auto const& sourceParticlesArray : particlesArrays)
             {
-                Box<int, dim> const destBox_p{destBox};
-                new_size += srcDomainParticles.nbr_particles_in(destBox_p);
-                if (domainParticles.capacity() < new_size)
-                    domainParticles.reserve(new_size);
-
-                srcDomainParticles.export_particles(destBox_p, domainParticles);
-            }
-            PHARE_LOG_STOP("ParticleData::copy_ DomainToDomain");
-
-
-
-            PHARE_LOG_START("ParticlesData::copy_ DomainToGhosts");
-            // Now copy particles from the source domain that fall into
-            // our ghost layer. The ghost layer is the result of removing the domain box
-            // from the intersection box.
-            SAMRAI::hier::BoxContainer ghostLayerBoxes{};
-            ghostLayerBoxes.removeIntersections(overlapBox, myDomainBox);
-
-            new_size = patchGhostParticles.size();
-            for (auto& selectionBox : ghostLayerBoxes)
-            {
-                if (!selectionBox.empty())
+                auto& particleArray = *sourceParticlesArray;
+                for (std::size_t p_idx = 0; p_idx < particleArray.size(); ++p_idx)
                 {
-                    Box<int, dim> const selectionBox_p{selectionBox};
-                    new_size += srcDomainParticles.nbr_particles_in(selectionBox_p);
+                    if (isInBox(intersectionBox, particleArray.iCell(p_idx)))
+                    {
+                        if (isInBox(myDomainBox, particleArray.iCell(p_idx)))
+                        {
+                            domainParticles.push_back(particleArray[p_idx]);
+                        }
+                        else
+                        {
+                            patchGhostParticles.push_back(particleArray[p_idx]);
+                        }
+                    }
                 }
             }
-            if (patchGhostParticles.capacity() < new_size)
-                patchGhostParticles.reserve(new_size);
-
-
-            for (auto const& selectionBox : ghostLayerBoxes)
-            {
-                if (!selectionBox.empty())
-                {
-                    Box<int, dim> const selectionBox_p{selectionBox};
-                    srcDomainParticles.export_particles(selectionBox_p, patchGhostParticles);
-                }
-            }
-            PHARE_LOG_STOP("ParticlesData::copy_ DomainToGhosts");
         }
 
-        void copy_(SAMRAI::hier::Box const& overlapBox, ParticlesData const& sourceData,
-                   SAMRAI::hier::Transformation const& transformation)
+
+
+
+        void copyWithTransform_(SAMRAI::hier::Box const& /*sourceGhostBox*/,
+                                SAMRAI::hier::Box const& intersectionBox,
+                                SAMRAI::hier::Transformation const& transformation,
+                                ParticlesData const& sourceData)
         {
-            auto const myDomainBox   = this->getBox();
-            auto& srcDomainParticles = sourceData.domainParticles;
+            std::array<ParticleArray const*, 2> particlesArrays{&sourceData.domainParticles,
+                                                                &sourceData.patchGhostParticles};
 
-            PHARE_LOG_START("ParticleData::copy_ (transform)");
+            auto myDomainBox = this->getBox();
 
-            // first copy particles that fall into our domain array
-            // they can come from the source domain or patch ghost
-            auto destBox        = myDomainBox * overlapBox;
-            auto const offset   = transformation.getOffset();
-            auto new_size       = domainParticles.size();
-            auto const offseter = [&](auto const& particle) {
-                // we make a copy because we do not want to
-                // shift the original particle...
-                auto shiftedParticle{particle};
-                for (std::size_t idir = 0; idir < dim; ++idir)
-                {
-                    shiftedParticle.iCell[idir] += offset[idir];
-                }
-                return shiftedParticle;
-            };
+            auto offset = transformation.getOffset();
 
-            PHARE_LOG_START("DomainToDomain (transform)");
-            if (!destBox.empty())
+            for (auto const& sourceParticlesArray : particlesArrays)
             {
-                // we cannot select particles from the intersectDomain box
-                // right away. The reason is that the transformation may have
-                // a non-zero offset and particle iCells from the source are in
-                // the source index space, not in the destination index space
-                // therefore we need to first modify the destination box to
-                // be in the source index space
-                // this is done by applying the INVERSE transformation
-                // since a *transformation* is from source to destination.
-
-                transformation.inverseTransform(destBox);
-                Box<int, dim> const destBox_p{destBox};
-                new_size += srcDomainParticles.nbr_particles_in(destBox_p);
-
-                if (domainParticles.capacity() < new_size)
-                    domainParticles.reserve(new_size);
-                srcDomainParticles.export_particles(destBox_p, domainParticles, offseter);
-            }
-            PHARE_LOG_STOP("DomainToDomain (transform)");
-
-
-
-            PHARE_LOG_START("DomainToGhosts (transform)");
-            // Now copy particles from the source domain and patchghost that fall into
-            // our ghost layer. The ghost layer is the result of removing the domain box
-            // from the intersection box.
-            SAMRAI::hier::BoxContainer ghostLayerBoxes{};
-            ghostLayerBoxes.removeIntersections(overlapBox, myDomainBox);
-
-            new_size = patchGhostParticles.size();
-            for (auto& selectionBox : ghostLayerBoxes)
-            {
-                if (!selectionBox.empty())
+                auto& particleArray = *sourceParticlesArray;
+                for (std::size_t p_idx = 0; p_idx < particleArray.size(); ++p_idx)
                 {
-                    transformation.inverseTransform(selectionBox);
-                    Box<int, dim> const selectionBox_p{selectionBox};
-                    new_size += srcDomainParticles.nbr_particles_in(selectionBox_p);
-                }
-            }
-            if (patchGhostParticles.capacity() < new_size)
-                patchGhostParticles.reserve(new_size);
+                    // the particle is only copied if it is in the intersectionBox
+                    // but before its iCell must be shifted by the transformation offset
 
+                    auto newParticleiCell{particleArray.iCell(p_idx)};
+                    for (auto iDir = 0u; iDir < newParticleiCell.size(); ++iDir)
+                        newParticleiCell[iDir] += offset[iDir];
 
-            // ghostLayer boxes already have been inverse transformed
-            // in previous loop, not to do again...
-            for (auto const& selectionBox : ghostLayerBoxes)
-            {
-                if (!selectionBox.empty())
-                {
-                    Box<int, dim> selectionBox_p{selectionBox};
-                    srcDomainParticles.export_particles(selectionBox_p, patchGhostParticles,
-                                                        offseter);
+                    if (isInBox(intersectionBox, newParticleiCell))
+                    {
+                        // now we now the particle is in the intersection
+                        // we need to know whether it is in the domain part of that
+                        // intersection. If it is not, then it must be in the ghost part
+
+                        auto add_update = [&](auto& array) {
+                            array.push_back(particleArray[p_idx]);
+                            array.iCell(array.size() - 1) = newParticleiCell;
+                        };
+
+                        if (isInBox(myDomainBox, newParticleiCell))
+                            add_update(domainParticles);
+                        else
+                            add_update(patchGhostParticles);
+                    }
                 }
             }
 
-            PHARE_LOG_STOP("DomainToGhosts (transform)");
-            PHARE_LOG_STOP("ParticleData::copy_ (transform)");
+
+            // SAMRAI::hier::Box localSourceSelectionBox = AMRToLocal(intersectionBox,
+            // sourceGhostBox);
+
+            // we shift it back the box on top of source AMR indexes
+            // transformation.inverseTransform(localSourceSelectionBox);
+
+            // copy_(sourceData, particleShift, localSourceSelectionBox);
         }
 
 
@@ -520,7 +545,6 @@ namespace amr
          */
         std::size_t countNumberParticlesIn_(SAMRAI::pdat::CellOverlap const& overlap) const
         {
-            PHARE_LOG_SCOPE("ParticleData::countNumberParticlesIn_");
             std::size_t numberParticles = 0;
 
             if (overlap.isOverlapEmpty())
@@ -539,59 +563,69 @@ namespace amr
                 // so we need to transform that overlap box into our box index space.
                 // Since source index space + offset = destination indexspace
                 // we need to apply an inverseTransform to the overlapBox.
+                // then we intersect it with our Box and count how many of domain particles
+                // our inside that intersection.
                 SAMRAI::hier::Box shiftedOverlapBox{overlapBox};
                 SAMRAI::hier::Transformation const& transformation = overlap.getTransformation();
                 transformation.inverseTransform(shiftedOverlapBox);
-                Box<int, dim> shiftedOverlapBox_p{shiftedOverlapBox};
-                numberParticles += domainParticles.nbr_particles_in(shiftedOverlapBox_p);
+                SAMRAI::hier::Box intersectionBox{shiftedOverlapBox * getGhostBox()};
+
+                numberParticles += countNumberParticlesIn_(intersectionBox);
             }
             return numberParticles;
         }
 
 
-
-        void pack_(SAMRAI::pdat::CellOverlap const& overlap,
-                   SAMRAI::hier::Transformation const& transformation,
-                   std::vector<Particle_t>& outBuffer) const
+        /**
+         * @brief countNumberParticlesIn_ returns the number of interior particles within a given
+         * box
+         *
+         * the box given is in AMR index space so the function first needs to put it in
+         * local indexing relative to the domain box
+         */
+        std::size_t countNumberParticlesIn_(SAMRAI::hier::Box const& box) const
         {
-            PHARE_LOG_SCOPE("ParticleData::pack_");
-            // we want to put particles from our domain and patchghost arrays
-            // that fall into the intersection box Note that the overlap boxes
-            // are not in the same index space as our particles.  the
-            // transformation offset goes from OUR index space to the
-            // destination space.  Therefore we need to inverse transform the
-            // overlap box into our index space, intersect each of them with
-            // our ghost box and put export them with the transformation offset
-            auto overlapBoxes = overlap.getDestinationBoxContainer();
-            auto offset       = transformation.getOffset();
-            std::size_t size  = 0;
-            auto offseter     = [&](auto const& particle) {
-                auto shiftedParticle{particle};
-                for (std::size_t idir = 0; idir < dim; ++idir)
+            std::size_t numberParticles{0};
+
+            for (std::size_t i = 0; i < domainParticles.size(); ++i)
+                if (isInBox(box, domainParticles.iCell(i)))
+                    ++numberParticles;
+
+            return numberParticles;
+        }
+
+
+
+
+        void pack_(ParticleArray& buffer, SAMRAI::hier::Box const& intersectionBox,
+                   [[maybe_unused]] SAMRAI::hier::Box const& sourceBox,
+                   SAMRAI::hier::Transformation const& transformation) const
+        {
+            std::array<ParticleArray const*, 2> particlesArrays{&domainParticles,
+                                                                &patchGhostParticles};
+
+            for (auto const& sourceParticlesArray : particlesArrays)
+            {
+                auto& particleArray = *sourceParticlesArray;
+                for (std::size_t p_idx = 0; p_idx < particleArray.size(); ++p_idx)
                 {
-                    shiftedParticle.iCell[idir] += offset[idir];
+                    auto shiftediCell{particleArray.iCell(p_idx)};
+                    auto offset = transformation.getOffset();
+
+                    for (auto i = 0u; i < dim; ++i)
+                        shiftediCell[i] += offset[i];
+
+                    if (isInBox(intersectionBox, shiftediCell))
+                    {
+                        buffer.push_back(particleArray[p_idx]);
+                        buffer.iCell(buffer.size() - 1) = shiftediCell;
+                    }
                 }
-                return shiftedParticle;
-            };
-            for (auto const& box : overlapBoxes)
-            {
-                auto toTakeFrom{box};
-                transformation.inverseTransform(toTakeFrom);
-                Box<int, dim> toTakeFrom_p{toTakeFrom};
-                size += domainParticles.nbr_particles_in(toTakeFrom_p);
-            }
-            outBuffer.reserve(size);
-            for (auto const& box : overlapBoxes)
-            {
-                auto toTakeFrom{box};
-                transformation.inverseTransform(toTakeFrom);
-                Box<int, dim> toTakeFrom_p{toTakeFrom};
-                domainParticles.export_particles(toTakeFrom_p, outBuffer, offseter);
             }
         }
     };
-} // namespace amr
 
+} // namespace amr
 } // namespace PHARE
 
 #endif

@@ -31,7 +31,7 @@ struct ParticleDeltaDistribution
 template<typename Particle>
 auto cellAsPoint(Particle const& particle)
 {
-    return Point<int, Particle::dimension>{particle.iCell};
+    return Point<int, Particle::dimension>{particle.iCell()};
 }
 
 
@@ -42,40 +42,51 @@ struct Particle
     static_assert(dim > 0 and dim < 4, "Only dimensions 1,2,3 are supported.");
     static const size_t dimension = dim;
 
-    double weight;
-    double charge;
+    double weight_;
+    double charge_;
 
-    std::array<int, dim> iCell    = ConstArray<int, dim>();
-    std::array<double, dim> delta = ConstArray<double, dim>();
-    std::array<double, 3> v       = ConstArray<double, 3>();
+    std::array<int, dim> iCell_    = ConstArray<int, dim>();
+    std::array<double, dim> delta_ = ConstArray<double, dim>();
+    std::array<double, 3> v_       = ConstArray<double, 3>();
 
 
     bool operator==(Particle<dim> const& that) const
     {
-        return (this->weight == that.weight) && //
-               (this->charge == that.charge) && //
-               (this->iCell == that.iCell) &&   //
-               (this->delta == that.delta) &&   //
-               (this->v == that.v);
+        return (this->weight_ == that.weight_) && //
+               (this->charge_ == that.charge_) && //
+               (this->iCell_ == that.iCell_) &&   //
+               (this->delta_ == that.delta_) &&   //
+               (this->v_ == that.v_);
     }
 
     template<std::size_t dimension>
     friend std::ostream& operator<<(std::ostream& out, const Particle<dimension>& particle);
+
+    auto& weight() { return weight_; }
+    auto& weight() const { return weight_; }
+    auto& charge() { return charge_; }
+    auto& charge() const { return charge_; }
+    auto& iCell() { return iCell_; }
+    auto& iCell() const { return iCell_; }
+    auto& delta() { return delta_; }
+    auto& delta() const { return delta_; }
+    auto& v() { return v_; }
+    auto& v() const { return v_; }
 };
 
 template<std::size_t dim>
 std::ostream& operator<<(std::ostream& out, Particle<dim> const& particle)
 {
     out << "iCell(";
-    for (auto c : particle.iCell)
+    for (auto c : particle.iCell())
         out << c << ",";
     out << "), delta(";
-    for (auto d : particle.delta)
+    for (auto d : particle.delta())
         out << d << ",";
     out << "), v(";
-    for (auto v : particle.v)
+    for (auto v : particle.v())
         out << v << ",";
-    out << "), charge : " << particle.charge << ", weight : " << particle.weight << '\n';
+    out << "), charge : " << particle.charge() << ", weight : " << particle.weight() << '\n';
     return out;
 }
 

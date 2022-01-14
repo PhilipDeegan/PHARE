@@ -64,9 +64,9 @@ struct twoParticlesDataNDTouchingPeriodicBorders : public testing::Test
 
     twoParticlesDataNDTouchingPeriodicBorders()
     {
-        particle.weight = 1.0;
-        particle.charge = 1.0;
-        particle.v      = {{1.0, 1.0, 1.0}};
+        particle.weight_ = 1.0;
+        particle.charge_ = 1.0;
+        particle.v_      = {{1.0, 1.0, 1.0}};
     }
 };
 
@@ -92,23 +92,14 @@ TYPED_TEST(twoParticlesDataNDTouchingPeriodicBorders,
 
     auto leftDestGhostCell = -1;
     auto rightSourceCell   = 15;
-    if constexpr (dim == 1)
-    {
-        this->particle.iCell = {{rightSourceCell}};
-    }
-    else if constexpr (dim == 2)
-    {
-        this->particle.iCell = {{rightSourceCell, rightSourceCell}};
-    }
-    else if constexpr (dim == 3)
-    {
-        this->particle.iCell = {{rightSourceCell, rightSourceCell, rightSourceCell}};
-    }
+
+    this->particle.iCell_ = ConstArray<int, dim>(rightSourceCell);
+
     this->sourcePdat.domainParticles.push_back(this->particle);
     this->destPdat.copy(this->sourcePdat, *(this->cellOverlap));
 
     EXPECT_THAT(this->destPdat.patchGhostParticles.size(), Eq(1));
-    EXPECT_EQ(leftDestGhostCell, this->destPdat.patchGhostParticles[0].iCell[0]);
+    EXPECT_EQ(leftDestGhostCell, this->destPdat.patchGhostParticles[0].iCell()[0]);
 }
 
 
@@ -117,24 +108,24 @@ TYPED_TEST(twoParticlesDataNDTouchingPeriodicBorders, preserveParticleAttributes
     static constexpr auto dim = TypeParam{}();
 
 
-    this->particle.iCell = ConstArray<int, dim>(15);
+    this->particle.iCell_ = ConstArray<int, dim>(15);
     this->sourcePdat.domainParticles.push_back(this->particle);
     this->destPdat.copy(this->sourcePdat, *(this->cellOverlap));
 
     EXPECT_THAT(this->destPdat.patchGhostParticles.size(), Eq(1));
-    EXPECT_THAT(this->destPdat.patchGhostParticles[0].v, Eq(this->particle.v));
-    EXPECT_THAT(this->destPdat.patchGhostParticles[0].iCell[0], Eq(-1));
+    EXPECT_THAT(this->destPdat.patchGhostParticles[0].v(), Eq(this->particle.v()));
+    EXPECT_THAT(this->destPdat.patchGhostParticles[0].iCell()[0], Eq(-1));
     if constexpr (dim > 1)
     {
-        EXPECT_THAT(this->destPdat.patchGhostParticles[0].iCell[1], Eq(-1));
+        EXPECT_THAT(this->destPdat.patchGhostParticles[0].iCell()[1], Eq(-1));
     }
     if constexpr (dim > 2)
     {
-        EXPECT_THAT(this->destPdat.patchGhostParticles[0].iCell[2], Eq(-1));
+        EXPECT_THAT(this->destPdat.patchGhostParticles[0].iCell()[2], Eq(-1));
     }
-    EXPECT_THAT(this->destPdat.patchGhostParticles[0].delta, Eq(this->particle.delta));
-    EXPECT_THAT(this->destPdat.patchGhostParticles[0].weight, Eq(this->particle.weight));
-    EXPECT_THAT(this->destPdat.patchGhostParticles[0].charge, Eq(this->particle.charge));
+    EXPECT_THAT(this->destPdat.patchGhostParticles[0].delta(), Eq(this->particle.delta()));
+    EXPECT_THAT(this->destPdat.patchGhostParticles[0].weight(), Eq(this->particle.weight()));
+    EXPECT_THAT(this->destPdat.patchGhostParticles[0].charge(), Eq(this->particle.charge()));
 }
 
 
@@ -146,7 +137,7 @@ TYPED_TEST(twoParticlesDataNDTouchingPeriodicBorders, preserveParticleAttributes
 //    auto rightSourceGhostCell = 16;
 //    auto leftDestCell         = 0;
 //
-//    this->particle.iCell = ConstArray<int, dim>(rightSourceGhostCell);
+//    this->particle.iCell_ = ConstArray<int, dim>(rightSourceGhostCell);
 //    this->sourcePdat.patchGhostParticles.push_back(this->particle);
 //    this->destPdat.copy(this->sourcePdat, *(this->cellOverlap));
 //

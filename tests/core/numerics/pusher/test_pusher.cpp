@@ -140,11 +140,11 @@ public:
         , nt{static_cast<std::size_t>((tend - tstart) / dt + 1)}
 
     {
-        auto first    = std::begin(particlesIn);
-        first->charge = 1;
-        first->v      = {{0, 10., 0}};
-        first->iCell.fill(5);
-        first->delta.fill(0.0);
+        auto first     = std::begin(particlesIn);
+        first->charge_ = 1;
+        first->v_      = {{0, 10., 0}};
+        first->iCell_.fill(5);
+        first->delta_.fill(0.0);
         dxyz.fill(0.05);
         for (std::size_t i = 0; i < dim; i++)
             actual[i].resize(nt, 0.05);
@@ -188,12 +188,12 @@ TEST_F(APusher3D, trajectoryIsOk)
 
     for (decltype(nt) i = 0; i < nt; ++i)
     {
-        actual[0][i]
-            = (particlesOut[0].iCell[0] + particlesOut[0].delta[0]) * static_cast<float>(dxyz[0]);
-        actual[1][i]
-            = (particlesOut[0].iCell[1] + particlesOut[0].delta[1]) * static_cast<float>(dxyz[1]);
-        actual[2][i]
-            = (particlesOut[0].iCell[2] + particlesOut[0].delta[2]) * static_cast<float>(dxyz[2]);
+        actual[0][i] = (particlesOut[0].iCell()[0] + particlesOut[0].delta()[0])
+                       * static_cast<float>(dxyz[0]);
+        actual[1][i] = (particlesOut[0].iCell()[1] + particlesOut[0].delta()[1])
+                       * static_cast<float>(dxyz[1]);
+        actual[2][i] = (particlesOut[0].iCell()[2] + particlesOut[0].delta()[2])
+                       * static_cast<float>(dxyz[2]);
 
         pusher->move(rangeIn, rangeOut, em, mass, interpolator, selector, layout, particle_EBs);
 
@@ -216,10 +216,10 @@ TEST_F(APusher2D, trajectoryIsOk)
 
     for (decltype(nt) i = 0; i < nt; ++i)
     {
-        actual[0][i]
-            = (particlesOut[0].iCell[0] + particlesOut[0].delta[0]) * static_cast<float>(dxyz[0]);
-        actual[1][i]
-            = (particlesOut[0].iCell[1] + particlesOut[0].delta[1]) * static_cast<float>(dxyz[1]);
+        actual[0][i] = (particlesOut[0].iCell()[0] + particlesOut[0].delta()[0])
+                       * static_cast<float>(dxyz[0]);
+        actual[1][i] = (particlesOut[0].iCell()[1] + particlesOut[0].delta()[1])
+                       * static_cast<float>(dxyz[1]);
 
         pusher->move(rangeIn, rangeOut, em, mass, interpolator, selector, layout, particle_EBs);
 
@@ -240,8 +240,8 @@ TEST_F(APusher1D, trajectoryIsOk)
 
     for (decltype(nt) i = 0; i < nt; ++i)
     {
-        actual[0][i]
-            = (particlesOut[0].iCell[0] + particlesOut[0].delta[0]) * static_cast<float>(dxyz[0]);
+        actual[0][i] = (particlesOut[0].iCell()[0] + particlesOut[0].delta()[0])
+                       * static_cast<float>(dxyz[0]);
 
         pusher->move(rangeIn, rangeOut, em, mass, interpolator, selector, layout, particle_EBs);
 
@@ -283,10 +283,10 @@ public:
 
         for (auto& part : particlesIn)
         {
-            part.charge = 1;
-            part.v      = {{5., 0., 0.}};
-            part.iCell  = {{dis(gen)}};
-            part.delta  = {{delta(gen)}};
+            part.charge_ = 1;
+            part.v_      = {{5., 0., 0.}};
+            part.iCell_  = {{dis(gen)}};
+            part.delta_  = {{delta(gen)}};
         }
         pusher->setMeshAndTimeStep({{dx}}, dt);
     }

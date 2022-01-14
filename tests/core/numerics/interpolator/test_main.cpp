@@ -40,7 +40,7 @@ template<std::size_t dim, std::size_t interpOrder>
 struct Testables : public TestablesBase<dim, interpOrder>
 {
     using PHARE_TYPES     = PHARE::core::PHARE_Types<dim, interpOrder>;
-    using ParticleArray_t = typename PHARE_TYPES::ParticleArray_t;
+    using ParticleArray_t = typename PHARE_TYPES::ParticleAoS_t;
 };
 
 template<std::size_t dim, std::size_t interpOrder, std::size_t version_ = 0>
@@ -294,10 +294,17 @@ public:
             ez1d_(ix) = ez0;
         }
 
-        for (auto& part : particles)
+        auto set = [](auto& iCell, auto& delta) {
+            iCell[0] = 5;
+            delta[0] = 0.32f;
+        };
+
+        for (std::size_t i = 0; i < particles.size(); ++i)
         {
-            part.iCell[0] = 5;
-            part.delta[0] = 0.32f;
+            if constexpr (ParticleArray_t::is_contiguous)
+                set(particles.iCell(i), particles.delta[i]);
+            else
+                set(particles.iCell(i), particles[i].delta);
         }
     }
 };
@@ -408,10 +415,17 @@ public:
             }
         }
 
-        for (auto& part : particles)
+        auto set = [](auto& iCell, auto& delta) {
+            iCell[0] = 5;
+            delta[0] = 0.32f;
+        };
+
+        for (std::size_t i = 0; i < particles.size(); ++i)
         {
-            part.iCell[0] = 5;
-            part.delta[0] = 0.32f;
+            if constexpr (ParticleArray_t::is_contiguous)
+                set(particles.iCell(i), particles.delta[i]);
+            else
+                set(particles.iCell(i), particles[i].delta);
         }
     }
 };
@@ -527,10 +541,17 @@ public:
             }
         }
 
-        for (auto& part : particles)
+        auto set = [](auto& iCell, auto& delta) {
+            iCell[0] = 5;
+            delta[0] = 0.32f;
+        };
+
+        for (std::size_t i = 0; i < particles.size(); ++i)
         {
-            part.iCell[0] = 5;
-            part.delta[0] = 0.32f;
+            if constexpr (ParticleArray_t::is_contiguous)
+                set(particles.iCell(i), particles.delta[i]);
+            else
+                set(particles.iCell(i), particles[i].delta());
         }
     }
 };
@@ -635,106 +656,106 @@ public:
 
         if constexpr (Interpolator::interp_order == 1)
         {
-            part.iCell[0] = 19; // AMR index
-            part.delta[0] = 0.5f;
-            part.weight   = 1.0;
-            part.v[0]     = +2.;
-            part.v[1]     = -1.;
-            part.v[2]     = +1.;
+            part.iCell_[0] = 19; // AMR index
+            part.delta_[0] = 0.5f;
+            part.weight_   = 1.0;
+            part.v_[0]     = +2.;
+            part.v_[1]     = -1.;
+            part.v_[2]     = +1.;
             particles.push_back(part);
 
-            part.iCell[0] = 20; // AMR index
-            part.delta[0] = 0.5f;
-            part.weight   = 0.4;
-            part.v[0]     = +2.;
-            part.v[1]     = -1.;
-            part.v[2]     = +1.;
+            part.iCell_[0] = 20; // AMR index
+            part.delta_[0] = 0.5f;
+            part.weight_   = 0.4;
+            part.v_[0]     = +2.;
+            part.v_[1]     = -1.;
+            part.v_[2]     = +1.;
             particles.push_back(part);
 
-            part.iCell[0] = 20; // AMR index
-            part.delta[0] = 0.5f;
-            part.weight   = 0.6;
-            part.v[0]     = +2.;
-            part.v[1]     = -1.;
-            part.v[2]     = +1.;
+            part.iCell_[0] = 20; // AMR index
+            part.delta_[0] = 0.5f;
+            part.weight_   = 0.6;
+            part.v_[0]     = +2.;
+            part.v_[1]     = -1.;
+            part.v_[2]     = +1.;
             particles.push_back(part);
         }
 
         if constexpr (Interpolator::interp_order == 2)
         {
-            part.iCell[0] = 19; // AMR index
-            part.delta[0] = 0.0f;
-            part.weight   = 1.0;
-            part.v[0]     = +2.;
-            part.v[1]     = -1.;
-            part.v[2]     = +1.;
+            part.iCell_[0] = 19; // AMR index
+            part.delta_[0] = 0.0f;
+            part.weight_   = 1.0;
+            part.v_[0]     = +2.;
+            part.v_[1]     = -1.;
+            part.v_[2]     = +1.;
             particles.push_back(part);
 
-            part.iCell[0] = 20; // AMR index
-            part.delta[0] = 0.0f;
-            part.weight   = 0.2;
-            part.v[0]     = +2.;
-            part.v[1]     = -1.;
-            part.v[2]     = +1.;
+            part.iCell_[0] = 20; // AMR index
+            part.delta_[0] = 0.0f;
+            part.weight_   = 0.2;
+            part.v_[0]     = +2.;
+            part.v_[1]     = -1.;
+            part.v_[2]     = +1.;
             particles.push_back(part);
 
-            part.iCell[0] = 20; // AMR index
-            part.delta[0] = 0.0f;
-            part.weight   = 0.8;
-            part.v[0]     = +2.;
-            part.v[1]     = -1.;
-            part.v[2]     = +1.;
+            part.iCell_[0] = 20; // AMR index
+            part.delta_[0] = 0.0f;
+            part.weight_   = 0.8;
+            part.v_[0]     = +2.;
+            part.v_[1]     = -1.;
+            part.v_[2]     = +1.;
             particles.push_back(part);
 
-            part.iCell[0] = 21; // AMR index
-            part.delta[0] = 0.0f;
-            part.weight   = 1.0;
-            part.v[0]     = +2.;
-            part.v[1]     = -1.;
-            part.v[2]     = +1.;
+            part.iCell_[0] = 21; // AMR index
+            part.delta_[0] = 0.0f;
+            part.weight_   = 1.0;
+            part.v_[0]     = +2.;
+            part.v_[1]     = -1.;
+            part.v_[2]     = +1.;
             particles.push_back(part);
         }
 
         if constexpr (Interpolator::interp_order == 3)
         {
-            part.iCell[0] = 18; // AMR index
-            part.delta[0] = 0.5f;
-            part.weight   = 1.0;
-            part.v[0]     = +2.;
-            part.v[1]     = -1.;
-            part.v[2]     = +1.;
+            part.iCell_[0] = 18; // AMR index
+            part.delta_[0] = 0.5f;
+            part.weight_   = 1.0;
+            part.v_[0]     = +2.;
+            part.v_[1]     = -1.;
+            part.v_[2]     = +1.;
             particles.push_back(part);
 
-            part.iCell[0] = 19; // AMR index
-            part.delta[0] = 0.5f;
-            part.weight   = 1.0;
-            part.v[0]     = +2.;
-            part.v[1]     = -1.;
-            part.v[2]     = +1.;
+            part.iCell_[0] = 19; // AMR index
+            part.delta_[0] = 0.5f;
+            part.weight_   = 1.0;
+            part.v_[0]     = +2.;
+            part.v_[1]     = -1.;
+            part.v_[2]     = +1.;
             particles.push_back(part);
 
-            part.iCell[0] = 20; // AMR index
-            part.delta[0] = 0.5f;
-            part.weight   = 1.0;
-            part.v[0]     = +2.;
-            part.v[1]     = -1.;
-            part.v[2]     = +1.;
+            part.iCell_[0] = 20; // AMR index
+            part.delta_[0] = 0.5f;
+            part.weight_   = 1.0;
+            part.v_[0]     = +2.;
+            part.v_[1]     = -1.;
+            part.v_[2]     = +1.;
             particles.push_back(part);
 
-            part.iCell[0] = 21; // AMR index
-            part.delta[0] = 0.5f;
-            part.weight   = 0.1;
-            part.v[0]     = +2.;
-            part.v[1]     = -1.;
-            part.v[2]     = +1.;
+            part.iCell_[0] = 21; // AMR index
+            part.delta_[0] = 0.5f;
+            part.weight_   = 0.1;
+            part.v_[0]     = +2.;
+            part.v_[1]     = -1.;
+            part.v_[2]     = +1.;
             particles.push_back(part);
 
-            part.iCell[0] = 21; // AMR index
-            part.delta[0] = 0.5f;
-            part.weight   = 0.9;
-            part.v[0]     = +2.;
-            part.v[1]     = -1.;
-            part.v[2]     = +1.;
+            part.iCell_[0] = 21; // AMR index
+            part.delta_[0] = 0.5f;
+            part.weight_   = 0.9;
+            part.v_[0]     = +2.;
+            part.v_[1]     = -1.;
+            part.v_[2]     = +1.;
             particles.push_back(part);
         }
 
@@ -766,7 +787,7 @@ INSTANTIATE_TYPED_TEST_SUITE_P(testInterpolator, ACollectionOfParticles_1d, MyTy
 
 
 template<typename Testables>
-struct ACollectionOfParticles_2d : public ::testing::Test /*, public Testables*/
+struct ACollectionOfParticles_2d : public ::testing::Test
 {
     using Interpolator    = typename Testables::Interpolator_t;
     using ParticleArray_t = typename Testables::ParticleArray_t;
