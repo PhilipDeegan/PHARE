@@ -8,9 +8,9 @@ import pyphare.pharein as ph
 seed = 133333333337
 time_step_nbr=10
 time_step=0.001
-cells, dl, ppc = 400, .2, 100
+cells, dl, ppc = 100, .2, 100
 patch_sizes = [12, 100]
-threads=10
+threads=1
 diag_outputs="tools/bench/real/harris/outputs"
 
 def density(x, y):
