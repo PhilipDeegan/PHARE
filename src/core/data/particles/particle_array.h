@@ -100,7 +100,7 @@ public:
     using Super                                      = AoSParticles<dim, AoSVector<dim>>;
     using Particle_t                                 = Particle<dim>;
     using Vector                                     = typename Super::container_type;
-    using Super::container_type;
+    using typename Super::container_type;
     using Super::particles_;
 
     template<std::size_t size>
