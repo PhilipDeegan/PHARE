@@ -257,6 +257,18 @@ NO_DISCARD Return sum(Container const& container, Return r = 0)
 }
 
 
+template<typename Container, typename F>
+NO_DISCARD auto sum_from(Container const& container, F fn)
+{
+    using value_type  = typename Container::value_type;
+    using return_type = std::decay_t<std::result_of_t<F(value_type const&)>>;
+    return_type sum   = 0;
+    for (auto const& el : container)
+        sum += fn(el);
+    return sum;
+}
+
+
 
 
 template<typename F>
@@ -273,6 +285,8 @@ NO_DISCARD auto generate(F&& f, std::size_t from, std::size_t to)
     return v;
 }
 
+
+
 template<typename F>
 NO_DISCARD auto generate(F&& f, std::size_t count)
 {
@@ -281,7 +295,7 @@ NO_DISCARD auto generate(F&& f, std::size_t count)
 
 
 template<typename F, typename Container>
-NO_DISCARD auto generate(F&& f, Container& container)
+NO_DISCARD auto generate(F&& f, Container const& container)
 {
     using T          = typename Container::value_type;
     using value_type = std::decay_t<std::result_of_t<F&(T&)>>;
@@ -352,6 +366,8 @@ auto inline float_equals(double const& a, double const& b, double diff = 1e-12)
 {
     return std::abs(a - b) < diff;
 }
+
+
 
 } // namespace PHARE::core
 
