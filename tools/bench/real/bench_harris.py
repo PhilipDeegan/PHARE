@@ -1,8 +1,13 @@
-
-
 import numpy as np
-from pyphare.cpp import cpp_lib # must be first
-cpp_lib("pybindlibs.cpp_sim_2_1_4")
+
+dim = 2 # no others supported
+interp = 1
+nb_parts = 4
+
+if __name__=="__main__":
+    from pyphare.cpp import cpp_lib
+    cpp_lib(f"pybindlibs.cpp_sim_{dim}_{interp}_{nb_parts}")
+
 import pyphare.pharein as ph
 
 seed = 133333333337
@@ -51,8 +56,8 @@ def vthxyz(x, y): return np.sqrt(T(x, y))
 def config():
     ph.Simulation(# strict=True,
         smallest_patch_size=patch_sizes[0], largest_patch_size=patch_sizes[1],
-        time_step_nbr=10, time_step=0.001,
-        cells=[cells] * 2, dl=[dl] * 2,
+        time_step_nbr=10, time_step=0.001, interp_order=interp,
+        cells=[cells] * dim, dl=[dl] * dim,
         resistivity=0.001, hyper_resistivity=0.001,
         diag_options={"format": "phareh5", "options": {"dir": diag_outputs, "mode":"overwrite"}},
         refinement_boxes={},
