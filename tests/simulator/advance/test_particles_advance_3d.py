@@ -14,7 +14,7 @@ matplotlib.use("Agg")  # for systems without GUI
 
 ndim = 3
 interp_orders = [1, 2, 3]
-ppc = 10
+ppc = 5
 
 def per_interp(dic):
     return [(interp, dic) for interp in interp_orders]
