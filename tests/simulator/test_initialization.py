@@ -39,7 +39,6 @@ class InitializationTest(SimulatorTest):
                      cells=120, dl=0.1, ndim=1):
         diag_outputs = f"phare_outputs/init/{diag_outputs}"
         from pyphare.pharein import global_vars
-        clean_up_diags(global_vars.sim)
         global_vars.sim =None
 
         if smallest_patch_size is None:
@@ -328,8 +327,6 @@ class InitializationTest(SimulatorTest):
 
 
 
-<<<<<<< HEAD
-
 
     def _test_density_is_as_provided_by_user(self, dim, interp_order, **kwargs):
         print(f"test_density_is_as_provided_by_user : dim {dim} interp_order {interp_order}")
@@ -337,7 +334,7 @@ class InitializationTest(SimulatorTest):
         empirical_dim_devs = {
               1: 6e-3,
               2: 3e-2,
-              3: 3e-2,
+              3: 2e-1,
         }
         nbParts = {1 : 10000, 2: 1000, 3: 20}
         hier = self.getHierarchy(interp_order, {"L0": {"B0": nDBox(dim, 5, 14)}},
@@ -364,45 +361,9 @@ class InitializationTest(SimulatorTest):
                 nbrGhosts = layout.nbrGhosts(interp_order, centering)
                 select = tuple([slice(nbrGhosts,-nbrGhosts) for i in range(dim)])
 
-                xyz = patch.patch_datas["rho"].meshgrid()
-                xyz0 = [v[select] for v in xyz]
-
-                # if dim == 1:
-                #     x0 = xx[select]
-                #     protons_expected = proton_density_fn(x0)
-                #     beam_expected    = beam_density_fn(x0)
-
-                #     # ion_expected     = protons_expected + beam_expected
-                #     # ion_actual     = ion_density[nbrGhosts:-nbrGhosts]
-                #     # beam_actual    = beam_density[nbrGhosts:-nbrGhosts]
-                #     # protons_actual = proton_density[nbrGhosts:-nbrGhosts]
-
-
-                # if dim == 2:
-                #     xx, yy = patch.patch_datas["rho"].meshgrid()
-
-                #     x0 = xx[select]
-                #     y0 = yy[select]
-
-                #     protons_expected = proton_density_fn(x0, y0)
-                #     beam_expected    = beam_density_fn(x0, y0)
-
-                #     # ion_expected     = protons_expected + beam_expected
-                #     # ion_actual     = ion_density[select]
-                #     # beam_actual    = beam_density[select]
-                #     # protons_actual = proton_density[select]
-
-
-
-                # if dim == 3:
-                #     xx, yy, zz = patch.patch_datas["rho"].meshgrid()
-
-                #     x0 = xx[select]
-                #     y0 = yy[select]
-                #     z0 = zz[select]
-
-                protons_expected = proton_density_fn(*xyz0)
-                beam_expected    = beam_density_fn(*xyz0)
+                mesh = patch.patch_datas["rho"].meshgrid(select)
+                protons_expected = proton_density_fn(*mesh)
+                beam_expected    = beam_density_fn(*mesh)
                 ion_expected   = protons_expected + beam_expected
 
                 protons_actual = proton_density[select]

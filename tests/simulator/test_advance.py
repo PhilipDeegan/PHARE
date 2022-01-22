@@ -36,7 +36,6 @@ class AdvanceTestBase(SimulatorTest):
                      dl=0.2, extra_diag_options={}, time_step_nbr=1, timestamps=None, ndim=1):
         diag_outputs = f"phare_outputs/advance/{diag_outputs}"
         from pyphare.pharein import global_vars
-        clean_up_diags(global_vars.sim)
         global_vars.sim = None
         if smallest_patch_size is None:
             from pyphare.pharein.simulation import check_patch_size

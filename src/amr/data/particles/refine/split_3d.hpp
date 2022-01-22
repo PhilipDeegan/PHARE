@@ -8,9 +8,9 @@ Splitting reference material can be found @
 
 #include <array>
 #include <cstddef>
-#include "core/utilities/point/point.h"
-#include "core/utilities/types.h"
-#include "splitter.h"
+#include "core/utilities/point/point.hpp"
+#include "core/utilities/types.hpp"
+#include "splitter.hpp"
 
 namespace PHARE::amr
 {
