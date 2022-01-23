@@ -9,7 +9,7 @@ import unittest, os, pyphare.pharein as ph
 from datetime import datetime, timezone
 from ddt import ddt, data
 from tests.simulator import NoOverwriteDict, populate_simulation
-from pyphare.simulator.simulator import Simulator
+from pyphare.simulator.simulator import Simulator,startMPI
 from pyphare.core.box import Box, Box2D
 
 out = "phare_outputs/valid/refinement_boxes/"
@@ -27,6 +27,10 @@ class SimulatorValidation(unittest.TestCase):
     def __init__(self, *args, **kwargs):
         super(SimulatorValidation, self).__init__(*args, **kwargs)
         self.simulator = None
+
+
+    def setUp(self):
+        startMPI()
 
 
     def tearDown(self):

@@ -111,6 +111,11 @@ class TaggingTest(unittest.TestCase):
         self.simulator = None
 
 
+    def setUp(self):
+        from pyphare.simulator.simulator import startMPI
+        startMPI()
+
+
     def tearDown(self):
         if self.simulator is not None:
             self.simulator.reset()
@@ -171,5 +176,4 @@ class TaggingTest(unittest.TestCase):
 
 
 if __name__ == "__main__":
-    startMPI()
     unittest.main()

@@ -190,6 +190,11 @@ class SimulatorTest(unittest.TestCase):
 
     test_kwargs = ["rethrow"]
 
+
+    def setUp(self):
+        from pyphare.simulator.simulator import startMPI
+        startMPI()
+
     def tearDown(self):
         self.clean_up_diags_dirs()
 
@@ -237,9 +242,8 @@ class SimulatorTest(unittest.TestCase):
 
 
     def clean_up_diags_dirs(self):
-        from pyphare.simulator.simulator import startMPI
+
         from pyphare.cpp import cpp_lib
-        startMPI()
         if cpp_lib().mpi_rank() > 0:
             return # only delete h5 files for rank 0
 

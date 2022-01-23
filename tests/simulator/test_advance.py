@@ -1,7 +1,7 @@
 from pyphare.cpp import cpp_lib
 cpp = cpp_lib()
 
-from pyphare.simulator.simulator import Simulator, startMPI
+from pyphare.simulator.simulator import Simulator
 from pyphare.core.phare_utilities import np_array_ify
 from pyphare.pharesee.hierarchy import hierarchy_from, merge_particles
 from pyphare.pharein import MaxwellianFluidModel
@@ -516,5 +516,4 @@ class AdvanceTestBase(SimulatorTest):
 
 
 if __name__ == "__main__":
-    startMPI()
     unittest.main()
