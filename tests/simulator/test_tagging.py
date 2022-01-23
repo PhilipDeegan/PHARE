@@ -108,7 +108,6 @@ class TaggingTest(unittest.TestCase):
 
     def __init__(self, *args, **kwargs):
         super(TaggingTest, self).__init__(*args, **kwargs)
-        startMPI()
         self.simulator = None
 
 
@@ -172,4 +171,5 @@ class TaggingTest(unittest.TestCase):
 
 
 if __name__ == "__main__":
+    startMPI()
     unittest.main()

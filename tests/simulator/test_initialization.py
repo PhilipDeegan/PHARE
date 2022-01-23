@@ -520,14 +520,8 @@ class InitializationTest(SimulatorTest):
     def _test_patch_ghost_on_refined_level_case(self, dim, has_patch_ghost, **kwargs):
         import pyphare.pharein as ph
 
-        from pyphare.simulator.simulator import startMPI
-
-        startMPI()
-
         out = "phare_outputs"
-
         test_id = self.ddt_test_id()
-
         refinement_boxes = {"L0": [nDBox(dim, 10, 19)]}
 
         kwargs["interp_order"] = kwargs.get("interp_order", 1)

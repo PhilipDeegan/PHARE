@@ -84,7 +84,6 @@ class DiagnosticsTest(unittest.TestCase):
 
     def __init__(self, *args, **kwargs):
         super(DiagnosticsTest, self).__init__(*args, **kwargs)
-        startMPI()
         self.simulator = None
 
 
@@ -180,5 +179,6 @@ class DiagnosticsTest(unittest.TestCase):
 
 
 if __name__ == "__main__":
+    startMPI()
     unittest.main()
 
