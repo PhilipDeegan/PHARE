@@ -453,16 +453,17 @@ class InitializationTest(SimulatorTest):
 
 
     def _test_nbr_particles_per_cell_is_as_provided(self, dim, interp_order, ppc=100, **kwargs):
-        ddt_test_id = self.ddt_test_id()
-        datahier = self.getHierarchy(interp_order, {"L0": {"B0": nDBox(dim, 10, 20)}}, "particles", ndim=dim,
-                      diag_outputs=f"ppc/{dim}/{interp_order}/{ddt_test_id}", nbr_part_per_cell=ppc, **kwargs)
+
+        datahier = self.getHierarchy(interp_order, {}, "particles", ndim=dim,
+                      diag_outputs=f"ppc/{dim}/{interp_order}/{self.ddt_test_id()}", nbr_part_per_cell=ppc, **kwargs)
+
+        if cpp.mpi_rank() > 0: return
 
         for patch in datahier.level(0).patches:
             pd = patch.patch_datas["protons_particles"]
             icells = pd.dataset[patch.box].iCells
-            H, edges = np.histogramdd(icells)
-            self.assertTrue((H == ppc).all())
-
+            vals, count = np.unique(icells, axis=0, return_counts=True)
+            np.testing.assert_equal(count, ppc)
 
 
 
@@ -485,9 +486,11 @@ class InitializationTest(SimulatorTest):
 
     def _test_domainparticles_have_correct_split_from_coarser_particle(self, ndim, interp_order, refinement_boxes, **kwargs):
         print("test_domainparticles_have_correct_split_from_coarser_particle for dim/interp : {}/{}".format(ndim, interp_order))
-        ddt_test_id = self.ddt_test_id()
+
         datahier = self.getHierarchy(interp_order, refinement_boxes, "particles", ndim=ndim,
-           diag_outputs=f"coarser_split/{ndim}/{interp_order}/{ddt_test_id}", cells=30, **kwargs)
+           diag_outputs=f"coarser_split/{ndim}/{interp_order}/{self.ddt_test_id()}", cells=30, **kwargs)
+
+        if cpp.mpi_rank() > 0: return
 
         from pyphare.pharein.global_vars import sim
         assert sim is not None and len(sim.cells) == ndim

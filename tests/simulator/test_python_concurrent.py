@@ -73,9 +73,13 @@ class CallableTest:
         self.ti = ti
         self.cmd = cmd
         self.run = None
+        self.e = None
 
     def __call__(self, **kwargs):
-        self.run = run(self.cmd.split(), shell=False, capture_output=True, check=True, print_cmd=False)
+        try:
+            self.run = run(self.cmd.split(), shell=False, capture_output=True, check=True, print_cmd=False)
+        except RuntimeError as e:
+            self.e = e
         return self
 
 class CoreCount:
@@ -95,7 +99,7 @@ def print_tests(batches):
 
 if __name__ == "__main__":
     batches = build_batches()
-    # batches = [TestBatch([batches[0].tests[0]])]
+
     if PRINT:
         print_tests(batches)
 
@@ -129,7 +133,10 @@ if __name__ == "__main__":
                 proc = queue.get()
                 time.sleep(.01) # don't throttle!
                 if (isinstance(proc, CallableTest)):
-                    print(proc.cmd, f"finished in {proc.run.t:.2f} seconds")
+                    if proc.e is None:
+                        print(proc.cmd, f"finished in {proc.run.t:.2f} seconds")
+                    else:
+                        print(proc.cmd, f"failed with error: {proc.e}")
                     cc.cores_avail += batches[proc.bi].mpi_run
                     cc.fin[proc.bi] += 1
                     launch_tests()
