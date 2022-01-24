@@ -154,7 +154,8 @@ class AdvanceTestBase(SimulatorTest):
                                     write_timestamps=timestamps,
                                     population_name=pop)
 
-        Simulator(global_vars.sim).run()
+        Simulator(global_vars.sim).run().reset()
+        cpp.mpi_barrier()
 
         eb_hier = None
         if qty in ["e", "eb", "fields"]:

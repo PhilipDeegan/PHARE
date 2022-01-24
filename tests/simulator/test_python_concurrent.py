@@ -4,6 +4,7 @@
 """
 
 import os
+import sys
 import time
 import unittest
 from multiprocessing import Process, Queue, cpu_count
@@ -99,6 +100,7 @@ def print_tests(batches):
 
 if __name__ == "__main__":
     batches = build_batches()
+    exit_code = 0
 
     if PRINT:
         print_tests(batches)
@@ -137,6 +139,7 @@ if __name__ == "__main__":
                         print(proc.cmd, f"finished in {proc.run.t:.2f} seconds")
                     else:
                         print(proc.cmd, f"failed with error: {proc.e}")
+                        exit_code = 1
                     cc.cores_avail += batches[proc.bi].mpi_run
                     cc.fin[proc.bi] += 1
                     launch_tests()
@@ -144,3 +147,5 @@ if __name__ == "__main__":
 
         launch_tests()
         waiter(pqueue)
+
+    sys.exit(exit_code)

@@ -171,6 +171,7 @@ class InitializationTest(SimulatorTest):
                                     population_name=pop)
 
         Simulator(global_vars.sim).initialize().reset()
+        cpp.mpi_barrier()
 
         eb_hier = None
         if qty in ["e", "eb"]:

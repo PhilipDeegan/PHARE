@@ -244,6 +244,7 @@ class SimulatorTest(unittest.TestCase):
     def clean_up_diags_dirs(self):
 
         from pyphare.cpp import cpp_lib
+        cpp_lib().mpi_barrier()
         if cpp_lib().mpi_rank() > 0:
             return # only delete h5 files for rank 0
 
