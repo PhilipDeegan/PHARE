@@ -34,7 +34,7 @@ class AdvanceTestBase(SimulatorTest):
                      smallest_patch_size=None, largest_patch_size=20,
                      cells=120, time_step=0.001, model_init={},
                      dl=0.2, extra_diag_options={}, time_step_nbr=1, timestamps=None, ndim=1):
-        diag_outputs = f"phare_outputs/advance/{diag_outputs}"
+        diag_outputs = f"phare_outputs/advance/mpi_run_{cpp.mpi_size()}/{diag_outputs}"
         from pyphare.pharein import global_vars
         global_vars.sim = None
         if smallest_patch_size is None:

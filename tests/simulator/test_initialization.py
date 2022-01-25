@@ -37,7 +37,7 @@ class InitializationTest(SimulatorTest):
                      beam = False, time_step_nbr=1,
                      smallest_patch_size=None, largest_patch_size=10,
                      cells=120, dl=0.1, ndim=1):
-        diag_outputs = f"phare_outputs/init/{diag_outputs}"
+        diag_outputs = f"phare_outputs/init/mpi_run_{cpp.mpi_size()}/{diag_outputs}"
         from pyphare.pharein import global_vars
         global_vars.sim =None
 
