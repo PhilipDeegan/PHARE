@@ -190,6 +190,11 @@ class SimulatorTest(unittest.TestCase):
     def tearDown(self):
         self.clean_up_diags_dirs()
 
+    def setUp(self):
+        from pyphare.simulator.simulator import startMPI
+        startMPI()
+        return self
+
     def datetime_now(self):
         return datetime.now()
 
@@ -234,9 +239,9 @@ class SimulatorTest(unittest.TestCase):
 
 
     def clean_up_diags_dirs(self):
-        from pyphare.simulator.simulator import startMPI
         from pyphare.cpp import cpp_lib
-        startMPI()
+
+        cpp_lib().mpi_barrier() # synchronize first
         if cpp_lib().mpi_rank() > 0:
             return # only delete h5 files for rank 0
 

@@ -1,4 +1,4 @@
-#!/usr/bin/env python3
+# TODO: RM FILE
 
 import pyphare.pharein as ph #lgtm [py/import-and-import-from]
 from pyphare.pharein import Simulation

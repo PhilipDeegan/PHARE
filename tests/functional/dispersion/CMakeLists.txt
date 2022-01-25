@@ -9,6 +9,6 @@ endif()
 
 if(HighFive)
   ## These test use dump diagnostics so require HighFive!
-  phare_python3_exec(11, test-dispersion-whistler-AIC dispersion1d.py ${CMAKE_CURRENT_BINARY_DIR})
-  phare_python3_exec(11, test-dispersion-whistler-AIC dispersion2d.py ${CMAKE_CURRENT_BINARY_DIR})
+
+  phare_python3_exec(11, test-dispersion-whistler-AIC dispersion.py ${CMAKE_CURRENT_BINARY_DIR})
 endif()
