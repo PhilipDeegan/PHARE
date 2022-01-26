@@ -208,7 +208,10 @@ if __name__=="__main__":
         if resolution not in ['low', 'high']:
             raise ValueError('arg should be "low" or "high"')
 
-        DispersionTest().setUp().test_dispersion(int(dim), resolution).tearDown()
+        test = DispersionTest()
+        test.setUp()
+        test.test_dispersion(int(dim), resolution)
+        test.tearDown()
 
     elif len(sys.argv) == 1:
 
