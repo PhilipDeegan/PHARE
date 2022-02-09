@@ -50,11 +50,11 @@ namespace core
         return Range<Iterator>{std::forward<Iterator>(begin), std::forward<Iterator>(last)};
     }
 
-    template<typename Iterator>
-    Range<Iterator> makeRange(Iterator const& begin, Iterator const& last)
-    {
-        return Range<Iterator>{begin, last};
-    }
+    // template<typename Iterator>
+    // Range<Iterator> makeRange(Iterator const& begin, Iterator const& last)
+    // {
+    //     return Range<Iterator>{begin, last};
+    // }
 
     template<typename Container>
     auto makeRange(Container& container)

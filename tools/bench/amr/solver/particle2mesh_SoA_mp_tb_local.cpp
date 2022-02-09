@@ -3,7 +3,7 @@
 #include <thread>
 #include <cstdlib>
 
-#include "bench/core/bench.h"
+#include "bench/core/bench.hpp"
 
 #include "core/numerics/ion_updater/ion_range.h"
 #include "core/numerics/ion_updater/ion_updater.h"

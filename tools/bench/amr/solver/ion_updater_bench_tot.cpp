@@ -2,7 +2,7 @@
 
 #include "mkn/kul/log.hpp"
 
-#include "bench/core/bench.h"
+#include "bench/core/bench.hpp"
 
 #include <thread>
 

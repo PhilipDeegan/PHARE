@@ -3,7 +3,7 @@
 #include <thread>
 #include <cstdlib>
 
-#include "bench/core/bench.h"
+#include "bench/core/bench.hpp"
 
 #include "core/data/particles/particle_array_soa.h"
 

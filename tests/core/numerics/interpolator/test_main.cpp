@@ -86,8 +86,7 @@ public:
             auto delta = normalizedPositions[i] - icell;
             auto startIndex
                 = icell
-                  - Interpolator_t::template computeStartLeftShift<QtyCentering,
-                                                                   QtyCentering::primal>(delta);
+                  - Interpolator_t::template computeStartLeftShift<QtyCentering::primal>(delta);
             this->weighter.computeWeight(normalizedPositions[i], startIndex, weights_[i]);
         }
 
@@ -175,7 +174,7 @@ BSpline readFromFile(std::string centering, std::size_t order)
     return bs;
 }
 
-template<typename AWeighter_t, typename Centering, Centering centering, typename Weighter>
+template<typename AWeighter_t, auto centering, typename Weighter>
 void check_bspline(Weighter& weighter, std::string centering_id)
 {
     using Interpolator_t        = typename AWeighter_t::Interpolator_t;
@@ -195,8 +194,7 @@ void check_bspline(Weighter& weighter, std::string centering_id)
     {
         auto delta = static_cast<double>(ipos) * dx;
 
-        auto startIndex
-            = icell - Interpolator_t::template computeStartLeftShift<Centering, centering>(delta);
+        auto startIndex = icell - Interpolator_t::template computeStartLeftShift<centering>(delta);
 
         double normalizedPosition = icell + delta;
         if constexpr (centering == QtyCentering::dual)
@@ -223,7 +221,7 @@ TYPED_TEST(AWeighter, computesPrimalBSplineWeightsForAnyParticlePosition)
     static_assert(Interpolator_t::interp_order == GridLayout_t::interp_order);
     assert(GridLayout_t::nbrGhosts() == Interpolator_t::interp_order + 1);
 
-    check_bspline<AWeighter_t, QtyCentering, QtyCentering::primal>(this->weighter, "primal");
+    check_bspline<AWeighter_t, QtyCentering::primal>(this->weighter, "primal");
 }
 TYPED_TEST(AWeighter, computesDualBSplineWeightsForAnyParticlePosition)
 {
@@ -234,7 +232,7 @@ TYPED_TEST(AWeighter, computesDualBSplineWeightsForAnyParticlePosition)
     static_assert(Interpolator_t::interp_order == GridLayout_t::interp_order);
     assert(GridLayout_t::nbrGhosts() == Interpolator_t::interp_order + 1);
 
-    check_bspline<AWeighter_t, QtyCentering, QtyCentering::dual>(this->weighter, "dual");
+    check_bspline<AWeighter_t, QtyCentering::dual>(this->weighter, "dual");
 }
 
 
