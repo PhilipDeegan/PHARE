@@ -91,11 +91,6 @@ private:
     {
         auto const& nextWrite = nextWrite_;
 
-        PHARE_LOG_LINE_STR(nextWrite);
-        PHARE_LOG_LINE_STR(rest.writeTimestamps.size());
-        PHARE_LOG_LINE_STR((nextWrite < rest.writeTimestamps.size()));
-        PHARE_LOG_LINE_STR((needsAction_(rest.writeTimestamps[nextWrite], timeStamp, timeStep)));
-
         return nextWrite < rest.writeTimestamps.size()
                and needsAction_(rest.writeTimestamps[nextWrite], timeStamp, timeStep);
     }
