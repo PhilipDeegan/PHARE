@@ -46,11 +46,6 @@ struct TimeStamperFactory
         auto time_step  = dict["time_step"].template to<double>();
         std::size_t idx = 0;
 
-        PHARE_LOG_LINE_STR(dict.contains("restarts"));
-
-        if (dict.contains("restarts"))
-            PHARE_LOG_LINE_STR(dict["restarts"].contains("restart_idx"));
-
         if (dict.contains("restarts") and dict["restarts"].contains("restart_idx"))
             idx = dict["restarts"]["restart_idx"].template to<std::size_t>();
 
