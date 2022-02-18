@@ -9,14 +9,18 @@
 #include <SAMRAI/hier/PatchData.h>
 #include <SAMRAI/pdat/CellOverlap.h>
 #include <SAMRAI/tbox/MemoryUtilities.h>
+#include <SAMRAI/tbox/RestartManager.h>
 
 
 #include "core/data/ions/ion_population/particle_pack.hpp"
 #include "core/data/particles/particle.hpp"
 #include "core/data/particles/particle_array.hpp"
+#include "core/data/particles/particle_packer.hpp"
 #include "amr/resources_manager/amr_utils.hpp"
 
 #include "core/logger.hpp"
+
+
 
 namespace PHARE
 {
@@ -89,9 +93,10 @@ namespace amr
     template<typename ParticleArray>
     class ParticlesData : public SAMRAI::hier::PatchData
     {
+        using Super = SAMRAI::hier::PatchData;
+
         using Particle_t          = typename ParticleArray::Particle_t;
         static constexpr auto dim = ParticleArray::dimension;
-
 
     public:
         ParticlesData(SAMRAI::hier::Box const& box, SAMRAI::hier::IntVector const& ghost)
@@ -100,6 +105,8 @@ namespace amr
                    &levelGhostParticlesOld, &levelGhostParticlesNew}
             , interiorLocalBox_{AMRToLocal(box, this->getGhostBox())}
         {
+            auto* restart_manager = SAMRAI::tbox::RestartManager::getManager();
+            PHARE_LOG_LINE_STR(restart_manager->isFromRestart());
         }
 
 
@@ -115,8 +122,52 @@ namespace amr
 
 
 
-
         // SAMRAI interface
+
+        void putToRestart(std::shared_ptr<SAMRAI::tbox::Database> const& restart_db) const override
+        {
+            PHARE_LOG_LINE;
+            Super::putToRestart(restart_db);
+
+            using Packer = core::ParticlePacker<dim>;
+
+            Packer packer(domainParticles);
+            core::ContiguousParticles<dim> soa{domainParticles.size()};
+            PHARE_LOG_LINE_STR(domainParticles.size());
+            packer.pack(soa);
+
+            std::size_t part_idx = 0;
+            core::apply(soa(), [&](auto const& arg) {
+                auto data_path = "domainParticles_" + packer.keys()[part_idx++];
+                restart_db->putVector(data_path, arg);
+            });
+        };
+
+
+        void getFromRestart(std::shared_ptr<SAMRAI::tbox::Database> const& restart_db) override
+        {
+            PHARE_LOG_LINE;
+            Super::getFromRestart(restart_db);
+
+            using Packer = core::ParticlePacker<dim>;
+
+            auto n_particles = restart_db->getArraySize("domainParticles_weight"); //
+            PHARE_LOG_LINE_STR(n_particles);
+
+            core::ContiguousParticles<dim> soa{n_particles};
+
+            std::size_t part_idx = 0;
+            core::apply(soa(), [&](auto& arg) {
+                auto data_path = "domainParticles_" + Packer::keys()[part_idx++];
+                restart_db->getVector(data_path, arg);
+            });
+
+            assert(domainParticles.size() == 0);
+
+            domainParticles.resize(n_particles);
+            for (std::size_t i = 0; i < n_particles; ++i)
+                domainParticles[i] = soa.copy(i);
+        }
 
 
         /**

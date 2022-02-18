@@ -163,6 +163,9 @@ struct ContiguousParticles
         std::vector<ParticleView<dim>> views;
     };
 
+    auto operator()() { return std::forward_as_tuple(weight, charge, iCell, delta, v); }
+    auto operator()() const { return std::forward_as_tuple(weight, charge, iCell, delta, v); }
+
     auto begin() { return iterator(this); }
     auto cbegin() const { return iterator(this); }
 

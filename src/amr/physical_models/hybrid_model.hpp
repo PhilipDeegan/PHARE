@@ -127,6 +127,9 @@ void HybridModel<GridLayoutT, Electromag, Ions, Electrons, AMR_Types>::initializ
 
         state.electromag.initialize(layout);
     }
+
+
+    resourcesManager->registerForRestarts();
 }
 
 

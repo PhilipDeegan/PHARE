@@ -239,6 +239,50 @@ Return sum(Container const& container, Return r = 0)
 {
     return std::accumulate(container.begin(), container.end(), r);
 }
+
+
+
+
+template<typename F>
+auto generate(F&& f, std::size_t from, std::size_t to)
+{
+    using value_type = std::decay_t<std::result_of_t<F&(std::size_t const&)>>;
+    std::vector<value_type> v;
+    std::size_t count = to - from;
+    if (count > 0)
+        v.reserve(count);
+    for (std::size_t i = from; i < to; ++i)
+        v.emplace_back(f(i));
+    return v;
+}
+
+template<typename F>
+auto generate(F&& f, std::size_t count)
+{
+    return generate(std::forward<F>(f), 0, count);
+}
+
+
+template<typename F, typename Container>
+auto generate(F&& f, Container& container)
+{
+    using T          = typename Container::value_type;
+    using value_type = std::decay_t<std::result_of_t<F&(T&)>>;
+    std::vector<value_type> v1;
+    if (container.size() > 0)
+        v1.reserve(container.size());
+    for (auto& v : container)
+        v1.emplace_back(f(v));
+    return v1;
+}
+
+template<typename F, typename T>
+auto generate(F&& f, std::vector<T>&& v)
+{
+    return generate(std::forward<F>(f), v);
+}
+
+
 } // namespace PHARE::core
 
 

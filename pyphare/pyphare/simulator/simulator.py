@@ -104,12 +104,13 @@ class Simulator:
                          self.cpp_sim.endTime() + self.timeStep(),
                          self.timeStep())
 
-    def run(self):
+    def run(self, restart_time=None):
         from pyphare.cpp import cpp_lib
         self._check_init()
         perf = []
         end_time = self.cpp_sim.endTime()
-        t = 0.
+        print("simulator restart_time" ,restart_time)
+        t = restart_time if restart_time is not None else 0.
         while t < end_time:
             tick  = timem.time()
             self.advance()
@@ -128,7 +129,7 @@ class Simulator:
 
 
     def _auto_dump(self):
-        return self.auto_dump and len(self.simulation.diagnostics) > 0 and self.dump()
+        return self.auto_dump and self.dump()
 
 
     def dump(self, *args):

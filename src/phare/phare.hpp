@@ -29,6 +29,9 @@ class SamraiLifeCycle
 public:
     SamraiLifeCycle(int argc = 0, char** argv = nullptr)
     {
+        // abort gives stack trace
+        SAMRAI::tbox::SAMRAI_MPI::setCallAbortInSerialInsteadOfExit(true);
+
         SAMRAI::tbox::SAMRAI_MPI::init(&argc, &argv);
         SAMRAI::tbox::SAMRAIManager::initialize();
         SAMRAI::tbox::SAMRAIManager::startup();

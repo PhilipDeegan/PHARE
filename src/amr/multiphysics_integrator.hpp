@@ -14,6 +14,9 @@
 #include <SAMRAI/algs/TimeRefinementLevelStrategy.h>
 #include <SAMRAI/mesh/StandardTagAndInitStrategy.h>
 
+#include "SAMRAI/tbox/RestartManager.h"
+#include "SAMRAI/hier/PatchDataRestartManager.h"
+
 
 #include "amr/messengers/messenger.hpp"
 #include "amr/tagging/tagger.hpp"
@@ -26,6 +29,7 @@
 #include "amr/solvers/solver_mhd.hpp"
 #include "amr/solvers/solver_ppc.hpp"
 
+#include "core/logger.hpp"
 #include "core/utilities/algorithm.hpp"
 
 #include "phare_core.hpp"
@@ -109,6 +113,9 @@ namespace solver
 
             //@TODO - chaque modele utilisé doit register ses variables aupres du ResourcesManager
             //@TODO - chaque solveur utilisé doit register ses variables aupres du ResourcesManager
+
+            auto* restart_manager = SAMRAI::tbox::RestartManager::getManager();
+            PHARE_LOG_LINE_STR(restart_manager->isFromRestart());
         }
 
 
@@ -294,6 +301,8 @@ namespace solver
                                  = std::shared_ptr<SAMRAI::hier::PatchLevel>(),
                                  bool const allocateData = true) override
         {
+            PHARE_LOG_LINE;
+
             auto& model            = getModel_(levelNumber);
             auto& solver           = getSolver_(levelNumber);
             auto& messenger        = getMessengerWithCoarser_(levelNumber);
@@ -339,10 +348,20 @@ namespace solver
 
 
 
-        void resetHierarchyConfiguration(
-            std::shared_ptr<SAMRAI::hier::PatchHierarchy> const& /*hierarchy*/,
-            int const /*coarsestLevel*/, int const /*finestLevel*/) override
+        void
+        resetHierarchyConfiguration(std::shared_ptr<SAMRAI::hier::PatchHierarchy> const& hierarchy,
+                                    int const coarsestLevel, int const finestLevel) override
         {
+            PHARE_LOG_LINE;
+
+            // handle samrai restarts / schedule creation
+            if (SAMRAI::tbox::RestartManager::getManager()->isFromRestart())
+            {
+                auto& messenger = getMessengerWithCoarser_(coarsestLevel);
+                auto nextFiner = (coarsestLevel == finestLevel) ? coarsestLevel : coarsestLevel + 1;
+                for (auto ilvl = coarsestLevel; ilvl <= nextFiner; ++ilvl)
+                    messenger.registerLevel(hierarchy, ilvl);
+            }
         }
 
 

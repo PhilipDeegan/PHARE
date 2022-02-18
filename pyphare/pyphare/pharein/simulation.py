@@ -356,26 +356,33 @@ def check_patch_size(ndim, **kwargs):
 
 # ------------------------------------------------------------------------------
 
-# diag_options = {"format":"phareh5", "options": {"dir": "phare_ouputs/"}}
-def check_diag_options(**kwargs):
-    diag_options = kwargs.get("diag_options", None)
+# *_options = {"format":"phareh5", "options": {"dir": "phare_ouputs/"}}
+def _check_hdf5_options(key, **kwargs):
+    hdf5_options = kwargs.get(key, None)
     formats = ["phareh5"]
-    if diag_options is not None and "format" in diag_options:
-        if diag_options["format"] not in formats:
-            raise ValueError("Error - diag_options format is invalid")
-        if "options" in diag_options and "dir" in diag_options["options"]:
-            diag_dir = diag_options["options"]["dir"]
+    if hdf5_options is not None and "format" in hdf5_options:
+        if hdf5_options["format"] not in formats:
+            raise ValueError(f"Error - {key} format is invalid")
+        if "options" in hdf5_options and "dir" in hdf5_options["options"]:
+            diag_dir = hdf5_options["options"]["dir"]
             if os.path.exists(diag_dir) and os.path.isfile(diag_dir):
-                raise ValueError ("Error: Simulation diag_options dir exists as a file.")
+                raise ValueError (f"Error: Simulation {key} dir exists as a file.")
             try:
                 os.makedirs(diag_dir, exist_ok=True)
                 if not os.path.exists(diag_dir):
                     raise ValueError ("1. Creation of the directory %s failed" % diag_dir)
             except FileExistsError:
                 raise ValueError ("Creation of the directory %s failed" % diag_dir)
-    return diag_options
+    return hdf5_options
 
 
+
+def check_diag_options(**kwargs):
+    return _check_hdf5_options("diag_options", **kwargs)
+
+
+def check_restart_options(**kwargs):
+    return _check_hdf5_options("restart_options", **kwargs)
 
 
 
@@ -450,7 +457,7 @@ def checker(func):
                              'boundary_types', 'refined_particle_nbr', 'path', 'nesting_buffer',
                              'diag_export_format', 'refinement_boxes', 'refinement', 'init_time',
                              'smallest_patch_size', 'largest_patch_size', "diag_options",
-                             'resistivity', 'hyper_resistivity', 'strict' ]
+                             'resistivity', 'hyper_resistivity', 'strict', "restart_options", ]
 
         accepted_keywords += check_optional_keywords(**kwargs)
 
@@ -482,6 +489,7 @@ def checker(func):
 
         ndim = compute_dimension(cells)
         kwargs["diag_options"] = check_diag_options(**kwargs)
+        kwargs["restart_options"] = check_restart_options(**kwargs)
 
         kwargs["boundary_types"] = check_boundaries(ndim, **kwargs)
         kwargs["origin"] = check_origin(ndim, **kwargs)
@@ -646,6 +654,7 @@ Adaptive Mesh Refinement (AMR) parameters
         self.ndim = compute_dimension(self.cells)
 
         self.diagnostics = []
+        self.restarts = []
         self.model = None
         self.electrons = None
 
@@ -684,7 +693,7 @@ Adaptive Mesh Refinement (AMR) parameters
 # ------------------------------------------------------------------------------
 
     def add_diagnostics(self, diag):
-        if diag.name in [diag.name for diag in self.diagnostics]:
+        if diag.name in [diagnostic.name for diagnostic in self.diagnostics]:
             raise ValueError("Error: diagnostics {} already registered".format(diag.name))
 
         # check whether the spatial extent of the diagnostics is valid, given the domain size
@@ -692,6 +701,13 @@ Adaptive Mesh Refinement (AMR) parameters
             raise RuntimeError("Error: invalid diagnostics spatial extent")
 
         self.diagnostics.append(diag)
+
+
+    def add_restarts(self, restart):
+        if len(self.restarts):
+            raise ValueError("Error: restarts {} already registered".format(restart.name))
+
+        self.restarts.append(restart)
 
 
 # ------------------------------------------------------------------------------

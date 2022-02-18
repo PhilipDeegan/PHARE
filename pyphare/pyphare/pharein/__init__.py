@@ -28,6 +28,7 @@ from .uniform_model import UniformModel
 from .maxwellian_fluid_model import MaxwellianFluidModel
 from .electron_model import ElectronModel
 from .diagnostics import FluidDiagnostics, ElectromagDiagnostics, ParticleDiagnostics, MetaDiagnostics
+from .restarts import Restarts
 from .simulation import Simulation
 
 
@@ -198,6 +199,8 @@ def populateDict():
     addInitFunction(maginit_path+"y_component", fn_wrapper(modelDict["by"]))
     addInitFunction(maginit_path+"z_component", fn_wrapper(modelDict["bz"]))
 
+
+    #### adding diagnostics
     diag_path = "simulation/diagnostics/"
     for diag in simulation.diagnostics:
         type_path = diag_path + diag.type + '/'
@@ -212,18 +215,48 @@ def populateDict():
             add_string(name_path + "/" + f'attribute_{attr_idx}_key' , attr_key)
             add_string(name_path + "/" + f'attribute_{attr_idx}_value' , diag.attributes[attr_key])
 
-
-
     if simulation.diag_options is not None and "options" in simulation.diag_options:
         add_string(diag_path + "filePath", simulation.diag_options["options"]["dir"])
-    else:
-        add_string(diag_path + "filePath", "phare_output")
-
-    if simulation.diag_options is not None and "options" in simulation.diag_options:
         if "mode" in simulation.diag_options["options"]:
             add_string(diag_path + "mode", simulation.diag_options["options"]["mode"])
         if "fine_dump_lvl_max" in simulation.diag_options["options"]:
             add_int(diag_path + "fine_dump_lvl_max", simulation.diag_options["options"]["fine_dump_lvl_max"])
+    else:
+        add_string(diag_path + "filePath", "phare_output")
+    #### diagnostics added
+
+
+
+    #### adding restarts
+    restarts_path = "simulation/restarts/"
+    if simulation.restart_options is not None:
+        add_string(restarts_path + "strat", "auto")
+        restart_file_path = "phare_output"
+        restart_time = 0
+        restart_idx = 0
+        if "options" in simulation.restart_options:
+            options = simulation.restart_options["options"]
+            restart_file_path = options["dir"]
+            if "restart_time" in options:
+                restart_time = options["restart_time"]
+
+            if "restart_idx" in options:
+                restart_idx = options["restart_idx"]
+
+        add_string(restarts_path + "filePath", restart_file_path)
+        add_double(restarts_path + "restart_time", restart_time)
+        add_size_t(restarts_path + "restart_idx", restart_idx)
+        filePathExists = os.path.exists(restart_file_path +"/restore.000005")
+
+        add_int(restarts_path + "filePathExists", filePathExists)
+
+        assert len(simulation.restarts) <= 1
+
+        for restart in simulation.restarts:
+            pp.add_array_as_vector(restarts_path + "write_timestamps", restart.write_timestamps)
+
+    #### restarts added
+
 
 
     #### adding electrons

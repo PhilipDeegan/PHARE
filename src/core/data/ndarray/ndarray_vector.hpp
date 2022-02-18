@@ -276,10 +276,20 @@ public:
     }
 
 
+    auto& vector() { return data_; }
+    auto& vector() const { return data_; }
+
 private:
     std::array<std::uint32_t, dim> nCells_;
     std::vector<DataType> data_;
 };
+
+
+template<std::size_t dim, typename DataType = double>
+auto make_array_view(NdArrayVector<dim, DataType> const& vec)
+{
+    return NdArrayView<dim, DataType, DataType const*>{vec.data(), vec.shape()};
+}
 
 
 class NdArrayMask
