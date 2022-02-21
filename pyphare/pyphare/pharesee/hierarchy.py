@@ -748,9 +748,12 @@ class PatchHierarchy:
             fig = ax.figure
 
         # assumes max 5 levels...
-        patchcolors = ["black", "dimgray", "darkgray", "lightgrey", "white"]
-        patchcolors = ["black", "red", "blue", "lightgrey", "white"]
+        patchcolors = ["k"]*len(usr_lvls)
         patchcolors = kwargs.get("patchcolors", patchcolors)
+        linewidths = [1]*len(usr_lvls)
+        linewidths = kwargs.get("lw", linewidths)
+        linestyles = ['-']*len(usr_lvls)
+        linestyles = kwargs.get("ls", linestyles)
         for lvl_nbr, lvl  in self.levels(time).items():
             if lvl_nbr not in usr_lvls:
                 continue
@@ -785,7 +788,7 @@ class PatchHierarchy:
                                   patch.box.shape[0]*dx,
                                   patch.box.shape[1]*dy,
                                   fc="none", ec=patchcolors[lvl_nbr],
-                                  alpha=0.4, lw=0.8)
+                                  alpha=0.4, lw=linewidths[lvl_nbr],ls=linestyles[lvl_nbr])
                     ax.add_patch(r)
 
         ax.set_aspect("equal")
