@@ -301,7 +301,7 @@ namespace solver
                                  = std::shared_ptr<SAMRAI::hier::PatchLevel>(),
                                  bool const allocateData = true) override
         {
-            PHARE_LOG_LINE;
+            PHARE_LOG_LINE_STR(SAMRAI::tbox::RestartManager::getManager()->isFromRestart());
 
             auto& model            = getModel_(levelNumber);
             auto& solver           = getSolver_(levelNumber);

@@ -82,7 +82,7 @@ def setup_model(ppc=100):
 
 out = "phare_outputs/restarts_test/"
 simArgs = dict(
-  time_step_nbr = 10,
+  time_step_nbr = 5,
   time_step = 0.001,
   boundary_types = "periodic",
   cells = 40,
@@ -170,7 +170,9 @@ class RestartsTest(SimulatorTest):
             dump_all_diags(model.populations, timestamps=np.array([timestamps[-1]]))
 
             # dump middle for restarts
-            ph.Restarts(write_timestamps=np.array([timestamps[timestamps.shape[0]//2]]))
+            restart_idx = 4
+            restart_time=simInput["time_step"] * restart_idx
+            ph.Restarts(write_timestamps=np.array([restart_time]))
 
             Simulator(simulation).run().reset()
             ph.global_vars.sim = None
@@ -185,37 +187,52 @@ class RestartsTest(SimulatorTest):
             model = setup_model()
             dump_all_diags(model.populations, timestamps=np.array([timestamps[-1]]))
 
-            restart_time=simInput["time_step"] * (simInput["time_step_nbr"] // 2)
-            simulation.restart_options["options"]["restart_time"] = restart_time;
-            simulation.restart_options["options"]["restart_idx"] = 5;
+
+            simulation.restart_options["options"]["restart_time"] = restart_time
+            simulation.restart_options["options"]["restart_idx"] = restart_idx
 
             Simulator(simulation).run(restart_time=restart_time).reset()
 
-
-            def compare(qty0, qty1):
+            def check(qty0, qty1, checker):
                 checks = 0
                 for ilvl, lvl0 in qty0.patch_levels.items():
+
                     patch_level1 = qty1.patch_levels[ilvl]
                     for p_idx, patch0 in enumerate(lvl0):
+
                         patch1 = patch_level1.patches[p_idx]
                         for pd_key, pd0 in patch0.patch_datas.items():
                             pd1 = patch1.patch_datas[pd_key]
                             self.assertTrue(id(pd0) != id(pd1))
-
-                            # BAD!
-                            np.testing.assert_allclose(pd0.dataset[:], pd1.dataset[:], atol=1e-4, rtol=0)
-
+                            checker(pd0, pd1)
                             checks += 1
+
                 return checks
 
+            def check_particles(qty0, qty1):
+                return check(qty0, qty1, lambda pd0, pd1: self.assertEqual(pd0.dataset, pd1.dataset))
+
+            def check_field(qty0, qty1):
+                return  check(qty0, qty1, lambda pd0, pd1: np.testing.assert_equal(pd0.dataset[:], pd1.dataset[:]))
+
+            checks = 0
+            time = timestamps[-1]
             run0 = Run(diag_dir0)
             run1 = Run(diag_dir1)
 
-            checks = 0
-            checks += compare(run0.GetB(timestamps[-1]), run1.GetB(timestamps[-1]))
-            checks += compare(run0.GetE(timestamps[-1]), run1.GetE(timestamps[-1]))
+            pops = ["protons", "alpha"]
+            checks += check_particles(run0.GetParticles(time, pops), run1.GetParticles(time, pops))
+            checks += check_field(run0.GetB(time), run1.GetB(time))
+            checks += check_field(run0.GetE(time), run1.GetE(time))
+            checks += check_field(run0.GetNi(time), run1.GetNi(time))
+            checks += check_field(run0.GetVi(time), run1.GetVi(time))
 
-            self.assertTrue(checks >= 6)
+
+            for pop in pops:
+                checks += check_field(run0.GetFlux(time, pop), run1.GetFlux(time, pop))
+                checks += check_field(run0.GetN(time, pop), run1.GetN(time, pop))
+
+            self.assertTrue(checks >= 14)
 
             ph.global_vars.sim = None
 

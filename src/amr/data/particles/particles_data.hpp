@@ -105,8 +105,6 @@ namespace amr
                    &levelGhostParticlesOld, &levelGhostParticlesNew}
             , interiorLocalBox_{AMRToLocal(box, this->getGhostBox())}
         {
-            auto* restart_manager = SAMRAI::tbox::RestartManager::getManager();
-            PHARE_LOG_LINE_STR(restart_manager->isFromRestart());
         }
 
 
@@ -126,47 +124,65 @@ namespace amr
 
         void putToRestart(std::shared_ptr<SAMRAI::tbox::Database> const& restart_db) const override
         {
-            PHARE_LOG_LINE;
             Super::putToRestart(restart_db);
 
             using Packer = core::ParticlePacker<dim>;
 
-            Packer packer(domainParticles);
-            core::ContiguousParticles<dim> soa{domainParticles.size()};
-            PHARE_LOG_LINE_STR(domainParticles.size());
-            packer.pack(soa);
+            auto putParticles = [&](std::string name, auto& particles) {
+                // SAMRAI errors on writing 0 size arrays
+                if (particles.size() == 0)
+                    return;
 
-            std::size_t part_idx = 0;
-            core::apply(soa(), [&](auto const& arg) {
-                auto data_path = "domainParticles_" + packer.keys()[part_idx++];
-                restart_db->putVector(data_path, arg);
-            });
+                Packer packer(particles);
+                core::ContiguousParticles<dim> soa{particles.size()};
+                packer.pack(soa);
+
+                std::size_t part_idx = 0;
+                core::apply(soa(), [&](auto const& arg) {
+                    restart_db->putVector(name + "_" + packer.keys()[part_idx++], arg);
+                });
+            };
+
+            putParticles("domainParticles", domainParticles);
+            putParticles("patchGhostParticles", patchGhostParticles);
+            putParticles("levelGhostParticles", levelGhostParticles);
+            putParticles("levelGhostParticlesNew", levelGhostParticlesNew);
+            putParticles("levelGhostParticlesOld", levelGhostParticlesOld);
         };
 
 
         void getFromRestart(std::shared_ptr<SAMRAI::tbox::Database> const& restart_db) override
         {
-            PHARE_LOG_LINE;
             Super::getFromRestart(restart_db);
 
             using Packer = core::ParticlePacker<dim>;
 
-            auto n_particles = restart_db->getArraySize("domainParticles_weight"); //
-            PHARE_LOG_LINE_STR(n_particles);
+            auto getParticles = [&](std::string name, auto& particles) {
+                // can't read what doesn't exist
+                if (!restart_db->keyExists(name + "_weight"))
+                    return;
 
-            core::ContiguousParticles<dim> soa{n_particles};
+                auto n_particles = restart_db->getArraySize(name + "_weight");
+                core::ContiguousParticles<dim> soa{n_particles};
 
-            std::size_t part_idx = 0;
-            core::apply(soa(), [&](auto& arg) {
-                auto data_path = "domainParticles_" + Packer::keys()[part_idx++];
-                restart_db->getVector(data_path, arg);
-            });
+                {
+                    std::size_t part_idx = 0;
+                    core::apply(soa(), [&](auto& arg) {
+                        restart_db->getVector(name + "_" + Packer::keys()[part_idx++], arg);
+                    });
+                }
 
-            assert(domainParticles.size() == 0);
+                assert(particles.size() == 0);
+                particles.resize(n_particles);
+                for (std::size_t i = 0; i < n_particles; ++i)
+                    particles[i] = soa.copy(i);
+            };
 
-            domainParticles.resize(n_particles);
-            for (std::size_t i = 0; i < n_particles; ++i)
-                domainParticles[i] = soa.copy(i);
+            getParticles("domainParticles", domainParticles);
+            getParticles("patchGhostParticles", patchGhostParticles);
+            getParticles("levelGhostParticles", levelGhostParticles);
+            getParticles("levelGhostParticlesNew", levelGhostParticlesNew);
+            getParticles("levelGhostParticlesOld", levelGhostParticlesOld);
         }
 
 

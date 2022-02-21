@@ -309,6 +309,14 @@ namespace amr
         void registerForRestarts() const
         {
             auto pdrm = SAMRAI::hier::PatchDataRestartManager::getManager();
+
+            PHARE_LOG_LINE_STR(variableDatabase_->getNumberOfRegisteredPatchDataIndices());
+
+            // for (std::size_t i = 0; i < 52; i++)
+            //   pdrm->registerPatchDataForRestart(i);
+
+            PHARE_LOG_LINE_STR(nameToResourceInfo_.size());
+
             for (auto const& [key, info] : nameToResourceInfo_)
             {
                 PHARE_LOG_LINE_STR(key);

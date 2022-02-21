@@ -81,26 +81,16 @@ namespace amr
 
         void getFromRestart(std::shared_ptr<SAMRAI::tbox::Database> const& restart_db) override
         {
-            PHARE_LOG_LINE;
-            PHARE_LOG_LINE_STR(field.size());
-
             Super::getFromRestart(restart_db);
 
-            auto data_path = "field_" + field.name();
-            restart_db->getVector(data_path, field.vector());
-
-            PHARE_LOG_LINE_STR(field.size());
+            restart_db->getVector("field_" + field.name(), field.vector());
         }
 
         void putToRestart(std::shared_ptr<SAMRAI::tbox::Database> const& restart_db) const override
         {
-            PHARE_LOG_LINE;
-            PHARE_LOG_LINE_STR(field.size());
-
             Super::putToRestart(restart_db);
 
-            auto data_path = "field_" + field.name();
-            restart_db->putVector(data_path, field.vector());
+            restart_db->putVector("field_" + field.name(), field.vector());
         };
 
 

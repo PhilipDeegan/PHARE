@@ -246,7 +246,7 @@ def populateDict():
         add_string(restarts_path + "filePath", restart_file_path)
         add_double(restarts_path + "restart_time", restart_time)
         add_size_t(restarts_path + "restart_idx", restart_idx)
-        filePathExists = os.path.exists(restart_file_path +"/restore.000005")
+        filePathExists = os.path.exists(restart_file_path + f"/restore.{str(restart_idx).zfill(6)}")
 
         add_int(restarts_path + "filePathExists", filePathExists)
 
