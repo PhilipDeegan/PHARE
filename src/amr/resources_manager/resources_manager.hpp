@@ -306,27 +306,15 @@ namespace amr
             }
         }
 
-        void registerForRestarts() const
+        void registerForRestarts(std::vector<int> const& ids) const
         {
             auto pdrm = SAMRAI::hier::PatchDataRestartManager::getManager();
 
-            PHARE_LOG_LINE_STR(variableDatabase_->getNumberOfRegisteredPatchDataIndices());
-
-            // for (std::size_t i = 0; i < 52; i++)
-            //   pdrm->registerPatchDataForRestart(i);
-
-            PHARE_LOG_LINE_STR(nameToResourceInfo_.size());
-
-            for (auto const& [key, info] : nameToResourceInfo_)
-            {
-                PHARE_LOG_LINE_STR(key);
-                PHARE_LOG_LINE_STR(info.id);
-
-                pdrm->registerPatchDataForRestart(info.id);
-            }
+            for (auto const& id : ids)
+                pdrm->registerPatchDataForRestart(id);
         }
 
-
+        auto id_for_key(std::string const& name) const { return nameToResourceInfo_.at(name).id; }
 
     private:
         template<typename ResourcesUser>

@@ -6,6 +6,7 @@
 
 #include "restarts/restarts_props.hpp"
 
+#include "hdf5/detail/h5/h5_file.hpp"
 
 namespace PHARE::restarts::h5
 {
@@ -37,7 +38,15 @@ public:
     {
         PHARE_LOG_LINE;
 
-        modelView_.writeRestartFile(filePath_, timestep_idx);
+        auto restart_file = modelView_.writeRestartFile(filePath_, timestep_idx);
+
+        // write model patch_data_ids to file with highfive
+
+        PHARE::hdf5::h5::HighFiveFile h5File{restart_file};
+
+        auto patch_ids = modelView_.patch_data_ids();
+        h5File.create_data_set<int>("/phare/patch/ids", patch_ids.size());
+        h5File.write_data_set("/phare/patch/ids", patch_ids);
     }
 
     auto& modelView() { return modelView_; }

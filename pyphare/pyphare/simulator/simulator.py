@@ -68,6 +68,8 @@ class Simulator:
             )
 
             self.cpp_sim.initialize()
+            print(self.cpp_sim.patch_data_ids())
+
             self._auto_dump() # first dump might be before first advance
             return self
         except:

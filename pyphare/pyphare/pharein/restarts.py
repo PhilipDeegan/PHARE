@@ -61,19 +61,9 @@ def validate_timestamps(clazz, **kwargs):
 
 # ------------------------------------------------------------------------------
 
-def try_cpp_dep_vers():
-    try:
-        from pyphare.cpp import cpp_etc_lib
-        return cpp_etc_lib().phare_deps()
-    except ImportError:
-        return {}
-
 
 
 class Restarts(object):
-
-    h5_flush_never = 0
-    cpp_dep_vers = try_cpp_dep_vers()
 
     @restarts_checker
     def __init__(self, **kwargs):

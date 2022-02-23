@@ -2,6 +2,12 @@
 #include "python3/pybind_def.hpp"
 #include "simulator/simulator.hpp"
 
+
+
+#include <SAMRAI/tbox/RestartManager.h>
+
+
+
 namespace py = pybind11;
 
 namespace PHARE::pydata
@@ -37,6 +43,11 @@ PYBIND11_MODULE(cpp_etc, m)
                                                               {"samrai", samrai_version()}};
         _PHARE_WITH_HIGHFIVE(versions["highfive"] = PHARE_TO_STR(HIGHFIVE_VERSION));
         return versions;
+    });
+
+
+    m.def("restart_file", [](std::string path, int idx) {
+        return SAMRAI::tbox::RestartManager::getManager()->getRestartFileFullPath(path, idx);
     });
 }
 } // namespace PHARE::pydata

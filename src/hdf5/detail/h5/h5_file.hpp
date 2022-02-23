@@ -72,7 +72,7 @@ public:
         };
     }
 
-    HighFiveFile(std::string const path, unsigned flags)
+    HighFiveFile(std::string const path, unsigned flags = HiFile::ReadWrite)
         : h5file_{createHighFiveFile(path, flags)}
     {
     }

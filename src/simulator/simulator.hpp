@@ -44,6 +44,8 @@ template<std::size_t _dimension, std::size_t _interp_order, std::size_t _nbRefin
 class Simulator : public ISimulator
 {
 public:
+    auto patch_data_ids() const { return hybridModel_->patch_data_ids(); }
+
     double startTime() override { return 0.; }
     double endTime() override { return finalTime_; }
     double timeStep() override { return dt_; }
@@ -109,7 +111,19 @@ public:
 private:
     auto find_model(std::string name);
 
-    std::ofstream log_out{".log/" + std::to_string(core::mpi::rank()) + ".out"};
+    auto static log_file_name()
+    {
+        if (auto log = core::get_env("PHARE_LOG"); log == "RANK_FILES")
+            return ".log/" + std::to_string(core::mpi::rank()) + ".out";
+
+        // else date time (of rank 0) files
+        auto date_time = core::mpi::date_time();
+        auto rank      = std::to_string(core::mpi::rank());
+        auto size      = std::to_string(core::mpi::size());
+        return ".log/" + date_time + "_" + rank + "_of_" + size + ".out";
+    }
+
+    std::ofstream log_out{log_file_name()};
     std::streambuf* coutbuf = nullptr;
     std::shared_ptr<PHARE::amr::Hierarchy> hierarchy_;
     std::unique_ptr<Integrator> integrator_;
@@ -160,8 +174,7 @@ namespace
     inline auto logging(std::ofstream& log_out)
     {
         std::streambuf* buf = nullptr;
-        if (std::optional<std::string> log = core::get_env("PHARE_LOG");
-            log and *log == "RANK_FILES")
+        if (core::get_env("PHARE_LOG"))
         {
             buf = std::cout.rdbuf();
             std::cout.rdbuf(log_out.rdbuf());

@@ -20,9 +20,14 @@ public:
 IModelView::~IModelView() {}
 
 
+template<typename Model>
+bool constexpr is_hybrid_model
+    = std::is_same_v<solver::type_list_to_hybrid_model_t<typename Model::type_list>, Model>;
 
 
-template<typename Hierarchy, typename Model>
+
+
+template<typename Hierarchy, typename Model, std::enable_if_t<is_hybrid_model<Model>, int> = 0>
 class ModelView : public IModelView
 {
 public:
@@ -34,11 +39,13 @@ public:
 
 
 
-    void writeRestartFile(std::string const& path, int timeStepIdx)
+    auto writeRestartFile(std::string const& path, int timeStepIdx)
     {
-        hierarchy_.writeRestartFile(path, timeStepIdx);
+        return hierarchy_.writeRestartFile(path, timeStepIdx);
     }
 
+
+    auto patch_data_ids() { return model_.patch_data_ids(); }
 
 
     ModelView(ModelView const&) = delete;

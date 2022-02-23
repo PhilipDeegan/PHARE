@@ -26,6 +26,7 @@
 #include "python3/data_wrangler.hpp"
 
 
+
 namespace py = pybind11;
 
 namespace PHARE::pydata
@@ -73,6 +74,7 @@ void declareSimulator(PyClass&& sim)
         .def("to_str", &Simulator::to_str)
         .def("domain_box", &Simulator::domainBox)
         .def("cell_width", &Simulator::cellWidth)
+        .def("patch_data_ids", &Simulator::patch_data_ids)
         .def("dump", &Simulator::dump, py::arg("timestamp"), py::arg("timestep"));
 }
 

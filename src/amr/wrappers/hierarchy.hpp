@@ -46,15 +46,19 @@ public:
 
             if (dict["filePathExists"].template to<int>() > 0)
             {
-                auto pdrm = SAMRAI::hier::PatchDataRestartManager::getManager();
-
-                for (int i = 0; i < 48; ++i) // a wizard did it
-                    pdrm->registerPatchDataForRestart(i);
+                auto restart_manager = SAMRAI::tbox::RestartManager::getManager();
+                auto pdrm            = SAMRAI::hier::PatchDataRestartManager::getManager();
 
                 auto& directory = dict["filePath"].template to<std::string>();
                 int timeStepIdx = static_cast<int>(dict["restart_idx"].template to<std::size_t>());
 
-                auto* restart_manager = SAMRAI::tbox::RestartManager::getManager();
+                auto const patch_ids = dict["restart_ids"].template to<std::vector<int>>();
+                // {3,  4,  5, 0, 1, 2,  6,  17, 18, 19, 23, 24,
+                // 25, 26, 8, 7, 9, 10, 11, 13, 12, 14, 15, 16};
+                for (auto& id : patch_ids)
+                    pdrm->registerPatchDataForRestart(id);
+
+
                 restart_manager->openRestartFile(directory, timeStepIdx, core::mpi::size());
             }
         }
@@ -79,7 +83,7 @@ public:
     auto const& origin() const { return origin_; }
 
 
-    void writeRestartFile(std::string directory, int flags) const;
+    auto writeRestartFile(std::string directory, int flags) const;
 
 protected:
     template<std::size_t dimension>
@@ -189,12 +193,15 @@ Hierarchy::Hierarchy(initializer::PHAREDict const& dict,
 
 
 
-inline void Hierarchy::writeRestartFile(std::string directory, int flags) const
+inline auto Hierarchy::writeRestartFile(std::string directory, int flags) const
 {
     PHARE_LOG_LINE;
     auto* restart_manager = SAMRAI::tbox::RestartManager::getManager();
+
     restart_manager->writeRestartFile(directory, flags);
     restart_manager->closeRestartFile();
+
+    return restart_manager->getRestartFileFullPath(directory, flags);
 }
 
 

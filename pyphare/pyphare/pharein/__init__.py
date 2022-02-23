@@ -36,6 +36,15 @@ def getSimulation():
     from .global_vars import sim
     return sim
 
+def _patch_data_ids(path, idx):
+    from pyphare.cpp import cpp_etc_lib
+    import h5py
+    h5File = cpp_etc_lib().restart_file(path, idx)
+    file = h5py.File(h5File, "r")
+    patch_ids = file["phare"]["patch"]["ids"][:]
+    return patch_ids
+
+
 
 # converts scalars to array of expected size
 # converts lists to arrays
@@ -249,6 +258,9 @@ def populateDict():
         filePathExists = os.path.exists(restart_file_path + f"/restore.{str(restart_idx).zfill(6)}")
 
         add_int(restarts_path + "filePathExists", filePathExists)
+
+        if filePathExists:
+            add_vector_int(restarts_path + "restart_ids", _patch_data_ids(restart_file_path, restart_idx))
 
         assert len(simulation.restarts) <= 1
 
