@@ -70,7 +70,8 @@ Integrator<_dimension>::Integrator(
     auto loadBalancer = std::make_shared<SAMRAI::mesh::TreeLoadBalancer>(
         SAMRAI::tbox::Dimension{dimension}, "LoadBalancer");
 
-    auto refineDB    = getUserRefinementBoxesDatabase<dimension>(dict["simulation"]["AMR"]);
+    auto& amr_dict   = dict["simulation"]["AMR"];
+    auto refineDB    = getUserRefinementBoxesDatabase<dimension>(amr_dict);
     auto standardTag = std::make_shared<SAMRAI::mesh::StandardTagAndInitialize>(
         "StandardTagAndInitialize", tagAndInitStrategy.get(), refineDB);
 
@@ -92,7 +93,11 @@ Integrator<_dimension>::Integrator(
     db->putDouble("start_time", startTime);
     db->putDouble("end_time", endTime);
     db->putInteger("max_integrator_steps", 1000000);
-    // db->putIntegerVector("tag_buffer", std::vector<int>(hierarchy->getMaxNumberOfLevels(), 8));
+
+    if (amr_dict.contains("tag_buffer"))
+        db->putIntegerVector("tag_buffer",
+                             std::vector<int>(hierarchy->getMaxNumberOfLevels(),
+                                              amr_dict["tag_buffer"].template to<int>()));
 
 
     timeRefIntegrator_ = std::make_shared<SAMRAI::algs::TimeRefinementIntegrator>(
