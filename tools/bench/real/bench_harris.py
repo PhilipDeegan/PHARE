@@ -35,7 +35,7 @@ def config():
         dl=(dl, dl),
         refinement="tagging",
         max_nbr_levels = 3,
-        nesting_buffer=1,
+        nesting_buffer=2,
         hyper_resistivity=0.002,
         resistivity=0.001,
         diag_options={"format": "phareh5",
