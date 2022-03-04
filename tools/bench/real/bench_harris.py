@@ -20,6 +20,8 @@ startMPI()
 
 time_step=0.01
 diag_outputs="phare_outputs/harris"
+dl=.4
+L0_to_L2_ratio = 4
 
 def config():
     L=0.5
@@ -30,10 +32,10 @@ def config():
         #final_time=40.,
         #boundary_types="periodic",
         cells=(100,100),
-        dl=(0.40, 0.40),
+        dl=(dl, dl),
         refinement="tagging",
         max_nbr_levels = 3,
-        nesting_buffer=2,
+        nesting_buffer=1,
         hyper_resistivity=0.002,
         resistivity=0.001,
         diag_options={"format": "phareh5",
@@ -142,8 +144,6 @@ def config():
     dt =   1.*sim.time_step
     nt = sim.final_time/dt+1
     timestamps = dt * np.arange(nt)
-    print(timestamps)
-
 
     for quantity in ["E", "B"]:
         ElectromagDiagnostics(
@@ -151,7 +151,6 @@ def config():
             write_timestamps=timestamps,
             compute_timestamps=timestamps,
         )
-
 
     for quantity in ["density", "bulkVelocity"]:
         FluidDiagnostics(
@@ -172,9 +171,8 @@ def plot(time, ref_pd, cmp_pd):
     upper_x = np.max([b0.upper[0], b1.upper[0]])
     lower_y = np.min([b0.lower[1], b1.lower[0]])
     upper_y = np.max([b0.upper[1], b1.upper[1]])
-    x_lim = [lower_x * .1 - 5, upper_x * .1 + 5]
-    y_lim = [lower_y * .1 - 5, upper_y * .1 + 5]
-
+    x_lim = [lower_x / L0_to_L2_ratio * dl - 5, upper_x / L0_to_L2_ratio * dl + 5]
+    y_lim = [lower_y / L0_to_L2_ratio * dl - 5, upper_y / L0_to_L2_ratio * dl + 5]
 
     fig, ax = Ni.plot(qty="rho", vmin=-0.1, vmax=3.6, plot_patches=True,
         patchcolors=['k','r','k'], ls=["-", "-", "-"],levels=(2,),
@@ -206,9 +204,9 @@ def main():
     Simulator(gv.sim, post_advance=post_advance).run()
 
 if __name__=="__main__":
-    #main()
+    main()
 
-    for i in range(55, 66):
-        time = time_step * i
-        post_advance(time)
+    # for i in range(55, 66):
+    #     time = time_step * i
+    #     post_advance(time)
 
