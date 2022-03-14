@@ -87,8 +87,9 @@ def print_tests(batches):
             print(test)
 
 if __name__ == "__main__":
+
     batches = build_batches()
-    # batches = [TestBatch([batches[0].tests[0]])]
+
     if PRINT:
         print_tests(batches)
 
