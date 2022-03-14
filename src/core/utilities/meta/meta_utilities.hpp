@@ -80,6 +80,8 @@ namespace core
                           SimulatorOption<DimConst<2>, InterpConst<2>, 4, 5, 8, 9, 16>,
                           SimulatorOption<DimConst<2>, InterpConst<3>, 4, 5, 8, 9, 25>,
 
+                          // TODO add in the rest of 3d nbrParticles permutations
+                          // possibly consider compile time activation for uncommon cases
                           SimulatorOption<DimConst<3>, InterpConst<1>, 6, 12 /*, 27*/>,
                           SimulatorOption<DimConst<3>, InterpConst<2>, 6, 12>,
                           SimulatorOption<DimConst<3>, InterpConst<3>, 6, 12>>{};
