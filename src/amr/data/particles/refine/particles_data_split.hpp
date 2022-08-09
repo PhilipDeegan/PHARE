@@ -29,7 +29,7 @@ namespace amr
     };
 
 
-    template<std::size_t interp, typename Particle>
+    template<typename Particle>
     Particle toFineGrid(Particle toFine)
     {
         constexpr auto dim   = Particle::dimension;
@@ -182,7 +182,7 @@ namespace amr
                     {
                         std::array<typename ParticleArray::value_type, nbRefinedPart>
                             refinedParticles;
-                        auto particleRefinedPos = toFineGrid<interpOrder>(particle);
+                        auto particleRefinedPos = toFineGrid(particle);
 
                         if (isCandidateForSplit_(particleRefinedPos, destinationBox))
                         {

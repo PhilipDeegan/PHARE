@@ -196,9 +196,9 @@ void MaxwellianParticleInitializer<ParticleArray, GridLayout>::loadParticles(
             if (basis_ == Basis::Magnetic)
                 particleVelocity = basisTransform(basis, particleVelocity);
 
-            particles.emplace_back(Particle{cellWeight, particleCharge_,
-                                            AMRCellIndex.template toArray<int>(),
-                                            deltas(deltaDistrib, randGen), particleVelocity});
+            particles.emplace_back(cellWeight, particleCharge_,
+                                   AMRCellIndex.template toArray<int>(),
+                                   deltas(deltaDistrib, randGen), particleVelocity);
         }
     }
 }

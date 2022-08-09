@@ -91,8 +91,10 @@ public:
         particles_.insert(position, first, last);
     }
 
-    auto back() { return particles_.back(); }
-    auto front() { return particles_.front(); }
+    auto& back() { return particles_.back(); }
+    auto& back() const { return particles_.back(); }
+    auto& front() { return particles_.front(); }
+    auto& front() const { return particles_.front(); }
 
     auto erase(IndexRange_& range) { cellMap_.erase(particles_, range); }
     auto erase(IndexRange_&& range)
@@ -127,6 +129,21 @@ public:
     Particle_t& emplace_back(Particle_t&& p)
     {
         auto& part = particles_.emplace_back(std::forward<Particle_t>(p));
+        cellMap_.add(particles_, particles_.size() - 1);
+        return part;
+    }
+
+    template<typename... Args>
+    auto& emplace_back(Args&&... args)
+    {
+        auto& part = particles_.emplace_back(std::forward<Args>(args)...);
+        cellMap_.add(particles_, particles_.size() - 1);
+        return part;
+    }
+    template<typename... Args>
+    auto& emplace_back(Args const&... args)
+    {
+        auto& part = particles_.emplace_back(args...);
         cellMap_.add(particles_, particles_.size() - 1);
         return part;
     }

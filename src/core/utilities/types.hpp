@@ -215,7 +215,7 @@ namespace core
     }
 
     template<typename T, std::size_t... Is>
-    constexpr auto gft_helper(std::index_sequence<Is...> const&&)
+    constexpr auto gft_helper(std::index_sequence<Is...> const &&)
         -> decltype(std::make_tuple((Is, std::declval<T>())...));
 
     template<typename T, std::size_t N>
@@ -338,6 +338,12 @@ auto none(Container const& container)
 }
 
 
+
+void inline abort_if(bool b)
+{
+    if (b)
+        std::abort();
+}
 
 
 } // namespace PHARE::core

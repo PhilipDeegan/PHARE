@@ -34,7 +34,7 @@ class AdvanceTestBase(SimulatorTest):
                      smallest_patch_size=None, largest_patch_size=20,
                      cells=120, time_step=0.001, model_init={},
                      dl=0.2, extra_diag_options={}, time_step_nbr=1, timestamps=None, ndim=1,
-                     block_merging_particles=False):
+                     block_merging_particles=False, **kwargs):
 
         diag_outputs = f"phare_outputs/advance/{diag_outputs}"
         from pyphare.pharein import global_vars
@@ -59,6 +59,7 @@ class AdvanceTestBase(SimulatorTest):
             diag_options={"format": "phareh5",
                           "options": extra_diag_options},
             strict=True,
+            **kwargs,
         )
 
 

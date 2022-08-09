@@ -61,7 +61,7 @@ class InitializationTest(SimulatorTest):
             diag_options={"format": "phareh5",
                           "options": extra_diag_options},
             strict=True,
-            **kwargs
+            **kwargs,
         )
 
 
