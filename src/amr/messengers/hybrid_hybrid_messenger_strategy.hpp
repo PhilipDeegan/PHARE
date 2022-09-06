@@ -138,6 +138,8 @@ namespace amr
         void registerLevel(std::shared_ptr<SAMRAI::hier::PatchHierarchy> const& hierarchy,
                            int const levelNumber) override
         {
+            PHARE_LOG_SCOPE("HybridHybridMessengerStrategy::registerLevel");
+
             auto const level = hierarchy->getPatchLevel(levelNumber);
 
             magneticSharedNodes_.registerLevel(hierarchy, level);
@@ -235,6 +237,8 @@ namespace amr
         void initLevel(IPhysicalModel& model, SAMRAI::hier::PatchLevel& level,
                        double const initDataTime) override
         {
+            PHARE_LOG_SCOPE("HybridHybridMessengerStrategy::initLevel");
+
             auto levelNumber = level.getLevelNumber();
 
             magneticInit_.fill(levelNumber, initDataTime);

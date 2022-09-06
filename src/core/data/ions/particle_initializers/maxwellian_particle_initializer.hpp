@@ -9,10 +9,10 @@
 #include "core/data/grid/gridlayoutdefs.hpp"
 #include "core/hybrid/hybrid_quantities.hpp"
 #include "core/utilities/types.hpp"
+#include "core/utilities/point/point.hpp"
 #include "core/data/ions/particle_initializers/particle_initializer.hpp"
 #include "core/data/particles/particle.hpp"
 #include "initializer/data_provider.hpp"
-#include "core/utilities/point/point.hpp"
 
 
 namespace PHARE::core

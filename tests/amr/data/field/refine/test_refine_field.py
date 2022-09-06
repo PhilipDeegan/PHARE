@@ -151,6 +151,10 @@ def refine(field, **kwargs):
             )
 
 
+    if fine_box.ndim == 3:
+        assert False
+
+
     # the fine data is ghost_nbr larger than expected to include ghost values from the coarser, so we drop the outer values
     if field.box.ndim == 1:
         fine_data = fine_data[field.ghosts_nbr[0] : -field.ghosts_nbr[0]]

@@ -192,13 +192,14 @@ class AdvanceTestBase(SimulatorTest):
             return mom_hier
 
 
+
+
+
     def base_test_overlaped_fields_are_equal(self, datahier, coarsest_time):
         checks = 0
         for ilvl, overlaps in hierarchy_overlaps(datahier, coarsest_time).items():
             for overlap in overlaps:
-                pd1, pd2 = overlap["pdatas"]
-                box      = overlap["box"]
-                offsets  = overlap["offset"]
+                (pd1, pd2), box, offsets = overlap["pdatas"], overlap["box"], overlap["offset"]
 
                 self.assertEqual(pd1.quantity, pd2.quantity)
 
@@ -214,22 +215,11 @@ class AdvanceTestBase(SimulatorTest):
                     # this is because the overlap box has been calculated from
                     # the intersection of possibly shifted patch data ghost boxes
 
-                    loc_b1 = boxm.amr_to_local(box, boxm.shift(pd1.ghost_box, offsets[0]))
-                    loc_b2 = boxm.amr_to_local(box, boxm.shift(pd2.ghost_box, offsets[1]))
-
-                    data1 = pd1.dataset
-                    data2 = pd2.dataset
-
-                    if box.ndim == 1:
-                        slice1 = data1[loc_b1.lower[0]:loc_b1.upper[0] + 1]
-                        slice2 = data2[loc_b2.lower[0]:loc_b2.upper[0] + 1]
-
-                    if box.ndim == 2:
-                        slice1 = data1[loc_b1.lower[0]:loc_b1.upper[0] + 1, loc_b1.lower[1]:loc_b1.upper[1] + 1]
-                        slice2 = data2[loc_b2.lower[0]:loc_b2.upper[0] + 1, loc_b2.lower[1]:loc_b2.upper[1] + 1]
+                    slice1 = boxm.select(pd1.dataset, boxm.amr_to_local(box, boxm.shift(pd1.ghost_box, offsets[0])))
+                    slice2 = boxm.select(pd2.dataset, boxm.amr_to_local(box, boxm.shift(pd2.ghost_box, offsets[1])))
+                    assert slice1.dtype == np.float64
 
                     try:
-                        assert slice1.dtype == np.float64
                         np.testing.assert_equal(slice1, slice2)
                         checks += 1
                     except AssertionError as e:
@@ -300,8 +290,8 @@ class AdvanceTestBase(SimulatorTest):
                         self.assertEqual(part1, part2)
 
 
-    def _test_L0_particle_number_conservation(self, ndim, interp_order, ppc=100):
-        cells=120
+    def _test_L0_particle_number_conservation(self, ndim, interp_order, ppc=100, cells=120):
+
         time_step_nbr=10
         time_step=0.001
 
@@ -324,7 +314,7 @@ class AdvanceTestBase(SimulatorTest):
 
 
 
-    def _test_field_coarsening_via_subcycles(self, dim, interp_order, refinement_boxes, **kwargs):
+    def _test_field_coarsening_via_subcycles(self, dim, interp_order, refinement_boxes, cells=60, **kwargs):
         print("test_field_coarsening_via_subcycles for dim/interp : {}/{}".format(dim, interp_order))
 
         from tests.amr.data.field.coarsening.test_coarsen_field import coarsen
@@ -333,7 +323,7 @@ class AdvanceTestBase(SimulatorTest):
         time_step_nbr=3
 
         diag_outputs=f"subcycle_coarsening/{dim}/{interp_order}/{self.ddt_test_id()}"
-        datahier = self.getHierarchy(interp_order, refinement_boxes, "eb", cells=60,
+        datahier = self.getHierarchy(interp_order, refinement_boxes, "eb", cells=cells,
                                       diag_outputs=diag_outputs, time_step=0.001,
                                       extra_diag_options={"fine_dump_lvl_max": 10},
                                       time_step_nbr=time_step_nbr,
@@ -396,12 +386,7 @@ class AdvanceTestBase(SimulatorTest):
                                     afterCoarse = np.copy(coarse_pdDataset)
 
                                     # change values that should be updated to make failure obvious
-                                    assert(dim < 3) # update
-                                    if dim == 1:
-                                        afterCoarse[dataBox.lower[0] : dataBox.upper[0] + 1] = -144123
-                                    if dim == 2:
-                                        afterCoarse[dataBox.lower[0] : dataBox.upper[0] + 1,
-                                                    dataBox.lower[1] : dataBox.upper[1] + 1] = -144123
+                                    boxm.DataSelector(afterCoarse)[dataBox] = -144123
 
                                     coarsen(qty, coarse_pd, fine_pd, coarseBox, fine_pdDataset, afterCoarse)
                                     np.testing.assert_allclose(coarse_pdDataset, afterCoarse, atol=1e-16, rtol=0)

@@ -253,3 +253,19 @@ if (test AND ${PHARE_EXEC_LEVEL_MIN} GREATER 0) # 0 = no tests
 
 endif()
 
+# -DwithPGO_GEN
+if (withPGO_GEN)
+  set (PHARE_PGO_FLAGS -fprofile-generate)
+endif(withPGO_GEN)
+
+# -DwithPGO_USE
+if (withPGO_USE)
+  set (PHARE_PGO_FLAGS -fprofile-use)
+endif(withPGO_USE)
+
+if (withPGO_GEN OR withPGO_USE)
+  set (CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} ${PHARE_PGO_FLAGS}" )
+  set (CMAKE_MODULE_LINKER_FLAGS "${CMAKE_MODULE_LINKER_FLAGS} ${PHARE_PGO_FLAGS}"  )
+  set (CMAKE_SHARED_LINKER_FLAGS "${CMAKE_SHARED_LINKER_FLAGS} ${PHARE_PGO_FLAGS}"  )
+endif() # (withPGO_GEN OR withPGO_USE)
+

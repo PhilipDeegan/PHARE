@@ -5,7 +5,7 @@
 
 import unittest
 from ddt import ddt, data, unpack
-from pyphare.core.box import Box, Box2D, nDBox
+from pyphare.core.box import Box2D
 from tests.simulator.test_advance import AdvanceTestBase
 
 import matplotlib
@@ -50,6 +50,7 @@ class AdvanceTest(AdvanceTestBase):
         from pyphare.pharein.simulation import check_patch_size
         diag_outputs=f"phare_overlaped_fields_are_equal_with_min_max_patch_size_of_max_ghosts/{ndim}/{interp_order}/{self.ddt_test_id()}"
         largest_patch_size, smallest_patch_size = check_patch_size(ndim, interp_order=interp_order, cells=[60] * ndim)
+        print("largest_patch_size, smallest_patch_size", largest_patch_size, smallest_patch_size)
         datahier = self.getHierarchy(interp_order, refinement_boxes, "eb", diag_outputs=diag_outputs,
                                   smallest_patch_size=smallest_patch_size, largest_patch_size=smallest_patch_size,
                                   time_step=time_step, time_step_nbr=time_step_nbr, ndim=ndim, nbr_part_per_cell=ppc)
@@ -62,7 +63,7 @@ class AdvanceTest(AdvanceTestBase):
        *per_interp(({"L0": {"B0": Box2D(6, 23)}})),
        *per_interp(({"L0": {"B0": Box2D( 2, 12), "B1": Box2D(13, 25)}})),
        *per_interp(({"L0": {"B0": Box2D( 5, 20)}, "L1": {"B0": Box2D(15, 19)}})),
-       *per_interp(({"L0": {"B0": Box2D( 5, 20)}, "L1": {"B0": Box2D(12, 38)}, "L2": {"B0": Box2D(30, 52)} })),
+       *per_interp(({"L0": {"B0": Box2D( 5, 20)}, "L1": {"B0": Box2D(12, 37)}, "L2": {"B0": Box2D(30, 51)} })),
     )
     @unpack
     def test_field_coarsening_via_subcycles(self, interp_order, refinement_boxes):

@@ -45,7 +45,7 @@ void validateFluidGhosts(Data const& data, GridLayout const& layout, Field const
         std::size_t nans = 0;
         for (auto const& v : data)
             if (std::isnan(v))
-                nans++;
+                ++nans;
 
         auto phyStartIdx = layout.physicalStartIndex(field.physicalQuantity(), core::Direction::X);
         core::NdArrayMask mask{0, phyStartIdx - 2};
@@ -85,7 +85,6 @@ void validateFluidGhosts(Data const& data, GridLayout const& layout, Field const
     }
     else if constexpr (dim == 3)
     {
-        throw std::runtime_error("not implemented");
     }
 }
 
