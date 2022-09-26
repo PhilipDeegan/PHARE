@@ -1,13 +1,15 @@
 #ifndef PHARE_PARTICLES_DATA_SPLIT_HPP
 #define PHARE_PARTICLES_DATA_SPLIT_HPP
 
-
-#include "amr/data/particles/particles_data.hpp"
-#include "amr/resources_manager/amr_utils.hpp"
 #include "split.hpp"
-#include "core/utilities/constants.hpp"
+
 #include "phare_core.hpp"
+#include "core/utilities/constants.hpp"
+
 #include "amr/amr_constants.hpp"
+#include "amr/utilities/box/amr_box.hpp"
+#include "amr/resources_manager/amr_utils.hpp"
+#include "amr/data/particles/particles_data.hpp"
 
 #include <SAMRAI/geom/CartesianPatchGeometry.h>
 #include <SAMRAI/hier/Box.h>
@@ -50,6 +52,8 @@ namespace amr
     template<typename ParticleArray, ParticlesDataSplitType splitType, typename Splitter>
     class ParticlesRefineOperator : public SAMRAI::hier::RefineOperator
     {
+        using Particle_t = typename ParticleArray::value_type;
+
     public:
         static constexpr auto dim           = Splitter::dimension;
         static constexpr auto interpOrder   = Splitter::interp_order;
@@ -171,20 +175,20 @@ namespace amr
             for (auto const& destinationBox : destBoxes)
             {
                 std::array particlesArrays{&srcInteriorParticles, &srcGhostParticles};
+                auto splitBox = grow<dim>(destinationBox, Splitter::maxCellDistanceFromSplit());
 
-                auto isInDest = [&destinationBox](auto const& particle) //
-                { return isInBox(destinationBox, particle); };
-
+                auto isInDest = [&destinationBox](auto const& particle) {
+                    return isInBox(destinationBox, particle);
+                };
 
                 for (auto const& sourceParticlesArray : particlesArrays)
                 {
                     for (auto const& particle : *sourceParticlesArray)
                     {
-                        std::array<typename ParticleArray::value_type, nbRefinedPart>
-                            refinedParticles;
+                        std::array<Particle_t, nbRefinedPart> refinedParticles;
                         auto particleRefinedPos = toFineGrid<interpOrder>(particle);
 
-                        if (isCandidateForSplit_(particleRefinedPos, destinationBox))
+                        if (isInBox(splitBox, particleRefinedPos))
                         {
                             split(particleRefinedPos, refinedParticles);
 
@@ -242,30 +246,6 @@ namespace amr
                     }     // end loop on particles
                 }         // end loop on source particle arrays
             }             // loop on destination box
-        }
-
-
-        SAMRAI::hier::Box getSplitBox(SAMRAI::hier::Box const& destinationBox) const
-        {
-            SAMRAI::hier::Box splitBox{destinationBox};
-            SAMRAI::tbox::Dimension dimension{dim};
-            auto growingVec = SAMRAI::hier::IntVector::getZero(dimension);
-
-            for (auto iDim = 0u; iDim < dim; ++iDim)
-            {
-                growingVec[iDim] = Splitter::maxCellDistanceFromSplit();
-            }
-            splitBox.grow(growingVec);
-
-            return splitBox;
-        }
-
-        template<typename Particle>
-        bool isCandidateForSplit_(Particle const& particle,
-                                  SAMRAI::hier::Box const& toFillBox) const
-        {
-            auto toSplitBox = getSplitBox(toFillBox);
-            return isInBox(toSplitBox, particle);
         }
     };
 

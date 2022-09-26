@@ -2,10 +2,10 @@
 #ifndef PHARE_AMR_UTILITIES_BOX_BOX_HPP
 #define PHARE_AMR_UTILITIES_BOX_BOX_HPP
 
-
 #include "SAMRAI/hier/Box.h"
-#include "core/utilities/box/box.hpp"
 
+#include "core/utilities/types.hpp"
+#include "core/utilities/box/box.hpp"
 
 namespace PHARE::amr
 {
@@ -25,6 +25,42 @@ auto phare_box_from(SAMRAI::hier::Box const& box)
     std::array<Type, dim> upper = *reinterpret_cast<std::array<int, dim> const*>(&box.upper()[0]);
 
     return PHARE::core::Box<Type, dim>{core::Point{lower}, core::Point{upper}};
+}
+
+template<std::size_t dim, typename Container>
+auto grow(SAMRAI::hier::Box const& box, Container const& container)
+{
+    auto copy{box};
+    SAMRAI::tbox::Dimension dimension{dim};
+    auto growingVec = SAMRAI::hier::IntVector::getZero(dimension);
+    for (auto iDim = 0u; iDim < dim; ++iDim)
+        growingVec[iDim] = container[iDim];
+    copy.grow(growingVec);
+    return copy;
+}
+
+template<std::size_t dim>
+auto grow(SAMRAI::hier::Box const& box, int const value)
+{
+    return grow<dim>(box, core::ConstArray<int, dim>(value));
+}
+
+template<std::size_t dim, typename Container>
+auto shrink(SAMRAI::hier::Box const& box, Container const& container)
+{
+    auto copy{box};
+    SAMRAI::tbox::Dimension dimension{dim};
+    auto growingVec = SAMRAI::hier::IntVector::getZero(dimension);
+    for (auto iDim = 0u; iDim < dim; ++iDim)
+        growingVec[iDim] = static_cast<std::int32_t>(container[iDim]) * -1;
+    copy.grow(growingVec);
+    return copy;
+}
+
+template<std::size_t dim>
+auto shrink(SAMRAI::hier::Box const& box, int const value)
+{
+    return shrink<dim>(box, core::ConstArray<int, dim>(value));
 }
 
 inline bool operator==(SAMRAI::hier::Box const& b1, SAMRAI::hier::Box const& b2)
