@@ -2,7 +2,7 @@
 #define PHARE_BENCH_CORE_BENCH_H
 
 #include "phare_core.hpp"
-#include "benchmark/benchmark.hpp"
+#include "benchmark/benchmark.h"
 
 
 namespace PHARE::core::bench
@@ -13,6 +13,17 @@ using Field = PHARE::core::Field<PHARE::core::NdArrayVector<dim>,
 template<std::size_t dim>
 using VecField
     = PHARE::core::VecField<PHARE::core::NdArrayVector<dim>, typename PHARE::core::HybridQuantity>;
+
+
+template<std::size_t dim, std::size_t interp>
+auto getLayout(std::uint32_t cells)
+{
+    using PHARE_Types  = PHARE::core::PHARE_Types<dim, interp>;
+    using GridLayout_t = typename PHARE_Types::GridLayout_t;
+    return GridLayout_t{PHARE::core::ConstArray<double, dim>(1.0 / cells),
+                        PHARE::core::ConstArray<std::uint32_t, dim>(cells),
+                        PHARE::core::Point<double, dim>{PHARE::core::ConstArray<double, dim>(0)}};
+}
 
 
 template<std::size_t dim>
@@ -69,7 +80,7 @@ auto make_particles(std::size_t ppc, Box disperse_in, std::optional<int> seed = 
 
 
 template<typename GridLayout, typename Quantity, std::size_t dim = GridLayout::dimension>
-Field<dim> field(std::string key, Quantity type, GridLayout const& layout)
+auto field(std::string key, Quantity type, GridLayout const& layout)
 {
     Field<dim> feeld{key, type, layout.allocSize(type)};
     std::fill(feeld.begin(), feeld.end(), 1);
@@ -159,6 +170,8 @@ public:
         Super::E.setBuffer("EM_E_y", &ey);
         Super::E.setBuffer("EM_E_z", &ez);
     }
+
+    Electromag(Electromag const&) = delete;
 
 private:
     decltype(EM(*static_cast<GridLayout*>(0))) emFields;

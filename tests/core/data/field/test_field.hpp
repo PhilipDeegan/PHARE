@@ -7,6 +7,7 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+#include "core/data/ndarray/ndarray_vector.hpp"
 
 namespace PHARE
 {
@@ -85,24 +86,38 @@ namespace PHARE::core
 template<std::size_t dim>
 struct FieldMock
 {
+    using value_type = double;
+
     static auto constexpr dimension   = dim;
     static auto constexpr is_host_mem = true;
-    double data;
+
 
     FieldMock() = default;
 
     template<typename... Args>
     auto& operator()(Args...)
     {
-        return data;
+        return _data[0];
     }
     template<typename... Args>
     auto& operator()(Args...) const
     {
-        return data;
+        return _data[0];
     }
     auto physicalQuantity() const { return qty; }
     std::string name() const { return "FieldMock"; }
+
+    auto shape() const { return ConstArray<std::uint32_t, dim>(1); }
+
+    auto& vector() { return _data; }
+    auto& vector() const { return _data; }
+
+    auto data() { return _data.data(); }
+    auto data() const { return _data.data(); }
+    std::size_t size() const { return 1; }
+    std::size_t size() { return 1; }
+
+    std::vector<double> _data{0};
 
     PHARE::core::HybridQuantity::Scalar qty = PHARE::core::HybridQuantity::Scalar::Ex;
 };
@@ -190,7 +205,8 @@ void test(GridLayout const& layout,
           std::vector<T> const& fieldV, FF const ff = FF{})
 {
     EXPECT_EQ(field0.size(), fieldV.size());
-    core::NdArrayView<GridLayout::dimension, T> const field1{fieldV.data(), field0.shape()};
+
+    auto field1 = core::make_array_view(fieldV, field0.shape());
     test_fields(layout, field0, field1, ff);
 }
 
@@ -200,7 +216,7 @@ void test(GridLayout const& layout, PHARE::core::Field<NdArrayImpl, Qty> field0,
           std::vector<T>&& fieldV, FF const ff = FF{})
 {
     EXPECT_EQ(field0.size(), fieldV.size());
-    core::NdArrayView<GridLayout::dimension, T> field1{fieldV, field0.shape()};
+    auto field1 = core::make_array_view(fieldV, field0.shape());
     test_fields(layout, field0, field1, ff);
 }
 

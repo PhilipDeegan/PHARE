@@ -9,6 +9,7 @@
 #include <numeric>
 #include <iostream>
 
+#include "mkn/avx.hpp"
 
 namespace PHARE::core
 {
@@ -171,7 +172,9 @@ public:
         return const_cast<DataType&>(static_cast<NdArrayView const&>(*this)(indexes));
     }
 
+    auto data() { return ptr_; }
     auto data() const { return ptr_; }
+
     std::size_t size() const
     {
         return std::accumulate(nCells_.begin(), nCells_.end(), 1, std::multiplies<std::size_t>());
@@ -183,6 +186,18 @@ private:
     std::array<std::uint32_t, dim> nCells_;
 };
 
+
+template<typename DataType, std::size_t dim>
+auto make_array_view(std::vector<DataType>& vec, std::array<std::uint32_t, dim> shape)
+{
+    return NdArrayView<dim, DataType>{vec.data(), shape};
+}
+
+template<typename DataType, std::size_t dim>
+auto make_array_view(std::vector<DataType> const& vec, std::array<std::uint32_t, dim> shape)
+{
+    return NdArrayView<dim, DataType const>{vec.data(), shape};
+}
 
 
 
@@ -210,15 +225,15 @@ public:
     {
     }
 
-    NdArrayVector(NdArrayVector const& source) = default;
     NdArrayVector(NdArrayVector&& source)      = default;
-    NdArrayVector& operator=(NdArrayVector const& source) = default;
+    NdArrayVector(NdArrayVector const& source) = default;
+
     NdArrayVector& operator=(NdArrayVector&& source) = default;
+    NdArrayVector& operator=(NdArrayVector const& source) = default;
+
 
     auto data() const { return data_.data(); }
     auto data() { return data_.data(); }
-
-    auto size() const { return data_.size(); }
 
     auto begin() const { return std::begin(data_); }
     auto begin() { return std::begin(data_); }
@@ -226,9 +241,8 @@ public:
     auto end() const { return std::end(data_); }
     auto end() { return std::end(data_); }
 
+    auto size() const { return data_.size(); }
     void zero() { std::fill(data_.begin(), data_.end(), 0); }
-
-
 
 
     template<typename... Indexes>
@@ -255,7 +269,6 @@ public:
         return const_cast<DataType&>(static_cast<NdArrayVector const&>(*this)(indexes));
     }
 
-
     auto& shape() const { return nCells_; }
 
     template<typename Mask>
@@ -264,14 +277,14 @@ public:
         return MaskedView{*this, std::forward<Mask>(mask)};
     }
 
-
-    auto& vector() { return data_; }
-    auto& vector() const { return data_; }
+    auto& vector() { return *reinterpret_cast<std::vector<DataType>*>(&data_()); }
+    auto& vector() const { return *reinterpret_cast<std::vector<DataType> const*>(&data_()); }
 
 
 private:
     std::array<std::uint32_t, dim> nCells_;
-    std::vector<DataType> data_;
+    // std::vector<DataType> data_;
+    mkn::avx::Vector<DataType> data_;
 };
 
 

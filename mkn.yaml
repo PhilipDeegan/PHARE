@@ -1,0 +1,154 @@
+#! clean build -x mpi -dtKOp py
+
+name: phare
+
+property:
+  MPI_INC: /usr/include/hdf5/mpich
+  MPI_LIB: hdf5_mpich
+
+profile:
+- name: base
+  arg: -DPHARE_HAS_HIGHFIVE=1
+
+
+- name: core
+  inc: src subprojects
+  src: src/core
+  dep: mkn.kul mkn.avx
+  out: phare_core
+
+- name: samrai
+  self: core
+  dep: llnl.samrai(https://github.com/PhilipDeegan/llnl.samrai)
+  src: src/amr
+  out: phare_amr
+
+- name: diagnostic
+  self: samrai
+  dep: hpc.highfive(https://github.com/PhilipDeegan/hpc.highfive)
+  inc: build/subprojects/highfive/include
+       ${MPI_INC}
+  lib: ${MPI_LIB}
+
+- name: simulator
+  parent: base
+  self: diagnostic
+
+- name: exe
+  parent: base
+  mode: none
+  dep: lang.pybind11
+  self: simulator init
+  main: src/phare/phare.cpp
+  mod: lang.python3
+  env: PYTHONPATH=${MKN_ROOT}:${MKN_ROOT}/tests/diagnostic:${MKN_ROOT}/build:${MKN_ROOT}/pyphare
+
+- name: init
+  src: src/initializer/data_provider.cpp
+  self: core
+  out: phare_initializer
+  mode: shared # static singleton dict lives here
+
+- name: pybind
+  parent: base
+  mode: shared
+  dep: lang.pybind11
+  mod: lang.pybind11 lang.python3
+
+- name: dictator
+  parent: pybind
+  self: init
+  src: src/initializer/dictator.cpp
+  install: build/pybindlibs
+  out: dictator
+
+- name: cpp
+  parent: pybind
+  self: simulator
+  src: src/python3/cpp_simulator.cpp
+  install: build/pybindlibs
+  out: cpp
+
+
+- name: cpp_etc
+  parent: pybind
+  self: simulator
+  src: src/python3/cpp_etc.cpp
+  install: build/pybindlibs
+  out: cpp_etc
+
+- name: py
+  self: dictator cpp_etc cpp
+
+- name: test
+  parent: base
+  self: init simulator
+  dep: lang.pybind11 google.test
+  mod: lang.python3
+  inc: .
+  link: -pthread
+
+- name: test_diagnostics
+  parent: test
+  mode: none
+  mod: lang.python3
+  test:
+    tests/diagnostic/test-diagnostics_1d.cpp
+    tests/diagnostic/test-diagnostics_2d.cpp
+  env: PYTHONPATH=${MKN_ROOT}:${MKN_ROOT}/tests/diagnostic:${MKN_ROOT}/build:${MKN_ROOT}/pyphare
+
+- name: bench
+  # self: core
+  inc: src subprojects tools
+  dep: mkn.kul mkn.avx google.benchmark
+  # main: tools/bench/core/data/particles/interop.cpp
+  link: -pthread
+
+- name: faraday
+  parent: bench
+  test: tools/bench/core/numerics/faraday/bench_faraday.cpp
+         tools/bench/core/numerics/faraday/bench_faraday_avx.cpp
+
+
+- name: real_bench_py_2_1_4
+  dep: llnl.caliper google.sparsehash
+  parent: pybind
+  self:  init simulator
+  src: tools/bench/real/sim/sim_2_1_4.cpp
+  install: build/pybindlibs
+  out: cpp_sim_2_1_4
+  arg: -DPHARE_WITH_CALIPER=1
+  test: |
+    python3 -uO tools/bench/real/bench_harris.py
+# env: |
+#   CALI_CONFIG=runtime-report
+
+
+- name: range_test
+  mode: none
+  dep: google.test
+  self: init simulator
+  main: tests/core/utilities/range/test_ranges.cpp
+  link: -pthread
+
+
+- name: solver_ppc_bench
+  mode: none
+  inc: tools
+  self: core
+  dep: google.benchmark
+  main: tools/bench/amr/solver/particle2mesh.cpp #tools/bench/amr/solver/ion_updater_bench.cpp
+  link: -pthread
+
+
+- name: test_ampere
+  dep: google.test
+  inc: .
+  self: core
+  main: tests/core/numerics/ampere/test_main.cpp
+
+- name: test_faraday
+  dep: google.test
+  inc: .
+  self: core
+  main: tests/core/numerics/faraday/test_main.cpp

@@ -1,5 +1,5 @@
 
-#include "benchmark/benchmark.hpp"
+// #include "benchmark/benchmark.hpp"
 
 #include "phare_core.hpp"
 #include "core/numerics/pusher/boris.hpp"
@@ -69,7 +69,7 @@ void push(benchmark::State& state)
     Field<dim> ey = field("Ey", PHARE::core::HybridQuantity::Scalar::Ey, layout);
     Field<dim> ez = field("Ez", PHARE::core::HybridQuantity::Scalar::Ez, layout);
 
-    PHARE::core::Electromag<VecField<dim>> emFields{std::string{"EM"}};
+    PHARE::core::Electromag<VecField<dim>> emFields{"EM"};
     emFields.B.setBuffer("EM_B_x", &bx);
     emFields.B.setBuffer("EM_B_y", &by);
     emFields.B.setBuffer("EM_B_z", &bz);
