@@ -118,8 +118,11 @@ struct DummyLayout
 template<std::size_t dim>
 class APusher : public ::testing::Test
 {
+    using ParticleArray_t = MappedParticleArray<dim>;
+    using Particle_t      = typename ParticleArray_t::Particle_t;
+
 public:
-    using Pusher_ = BorisPusher<dim, IndexRange<ParticleArray<dim>>, Electromag, Interpolator,
+    using Pusher_ = BorisPusher<dim, IndexRange<ParticleArray_t>, Electromag, Interpolator,
                                 BoundaryCondition<dim, 1>, DummyLayout<dim>>;
 
     APusher()
@@ -144,11 +147,10 @@ public:
     }
 
 protected:
-    using Particle = typename ParticleArray<dim>::Particle_t;
     Trajectory expectedTrajectory;
     DummyLayout<dim> layout;
-    ParticleArray<dim> particlesIn;
-    ParticleArray<dim> particlesOut;
+    ParticleArray_t particlesIn;
+    ParticleArray_t particlesOut;
     std::unique_ptr<Pusher_> pusher;
     double mass;
     double dt;
@@ -251,11 +253,16 @@ TEST_F(APusher1D, trajectoryIsOk)
 // and those that stay.
 class APusherWithLeavingParticles : public ::testing::Test
 {
+    static constexpr std::size_t dim = 1;
+    using ParticleArray_t            = MappedParticleArray<dim>;
+    using Particle_t                 = typename ParticleArray_t::Particle_t;
+
 public:
+    using Pusher_ = BorisPusher<dim, IndexRange<ParticleArray_t>, Electromag, Interpolator,
+                                BoundaryCondition<dim, 1>, DummyLayout<dim>>;
+
     APusherWithLeavingParticles()
-        : pusher{std::make_unique<
-            BorisPusher<1, IndexRange<ParticleArray<1>>, Electromag, Interpolator,
-                        BoundaryCondition<1, 1>, DummyLayout<1>>>()}
+        : pusher{std::make_unique<Pusher_>()}
         , mass{1}
         , dt{0.001}
         , tstart{0}
@@ -282,9 +289,7 @@ public:
 
 
 protected:
-    std::unique_ptr<BorisPusher<1, IndexRange<ParticleArray<1>>, Electromag, Interpolator,
-                                BoundaryCondition<1, 1>, DummyLayout<1>>>
-        pusher;
+    std::unique_ptr<Pusher_> pusher;
     double mass;
     double dt;
     double tstart;
@@ -296,9 +301,9 @@ protected:
     Box<double, 1> domain;
     Box<int, 1> cells;
     BoundaryCondition<1, 1> bc;
-    ParticleArray<1> particlesIn;
-    ParticleArray<1> particlesOut1;
-    ParticleArray<1> particlesOut2;
+    ParticleArray_t particlesIn;
+    ParticleArray_t particlesOut1;
+    ParticleArray_t particlesOut2;
 };
 
 
@@ -381,9 +386,12 @@ TEST_F(APusherWithLeavingParticles, pusherWithOrWithoutBCReturnsSameNbrOfStaying
 
 TEST(APusherFactory, canReturnABorisPusher)
 {
+    static constexpr std::size_t dim = 1;
+    using ParticleArray_t            = MappedParticleArray<dim>;
+
     auto pusher
-        = PusherFactory::makePusher<1, IndexRange<ParticleArray<1>>, Electromag, Interpolator,
-                                    BoundaryCondition<1, 1>, DummyLayout<1>>("modified_boris");
+        = PusherFactory::makePusher<dim, IndexRange<ParticleArray_t>, Electromag, Interpolator,
+                                    BoundaryCondition<dim, 1>, DummyLayout<dim>>("modified_boris");
 
     EXPECT_NE(nullptr, pusher);
 }

@@ -7,7 +7,6 @@
 #include "core/data/ions/particle_initializers/maxwellian_particle_initializer.hpp"
 #include "core/data/particles/particle_array.hpp"
 #include "core/data/particles/particle_utilities.hpp"
-#include "core/utilities/box/box.hpp"
 #include "core/utilities/point/point.hpp"
 
 #include "gmock/gmock.h"
@@ -30,7 +29,6 @@ private:
 public:
     AMaxwellianParticleInitializer1D()
         : layout{{{0.1}}, {{50}}, Point{0.}, Box{Point{50}, Point{99}}}
-        , particles{layout.AMRBox()}
         , initializer{std::make_unique<MaxwellianParticleInitializer<ParticleArrayT, GridLayoutT>>(
               density, InitFunctionArray{vx, vy, vz}, InitFunctionArray{vthx, vthy, vthz}, 1.,
               nbrParticlesPerCell)}

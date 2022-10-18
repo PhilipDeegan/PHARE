@@ -42,7 +42,7 @@ struct PHARE_Types
     using GridLayout_t = PHARE::core::GridLayout<YeeLayout_t>;
 
     using Particle_t      = PHARE::core::Particle<dimension>;
-    using ParticleAoS_t   = PHARE::core::ParticleArray<dimension>;
+    using ParticleAoS_t   = PHARE::core::MappedParticleArray<dimension>;
     using ParticleArray_t = ParticleAoS_t;
     using ParticleSoA_t   = PHARE::core::ContiguousParticles<dimension>;
 

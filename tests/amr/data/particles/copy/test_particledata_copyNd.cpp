@@ -18,6 +18,8 @@ template<typename dimType>
 struct AParticlesDataND : public testing::Test
 {
     static constexpr auto dim = dimType{}();
+    using ParticleArray_t     = MappedParticleArray<dim>;
+    using Particle_t          = typename ParticleArray_t::Particle_t;
 
     SAMRAI::tbox::Dimension dimension{dim};
     SAMRAI::hier::BlockId blockId{0};
@@ -37,9 +39,9 @@ struct AParticlesDataND : public testing::Test
 
     SAMRAI::hier::IntVector ghost{SAMRAI::hier::IntVector::getOne(dimension)};
 
-    ParticlesData<ParticleArray<dim>> destData{destDomain, ghost};
-    ParticlesData<ParticleArray<dim>> sourceData{sourceDomain, ghost};
-    typename ParticleArray<dim>::Particle_t particle;
+    ParticlesData<ParticleArray_t> destData{destDomain, ghost};
+    ParticlesData<ParticleArray_t> sourceData{sourceDomain, ghost};
+    Particle_t particle;
 
 
     AParticlesDataND()

@@ -26,33 +26,13 @@ public:
     using Particle_t                    = Particle<dim>;
     using Vector                        = std::vector<Particle_t>;
 
-private:
-    using CellMap_t   = CellMap<dim, int>;
-    using IndexRange_ = IndexRange<This>;
-
-
-public:
     using value_type     = Particle_t;
-    using box_t          = Box<int, dim>;
     using iterator       = typename Vector::iterator;
     using const_iterator = typename Vector::const_iterator;
 
-
-
-public:
-    ParticleArray(box_t box)
-        : box_{box}
-        , cellMap_{box_}
-    {
-        assert(box_.size() > 0);
-    }
-
-    ParticleArray(box_t box, std::size_t size)
+    ParticleArray(std::size_t size = 0)
         : particles_(size)
-        , box_{box}
-        , cellMap_{box_}
     {
-        assert(box_.size() > 0);
     }
 
     ParticleArray(ParticleArray const& from) = default;
@@ -63,21 +43,14 @@ public:
     std::size_t size() const { return particles_.size(); }
     std::size_t capacity() const { return particles_.capacity(); }
 
-    void clear()
-    {
-        particles_.clear();
-        cellMap_.clear();
-    }
+    void clear() { particles_.clear(); }
     void reserve(std::size_t newSize) { return particles_.reserve(newSize); }
     void resize(std::size_t newSize) { return particles_.resize(newSize); }
 
-    auto const& operator[](std::size_t i) const { return particles_[i]; }
+    auto& operator[](std::size_t i) const { return particles_[i]; }
     auto& operator[](std::size_t i) { return particles_[i]; }
 
-    bool operator==(ParticleArray<dim> const& that) const
-    {
-        return (this->particles_ == that.particles_);
-    }
+    bool operator==(This const& that) const { return (this->particles_ == that.particles_); }
 
     auto begin() const { return particles_.begin(); }
     auto begin() { return particles_.begin(); }
@@ -94,12 +67,6 @@ public:
     auto back() { return particles_.back(); }
     auto front() { return particles_.front(); }
 
-    auto erase(IndexRange_& range) { cellMap_.erase(particles_, range); }
-    auto erase(IndexRange_&& range)
-    {
-        // TODO move ctor for range?
-        cellMap_.erase(std::forward<IndexRange_>(range));
-    }
 
     iterator erase(iterator first, iterator last)
     {
@@ -115,35 +82,105 @@ public:
     }
 
 
-    Particle_t& emplace_back()
+    auto& emplace_back() { return particles_.emplace_back(); }
+    auto& emplace_back(Particle_t&& p)
     {
-        auto& part = particles_.emplace_back();
+        return particles_.emplace_back(std::forward<Particle_t>(p));
+    }
+
+    void push_back(Particle_t const& p) { particles_.push_back(p); }
+    void push_back(Particle_t&& p) { particles_.push_back(std::forward<Particle_t>(p)); }
+
+    void swap(ParticleArray<dim>& that) { std::swap(this->particles_, that.particles_); }
+
+    auto& vector() { return particles_; }
+    auto& vector() const { return particles_; }
+
+protected:
+    Vector particles_;
+};
+
+
+
+template<std::size_t dim>
+class MappedParticleArray : public ParticleArray<dim>
+{
+    using This  = MappedParticleArray<dim>;
+    using Super = ParticleArray<dim>;
+
+    using CellMap_t   = CellMap<dim, int>;
+    using IndexRange_ = IndexRange<This>;
+    using Super::particles_;
+
+public:
+    using Particle_t = typename Super::Particle_t;
+    using box_t      = Box<int, dim>;
+
+    using Super::erase;
+
+
+    MappedParticleArray(box_t box)
+        : Super{}
+        , box_{box}
+        , cellMap_{box_}
+    {
+        assert(box_.size() > 0);
+    }
+
+    MappedParticleArray(box_t box, std::size_t size)
+        : Super(size)
+        , box_{box}
+        , cellMap_{box_}
+    {
+        assert(box_.size() > 0);
+    }
+
+
+    MappedParticleArray(This const& from) = default;
+    MappedParticleArray(This&& from)      = default;
+    This& operator=(This&& from) = default;
+    This& operator=(This const& from) = default;
+
+    auto erase(IndexRange_& range) { cellMap_.erase(particles_, range); }
+    auto erase(IndexRange_&& range)
+    {
+        // TODO move ctor for range?
+        cellMap_.erase(std::forward<IndexRange_>(range));
+    }
+
+    void clear()
+    {
+        Super::clear();
+        cellMap_.clear();
+    }
+
+    auto& emplace_back()
+    {
+        auto& part = Super::emplace_back();
         cellMap_.add(particles_, particles_.size() - 1);
         return part;
     }
 
 
-
-    Particle_t& emplace_back(Particle_t&& p)
+    auto& emplace_back(Particle_t&& p)
     {
-        auto& part = particles_.emplace_back(std::forward<Particle_t>(p));
+        auto& part = Super::emplace_back(std::forward<Particle_t>(p));
         cellMap_.add(particles_, particles_.size() - 1);
         return part;
     }
+
 
     void push_back(Particle_t const& p)
     {
-        particles_.push_back(p);
+        Super::push_back(p);
         cellMap_.add(particles_, particles_.size() - 1);
     }
 
     void push_back(Particle_t&& p)
     {
-        particles_.push_back(std::forward<Particle_t>(p));
+        Super::push_back(std::forward<Particle_t>(p));
         cellMap_.add(particles_, particles_.size() - 1);
     }
-
-    void swap(ParticleArray<dim>& that) { std::swap(this->particles_, that.particles_); }
 
     void map_particles() const { cellMap_.add(particles_); }
     void empty_map() { cellMap_.empty(); }
@@ -151,25 +188,19 @@ public:
 
     auto nbr_particles_in(box_t const& box) const { return cellMap_.size(box); }
 
-    void export_particles(box_t const& box, ParticleArray<dim>& dest) const
+    void export_particles(box_t const& box, This& dest) const
     {
         PHARE_LOG_SCOPE("ParticleArray::export_particles");
         cellMap_.export_to(box, particles_, dest);
     }
 
-    template<typename Fn>
-    void export_particles(box_t const& box, ParticleArray<dim>& dest, Fn&& fn) const
+    template<typename Fn, typename Destination>
+    void export_particles(box_t const& box, Destination& dest, Fn&& fn) const
     {
         PHARE_LOG_SCOPE("ParticleArray::export_particles (Fn)");
         cellMap_.export_to(box, particles_.data(), dest, std::forward<Fn>(fn));
     }
 
-    template<typename Fn>
-    void export_particles(box_t const& box, std::vector<Particle_t>& dest, Fn&& fn) const
-    {
-        PHARE_LOG_SCOPE("ParticleArray::export_particles (box, vector, Fn)");
-        cellMap_.export_to(box, particles_.data(), dest, std::forward<Fn>(fn));
-    }
 
     template<typename Predicate>
     void export_particles(This& dest, Predicate&& pred) const
@@ -227,14 +258,12 @@ public:
 
     void sortMapping() const { cellMap_.sort(); }
 
-    auto& vector() { return particles_; }
-    auto& vector() const { return particles_; }
-
 private:
-    Vector particles_;
     box_t box_;
     mutable CellMap_t cellMap_;
 };
+
+
 
 } // namespace PHARE::core
 
@@ -245,6 +274,12 @@ namespace core
 {
     template<std::size_t dim>
     void empty(ParticleArray<dim>& array)
+    {
+        array.clear();
+    }
+
+    template<std::size_t dim>
+    void empty(MappedParticleArray<dim>& array)
     {
         array.clear();
     }
