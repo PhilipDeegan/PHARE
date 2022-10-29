@@ -170,14 +170,14 @@ namespace core
         auto end() { return r.end(); }
         auto end() const { return r.end(); }
 
-
     private:
         std::array<Type, dim> r{};
     };
 
     template<typename... Indexes>
     Point(Indexes... indexes)
-        -> Point<typename std::tuple_element<0, std::tuple<Indexes...>>::type, sizeof...(indexes)>;
+        ->Point<typename std::tuple_element<0, std::tuple<Indexes...>>::type, sizeof...(indexes)>;
+
 
     template<typename Type, std::size_t dim>
     auto& operator<<(std::ostream& os, Point<Type, dim> const& p)
@@ -202,6 +202,14 @@ PHARE::core::Point<Type, dim> abs(PHARE::core::Point<Type, dim> const& point)
         postive[i] = std::abs(point[i]);
     return postive;
 }
+
+
+template<typename Type, std::size_t dim>
+auto to_string(PHARE::core::Point<Type, dim> const& point)
+{
+    return point.str();
+}
+
 
 } // namespace std
 

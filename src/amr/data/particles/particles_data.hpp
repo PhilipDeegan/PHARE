@@ -26,52 +26,12 @@
 
 #include "core/logger.hpp"
 
-
+#include "hdf5/detail/hdf5_utils.hpp"
 
 namespace PHARE
 {
 namespace amr
 {
-
-
-    template<typename Particle>
-    inline bool isInBox(SAMRAI::hier::Box const& box, Particle const& particle)
-    {
-        constexpr auto dim = Particle::dimension;
-
-        auto const& iCell = particle.iCell;
-
-        auto const& lower = box.lower();
-        auto const& upper = box.upper();
-
-
-        if (iCell[0] >= lower(0) && iCell[0] <= upper(0))
-        {
-            if constexpr (dim > 1)
-            {
-                if (iCell[1] >= lower(1) && iCell[1] <= upper(1))
-                {
-                    if constexpr (dim > 2)
-                    {
-                        if (iCell[2] >= lower(2) && iCell[2] <= upper(2))
-                        {
-                            return true;
-                        }
-                    }
-                    else
-                    {
-                        return true;
-                    }
-                }
-            }
-            else
-            {
-                return true;
-            }
-        }
-        return false;
-    }
-
 
     /** @brief ParticlesData is a concrete SAMRAI::hier::PatchData subclass to store Particle data
      *
@@ -108,14 +68,23 @@ namespace amr
         // add one cell surrounding ghost box to map particles exiting the ghost layer
         static constexpr int ghostSafeMapLayer = 1;
 
+        auto constexpr construct_particles()
+        {
+            if constexpr (ParticleArray::is_mapped)
+                return ParticleArray{grow(phare_box_from<dim>(getGhostBox()), ghostSafeMapLayer)};
+            else
+                // return ParticleArray{};
+                throw std::runtime_error("not implemented yet");
+        }
+
     public:
         ParticlesData(SAMRAI::hier::Box const& box, SAMRAI::hier::IntVector const& ghost)
             : SAMRAI::hier::PatchData::PatchData(box, ghost)
-            , domainParticles{grow(phare_box_from<dim>(getGhostBox()), ghostSafeMapLayer)}
-            , patchGhostParticles{grow(phare_box_from<dim>(getGhostBox()), ghostSafeMapLayer)}
-            , levelGhostParticles{grow(phare_box_from<dim>(getGhostBox()), ghostSafeMapLayer)}
-            , levelGhostParticlesOld{grow(phare_box_from<dim>(getGhostBox()), ghostSafeMapLayer)}
-            , levelGhostParticlesNew{grow(phare_box_from<dim>(getGhostBox()), ghostSafeMapLayer)}
+            , domainParticles{construct_particles()}
+            , patchGhostParticles{construct_particles()}
+            , levelGhostParticles{construct_particles()}
+            , levelGhostParticlesOld{construct_particles()}
+            , levelGhostParticlesNew{construct_particles()}
             , pack{&domainParticles, &patchGhostParticles, &levelGhostParticles,
                    &levelGhostParticlesOld, &levelGhostParticlesNew}
             , interiorLocalBox_{AMRToLocal(box, this->getGhostBox())}
@@ -133,9 +102,18 @@ namespace amr
 
         ParticlesData& operator=(ParticlesData const&) = delete;
 
-
-
         // SAMRAI interface
+        template<typename DB, typename T, std::size_t S>
+        void static putVecArrayToDB(DB const& db, std::vector<std::array<T, S>> const& vec,
+                                    std::string key)
+        {
+            if constexpr (std::is_same_v<T, double>)
+                db->putDoubleArray(key, vec[0].data(), S * vec.size());
+            else if constexpr (std::is_same_v<T, int>)
+                db->putIntegerArray(key, vec[0].data(), S * vec.size());
+            else
+                throw std::runtime_error("NOPE");
+        }
 
         void putToRestart(std::shared_ptr<SAMRAI::tbox::Database> const& restart_db) const override
         {
@@ -151,12 +129,21 @@ namespace amr
                 particles.sortMapping();
 
                 Packer packer(particles);
-                core::ContiguousParticles<dim> soa{particles.size()};
+                core::SoAParticleArray<dim> soa{particles.size()};
                 packer.pack(soa);
 
                 std::size_t part_idx = 0;
                 core::apply(soa.as_tuple(), [&](auto const& arg) {
-                    restart_db->putVector(name + "_" + packer.keys()[part_idx++], arg);
+                    using Vec = std::decay_t<decltype(arg)>;
+
+                    auto constexpr is_array_v
+                        = hdf5::is_array_dataset<typename Vec::value_type, dim>;
+
+                    if constexpr (is_array_v)
+                        putVecArrayToDB(restart_db, arg, name + "_" + packer.keys()[part_idx++]);
+
+                    else
+                        restart_db->putVector(name + "_" + packer.keys()[part_idx++], arg);
                 });
             };
 
@@ -167,6 +154,22 @@ namespace amr
             putParticles("levelGhostParticlesOld", levelGhostParticlesOld);
         };
 
+        template<typename DB, typename T, std::size_t S>
+        void static getVecArrayFromDB(DB const& db, std::vector<std::array<T, S>>& vec,
+                                      std::string key)
+        {
+            auto size = db->getArraySize(key);
+
+            vec.resize(size / S);
+
+            if constexpr (std::is_same_v<T, double>)
+                db->getDoubleArray(key, vec[0].data(), size);
+
+            else if constexpr (std::is_same_v<T, int>)
+                db->getIntegerArray(key, vec[0].data(), size);
+            else
+                throw std::runtime_error("NOPE");
+        }
 
         void getFromRestart(std::shared_ptr<SAMRAI::tbox::Database> const& restart_db) override
         {
@@ -192,12 +195,21 @@ namespace amr
 
                 auto n_particles
                     = restart_db->getArraySize(name + "_" + Packer::arbitrarySingleValueKey());
-                core::ContiguousParticles<dim> soa{n_particles};
+                core::SoAParticleArray<dim> soa{n_particles};
 
                 {
                     std::size_t part_idx = 0;
                     core::apply(soa.as_tuple(), [&](auto& arg) {
-                        restart_db->getVector(name + "_" + Packer::keys()[part_idx++], arg);
+                        using Vec = std::decay_t<decltype(arg)>;
+
+                        auto constexpr is_array_v
+                            = hdf5::is_array_dataset<typename Vec::value_type, dim>;
+
+                        if constexpr (is_array_v)
+                            getVecArrayFromDB(restart_db, arg,
+                                              name + "_" + Packer::keys()[part_idx++]);
+                        else
+                            restart_db->getVector(name + "_" + Packer::keys()[part_idx++], arg);
                     });
                 }
 
@@ -327,7 +339,7 @@ namespace amr
 
             auto const& pOverlap{dynamic_cast<SAMRAI::pdat::CellOverlap const&>(overlap)};
 
-            std::vector<Particle_t> outBuffer;
+            typename ParticleArray::vector_type outBuffer;
 
             if (pOverlap.isOverlapEmpty())
             {
@@ -342,11 +354,22 @@ namespace amr
                 pack_(pOverlap, transformation, outBuffer);
                 stream << outBuffer.size();
                 stream.growBufferAsNeeded();
-                stream.pack(outBuffer.data(), outBuffer.size());
+                this->pack_(stream, outBuffer);
             }
         }
 
-
+        template<typename ParticleArray_t>
+        void pack_(SAMRAI::tbox::MessageStream& stream, ParticleArray_t const& outBuffer) const
+        {
+            if constexpr (ParticleArray_t::is_contiguous)
+                std::apply(
+                    [&](auto const&... container) {
+                        ((stream.pack(container.data(), outBuffer.size())), ...);
+                    },
+                    outBuffer.as_tuple());
+            else
+                stream.pack(outBuffer.data(), outBuffer.size());
+        }
 
         /**
          * @brief unpackStream is the function that unpacks a stream of particles to our particle
@@ -372,8 +395,8 @@ namespace amr
                 // unpack particles into a particle array
                 std::size_t numberParticles = 0;
                 stream >> numberParticles;
-                std::vector<Particle_t> particleArray(numberParticles);
-                stream.unpack(particleArray.data(), numberParticles);
+                typename ParticleArray::vector_type particleArray(numberParticles);
+                unpack_(stream, particleArray);
 
                 // ok now our goal is to put the particles we have just unpacked
                 // into the particleData and in the proper particleArray : interior or ghost
@@ -418,7 +441,18 @@ namespace amr
             }             // end overlap not empty
         }
 
-
+        template<typename ParticleArray_t>
+        void unpack_(SAMRAI::tbox::MessageStream& stream, ParticleArray_t& specie) const
+        {
+            if constexpr (ParticleArray_t::is_contiguous)
+                std::apply(
+                    [&](auto&... container) {
+                        ((stream.unpack(container.data(), specie.size())), ...);
+                    },
+                    specie.as_tuple());
+            else
+                stream.unpack(specie.data(), specie.size());
+        }
 
         core::ParticlesPack<ParticleArray>* getPointer() { return &pack; }
 
@@ -517,7 +551,7 @@ namespace amr
                 auto shiftedParticle{particle};
                 for (std::size_t idir = 0; idir < dim; ++idir)
                 {
-                    shiftedParticle.iCell[idir] += offset[idir];
+                    shiftedParticle.iCell()[idir] += offset[idir];
                 }
                 return shiftedParticle;
             };
@@ -624,9 +658,10 @@ namespace amr
 
 
 
+        template<typename ParticleArray_t>
         void pack_(SAMRAI::pdat::CellOverlap const& overlap,
                    SAMRAI::hier::Transformation const& transformation,
-                   std::vector<Particle_t>& outBuffer) const
+                   ParticleArray_t& outBuffer) const
         {
             PHARE_LOG_SCOPE("ParticleData::pack_");
             // we want to put particles from our domain and patchghost arrays
@@ -643,7 +678,7 @@ namespace amr
                 auto shiftedParticle{particle};
                 for (std::size_t idir = 0; idir < dim; ++idir)
                 {
-                    shiftedParticle.iCell[idir] += offset[idir];
+                    shiftedParticle.iCell()[idir] += offset[idir];
                 }
                 return shiftedParticle;
             };

@@ -30,12 +30,12 @@ public:
     static constexpr auto dimension    = GridLayout::dimension;
     static constexpr auto interp_order = GridLayout::interp_order;
 
-    using Box               = PHARE::core::Box<int, dimension>;
-    using Interpolator      = PHARE::core::Interpolator<dimension, interp_order>;
-    using VecField          = typename Ions::vecfield_type;
-    using ParticleArray     = typename Ions::particle_array_type;
-    using Particle_t        = typename ParticleArray::Particle_t;
-    using PartIterator      = typename ParticleArray::iterator;
+    using Box           = PHARE::core::Box<int, dimension>;
+    using Interpolator  = PHARE::core::Interpolator<dimension, interp_order>;
+    using VecField      = typename Ions::vecfield_type;
+    using ParticleArray = typename Ions::particle_array_type;
+    // using Particle_t        = typename ParticleArray::Particle_t;
+    // using PartIterator      = typename ParticleArray::iterator;
     using ParticleRange     = IndexRange<ParticleArray>;
     using BoundaryCondition = PHARE::core::BoundaryCondition<dimension, interp_order>;
     using Pusher = PHARE::core::Pusher<dimension, ParticleRange, Electromag, Interpolator,
@@ -164,10 +164,11 @@ void IonUpdater<Ions, Electromag, GridLayout>::updateAndDepositDomain_(Ions& ion
 
         auto pushAndAccumulateGhosts = [&](auto& inputArray, bool copyInDomain = false) {
             auto outputArray{inputArray}; // TODO : dynamic allocation can we get rid of that
-            //      eventually?
+                                          //      eventually?
 
             inRange  = makeIndexRange(inputArray);
             outRange = makeIndexRange(outputArray);
+
 
             auto enteredInDomain = pusher_->move(inRange, outRange, em, pop.mass(), interpolator_,
                                                  layout, inGhostBox, inDomainBox);

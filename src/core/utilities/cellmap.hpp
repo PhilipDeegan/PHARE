@@ -78,8 +78,11 @@ public:
     template<typename CellIndex>
     void addToCell(CellIndex const& cell, std::size_t itemIndex);
 
-    static auto constexpr default_extractor = [](auto const& item) -> auto& { return item.iCell; };
-    using DefaultExtractor                  = decltype(default_extractor);
+    static auto constexpr default_extractor = [](auto const& item) -> auto&
+    {
+        return item.iCell();
+    };
+    using DefaultExtractor = decltype(default_extractor);
 
 
     // same as above but cell is found with the CellExtractor

@@ -91,7 +91,7 @@ public:
 
         //  get electromagnetic fields interpolated on the particles of rangeOut
         //  stop at newEnd.
-        interpolator(rangeOut, emFields, layout);
+        interpolator.meshToParticle(rangeOut, emFields, layout);
 
         //  get the particle velocity from t=n to t=n+1
         accelerate_(rangeOut, rangeOut, mass);
@@ -127,16 +127,16 @@ private:
         std::array<int, dim> newCell;
         for (std::size_t iDim = 0; iDim < dim; ++iDim)
         {
-            double delta
-                = partIn.delta[iDim] + static_cast<double>(halfDtOverDl_[iDim] * partIn.v[iDim]);
+            double delta = partIn.delta()[iDim]
+                           + static_cast<double>(halfDtOverDl_[iDim] * partIn.v()[iDim]);
 
             double iCell = std::floor(delta);
             if (std::abs(delta) > 2)
             {
                 PHARE_LOG_ERROR("Error, particle moves more than 1 cell, delta >2");
             }
-            partOut.delta[iDim] = delta - iCell;
-            newCell[iDim]       = static_cast<int>(iCell + partIn.iCell[iDim]);
+            partOut.delta()[iDim] = delta - iCell;
+            newCell[iDim]         = static_cast<int>(iCell + partIn.iCell()[iDim]);
         }
         return newCell;
     }
@@ -150,6 +150,8 @@ private:
      */
     void pushStep_(ParticleRange const& rangeIn, ParticleRange& rangeOut, PushStep step)
     {
+        using ParticleArray = std::decay_t<decltype(rangeIn.array())>;
+
         auto& inParticles  = rangeIn.array();
         auto& outParticles = rangeOut.array();
         for (auto inIdx = rangeIn.ibegin(), outIdx = rangeOut.ibegin(); inIdx < rangeIn.iend();
@@ -166,13 +168,15 @@ private:
             // over rangeIn particles.
             if (step == PushStep::PrePush)
             {
-                outParticles[outIdx].charge = inParticles[inIdx].charge;
-                outParticles[outIdx].weight = inParticles[inIdx].weight;
-                outParticles[outIdx].v      = inParticles[inIdx].v;
+                outParticles[outIdx].charge() = inParticles[inIdx].charge();
+                outParticles[outIdx].weight() = inParticles[inIdx].weight();
+                outParticles[outIdx].v()      = inParticles[inIdx].v();
             }
             auto newCell = advancePosition_(inParticles[inIdx], outParticles[outIdx]);
-            if (newCell != inParticles[inIdx].iCell)
-                outParticles.change_icell(newCell, outIdx);
+
+            if constexpr (ParticleArray::is_mapped)
+                if (newCell != inParticles[inIdx].iCell())
+                    outParticles.change_icell(newCell, outIdx);
         }
     }
 
@@ -180,32 +184,41 @@ private:
 
     /** Accelerate the particles in rangeIn and put the new velocity in rangeOut
      */
-    void accelerate_(ParticleRange rangeIn, ParticleRange rangeOut, double mass)
+    template<typename ParticleRangeIn, typename ParticleRangeOut>
+    void accelerate_(ParticleRangeIn const& inputParticles, ParticleRangeOut& outputParticles,
+                     double const mass)
     {
         double dto2m = 0.5 * dt_ / mass;
 
-        auto& inParticles  = rangeIn.array();
-        auto& outParticles = rangeOut.array();
+        auto out_idx        = outputParticles.begin().idx();
+        auto& out_particles = outputParticles.begin()();
 
-        for (auto inIdx = rangeIn.ibegin(), outIdx = rangeOut.ibegin(); inIdx < rangeIn.iend();
-             ++inIdx, ++outIdx)
+        auto in_start      = inputParticles.begin().idx();
+        auto in_end        = inputParticles.end().idx();
+        auto& in_particles = inputParticles.begin()();
+
+        for (auto in_idx = in_start; in_idx < in_end; ++in_idx)
         {
-            auto& inPart  = inParticles[inIdx];
-            auto& outPart = outParticles[inIdx];
-            double coef1  = inPart.charge * dto2m;
+            auto const& E = in_particles.E(in_idx);
+            auto const& B = in_particles.B(in_idx);
+
+            auto const& [Ex, Ey, Ez] = E;
+            auto const& [Bx, By, Bz] = B;
+
+            double coef1 = in_particles.charge(in_idx) * dto2m;
 
             // We now apply the 3 steps of the BORIS PUSHER
 
             // 1st half push of the electric field
-            double velx1 = inPart.v[0] + coef1 * inPart.Ex;
-            double vely1 = inPart.v[1] + coef1 * inPart.Ey;
-            double velz1 = inPart.v[2] + coef1 * inPart.Ez;
-
+            auto const& in_v                = in_particles.v(in_idx);
+            std::array<double, 3> const vel = {in_v[0] + coef1 * Ex, //
+                                               in_v[1] + coef1 * Ey, //
+                                               in_v[2] + coef1 * Ez};
 
             // preparing variables for magnetic rotation
-            double const rx = coef1 * inPart.Bx;
-            double const ry = coef1 * inPart.By;
-            double const rz = coef1 * inPart.Bz;
+            double const rx = coef1 * Bx;
+            double const ry = coef1 * By;
+            double const rz = coef1 * Bz;
 
             double const rx2  = rx * rx;
             double const ry2  = ry * ry;
@@ -231,20 +244,16 @@ private:
             double const mzz = 1. + rz2 - rx2 - ry2;
 
             // magnetic rotation
-            double const velx2 = (mxx * velx1 + mxy * vely1 + mxz * velz1) * invDet;
-            double const vely2 = (myx * velx1 + myy * vely1 + myz * velz1) * invDet;
-            double const velz2 = (mzx * velx1 + mzy * vely1 + mzz * velz1) * invDet;
-
+            double const velx2 = (mxx * vel[0] + mxy * vel[1] + mxz * vel[2]) * invDet;
+            double const vely2 = (myx * vel[0] + myy * vel[1] + myz * vel[2]) * invDet;
+            double const velz2 = (mzx * vel[0] + mzy * vel[1] + mzz * vel[2]) * invDet;
 
             // 2nd half push of the electric field
-            velx1 = velx2 + coef1 * inPart.Ex;
-            vely1 = vely2 + coef1 * inPart.Ey;
-            velz1 = velz2 + coef1 * inPart.Ez;
-
             // Update particle velocity
-            outPart.v[0] = velx1;
-            outPart.v[1] = vely1;
-            outPart.v[2] = velz1;
+            out_particles.v(out_idx) = {velx2 + coef1 * Ex, //
+                                        vely2 + coef1 * Ey, //
+                                        velz2 + coef1 * Ez};
+            ++out_idx;
         }
     }
 

@@ -1,0 +1,33 @@
+#! clean build -x mpi -dtKOp py
+
+name: phare
+
+property:
+  MPI_INC: /usr/include #/hdf5/mpich #/usr/include/hdf5/openmpi #/usr/local/netcdf/include
+  MPI_LIB: hdf5
+
+profile:
+- name: base
+  arg:  -Wno-macro-redefined -Wno-unknown-cuda-version  -DPHARE_HAS_HIGHFIVE=0
+
+- name: core
+  inc: src subprojects
+  src: src/core
+  out: phare_core
+
+- name: test
+  dep: google.test
+
+- name: test_core
+  parent: test
+  self: core
+  test: |
+      tests/core/data/particles/test_particles.cpp
+      tests/core/numerics/ion_updater/test_updater.cpp
+
+
+- name: bench
+  inc: tools
+  self: core
+  dep: google.benchmark
+  main: tools/bench/amr/solver/particle2mesh_SoA.cpp

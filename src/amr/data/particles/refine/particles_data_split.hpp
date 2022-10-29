@@ -29,18 +29,21 @@ namespace amr
     };
 
 
-    template<std::size_t interp, typename Particle>
-    Particle toFineGrid(Particle toFine)
+    template<typename Iterator>
+    auto toFineGrid(Iterator iterator)
     {
-        constexpr auto dim   = Particle::dimension;
+        constexpr auto dim   = Iterator::dimension;
         constexpr auto ratio = PHARE::amr::refinementRatio;
+
+        auto toFine          = std::make_tuple(iterator.iCell(), iterator.delta());
+        auto& [iCell, delta] = toFine;
 
         for (size_t iDim = 0; iDim < dim; ++iDim)
         {
-            auto fineDelta     = toFine.delta[iDim] * ratio;
-            int fineDeltaInt   = static_cast<int>(fineDelta);
-            toFine.iCell[iDim] = toFine.iCell[iDim] * ratio + fineDeltaInt;
-            toFine.delta[iDim] = fineDelta - fineDeltaInt;
+            auto fineDelta   = delta[iDim] * ratio;
+            int fineDeltaInt = static_cast<int>(fineDelta);
+            iCell[iDim]      = iCell[iDim] * ratio + fineDeltaInt;
+            delta[iDim]      = fineDelta - fineDeltaInt;
         }
 
         return toFine;
@@ -173,21 +176,26 @@ namespace amr
                 std::array particlesArrays{&srcInteriorParticles, &srcGhostParticles};
                 auto splitBox = getSplitBox(destinationBox);
 
-                auto isInDest = [&destinationBox](auto const& particle) //
-                { return isInBox(destinationBox, particle); };
-
+                auto isInDest = [&destinationBox](auto const& particle) {
+                    if constexpr (ParticleArray::is_contiguous)
+                        return isInBox(destinationBox, particle.iCell());
+                    else
+                        return isInBox(destinationBox, particle);
+                };
 
                 for (auto const& sourceParticlesArray : particlesArrays)
                 {
-                    for (auto const& particle : *sourceParticlesArray)
-                    {
-                        std::array<typename ParticleArray::value_type, nbRefinedPart>
-                            refinedParticles;
-                        auto particleRefinedPos = toFineGrid<interpOrder>(particle);
+                    auto start = sourceParticlesArray->begin();
+                    auto end   = sourceParticlesArray->end();
 
-                        if (isInBox(splitBox, particleRefinedPos))
+                    for (auto it = start; it != sourceParticlesArray->end(); ++it)
+                    {
+                        typename ParticleArray::template array_type<nbRefinedPart> refinedParticles;
+                        auto particleRefinedPos = toFineGrid(it);
+
+                        if (isInBox(splitBox, std::get<0>(particleRefinedPos)))
                         {
-                            split(particleRefinedPos, refinedParticles);
+                            split(particleRefinedPos, it, refinedParticles);
 
 
                             // we need to know in which of interior or levelGhostParticlesXXXX

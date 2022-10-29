@@ -29,6 +29,8 @@ template<std::size_t dim>
 struct AParticlesData
 {
     static constexpr auto dimension = dim;
+    using ParticleArray_t           = AoSMappedParticleArray<dim>;
+    using Particle_t                = typename ParticleArray_t::Particle_t;
 
     SAMRAI::tbox::Dimension amr_dimension{dim};
     SAMRAI::hier::BlockId blockId{0};
@@ -47,8 +49,8 @@ struct AParticlesData
     SAMRAI::hier::Patch destPatch{destDomain, patchDescriptor};
     SAMRAI::hier::Patch sourcePatch{sourceDomain, patchDescriptor};
 
-    ParticlesData<ParticleArray<dim>> destData{destDomain, ghost};
-    ParticlesData<ParticleArray<dim>> sourceData{sourceDomain, ghost};
+    ParticlesData<ParticleArray_t> destData{destDomain, ghost};
+    ParticlesData<ParticleArray_t> sourceData{sourceDomain, ghost};
 
     std::shared_ptr<SAMRAI::hier::BoxGeometry> destGeom{
         std::make_shared<SAMRAI::pdat::CellGeometry>(destPatch.getBox(), ghost)};
@@ -73,14 +75,14 @@ struct AParticlesData
             *sourceGeom, srcMask, fillBox, overwriteInterior, transformation))};
 
 
-    typename ParticleArray<dim>::Particle_t particle;
+    Particle_t particle;
 
 
     AParticlesData()
     {
-        particle.weight = 1.0;
-        particle.charge = 1.0;
-        particle.v      = {1.0, 1.0, 1.0};
+        particle.weight_ = 1.0;
+        particle.charge_ = 1.0;
+        particle.v_      = {1.0, 1.0, 1.0};
     }
 };
 
@@ -104,7 +106,7 @@ TYPED_TEST(StreamPackTest, PreserveVelocityWhenPackStreamWithPeriodics)
     auto& cellOverlap = param.cellOverlap;
     auto& destData    = param.destData;
 
-    particle.iCell = ConstArray<int, dim>(15);
+    particle.iCell() = ConstArray<int, dim>(15);
     sourceData.domainParticles.push_back(particle);
 
     SAMRAI::tbox::MessageStream particlesWriteStream;
@@ -118,7 +120,7 @@ TYPED_TEST(StreamPackTest, PreserveVelocityWhenPackStreamWithPeriodics)
     destData.unpackStream(particlesReadStream, *cellOverlap);
 
     ASSERT_THAT(destData.patchGhostParticles.size(), Eq(1));
-    ASSERT_THAT(destData.patchGhostParticles[0].v, Eq(particle.v));
+    ASSERT_THAT(destData.patchGhostParticles[0].v_, Eq(particle.v_));
 }
 
 
@@ -135,7 +137,7 @@ TYPED_TEST(StreamPackTest, ShiftTheiCellWhenPackStreamWithPeriodics)
     auto& cellOverlap = param.cellOverlap;
     auto& destData    = param.destData;
 
-    particle.iCell = ConstArray<int, dim>(15);
+    particle.iCell() = ConstArray<int, dim>(15);
 
     sourceData.domainParticles.push_back(particle);
 
@@ -155,7 +157,7 @@ TYPED_TEST(StreamPackTest, ShiftTheiCellWhenPackStreamWithPeriodics)
 
 
     ASSERT_THAT(destData.patchGhostParticles.size(), Eq(1));
-    ASSERT_THAT(destData.patchGhostParticles[0].iCell, Eq(expectediCell));
+    ASSERT_THAT(destData.patchGhostParticles[0].iCell(), Eq(expectediCell));
 }
 
 
@@ -171,7 +173,7 @@ TYPED_TEST(StreamPackTest, PackInTheCorrectBufferWithPeriodics)
     auto& cellOverlap = param.cellOverlap;
     auto& destData    = param.destData;
 
-    particle.iCell = ConstArray<int, dim>(15);
+    particle.iCell() = ConstArray<int, dim>(15);
 
     sourceData.domainParticles.push_back(particle);
 
@@ -188,7 +190,7 @@ TYPED_TEST(StreamPackTest, PackInTheCorrectBufferWithPeriodics)
     auto expectediCell = ConstArray<int, dim>(-1);
 
     ASSERT_THAT(destData.patchGhostParticles.size(), Eq(1));
-    ASSERT_THAT(destData.patchGhostParticles[0].iCell, Eq(expectediCell));
+    ASSERT_THAT(destData.patchGhostParticles[0].iCell(), Eq(expectediCell));
 }
 
 
@@ -205,7 +207,7 @@ TYPED_TEST(StreamPackTest,
     auto& cellOverlap = param.cellOverlap;
     auto& destData    = param.destData;
 
-    particle.iCell = ConstArray<int, dim>(16);
+    particle.iCell() = ConstArray<int, dim>(16);
 
     sourceData.domainParticles.push_back(particle);
 
@@ -221,17 +223,17 @@ TYPED_TEST(StreamPackTest,
 
     auto expectediCell = ConstArray<int, dim>(0);
 
-    EXPECT_THAT(destData.domainParticles[0].v, Eq(particle.v));
-    EXPECT_THAT(destData.domainParticles[0].iCell, Eq(expectediCell));
-    EXPECT_THAT(destData.domainParticles[0].delta, Eq(particle.delta));
-    EXPECT_THAT(destData.domainParticles[0].weight, Eq(particle.weight));
-    EXPECT_THAT(destData.domainParticles[0].charge, Eq(particle.charge));
-    EXPECT_DOUBLE_EQ(destData.domainParticles[0].Ex, particle.Ex);
-    EXPECT_DOUBLE_EQ(destData.domainParticles[0].Ey, particle.Ey);
-    EXPECT_DOUBLE_EQ(destData.domainParticles[0].Ez, particle.Ez);
-    EXPECT_DOUBLE_EQ(destData.domainParticles[0].Bx, particle.Bx);
-    EXPECT_DOUBLE_EQ(destData.domainParticles[0].By, particle.By);
-    EXPECT_DOUBLE_EQ(destData.domainParticles[0].Bz, particle.Bz);
+    EXPECT_THAT(destData.domainParticles[0].v_, Eq(particle.v_));
+    EXPECT_THAT(destData.domainParticles[0].iCell_, Eq(expectediCell));
+    EXPECT_THAT(destData.domainParticles[0].delta_, Eq(particle.delta_));
+    EXPECT_THAT(destData.domainParticles[0].weight_, Eq(particle.weight_));
+    EXPECT_THAT(destData.domainParticles[0].charge_, Eq(particle.charge_));
+    EXPECT_DOUBLE_EQ(destData.domainParticles[0].E_[0], particle.E_[0]);
+    EXPECT_DOUBLE_EQ(destData.domainParticles[0].E_[1], particle.E_[1]);
+    EXPECT_DOUBLE_EQ(destData.domainParticles[0].E_[2], particle.E_[2]);
+    EXPECT_DOUBLE_EQ(destData.domainParticles[0].B_[0], particle.B_[0]);
+    EXPECT_DOUBLE_EQ(destData.domainParticles[0].B_[1], particle.B_[1]);
+    EXPECT_DOUBLE_EQ(destData.domainParticles[0].B_[2], particle.B_[2]);
 }
 
 
@@ -248,7 +250,7 @@ TYPED_TEST(StreamPackTest,
     auto& cellOverlap = param.cellOverlap;
     auto& destData    = param.destData;
 
-    particle.iCell = ConstArray<int, dim>(15);
+    particle.iCell() = ConstArray<int, dim>(15);
 
     sourceData.domainParticles.push_back(particle);
 
@@ -264,17 +266,17 @@ TYPED_TEST(StreamPackTest,
 
     auto expectediCell = ConstArray<int, dim>(-1);
 
-    EXPECT_THAT(destData.patchGhostParticles[0].v, Eq(particle.v));
-    EXPECT_THAT(destData.patchGhostParticles[0].iCell, Eq(expectediCell));
-    EXPECT_THAT(destData.patchGhostParticles[0].delta, Eq(particle.delta));
-    EXPECT_THAT(destData.patchGhostParticles[0].weight, Eq(particle.weight));
-    EXPECT_THAT(destData.patchGhostParticles[0].charge, Eq(particle.charge));
-    EXPECT_DOUBLE_EQ(destData.patchGhostParticles[0].Ex, particle.Ex);
-    EXPECT_DOUBLE_EQ(destData.patchGhostParticles[0].Ey, particle.Ey);
-    EXPECT_DOUBLE_EQ(destData.patchGhostParticles[0].Ez, particle.Ez);
-    EXPECT_DOUBLE_EQ(destData.patchGhostParticles[0].Bx, particle.Bx);
-    EXPECT_DOUBLE_EQ(destData.patchGhostParticles[0].By, particle.By);
-    EXPECT_DOUBLE_EQ(destData.patchGhostParticles[0].Bz, particle.Bz);
+    EXPECT_THAT(destData.patchGhostParticles[0].v_, Eq(particle.v_));
+    EXPECT_THAT(destData.patchGhostParticles[0].iCell_, Eq(expectediCell));
+    EXPECT_THAT(destData.patchGhostParticles[0].delta_, Eq(particle.delta_));
+    EXPECT_THAT(destData.patchGhostParticles[0].weight_, Eq(particle.weight_));
+    EXPECT_THAT(destData.patchGhostParticles[0].charge_, Eq(particle.charge_));
+    EXPECT_DOUBLE_EQ(destData.patchGhostParticles[0].E_[0], particle.E_[0]);
+    EXPECT_DOUBLE_EQ(destData.patchGhostParticles[0].E_[1], particle.E_[1]);
+    EXPECT_DOUBLE_EQ(destData.patchGhostParticles[0].E_[2], particle.E_[2]);
+    EXPECT_DOUBLE_EQ(destData.patchGhostParticles[0].B_[0], particle.B_[0]);
+    EXPECT_DOUBLE_EQ(destData.patchGhostParticles[0].B_[1], particle.B_[1]);
+    EXPECT_DOUBLE_EQ(destData.patchGhostParticles[0].B_[2], particle.B_[2]);
 }
 
 
