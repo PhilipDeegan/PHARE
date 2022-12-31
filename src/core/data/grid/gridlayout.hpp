@@ -1,23 +1,34 @@
 #ifndef PHARE_CORE_GRID_GridLayout_HPP
 #define PHARE_CORE_GRID_GridLayout_HPP
 
-
-#include "core/hybrid/hybrid_quantities.hpp"
-#include "core/utilities/types.hpp"
-#include "core/data/field/field.hpp"
-#include "gridlayoutdefs.hpp"
-#include "core/utilities/algorithm.hpp"
-#include "core/utilities/box/box.hpp"
-#include "core/utilities/constants.hpp"
-#include "core/utilities/index/index.hpp"
-#include "core/utilities/point/point.hpp"
-
 #include <array>
 #include <cmath>
 #include <tuple>
 #include <cstddef>
 #include <functional>
 #include <type_traits>
+
+#include "core/def.hpp"
+#include "core/hybrid/hybrid_quantities.hpp"
+#include "core/utilities/types.hpp"
+#include "core/data/field/field.hpp"
+#include "gridlayoutdefs.hpp"
+
+#include "core/utilities/algorithm.hpp"
+#include "core/utilities/box/box.hpp"
+#include "core/utilities/constants.hpp"
+#include "core/utilities/index/index.hpp"
+#include "core/utilities/point/point.hpp"
+
+
+#if PHARE_HAVE_RAJA
+#include "core/data/grid/detail/raja.hpp"
+#endif
+
+#if PHARE_HAVE_MKN_GPU
+#include "core/data/grid/detail/mkn_gpu.hpp"
+#endif
+
 
 namespace PHARE
 {
@@ -37,7 +48,10 @@ namespace core
     constexpr bool has_physicalQuantity_v = has_physicalQuantity<T>::value;
 
 
-    constexpr int centering2int(QtyCentering c) { return static_cast<int>(c); }
+    constexpr int centering2int(QtyCentering c)
+    {
+        return static_cast<int>(c);
+    }
 
 
     template<std::size_t interpOrder>
@@ -157,7 +171,10 @@ namespace core
         /**
          * @brief returns the mesh size in the 'dim' dimensions
          */
-        std::array<double, dimension> const& meshSize() const noexcept { return meshSize_; }
+        std::array<double, dimension> const& meshSize() const noexcept _PHARE_ALL_FN_
+        {
+            return meshSize_;
+        }
 
 
 
@@ -176,10 +193,12 @@ namespace core
          * @brief nbrCells returns the number of cells in the physical domain
          * described by the gridlayout
          */
-        auto& nbrCells() const { return nbrPhysicalCells_; }
+        auto& nbrCells() const _PHARE_ALL_FN_ { return nbrPhysicalCells_; }
 
 
-        auto const& AMRBox() const { return AMRBox_; }
+
+
+        auto const& AMRBox() const _PHARE_ALL_FN_ { return AMRBox_; }
 
 
 
@@ -289,7 +308,8 @@ namespace core
          * @brief physicalStartIndex returns the index of the first node of a given
          * centering and in a given direction that is in the physical domain, i.e. not a ghost node.
          */
-        std::uint32_t physicalStartIndex(QtyCentering centering, Direction direction) const
+        std::uint32_t physicalStartIndex(QtyCentering centering,
+                                         Direction direction) const _PHARE_ALL_FN_
         {
             std::uint32_t icentering = static_cast<std::uint32_t>(centering);
             std::uint32_t iDir       = static_cast<std::uint32_t>(direction);
@@ -542,6 +562,7 @@ namespace core
          * @brief the number of ghost nodes on each side of the mesh for a given centering
          */
         auto static constexpr nbrGhosts(QtyCentering /*centering*/ = QtyCentering::primal)
+            _PHARE_ALL_FN_
         { // Both dual and primal ghosts are the same!
             static_assert(nbrDualGhosts_() == nbrPrimalGhosts_());
 
@@ -593,7 +614,7 @@ namespace core
          * The next index is not just indexCenter+1 because this depends on the number
          * of ghost nodes for dual and primal nodes.
          */
-        auto static nextIndex(QtyCentering centering, std::uint32_t indexCenter)
+        auto static nextIndex(QtyCentering centering, std::uint32_t indexCenter) _PHARE_ALL_FN_
         {
             return indexCenter + nextIndexTable_[centering2int(centering)];
         }
@@ -603,7 +624,7 @@ namespace core
          * @brief prevIndex does the same thing as nextIndex but returns the index
          * of the node of a given centering just to the left of indexCenter.
          */
-        auto static prevIndex(QtyCentering centering, std::uint32_t indexCenter)
+        auto static prevIndex(QtyCentering centering, std::uint32_t indexCenter) _PHARE_ALL_FN_
         {
             return indexCenter + prevIndexTable_[centering2int(centering)];
         }
@@ -615,7 +636,7 @@ namespace core
          * on the dimensionality of the GridLayout.
          */
         template<auto direction, typename Field>
-        auto deriv(Field const& operand, MeshIndex<Field::dimension> index)
+        auto deriv(Field const& operand, MeshIndex<Field::dimension> index) const _PHARE_ALL_FN_
         {
             auto fieldCentering = centering(operand.physicalQuantity());
             using PHARE::core::dirX;
@@ -682,7 +703,7 @@ namespace core
          * on the dimensionality of the GridLayout.
          */
         template<typename Field>
-        auto laplacian(Field const& operand, MeshIndex<Field::dimension> index)
+        auto laplacian(Field const& operand, MeshIndex<Field::dimension> index) const _PHARE_ALL_FN_
         {
             static_assert(Field::dimension == dimension,
                           "field dimension must be equal to gridlayout dimension");
@@ -790,7 +811,7 @@ namespace core
          * This method only deals with **cell** indexes.
          */
         template<typename T>
-        auto AMRToLocal(Point<T, dimension> AMRPoint) const
+        auto AMRToLocal(Point<T, dimension> AMRPoint) const _PHARE_ALL_FN_
         {
             static_assert(std::is_integral_v<T>, "Error, must be MeshIndex (integral Point)");
             Point<T, dimension> localPoint;
@@ -826,8 +847,9 @@ namespace core
 
 
         template<typename Field, std::size_t nbr_points>
-        static typename Field::type project(Field const& field, MeshIndex<dimension> index,
-                                            std::array<WeightPoint<dimension>, nbr_points> wps)
+        static typename Field::type
+        project(Field const& field, MeshIndex<dimension> index,
+                std::array<WeightPoint<dimension>, nbr_points> wps) _PHARE_ALL_FN_
         {
             typename Field::type result = 0.;
             for (auto const& wp : wps)
@@ -889,7 +911,8 @@ namespace core
          * @return An std::array<std::uint32_t, dim> object, containing the size to which allocate
          * arrays of an HybridQuantity::Quantity 'qty' in every directions.
          */
-        std::array<std::uint32_t, dimension> allocSize(HybridQuantity::Scalar qty) const
+        std::array<std::uint32_t, dimension>
+        allocSize(HybridQuantity::Scalar qty) const _PHARE_ALL_FN_
         {
             std::uint32_t iQty = static_cast<std::uint32_t>(qty);
 
@@ -1130,28 +1153,79 @@ namespace core
 
 
 
-        template<typename Field, typename Fn>
-        void evalOnBox(Field& field, Fn&& fn) const
+        template<typename Field, typename Fn, typename... Args>
+        void evalOnBox(Field const& field, Fn&& fn, Args&&... args) const
+
         {
-            auto indices = [&](auto const& centering, auto const direction) {
+            auto indices_fn = [&](auto const& centering, auto const direction) {
                 return this->physicalStartToEnd(centering, direction);
             };
 
-            evalOnBox_(field, fn, indices);
+            if constexpr (Field::is_host_mem)
+            {
+                evalOnBox_(field, fn, indices_fn, args...);
+            }
+            else
+            {
+                PHARE_WITH_RAJA( // try not to make indexes every time
+                    auto indexes = make_indexes(field, indices_fn);
+                    grid_gpu_impl::GridLayout::evalOnBox(fn, indexes, args...); //
+                )
+                PHARE_WITH_MKN_GPU( // try not to make indexes every time
+                    auto indexes = make_indexes(field, indices_fn);
+                    grid_gpu_impl::GridLayout::evalOnBox(fn, indexes, args...); //
+                )
+            }
+        }
+
+    private:
+        template<typename Field, typename IndicesFn>
+        static auto make_indexes(Field const& field, IndicesFn& startToEnd)
+        {
+            std::vector<tuple_fixed_type<std::uint32_t, Field::dimension>> indexes;
+            indexes.reserve(core::product(evalOnBox_shape(field, startToEnd)));
+            evalOnBox_(
+                field, [&](auto const&... args) { indexes.emplace_back(args...); }, startToEnd);
+            return indexes;
+        }
+
+
+        template<typename Field, typename IndicesFn, typename... Args>
+        static auto evalOnBox_shape(Field& field, IndicesFn& startToEnd)
+        {
+            std::array<std::size_t, dimension> shape;
+
+            auto const [ix0, ix1] = startToEnd(field, Direction::X);
+            shape[0]              = ix1 - ix0 + 1;
+
+            if constexpr (dimension > 1)
+            {
+                auto const [iy0, iy1] = startToEnd(field, Direction::Y);
+                shape[1]              = iy1 - iy0 + 1;
+            }
+
+            if constexpr (dimension > 2)
+            {
+                auto const [iz0, iz1] = startToEnd(field, Direction::Z);
+                shape[2]              = iz1 - iz0 + 1;
+            }
+            return shape;
         }
 
 
 
-    private:
-        template<typename Field, typename IndicesFn, typename Fn>
-        static void evalOnBox_(Field& field, Fn& fn, IndicesFn& startToEnd)
+
+        template<typename Field, typename IndicesFn, typename Fn, typename... Args>
+        static void evalOnBox_(Field const& field, Fn& fn, IndicesFn& startToEnd, Args&... args)
         {
+            auto wrap_fn = [&](auto&& tuple) { fn(tuple, args...); };
+
             auto const [ix0, ix1] = startToEnd(field, Direction::X);
             for (auto ix = ix0; ix <= ix1; ++ix)
             {
                 if constexpr (dimension == 1)
                 {
-                    fn(ix);
+                    wrap_fn(std::make_tuple(ix));
                 }
                 else
                 {
@@ -1161,24 +1235,29 @@ namespace core
                     {
                         if constexpr (dimension == 2)
                         {
-                            fn(ix, iy);
+                            wrap_fn(std::make_tuple(ix, iy));
                         }
                         else
                         {
                             auto const [iz0, iz1] = startToEnd(field, Direction::Z);
 
                             for (auto iz = iz0; iz <= iz1; ++iz)
-                                fn(ix, iy, iz);
+                                wrap_fn(std::make_tuple(ix, iy, iz));
                         }
                     }
                 }
             }
         }
+        template<typename Field, typename IndicesFn, typename Fn, typename... Args>
+        static void evalOnBox_(Field const& field, Fn&& fn, IndicesFn& startToEnd, Args&... args)
+        {
+            evalOnBox_(field, fn, startToEnd, args...);
+        }
 
 
         template<typename Centering, typename StartToEnd>
-        auto StartToEndIndices_(Centering const& centering, StartToEnd const&& startToEnd,
-                                bool const includeEnd = false) const
+        static auto StartToEndIndices_(Centering const& centering, StartToEnd const&& startToEnd,
+                                       bool const includeEnd = false)
         {
             std::vector<tuple_fixed_type<std::uint32_t, dimension>> indices;
 
@@ -1318,7 +1397,7 @@ namespace core
          * directions depending on the multi-dimensional centering.
          */
         std::array<std::uint32_t, dimension> physicalNodeNbrFromCentering_(
-            std::array<QtyCentering, dimension> const& qtyCenterings) const
+            std::array<QtyCentering, dimension> const& qtyCenterings) const _PHARE_ALL_FN_
         {
             std::array<std::uint32_t, dimension> nodeNbr;
 
@@ -1339,8 +1418,8 @@ namespace core
          * The calculation is easy : there are nbrPhysicalCells + 1 nodes in the domain
          * + 2 times the number of ghost nodes.
          */
-        std::array<std::uint32_t, dimension>
-        nodeNbrFromCentering_(std::array<QtyCentering, dimension> const& qtyCenterings) const
+        std::array<std::uint32_t, dimension> nodeNbrFromCentering_(
+            std::array<QtyCentering, dimension> const& qtyCenterings) const _PHARE_ALL_FN_
         {
             std::array<std::uint32_t, dimension> nbrNodes
                 = physicalNodeNbrFromCentering_(qtyCenterings);

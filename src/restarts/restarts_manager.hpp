@@ -63,10 +63,10 @@ public:
     Writer& writer() { return *writer_.get(); }
 
 
-    RestartsManager(RestartsManager const&) = delete;
-    RestartsManager(RestartsManager&&)      = delete;
+    RestartsManager(RestartsManager const&)            = delete;
+    RestartsManager(RestartsManager&&)                 = delete;
     RestartsManager& operator=(RestartsManager const&) = delete;
-    RestartsManager& operator=(RestartsManager&&) = delete;
+    RestartsManager& operator=(RestartsManager&&)      = delete;
 
 private:
     bool needsAction_(double nextTime, double timeStamp, double timeStep)

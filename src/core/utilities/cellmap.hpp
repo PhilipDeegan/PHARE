@@ -37,10 +37,10 @@ public:
     {
     }
 
-    CellMap(CellMap const& from) = default;
-    CellMap(CellMap&& from)      = default;
+    CellMap(CellMap const& from)            = default;
+    CellMap(CellMap&& from)                 = default;
     CellMap& operator=(CellMap const& from) = default;
-    CellMap& operator=(CellMap&& from) = default;
+    CellMap& operator=(CellMap&& from)      = default;
 
     auto nbr_cells() const { return cellIndexes_.size(); }
 
@@ -260,7 +260,7 @@ template<typename Array, typename CellExtractor, typename>
 inline void CellMap<dim, cell_index_t>::add(Array const& items, std::size_t itemIndex,
                                             CellExtractor extract)
 {
-    PHARE_LOG_SCOPE("CellMap::add (add 1 index)");
+    // PHARE_LOG_SCOPE("CellMap::add (add 1 index)");
     addToCell(extract(items[itemIndex]), itemIndex);
 }
 

@@ -83,7 +83,10 @@ public:
 
     ~HighFiveFile() {}
 
-    HiFile& file() { return h5file_; }
+    HiFile& file()
+    {
+        return h5file_;
+    }
 
 
     template<typename T, std::size_t dim = 1>
@@ -218,9 +221,9 @@ public:
     }
 
 
-    HighFiveFile(const HighFiveFile&)  = delete;
-    HighFiveFile(const HighFiveFile&&) = delete;
-    HighFiveFile& operator=(const HighFiveFile&) = delete;
+    HighFiveFile(const HighFiveFile&)             = delete;
+    HighFiveFile(const HighFiveFile&&)            = delete;
+    HighFiveFile& operator=(const HighFiveFile&)  = delete;
     HighFiveFile& operator=(const HighFiveFile&&) = delete;
 
 private:

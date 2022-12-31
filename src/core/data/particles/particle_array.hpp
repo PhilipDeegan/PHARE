@@ -16,15 +16,17 @@
 
 namespace PHARE::core
 {
-template<std::size_t dim>
+template<typename Particle, typename Allocator = typename std::vector<Particle>::allocator_type>
 class ParticleArray
 {
 public:
+    static constexpr bool is_host_mem   = true;
     static constexpr bool is_contiguous = false;
-    static constexpr auto dimension     = dim;
-    using This                          = ParticleArray<dim>;
-    using Particle_t                    = Particle<dim>;
-    using Vector                        = std::vector<Particle_t>;
+    static constexpr auto dim           = Particle::dimension;
+    static constexpr auto dimension     = Particle::dimension;
+    using This                          = ParticleArray<Particle, Allocator>;
+    using Particle_t                    = Particle;
+    using Vector                        = std::vector<Particle_t, Allocator>;
 
 private:
     using CellMap_t   = CellMap<dim, int>;
@@ -55,10 +57,53 @@ public:
         assert(box_.size() > 0);
     }
 
-    ParticleArray(ParticleArray const& from) = default;
-    ParticleArray(ParticleArray&& from)      = default;
-    ParticleArray& operator=(ParticleArray&& from) = default;
-    ParticleArray& operator=(ParticleArray const& from) = default;
+    template<typename Allocator0>
+    ParticleArray(ParticleArray<Particle, Allocator0> const& that)
+        : ParticleArray{that.box_}
+    {
+        PHARE::Vector<Particle_t>::copy(this->particles, that.particles);
+    }
+
+
+    template<typename Allocator0>
+    ParticleArray(ParticleArray<Particle, Allocator0>&& that)
+        : ParticleArray{that.box_}
+    {
+        PHARE::Vector<Particle_t>::move(this->particles, that.particles);
+    }
+
+    ParticleArray(This const& from) = default;
+    ParticleArray(This&& from)      = default;
+
+    This& operator=(This&& from)      = default;
+    This& operator=(This const& from) = default;
+
+    template<typename Allocator0>
+    auto& operator=(std::vector<Particle, Allocator0>&& particles)
+    {
+        PHARE::Vector<Particle_t>::move(this->particles_, particles);
+        cellMap_.clear();
+        map_particles();
+        return *this;
+    }
+
+    template<typename Allocator0>
+    auto& operator=(ParticleArray<Particle, Allocator0> const& that)
+    {
+        PHARE::Vector<Particle_t>::copy(this->particles_, that.particles_);
+        cellMap_.clear();
+        map_particles();
+        return *this;
+    }
+
+    // template<typename Allocator0>
+    // auto& operator=(ParticleArray<Particle, Allocator0>&& that)
+    // {
+    //     PHARE::Vector<Particle_t>::move(this->particles_, that.particles_);
+    //     cellMap_.clear();
+    //     map_particles();
+    //     return *this;
+    // }
 
     std::size_t size() const { return particles_.size(); }
     std::size_t capacity() const { return particles_.capacity(); }
@@ -74,10 +119,7 @@ public:
     auto const& operator[](std::size_t i) const { return particles_[i]; }
     auto& operator[](std::size_t i) { return particles_[i]; }
 
-    bool operator==(ParticleArray<dim> const& that) const
-    {
-        return (this->particles_ == that.particles_);
-    }
+    bool operator==(This const& that) const { return (this->particles_ == that.particles_); }
 
     auto begin() const { return particles_.begin(); }
     auto begin() { return particles_.begin(); }
@@ -131,6 +173,15 @@ public:
         return part;
     }
 
+    template<typename... Args>
+    Particle_t& emplace_back(Args const&... args)
+    {
+        auto& part = particles_.emplace_back(args...);
+        cellMap_.add(particles_, particles_.size() - 1);
+        return part;
+    }
+
+
     void push_back(Particle_t const& p)
     {
         particles_.push_back(p);
@@ -143,7 +194,7 @@ public:
         cellMap_.add(particles_, particles_.size() - 1);
     }
 
-    void swap(ParticleArray<dim>& that) { std::swap(this->particles_, that.particles_); }
+    void swap(This& that) { std::swap(this->particles_, that.particles_); }
 
     void map_particles() const { cellMap_.add(particles_); }
     void empty_map() { cellMap_.empty(); }
@@ -151,14 +202,14 @@ public:
 
     auto nbr_particles_in(box_t const& box) const { return cellMap_.size(box); }
 
-    void export_particles(box_t const& box, ParticleArray<dim>& dest) const
+    void export_particles(box_t const& box, This& dest) const
     {
         PHARE_LOG_SCOPE("ParticleArray::export_particles");
         cellMap_.export_to(box, particles_, dest);
     }
 
     template<typename Fn>
-    void export_particles(box_t const& box, ParticleArray<dim>& dest, Fn&& fn) const
+    void export_particles(box_t const& box, This& dest, Fn&& fn) const
     {
         PHARE_LOG_SCOPE("ParticleArray::export_particles (Fn)");
         cellMap_.export_to(box, particles_.data(), dest, std::forward<Fn>(fn));
@@ -194,6 +245,10 @@ public:
     template<typename Predicate>
     auto partition(Predicate&& pred)
     {
+        // PHARE_LOG_LINE(particles_.size());
+        // assert(particles_.size() > 0);
+
+        // check();
         return cellMap_.partition(makeIndexRange(*this), std::forward<Predicate>(pred));
     }
 
@@ -207,10 +262,9 @@ public:
     bool is_mapped() const
     {
         bool ok = true;
-        if (particles_.size() != cellMap_.size())
-        {
-            throw std::runtime_error("particle array not mapped, map.size() != array.size()");
-        }
+
+        check();
+
         for (std::size_t pidx = 0; pidx < particles_.size(); ++pidx)
         {
             auto const& p = particles_[pidx];
@@ -227,13 +281,30 @@ public:
 
     void sortMapping() const { cellMap_.sort(); }
 
+    auto& box() const { return box_; }
     auto& vector() { return particles_; }
     auto& vector() const { return particles_; }
+
+    void check()
+    {
+        if (particles_.size() != cellMap_.size())
+        {
+            PHARE_LOG_LINE_STR(particles_.size());
+            PHARE_LOG_LINE_STR(cellMap_.size());
+        }
+
+        core::abort_if(particles_.size() != cellMap_.size());
+        // throw std::runtime_error("particle array not mapped, map.size() != array.size()");
+    }
 
 private:
     Vector particles_;
     box_t box_;
     mutable CellMap_t cellMap_;
+
+    // allow other versions of this class to have access to each others particle vector
+    template<typename, typename>
+    friend class ParticleArray;
 };
 
 } // namespace PHARE::core
@@ -243,16 +314,25 @@ namespace PHARE
 {
 namespace core
 {
-    template<std::size_t dim>
-    void empty(ParticleArray<dim>& array)
+    template<typename Particle, typename Allocator>
+    void empty(ParticleArray<Particle, Allocator>& array)
     {
         array.clear();
     }
 
-    template<std::size_t dim>
-    void swap(ParticleArray<dim>& array1, ParticleArray<dim>& array2)
+    template<typename Particle, typename Alloc0, typename Alloc1>
+    void swap(ParticleArray<Particle, Alloc0>& array1, ParticleArray<Particle, Alloc1>& array2)
     {
+        static_assert(std::is_same_v<Alloc0, Alloc1>);
+
         array1.swap(array2);
+    }
+
+    template<typename Particle, typename Allocator>
+    void append(ParticleArray<Particle, Allocator> const& src,
+                ParticleArray<Particle, Allocator>& dst)
+    {
+        std::copy(std::begin(src), std::end(src), std::back_inserter(dst));
     }
 
 

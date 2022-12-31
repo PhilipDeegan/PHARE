@@ -91,10 +91,13 @@ public:
                                              transformation);
     }
 
-    std::string const& getPatternName() const { return s_name_id; }
+    std::string const& getPatternName() const
+    {
+        return s_name_id;
+    }
 
 private:
-    FieldFillPattern(FieldFillPattern const&) = delete;
+    FieldFillPattern(FieldFillPattern const&)            = delete;
     FieldFillPattern& operator=(FieldFillPattern const&) = delete;
 
     static const inline std::string s_name_id = "BOX_GEOMETRY_FILL_PATTERN";

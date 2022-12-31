@@ -1,0 +1,28 @@
+#
+# example mkn call using this file
+#   mkn clean build test -Op cuda -x res/mkn/clang10_nvcc -a --cuda-gpu-arch="sm_61" -l -lcudart
+
+property:
+  cxx.flags: --std=c++17 -fPIC -fsized-deallocation #-fsanitize=address -fno-omit-frame-pointer
+  
+
+env: |
+  OMPI_CXX=clang++
+  PATH=/usr/bin:/home/deegan/chain/clang_14.0.6/bin:${PATH}
+  
+path: |
+  /home/deegan/hpc_sdk/Linux_x86_64/22.7/cuda/11.7/targets/x86_64-linux/lib
+  
+inc:
+  /home/deegan/hpc_sdk/Linux_x86_64/22.7/cuda/11.0/targets/x86_64-linux/include
+
+compiler:
+  mask:
+    g++:
+      mpicxx
+
+file:
+  - type: cpp:cxx:cc
+    archiver: ar -cr
+    compiler:  mpicxx ${cxx.flags} -x cuda --cuda-gpu-arch=sm_80 #--cuda-path=/home/deegan/hpc_sdk/Linux_x86_64/22.7/cuda/11.7 
+    linker:  mpicxx -Wl,-z,defs -fuse-ld=gold -lcudart #-lclang_rt.asan-x86_64

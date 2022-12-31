@@ -110,10 +110,10 @@ namespace amr
         }
 
 
-        ResourcesManager(ResourcesManager const&) = delete;
-        ResourcesManager(ResourcesManager&&)      = delete;
+        ResourcesManager(ResourcesManager const&)                   = delete;
+        ResourcesManager(ResourcesManager&&)                        = delete;
         ResourcesManager& operator=(ResourcesManager const& source) = delete;
-        ResourcesManager& operator=(ResourcesManager&&) = delete;
+        ResourcesManager& operator=(ResourcesManager&&)             = delete;
 
 
         /** @brief registerResources takes a ResourcesUser to register its resources

@@ -17,6 +17,8 @@ namespace core
         using reference         = typename Iterator::reference;
         using pointer           = typename Iterator::pointer;
 
+
+
         template<class Container>
         explicit Range(Container const& c)
             : first_{std::begin(c)}
@@ -60,9 +62,9 @@ namespace core
         }
 
         IndexRange& operator=(IndexRange const& from) = default;
-        IndexRange& operator=(IndexRange&& from) = default;
-        IndexRange(IndexRange&& from)            = default;
-        IndexRange(IndexRange const& from)       = default;
+        IndexRange& operator=(IndexRange&& from)      = default;
+        IndexRange(IndexRange&& from)                 = default;
+        IndexRange(IndexRange const& from)            = default;
 
         auto size() const { return end_ - first_; }
         auto ibegin() const { return first_; }
@@ -81,6 +83,9 @@ namespace core
         // auto& operator[](std::size_t idx) { return (*array_)[first_ + idx]; }
         // auto const& operator[](std::size_t idx) const { return (*array_)[first_ + idx]; }
 
+
+        auto& operator[](std::size_t i) { return *(first_ + i); }
+        auto& operator[](std::size_t i) const { return *(first_ + i); }
 
     private:
         Index first_;

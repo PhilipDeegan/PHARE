@@ -23,11 +23,11 @@ namespace PHARE::core
 class Indexer
 {
 public:
-    Indexer()                     = default;
-    Indexer(Indexer const& other) = default;
-    Indexer(Indexer&& other)      = default;
+    Indexer()                                = default;
+    Indexer(Indexer const& other)            = default;
+    Indexer(Indexer&& other)                 = default;
     Indexer& operator=(Indexer const& other) = default;
-    Indexer& operator=(Indexer&& other) = default;
+    Indexer& operator=(Indexer&& other)      = default;
 
     void add(std::size_t itemIndex) { indexes_.push_back(itemIndex); }
     void remove(std::size_t itemIndex)

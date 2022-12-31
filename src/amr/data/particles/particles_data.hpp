@@ -1,11 +1,11 @@
 #ifndef PHARE_SRC_AMR_DATA_PARTICLES_PARTICLES_DATA_HPP
 #define PHARE_SRC_AMR_DATA_PARTICLES_PARTICLES_DATA_HPP
 
-#include <iterator>
+#include <vector>
 #include <cstddef>
 #include <numeric>
+#include <iterator>
 #include <stdexcept>
-#include <vector>
 
 #include <SAMRAI/hier/BoxOverlap.h>
 #include <SAMRAI/hier/IntVector.h>
@@ -16,63 +16,23 @@
 #include "SAMRAI/hier/Transformation.h"
 
 
+#include "core/logger.hpp"
+#include "core/vector.hpp"
+
 #include "core/data/ions/ion_population/particle_pack.hpp"
 #include "core/data/particles/particle.hpp"
 #include "core/data/particles/particle_array.hpp"
 #include "core/data/particles/particle_packer.hpp"
-#include "amr/resources_manager/amr_utils.hpp"
-#include "amr/utilities/box/amr_box.hpp"
 #include "core/utilities/point/point.hpp"
 
-#include "core/logger.hpp"
-
+#include "amr/resources_manager/amr_utils.hpp"
+#include "amr/utilities/box/amr_box.hpp"
 
 
 namespace PHARE
 {
 namespace amr
 {
-
-
-    template<typename Particle>
-    inline bool isInBox(SAMRAI::hier::Box const& box, Particle const& particle)
-    {
-        constexpr auto dim = Particle::dimension;
-
-        auto const& iCell = particle.iCell;
-
-        auto const& lower = box.lower();
-        auto const& upper = box.upper();
-
-
-        if (iCell[0] >= lower(0) && iCell[0] <= upper(0))
-        {
-            if constexpr (dim > 1)
-            {
-                if (iCell[1] >= lower(1) && iCell[1] <= upper(1))
-                {
-                    if constexpr (dim > 2)
-                    {
-                        if (iCell[2] >= lower(2) && iCell[2] <= upper(2))
-                        {
-                            return true;
-                        }
-                    }
-                    else
-                    {
-                        return true;
-                    }
-                }
-            }
-            else
-            {
-                return true;
-            }
-        }
-        return false;
-    }
-
-
     /** @brief ParticlesData is a concrete SAMRAI::hier::PatchData subclass to store Particle data
      *
      * This class encapsulates particle storage known by the module core, and by being derived
@@ -98,15 +58,86 @@ namespace amr
     /**
      * @brief The ParticlesData class
      */
-    template<typename ParticleArray>
+    template<typename ParticleArray_>
     class ParticlesData : public SAMRAI::hier::PatchData
     {
-        using Super = SAMRAI::hier::PatchData;
-
+        using Super               = SAMRAI::hier::PatchData;
+        using ParticleArray       = ParticleArray_;
         using Particle_t          = typename ParticleArray::Particle_t;
         static constexpr auto dim = ParticleArray::dimension;
         // add one cell surrounding ghost box to map particles exiting the ghost layer
         static constexpr int ghostSafeMapLayer = 1;
+
+        template<typename T, std::size_t S>
+        static auto _put_vec_size(std::vector<std::array<T, S>> const& vec)
+        {
+            return vec.size() * S;
+        }
+        template<typename T>
+        static auto _put_vec_size(std::vector<T> const& vec)
+        {
+            return vec.size();
+        }
+        template<typename T, std::size_t S>
+        static auto _put_vec_data(std::vector<std::array<T, S>> const& vec)
+        {
+            return vec[0].data();
+        }
+        template<typename T>
+        static auto _put_vec_data(std::vector<T> const& vec)
+        {
+            return vec.data();
+        }
+
+        template<typename DB, typename T>
+        void static putVecArrayToDB(DB const& db, std::vector<T> const& vec, std::string const& key)
+        {
+            auto size = _put_vec_size(vec);
+            auto data = _put_vec_data(vec);
+            if constexpr (std::is_same_v<T, double>)
+                db->putDoubleArray(key, data, size);
+            else if constexpr (std::is_same_v<T, int>)
+                db->putIntegerArray(key, data, size);
+            else
+                throw std::runtime_error("NOPE");
+        }
+
+        template<typename T, std::size_t S>
+        static auto _get_vec_size(std::size_t size, std::vector<std::array<T, S>> const&)
+        {
+            return size / S;
+        }
+        template<typename T>
+        static auto _get_vec_size(std::size_t size, std::vector<T> const&)
+        {
+            return size;
+        }
+        template<typename T, std::size_t S>
+        static auto _get_vec_data(std::vector<std::array<T, S>>& vec)
+        {
+            return vec[0].data();
+        }
+        template<typename T>
+        static auto _get_vec_data(std::vector<T>& vec)
+        {
+            return vec.data();
+        }
+
+        template<typename DB, typename T>
+        void static getVecArrayFromDB(DB const& db, std::vector<T>& vec, std::string key)
+        {
+            auto size = _get_vec_size(db->getArraySize(key), vec);
+            vec.resize(size);
+            auto data = _get_vec_data(vec);
+
+            if constexpr (std::is_same_v<T, double>)
+                db->getDoubleArray(key, data, size);
+
+            else if constexpr (std::is_same_v<T, int>)
+                db->getIntegerArray(key, data, size);
+            else
+                throw std::runtime_error("NOPE");
+        }
 
     public:
         ParticlesData(SAMRAI::hier::Box const& box, SAMRAI::hier::IntVector const& ghost)
@@ -122,28 +153,23 @@ namespace amr
         {
         }
 
-
-
-
         ParticlesData()                     = delete;
         ParticlesData(ParticlesData const&) = delete;
         ParticlesData(ParticlesData&&)      = default;
 
 
-
         ParticlesData& operator=(ParticlesData const&) = delete;
 
-
-
         // SAMRAI interface
-
         void putToRestart(std::shared_ptr<SAMRAI::tbox::Database> const& restart_db) const override
         {
-            Super::putToRestart(restart_db);
-
             using Packer = core::ParticlePacker<dim>;
 
+            Super::putToRestart(restart_db);
+
             auto putParticles = [&](std::string name, auto& particles) {
+                auto static constexpr is_host_mem = std::decay_t<decltype(particles)>::is_host_mem;
+
                 // SAMRAI errors on writing 0 size arrays
                 if (particles.size() == 0)
                     return;
@@ -156,7 +182,24 @@ namespace amr
 
                 std::size_t part_idx = 0;
                 core::apply(soa.as_tuple(), [&](auto const& arg) {
-                    restart_db->putVector(name + "_" + packer.keys()[part_idx++], arg);
+                    using Vector = std::decay_t<decltype(arg)>;
+                    using T      = typename Vector::value_type;
+
+                    auto& vec = [](auto const& v) -> auto&
+                    {
+                        if constexpr (is_host_mem)
+                            return v;
+                        else
+                        {
+                            static std::vector<T> put_host_vec;
+                            put_host_vec.resize(v.size());
+                            PHARE::Vector<T>::copy(put_host_vec, v);
+                            return put_host_vec;
+                        }
+                    }
+                    (arg);
+
+                    putVecArrayToDB(restart_db, arg, name + "_" + packer.keys()[part_idx++]);
                 });
             };
 
@@ -167,14 +210,15 @@ namespace amr
             putParticles("levelGhostParticlesOld", levelGhostParticlesOld);
         };
 
-
         void getFromRestart(std::shared_ptr<SAMRAI::tbox::Database> const& restart_db) override
         {
-            Super::getFromRestart(restart_db);
-
             using Packer = core::ParticlePacker<dim>;
 
+            Super::getFromRestart(restart_db);
+
             auto getParticles = [&](std::string const name, auto& particles) {
+                auto static constexpr is_host_mem = std::decay_t<decltype(particles)>::is_host_mem;
+
                 auto const keys_exist = core::generate(
                     [&](auto const& key) { return restart_db->keyExists(name + "_" + key); },
                     Packer::keys());
@@ -197,14 +241,35 @@ namespace amr
                 {
                     std::size_t part_idx = 0;
                     core::apply(soa.as_tuple(), [&](auto& arg) {
-                        restart_db->getVector(name + "_" + Packer::keys()[part_idx++], arg);
+                        using Vector = std::decay_t<decltype(arg)>;
+                        using T      = typename Vector::value_type;
+
+                        auto& vec = [](auto const& v) -> auto&
+                        {
+                            if constexpr (is_host_mem)
+                                return v;
+                            else
+                            {
+                                static std::vector<T> get_host_vec;
+                                get_host_vec.clear();
+                                return get_host_vec;
+                            }
+                        }
+                        (arg);
+
+                        getVecArrayFromDB(restart_db, arg, name + "_" + Packer::keys()[part_idx++]);
+
+                        if constexpr (not is_host_mem)
+                            PHARE::Vector<T>::copy(arg, vec);
                     });
                 }
 
                 assert(particles.size() == 0);
                 particles.reserve(n_particles);
                 for (std::size_t i = 0; i < n_particles; ++i)
-                    particles.push_back(soa.copy(i));
+                    particles.emplace_back(soa.copy(i));
+
+                particles.check();
             };
 
             getParticles("domainParticles", domainParticles);

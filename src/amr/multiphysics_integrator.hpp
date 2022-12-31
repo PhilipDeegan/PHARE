@@ -49,7 +49,10 @@ namespace solver
     };
 
 
-    inline bool isRootLevel(int levelNumber) { return levelNumber == 0; }
+    inline bool isRootLevel(int levelNumber)
+    {
+        return levelNumber == 0;
+    }
 
 
     /**

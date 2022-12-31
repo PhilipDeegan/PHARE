@@ -91,10 +91,10 @@ public:
     Writer& writer() { return *writer_.get(); }
 
 
-    DiagnosticsManager(DiagnosticsManager const&) = delete;
-    DiagnosticsManager(DiagnosticsManager&&)      = delete;
+    DiagnosticsManager(DiagnosticsManager const&)            = delete;
+    DiagnosticsManager(DiagnosticsManager&&)                 = delete;
     DiagnosticsManager& operator=(DiagnosticsManager const&) = delete;
-    DiagnosticsManager& operator=(DiagnosticsManager&&) = delete;
+    DiagnosticsManager& operator=(DiagnosticsManager&&)      = delete;
 
 private:
     bool needsAction_(double nextTime, double timeStamp, double timeStep)
