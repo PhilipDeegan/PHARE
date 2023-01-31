@@ -32,6 +32,8 @@
 
 #include "core/utilities/algorithm.hpp"
 
+#include "load_balancing/load_balancer_manager.hpp"
+#include "load_balancing/load_balancer_estimator.hpp"
 #include "phare_core.hpp"
 
 
@@ -46,6 +48,7 @@ namespace solver
         int solverIndex              = NOT_SET;
         int resourcesManagerIndex    = NOT_SET;
         int taggerIndex              = NOT_SET;
+        //        int loadBalancerIndex        = NOT_SET;
         std::string messengerName;
     };
 
@@ -101,6 +104,7 @@ namespace solver
             , levelDescriptors_(dict["AMR"]["max_nbr_levels"].template to<int>())
             , simFuncs_{simFuncs}
             , dict_{dict}
+            , load_balancer_manager_{nullptr}
 
         {
             // auto mhdSolver = std::make_unique<SolverMHD<ResourcesManager>>(resourcesManager_);
@@ -319,6 +323,7 @@ namespace solver
                     model.allocate(*patch, initDataTime);
                     solver.allocate(model, *patch, initDataTime);
                     messenger.allocate(*patch, initDataTime);
+                    load_balancer_manager_->allocate(*patch, initDataTime);
                 }
             }
 
@@ -354,14 +359,22 @@ namespace solver
                                     int const coarsestLevel, int const finestLevel) override
         {
             // handle samrai restarts / schedule creation
-            //  allocation of patch datas which may not want to be saved to restart files will
-            //   likely need to go here somehow https://github.com/PHAREHUB/PHARE/issues/664
+            // allocation of patch datas which may not want to be saved to restart files will
+            // likely need to go here somehow https://github.com/PHAREHUB/PHARE/issues/664
             if (!restartInitialized_
                 and SAMRAI::tbox::RestartManager::getManager()->isFromRestart())
             {
                 auto& messenger = getMessengerWithCoarser_(coarsestLevel);
                 for (auto ilvl = coarsestLevel; ilvl <= finestLevel; ++ilvl)
+                {
                     messenger.registerLevel(hierarchy, ilvl);
+                    auto level = hierarchy->getPatchLevel(ilvl);
+                    for (auto& patch : *level)
+                    {
+                        auto time = dict_["restarts"]["restart_time"].template to<double>();
+                        load_balancer_manager_->allocate(*patch, time);
+                    }
+                }
                 restartInitialized_ = true;
             }
         }
@@ -500,6 +513,8 @@ namespace solver
                 dump_(iLevel);
             }
 
+            load_balancer_manager_->estimate(*level, model);
+
             return newTime;
         }
 
@@ -554,6 +569,11 @@ namespace solver
         bool usingRefinedTimestepping() const override { return true; }
 
 
+        void setLoadBalancerManager(std::unique_ptr<amr::LoadBalancerManager<dimension>> lbm)
+        {
+            load_balancer_manager_ = std::move(lbm);
+        }
+
 
 
     private:
@@ -571,6 +591,7 @@ namespace solver
         std::map<std::string, std::unique_ptr<LevelInitializerT>> levelInitializers_;
         SimFunctors const& simFuncs_;
         PHARE::initializer::PHAREDict const& dict_;
+        std::unique_ptr<amr::LoadBalancerManager<dimension>> load_balancer_manager_;
 
 
         bool validLevelRange_(int coarsestLevel, int finestLevel)
@@ -581,6 +602,7 @@ namespace solver
             }
             return true;
         }
+
 
 
         bool existTaggerOnRange_(int coarsestLevel, int finestLevel)
@@ -595,6 +617,19 @@ namespace solver
             return false;
         }
 
+
+
+        // bool existloadBalancererOnRange_(int coarsestLevel, int finestLevel)
+        // {
+        //     for (auto iLevel = coarsestLevel; iLevel <= finestLevel; ++iLevel)
+        //     {
+        //         if (levelDescriptors_[iLevel].loadBalancerIndex != LevelDescriptor::NOT_SET)
+        //         {
+        //             return true;
+        //         }
+        //     }
+        //     return false;
+        // }
 
 
 

@@ -572,6 +572,16 @@ def check_clustering(**kwargs):
     return clustering
 
 
+def check_loadbalancing(**kwargs):
+    valid_keys = ["nppc", "homogeneous"]
+    loadbalancing = kwargs.get("loadbalancing", "nppc")
+    if loadbalancing not in valid_keys:
+        raise ValueError(
+            f"Error: loadbalancing type is not supported, supported types are {valid_keys}"
+        )
+    return loadbalancing
+
+
 # ------------------------------------------------------------------------------
 
 
@@ -605,6 +615,7 @@ def checker(func):
             "restart_options",
             "tag_buffer",
             "description",
+            "loadbalancing",
         ]
 
         accepted_keywords += check_optional_keywords(**kwargs)
@@ -624,6 +635,8 @@ def checker(func):
         kwargs["description"] = kwargs.get("description", None)
 
         kwargs["clustering"] = check_clustering(**kwargs)
+
+        kwargs["loadbalancing"] = check_loadbalancing(**kwargs)
 
         time_step_nbr, time_step, final_time = check_time(**kwargs)
         kwargs["time_step_nbr"] = time_step_nbr
