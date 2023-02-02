@@ -23,6 +23,8 @@ set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 include(CheckCXXCompilerFlag)
 find_program(Git git)
 find_package(PythonInterp  3.0 REQUIRED)
+# verify of fail fast!
+execute_process(COMMAND ${PYTHON_EXECUTABLE} -c "import numpy" COMMAND_ERROR_IS_FATAL ANY)
 
 set(PHARE_PROJECT_DIR ${CMAKE_CURRENT_SOURCE_DIR})
 set(CMAKE_EXPORT_COMPILE_COMMANDS 1)
