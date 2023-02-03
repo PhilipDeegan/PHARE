@@ -85,11 +85,11 @@ jobs:
     - name: Build
       working-directory: ${{runner.workspace}}/build
       shell: bash
-      run: cmake --build .
+      run: cmake --build . -j 2
 
     - name: Test
       working-directory: ${{runner.workspace}}/build
       env:
         CTEST_OUTPUT_ON_FAILURE: 1
       shell: bash
-      run: ctest
+      run: ctest -j 2 
