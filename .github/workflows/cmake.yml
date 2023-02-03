@@ -85,7 +85,12 @@ jobs:
     - name: Build
       working-directory: ${{runner.workspace}}/build
       shell: bash
-      run: cmake --build . -j 2
+      run: |
+        if [ "$RUNNER_OS" == "Linux" ]; then
+           cmake --build . # OOM if more threads
+        else
+           cmake --build . -j 2
+        fi
 
     - name: Test
       working-directory: ${{runner.workspace}}/build
