@@ -26,6 +26,7 @@ if venv_path is not None:
 
 from .uniform_model import UniformModel
 from .maxwellian_fluid_model import MaxwellianFluidModel
+from .deterministic_fluid_model import DeterministicFluidModel
 from .electron_model import ElectronModel
 from .diagnostics import FluidDiagnostics, ElectromagDiagnostics, ParticleDiagnostics, MetaDiagnostics
 from .simulation import Simulation, serialize as serialize_sim, deserialize as deserialize_sim
@@ -202,7 +203,7 @@ def populateDict():
         d = modelDict[pop]
         add_string(pop_path+"{:d}/name".format(pop_index), pop)
         add_double(pop_path+"{:d}/mass".format(pop_index), d["mass"])
-        add_string(partinit_path+"name", "maxwellian")
+        add_string(partinit_path+"name", d.get("initializer", "maxwellian"))
 
         addInitFunction(partinit_path+"density", fn_wrapper(d["density"]))
         addInitFunction(partinit_path+"bulk_velocity_x", fn_wrapper(d["vx"]))

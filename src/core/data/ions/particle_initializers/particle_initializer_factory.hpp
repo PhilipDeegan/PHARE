@@ -5,6 +5,7 @@
 #include "core/utilities/types.hpp"
 #include "initializer/data_provider.hpp"
 #include "maxwellian_particle_initializer.hpp"
+#include "deterministic_particle_initializer.hpp"
 #include "particle_initializer.hpp"
 
 #include <memory>
@@ -74,6 +75,22 @@ namespace core
                         MaxwellianParticleInitializer<ParticleArray, GridLayout>>(
                         density, v, vth, charge, nbrPartPerCell, seed);
                 }
+            }
+            if (initializerName == "deterministic")
+            {
+                return std::make_unique<
+                    DeterministicParticleInitializer<ParticleArray, GridLayout>>(
+                    dict["density"].template to<FunctionType>(),
+                    std::array<FunctionType, 3>{
+                        dict["bulk_velocity_x"].template to<FunctionType>(),
+                        dict["bulk_velocity_y"].template to<FunctionType>(),
+                        dict["bulk_velocity_z"].template to<FunctionType>()},
+                    std::array<FunctionType, 3>{
+                        dict["thermal_velocity_x"].template to<FunctionType>(),
+                        dict["thermal_velocity_y"].template to<FunctionType>(),
+                        dict["thermal_velocity_z"].template to<FunctionType>()},
+                    dict["charge"].template to<double>(),
+                    dict["nbr_part_per_cell"].template to<int>());
             }
             // TODO throw?
             return nullptr;
