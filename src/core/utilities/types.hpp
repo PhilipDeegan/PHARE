@@ -28,6 +28,16 @@
 #define _PHARE_TO_STR(x) #x // convert macro text to string
 #define PHARE_TO_STR(x) _PHARE_TO_STR(x)
 
+
+#define ABORT_IF(x)                                                                                \
+    if (x)                                                                                         \
+        std::abort();
+#define ABORT_IF_NOT(x)                                                                            \
+    if (!(x))                                                                                      \
+        std::abort();
+
+#define DEBUG_ABORT_IF(x) PHARE_DEBUG_DO(ABORT_IF(x))
+
 namespace PHARE
 {
 namespace core
@@ -249,8 +259,9 @@ namespace core
 namespace PHARE::core
 {
 template<typename Container, typename Multiplies = typename Container::value_type>
-NO_DISCARD Multiplies product(Container const& container, Multiplies mul = 1)
+NO_DISCARD Multiplies constexpr product(Container const& container, Multiplies init = 1)
 {
+    assert(init > 0);
     // using  :
     // return std::accumulate(container.begin(), container.end(), init,
     // std::multiplies<Multiplies>()); will not be constexpr until C++20.
@@ -269,7 +280,31 @@ NO_DISCARD Return sum(Container const& container, Return r = 0)
     return std::accumulate(container.begin(), container.end(), r);
 }
 
+template<typename Container, typename F>
+auto sum_from(F fn, Container const& container)
+{
+    using value_type  = typename Container::value_type;
+    using return_type = std::decay_t<std::result_of_t<F const&(value_type const&)>>;
+    return_type sum   = 0;
+    for (auto const& el : container)
+        sum += fn(el);
+    return sum;
+}
 
+
+template<typename Container>
+auto& reverse(Container& container)
+{
+    std::reverse(container.begin(), container.end());
+    return container;
+}
+
+template<typename Container>
+auto reverse(Container&& container)
+{
+    std::reverse(container.begin(), container.end());
+    return container;
+}
 
 
 template<typename F>
@@ -313,13 +348,13 @@ NO_DISCARD auto generate(F&& f, std::vector<T>&& v)
 }
 
 template<std::size_t Idx, typename F, typename Type, std::size_t Size>
-NO_DISCARD auto constexpr generate_array__(F& f, std::array<Type, Size>& arr)
+NO_DISCARD auto constexpr generate_array__(F& f, std::array<Type, Size> const& arr)
 {
     return f(arr[Idx]);
 }
 
 template<typename Type, std::size_t Size, typename F, std::size_t... Is>
-NO_DISCARD auto constexpr generate_array_(F& f, std::array<Type, Size>& arr,
+NO_DISCARD auto constexpr generate_array_(F& f, std::array<Type, Size> const& arr,
                                           std::integer_sequence<std::size_t, Is...>)
 {
     return std::array{generate_array__<Is>(f, arr)...};
@@ -336,16 +371,17 @@ NO_DISCARD auto constexpr generate(F&& f, std::array<Type, Size> const& arr)
 auto constexpr static to_bool = [](auto const& v) { return bool{v}; };
 
 
-template<typename Container>
-NO_DISCARD auto all(Container const& container)
+template<typename Container, typename Fn = decltype(to_bool)>
+NO_DISCARD auto all(Container const& container, Fn fn = to_bool)
 {
-    return std::all_of(container.begin(), container.end(), to_bool);
+    return std::all_of(container.begin(), container.end(), fn);
 }
 
-template<typename Container>
-NO_DISCARD auto any(Container const& container)
+
+template<typename Container, typename Fn = decltype(to_bool)>
+NO_DISCARD auto any(Container const& container, Fn fn = to_bool)
 {
-    return std::any_of(container.begin(), container.end(), to_bool);
+    return std::any_of(container.begin(), container.end(), fn);
 }
 
 template<typename Container>
@@ -354,6 +390,82 @@ NO_DISCARD auto none(Container const& container)
     return std::none_of(container.begin(), container.end(), to_bool);
 }
 
+template<typename Container>
+auto fill(Container& container, typename Container::value_type val)
+{
+    std::fill(container.begin(), container.end(), val);
+    return container;
+}
+
+template<typename Container>
+auto zero(Container& container)
+{
+    return fill(container, 0);
+}
+
+
+
+template<typename T = std::uint16_t>
+struct Apply
+{
+    template<T i>
+    constexpr auto operator()()
+    {
+        return std::integral_constant<T, i>{};
+    }
+};
+
+template<typename Apply, std::uint16_t... Is>
+constexpr auto apply_N(Apply& f, std::integer_sequence<std::uint16_t, Is...> const&)
+{
+    if constexpr (!std::is_same_v<decltype(f.template operator()<0>()), void>)
+        return std::make_tuple(f.template operator()<Is>()...);
+    (f.template operator()<Is>(), ...);
+}
+template<std::uint16_t N, typename Apply>
+constexpr auto apply_N(Apply&& f)
+{
+    return apply_N(f, std::make_integer_sequence<std::uint16_t, N>{});
+}
+
+
+template<std::uint16_t N, typename Fn>
+constexpr auto for_N(Fn& fn)
+{
+    using return_type
+        = std::decay_t<std::result_of_t<Fn(std::integral_constant<std::uint16_t, 0>)>>;
+    constexpr bool returns = !std::is_same_v<return_type, void>;
+
+    /*
+        for_N<2>([](auto ic) {
+            constexpr auto i = ic();
+            // ...
+        });
+    */
+    if constexpr (returns)
+        return std::apply([&](auto... ics) { return std::make_tuple(fn(ics)...); },
+                          apply_N<N>(Apply{}));
+    else
+        std::apply([&](auto... ics) { (fn(ics), ...); }, apply_N<N>(Apply{}));
+}
+
+template<std::uint16_t N, typename Fn>
+constexpr auto for_N(Fn&& fn)
+{
+    return for_N<N>(fn);
+}
+
+template<std::uint16_t N, typename Fn>
+constexpr auto for_N_all(Fn&& fn)
+{
+    return std::apply([&](auto const&... item) { return (item && ...); }, for_N<N>(fn));
+}
+
+template<std::uint16_t N, typename Fn>
+constexpr auto for_N_any(Fn&& fn)
+{
+    return std::apply([&](auto const&... item) { return (item || ...); }, for_N<N>(fn));
+}
 
 
 

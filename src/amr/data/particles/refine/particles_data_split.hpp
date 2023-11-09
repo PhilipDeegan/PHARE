@@ -51,6 +51,8 @@ namespace amr
     template<typename ParticleArray, ParticlesDataSplitType splitType, typename Splitter>
     class ParticlesRefineOperator : public SAMRAI::hier::RefineOperator
     {
+        core::CountingSort<ParticleArray, Splitter::dimension> mutable counting_sort;
+
     public:
         static constexpr auto dim           = Splitter::dimension;
         static constexpr auto interpOrder   = Splitter::interp_order;
@@ -244,6 +246,9 @@ namespace amr
                     }     // end loop on particles
                 }         // end loop on source particle arrays
             }             // loop on destination box
+
+
+            ParticleCountSorting<ParticleArray>{destDomainParticles, counting_sort}();
         }
 
 

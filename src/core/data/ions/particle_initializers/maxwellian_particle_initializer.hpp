@@ -6,6 +6,7 @@
 #include <cassert>
 #include <functional>
 
+#include "core/data/particles/particle_array_sorting.hpp"
 #include "core/data/grid/gridlayoutdefs.hpp"
 #include "core/hybrid/hybrid_quantities.hpp"
 #include "core/utilities/types.hpp"
@@ -202,6 +203,8 @@ void MaxwellianParticleInitializer<ParticleArray, GridLayout>::loadParticles(
                                             deltas(deltaDistrib, randGen), particleVelocity});
         }
     }
+    CountingSort<ParticleArray, dimension> counting_sort;
+    ParticleCountSorting<ParticleArray>{particles, counting_sort}();
 }
 
 } // namespace PHARE::core

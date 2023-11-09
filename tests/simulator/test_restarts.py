@@ -238,6 +238,7 @@ class RestartsTest(SimulatorTest):
         diag_dir0 = local_out
 
         # second restarted simulation
+        print("!!RESTARTING!!")
         local_out = f"{local_out}_n2"
         simput["diag_options"]["options"]["dir"] = local_out
         simput["restart_options"]["restart_time"] = restart_time
@@ -268,7 +269,8 @@ class RestartsTest(SimulatorTest):
     )
     @unpack
     def test_restarts_elapsed_time(self, ndim, interp, simInput, expected_num_levels):
-        print(f"test_restarts_elapsed_time dim/interp:{ndim}/{interp}")
+        refinement = "tagging" if "refinement" in simInput else "boxes"
+        print(f"test_restarts_elapsed_time dim/interp:{ndim}/{interp}/{refinement}")
 
         simput = copy.deepcopy(simInput)
 
@@ -330,6 +332,7 @@ class RestartsTest(SimulatorTest):
         diag_dir0 = local_out
 
         # second restarted simulation
+        print("!!RESTARTING!!")
         local_out = f"{local_out}_n2"
         simput["diag_options"]["options"]["dir"] = local_out
         simput["restart_options"]["restart_time"] = restart_time

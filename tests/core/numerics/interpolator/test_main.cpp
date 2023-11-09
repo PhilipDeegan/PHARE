@@ -298,7 +298,7 @@ TYPED_TEST(A1DInterpolator, canComputeAllEMfieldsAtParticle)
     this->em.B.setBuffer("EM_B_y", &this->by1d_);
     this->em.B.setBuffer("EM_B_z", &this->bz1d_);
 
-    this->interp(makeIndexRange(this->particles), this->em, this->layout);
+    this->interp(this->particles, this->em, this->layout);
 
     EXPECT_TRUE(
         std::all_of(std::begin(this->particles), std::end(this->particles),
@@ -421,7 +421,7 @@ TYPED_TEST(A2DInterpolator, canComputeAllEMfieldsAtParticle)
     this->em.B.setBuffer("EM_B_y", &this->by_);
     this->em.B.setBuffer("EM_B_z", &this->bz_);
 
-    this->interp(makeIndexRange(this->particles), this->em, this->layout);
+    this->interp(this->particles, this->em, this->layout);
 
     EXPECT_TRUE(
         std::all_of(std::begin(this->particles), std::end(this->particles),
@@ -549,7 +549,7 @@ TYPED_TEST(A3DInterpolator, canComputeAllEMfieldsAtParticle)
     this->em.B.setBuffer("EM_B_y", &this->by_);
     this->em.B.setBuffer("EM_B_z", &this->bz_);
 
-    this->interp(makeIndexRange(this->particles), this->em, this->layout);
+    this->interp(this->particles, this->em, this->layout);
 
     EXPECT_TRUE(
         std::all_of(std::begin(this->particles), std::end(this->particles),
@@ -742,7 +742,7 @@ public:
             part.v[2]     = +1.;
             particles.push_back(part);
         }
-        interpolator(makeIndexRange(particles), rho, v, layout);
+        interpolator(particles, rho, v, layout);
     }
 
 
@@ -806,7 +806,7 @@ struct ACollectionOfParticles_2d : public ::testing::Test
                 part.v[1]   = -1.;
                 part.v[2]   = +1.;
             }
-        interpolator(makeIndexRange(particles), rho, v, layout);
+        interpolator(particles, rho, v, layout);
     }
 
     GridLayout_t layout{ConstArray<double, dim>(.1), {nx, ny}, ConstArray<double, dim>(0)};

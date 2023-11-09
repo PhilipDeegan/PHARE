@@ -11,6 +11,9 @@
 #include <iostream>
 
 
+#include "core/utilities/types.hpp"
+
+
 namespace PHARE::core
 {
 template<std::size_t dim, bool c_ordering = true, typename DataType = double>
@@ -208,7 +211,7 @@ public:
 
     explicit NdArrayVector(std::array<std::uint32_t, dim> const& ncells)
         : nCells_{ncells}
-        , data_(std::accumulate(ncells.begin(), ncells.end(), 1, std::multiplies<int>()))
+        , data_(product(ncells))
     {
     }
 
@@ -270,6 +273,12 @@ public:
     NO_DISCARD auto& vector() { return data_; }
     NO_DISCARD auto& vector() const { return data_; }
 
+    auto& update_from(std::array<std::uint32_t, dim> const& ncells)
+    {
+        nCells_ = ncells;
+        data_.resize(product(ncells));
+        return *this;
+    }
 
 private:
     std::array<std::uint32_t, dim> nCells_;

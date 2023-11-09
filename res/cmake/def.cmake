@@ -181,6 +181,11 @@ if (test AND ${PHARE_EXEC_LEVEL_MIN} GREATER 0) # 0 = no tests
 
 
   if(DEFINED GTEST_ROOT)
+
+    # Some Gtest info
+    #  args
+    #   disable exception handler to see stacks: --gtest_catch_exceptions=0
+
     set(GTEST_ROOT ${GTEST_ROOT} CACHE PATH "Path to googletest")
     find_package(GTest REQUIRED)
     set(GTEST_LIBS GTest::GTest GTest::Main)

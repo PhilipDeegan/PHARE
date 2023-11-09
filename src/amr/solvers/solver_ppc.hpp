@@ -524,7 +524,7 @@ void SolverPPC<HybridModel, AMR_Types>::moveIons_(level_t& level, Ions& ions,
                                                   Messenger& fromCoarser, double const currentTime,
                                                   double const newTime, core::UpdaterMode mode)
 {
-    PHARE_LOG_SCOPE("SolverPPC::moveIons_");
+    PHARE_LOG_SCOPE(std::string{"SolverPPC::moveIons_ "} + std::to_string(level.getLevelNumber()));
 
     PHARE_DEBUG_DO(std::size_t nbrDomainParticles = 0; std::size_t nbrPatchGhostParticles = 0;
                    std::size_t nbrLevelGhostNewParticles                                  = 0;

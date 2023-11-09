@@ -10,6 +10,7 @@
 #include <iostream>
 
 #include "core/def.hpp"
+#include "core/logger.hpp"
 #include "core/utilities/point/point.hpp"
 #include "core/utilities/span.hpp"
 #include "core/utilities/types.hpp"
@@ -34,6 +35,57 @@ NO_DISCARD auto cellAsPoint(Particle const& particle)
 {
     return Point<int, Particle::dimension>{particle.iCell};
 }
+
+template<typename Box_t, typename RValue = std::size_t>
+struct CellFlattener
+{
+    template<typename Int>
+    RValue operator()(std::array<Int, Box_t::dimension> const& icell) const
+    {
+        if constexpr (Box_t::dimension == 2)
+            return icell[1] + icell[0] * shape[1];
+        if constexpr (Box_t::dimension == 3)
+            return icell[2] + icell[1] * shape[2] + icell[0] * shape[1] * shape[2];
+        return icell[0];
+    }
+    template<typename Particle>
+    RValue operator()(Particle const& particle) const
+    {
+        return (*this)(particle.iCell);
+    }
+
+    Box_t const box;
+    std::array<int, Box_t::dimension> shape = box.shape().toArray();
+};
+template<typename Box_t, typename RValue = std::uint32_t>
+struct LocalisedCellFlattener
+{
+    static const size_t dim = Box_t::dimension;
+
+    RValue operator()(std::array<int, dim> icell) const
+    {
+        for_N<dim>([&](auto ic) {
+            constexpr auto i = ic();
+            icell[i] -= box.lower[i];
+            DEBUG_ABORT_IF(icell[i] < 0);
+        });
+
+        if constexpr (dim == 2)
+            return icell[1] + icell[0] * shape[1];
+        if constexpr (dim == 3)
+            return icell[2] + icell[1] * shape[2] + icell[0] * shape[1] * shape[2];
+        return icell[0];
+    }
+    template<typename Particle>
+    RValue operator()(Particle const& particle) const
+    {
+        return (*this)(particle.iCell);
+    }
+
+    Box_t const box;
+    std::array<int, dim> shape = box.shape().toArray();
+};
+
 
 
 template<size_t dim>
@@ -132,9 +184,9 @@ inline constexpr auto is_phare_particle_type
 
 template<std::size_t dim, template<std::size_t> typename ParticleA,
          template<std::size_t> typename ParticleB>
-NO_DISCARD typename std::enable_if_t<is_phare_particle_type<dim, ParticleA<dim>>
-                                         and is_phare_particle_type<dim, ParticleB<dim>>,
-                                     bool>
+NO_DISCARD typename std::enable_if_t<
+    is_phare_particle_type<dim, ParticleA<dim>> and is_phare_particle_type<dim, ParticleB<dim>>,
+    bool>
 operator==(ParticleA<dim> const& particleA, ParticleB<dim> const& particleB)
 {
     return particleA.weight == particleB.weight and //

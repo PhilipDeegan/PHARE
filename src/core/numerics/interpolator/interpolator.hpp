@@ -466,7 +466,7 @@ public:
      * onto the particle.
      */
     template<typename ParticleRange, typename Electromag, typename GridLayout>
-    inline void operator()(ParticleRange&& particleRange, Electromag const& Em,
+    inline void operator()(ParticleRange& particleRange, Electromag const& Em,
                            GridLayout const& layout)
     {
         PHARE_LOG_SCOPE("Interpolator::operator()");
@@ -521,7 +521,7 @@ public:
      * onto the particle.
      */
     template<typename ParticleRange, typename VecField, typename GridLayout, typename Field>
-    inline void operator()(ParticleRange&& particleRange, Field& density, VecField& flux,
+    inline void operator()(ParticleRange& particleRange, Field& density, VecField& flux,
                            GridLayout const& layout, double coef = 1.)
     {
         auto begin        = particleRange.begin();

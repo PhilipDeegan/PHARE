@@ -1,16 +1,15 @@
 #ifndef PHARE_CORE_LOGGER_HPP
 #define PHARE_CORE_LOGGER_HPP
 
+#include <iostream>
 
 #if !defined(NDEBUG) || defined(PHARE_FORCE_DEBUG_DO)
 #define PHARE_LOG_LINE_STR(str)                                                                    \
-    std::cout << __FILE__ << ":" << __LINE__ << " - " << str << std::endl;
+    std::cout << __FILE__ << ":" << __LINE__ << " - " << str << std::endl
 #else
 #define PHARE_LOG_LINE_STR(str)
 #endif
 #define PHARE_LOG_LINE PHARE_LOG_LINE_STR("")
-
-
 
 
 #if PHARE_WITH_CALIPER
@@ -18,6 +17,12 @@
 
 #define PHARE_LOG_START(str) CALI_MARK_BEGIN(str)
 #define PHARE_LOG_STOP(str) CALI_MARK_END(str)
+#define PHARE_LOG_SCOPE(str) PHARE::scope_log __phare_scope##__line__(str)
+
+#elif !defined(NDEBUG) || defined(PHARE_FORCE_DEBUG_DO)
+
+#define PHARE_LOG_START(str) PHARE_LOG_LINE_STR(str)
+#define PHARE_LOG_STOP(str) PHARE_LOG_LINE_STR(str)
 #define PHARE_LOG_SCOPE(str) PHARE::scope_log __phare_scope##__line__(str)
 
 #else

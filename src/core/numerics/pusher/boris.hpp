@@ -73,11 +73,7 @@ public:
     }
 #endif
 
-
-    ParticleRange move(ParticleRange const& rangeIn, ParticleRange& rangeOut,
-                       Electromag const& emFields, double mass, Interpolator& interpolator,
-                       GridLayout const& layout, ParticleSelector firstSelector,
-                       ParticleSelector secondSelector) override
+    ParticleRange move_first(ParticleRange const& rangeIn, ParticleRange& rangeOut)
     {
         PHARE_LOG_SCOPE("Boris::move_no_bc");
 
@@ -87,8 +83,14 @@ public:
         //   particles consistent. see: https://github.com/PHAREHUB/PHARE/issues/571
         pushStep_(rangeIn, rangeOut, PushStep::PrePush);
 
-        rangeOut = firstSelector(rangeOut);
+        return rangeOut;
+    }
 
+
+
+    ParticleRange move_second(ParticleRange& rangeOut, Electromag const& emFields, double mass,
+                              Interpolator& interpolator, GridLayout const& layout)
+    {
         //  get electromagnetic fields interpolated on the particles of rangeOut
         //  stop at newEnd.
         interpolator(rangeOut, emFields, layout);
@@ -100,7 +102,19 @@ public:
         // and get a pointer to the first leaving particle
         pushStep_(rangeOut, rangeOut, PushStep::PostPush);
 
-        return secondSelector(rangeOut);
+        return rangeOut;
+    }
+
+
+    ParticleRange move(ParticleRange const& rangeIn, ParticleRange& rangeOut,
+                       Electromag const& emFields, double mass, Interpolator& interpolator,
+                       GridLayout const& layout, ParticleSelector firstSelector,
+                       ParticleSelector secondSelector) override
+    {
+        move_first(rangeIn, rangeOut);
+        move_second(rangeOut, emFields, mass, interpolator, layout);
+
+        return rangeOut;
     }
 
 
@@ -122,9 +136,8 @@ private:
     /** move the particle partIn of half a time step and store it in partOut
      */
     template<typename Particle>
-    auto advancePosition_(Particle const& partIn, Particle& partOut)
+    void advancePosition_(Particle const& partIn, Particle& partOut)
     {
-        std::array<int, dim> newCell;
         for (std::size_t iDim = 0; iDim < dim; ++iDim)
         {
             double delta
@@ -136,9 +149,8 @@ private:
                 PHARE_LOG_ERROR("Error, particle moves more than 1 cell, delta >2");
             }
             partOut.delta[iDim] = delta - iCell;
-            newCell[iDim]       = static_cast<int>(iCell + partIn.iCell[iDim]);
+            partOut.iCell[iDim] = static_cast<int>(iCell + partIn.iCell[iDim]);
         }
-        return newCell;
     }
 
 
@@ -148,12 +160,12 @@ private:
      * @return the function returns and iterator on the first leaving particle, as
      * detected by the ParticleSelector
      */
-    void pushStep_(ParticleRange const& rangeIn, ParticleRange& rangeOut, PushStep step)
+    void pushStep_(ParticleRange const& inParticles, ParticleRange& outParticles, PushStep step)
     {
-        auto& inParticles  = rangeIn.array();
-        auto& outParticles = rangeOut.array();
-        for (auto inIdx = rangeIn.ibegin(), outIdx = rangeOut.ibegin(); inIdx < rangeIn.iend();
-             ++inIdx, ++outIdx)
+        // auto& inParticles  = rangeIn.array();
+        // auto& outParticles = rangeOut.array();
+        auto outIt = outParticles.begin();
+        for (auto inIt = inParticles.begin(); inIt != inParticles.end(); ++inIt, ++outIt)
         {
             // in the first push, this is the first time
             // we push to rangeOut, which contains crap
@@ -166,13 +178,13 @@ private:
             // over rangeIn particles.
             if (step == PushStep::PrePush)
             {
-                outParticles[outIdx].charge = inParticles[inIdx].charge;
-                outParticles[outIdx].weight = inParticles[inIdx].weight;
-                outParticles[outIdx].v      = inParticles[inIdx].v;
+                outIt->charge = inIt->charge;
+                outIt->weight = inIt->weight;
+                outIt->v      = inIt->v;
             }
-            auto newCell = advancePosition_(inParticles[inIdx], outParticles[outIdx]);
-            if (newCell != inParticles[inIdx].iCell)
-                outParticles.change_icell(newCell, outIdx);
+            /*auto newCell = */ advancePosition_(*inIt, *outIt);
+            // if (newCell != inIt->iCell)
+            //     outParticles.change_icell(newCell, outIdx);
         }
     }
 
@@ -180,18 +192,15 @@ private:
 
     /** Accelerate the particles in rangeIn and put the new velocity in rangeOut
      */
-    void accelerate_(ParticleRange rangeIn, ParticleRange rangeOut, double mass)
+    void accelerate_(ParticleRange const& inParticles, ParticleRange& outParticles, double mass)
     {
         double dto2m = 0.5 * dt_ / mass;
 
-        auto& inParticles  = rangeIn.array();
-        auto& outParticles = rangeOut.array();
-
-        for (auto inIdx = rangeIn.ibegin(), outIdx = rangeOut.ibegin(); inIdx < rangeIn.iend();
-             ++inIdx, ++outIdx)
+        auto outIt = outParticles.begin();
+        for (auto inIt = inParticles.begin(); inIt != inParticles.end(); ++inIt, ++outIt)
         {
-            auto& inPart  = inParticles[inIdx];
-            auto& outPart = outParticles[inIdx];
+            auto& inPart  = *inIt;
+            auto& outPart = *outIt;
             double coef1  = inPart.charge * dto2m;
 
             // We now apply the 3 steps of the BORIS PUSHER

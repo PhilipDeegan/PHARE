@@ -82,6 +82,24 @@ struct Box : public PHARE::core::Box<Type, dim>
     }
 };
 
+
+
+template<typename T, std::size_t dim>
+NO_DISCARD inline bool isInBox(SAMRAI::hier::Box const& box, std::array<T, dim> const& iCell)
+{
+    return core::for_N_all<dim>([&](auto ic) {
+        constexpr auto i = ic();
+        return iCell[i] >= box.lower(i) && iCell[i] <= box.upper(i);
+    });
+}
+
+
+template<typename Particle>
+NO_DISCARD inline bool isInBox(SAMRAI::hier::Box const& box, Particle const& particle)
+{
+    return isInBox(box, particle.iCell);
+}
+
 } // namespace PHARE::amr
 
 #endif

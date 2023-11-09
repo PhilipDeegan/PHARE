@@ -8,6 +8,7 @@
 
 #include "core/utilities/indexer.hpp"
 #include "particle.hpp"
+#include "particle_array_defs.hpp"
 #include "core/utilities/point/point.hpp"
 #include "core/utilities/cellmap.hpp"
 #include "core/logger.hpp"
@@ -112,6 +113,10 @@ public:
         // The only thing "bad" if these indexes are not deleted is that the
         // size of the cellmap becomes unequal to the size of the particleArray.
         // but  ¯\_(ツ)_/¯
+        return particles_.erase(first, last);
+    }
+    iterator erase(const_iterator first, const_iterator last)
+    {
         return particles_.erase(first, last);
     }
 
@@ -231,10 +236,81 @@ public:
     NO_DISCARD auto& vector() { return particles_; }
     NO_DISCARD auto& vector() const { return particles_; }
 
+    auto& box() { return box_; }
+    auto& box() const { return box_; }
+
+    auto& ppc() const { return ppc_; }
+    auto& ppc() { return ppc_; }
+
+    template<typename ICell>
+    auto& ppc(ICell const& icell)
+    {
+        return ppc_(toLocal(icell));
+    }
+    template<typename ICell>
+    auto& ppc(ICell const& icell) const
+    {
+        return ppc_(toLocal(icell));
+    }
+
+    template<typename ICell>
+    auto& ppc_offsets(ICell const& icell)
+    {
+        return ppc_offsets_(toLocal(icell));
+    }
+    template<typename ICell>
+    auto& ppc_offsets(ICell const& icell) const
+    {
+        return ppc_offsets_(toLocal(icell));
+    }
+
+    auto& update_from(This const& that)
+    {
+        this->resize(that.size());
+        std::copy(that.begin(), that.end(), this->begin());
+        this->box_ = that.box_;
+        // this->cellMap_ = that.cellMap_;
+        reset_sorting_bits();
+        return *this;
+    }
+    auto& set_as(This const& that)
+    {
+        // this->resize(that.size());
+        // std::copy(that.begin(), that.end(), this->begin());
+        this->box_ = that.box_;
+        // this->cellMap_ = that.cellMap_;
+        reset_sorting_bits();
+        return *this;
+    }
+
 private:
+    void reset_sorting_bits()
+    {
+        auto shape = this->box_.shape().template toArray<std::uint32_t>();
+        ppc_.update_from(shape);
+        ppc_offsets_.update_from(shape);
+    }
+
+    // updater can put domain particles in first ghost cell for domain particles
+    std::int32_t constexpr static ghostish_size = 0;
+
+    template<typename ICell>
+    auto toLocal(ICell icell) const
+    {
+        for_N<dim>([&](auto ic) {
+            constexpr auto i = ic();
+            icell[i] -= (box_.lower[i] - ghostish_size);
+            DEBUG_ABORT_IF(icell[i] < 0);
+        });
+        return icell;
+    }
+
     Vector particles_;
     box_t box_;
     mutable CellMap_t cellMap_;
+
+    NdArrayVector<dim, std::uint32_t> ppc_{box().shape().template toArray<std::uint32_t>()};
+    NdArrayVector<dim, std::uint32_t> ppc_offsets_{box().shape().template toArray<std::uint32_t>()};
 };
 
 } // namespace PHARE::core
@@ -366,6 +442,100 @@ namespace core
 
 } // namespace core
 } // namespace PHARE
+
+
+namespace PHARE::core
+{
+
+template<typename ParticleArray>
+class ParticleSorter
+{
+public:
+    using box_t = typename ParticleArray::box_t;
+
+    ParticleSorter(ParticleArray& particles_)
+        : particles{particles_}
+    {
+    }
+
+    void operator()(std::int64_t const& l, std::int64_t const& r) // basically quicksort
+    {
+        auto i          = l;
+        auto j          = r;
+        auto const half = particles[(l + r) / 2].iCell;
+        do
+        {
+            while (el_wise_less(particles[i].iCell, half))
+                i++;
+            while (el_wise_gr8r(particles[j].iCell, half))
+                j--;
+            if (i <= j)
+            {
+                std::swap(particles[i], particles[j]);
+                i++;
+                j--;
+            }
+        } while (i <= j);
+        if (l < j)
+            (*this)(l, j);
+        if (i < r)
+            (*this)(i, r);
+    }
+
+    void operator()() { (*this)(0, particles.size() - 1); }
+
+private:
+    template<typename V>
+    bool constexpr el_wise_less(V const& v0, V const& v1) const
+    {
+        return cell_flattener(v0) < cell_flattener(v1);
+    }
+
+    template<typename V>
+    bool constexpr el_wise_gr8r(V const& v0, V const& v1) const
+    {
+        return cell_flattener(v0) > cell_flattener(v1);
+    }
+
+    ParticleArray& particles;
+    CellFlattener<box_t> cell_flattener{particles.box()};
+};
+
+
+
+
+} // namespace PHARE::core
+
+
+namespace std
+{
+
+template<std::size_t dim>
+void sort_custom(PHARE::core::ParticleArray<dim>& particles)
+{
+    PHARE::core::ParticleSorter{particles}();
+}
+
+template<std::size_t dim>
+auto& sort(PHARE::core::ParticleArray<dim>& particles)
+{
+    using box_t = typename PHARE::core::ParticleArray<dim>::box_t;
+    PHARE::core::LocalisedCellFlattener<box_t> cell_flattener{grow(particles.box(), 1)};
+    std::sort(particles.vector().begin(), particles.vector().end(),
+              [&](auto const& a, auto const& b) {
+                  return cell_flattener(a.iCell) < cell_flattener(b.iCell);
+              });
+    return particles;
+}
+
+template<std::size_t dim>
+auto sort(PHARE::core::ParticleArray<dim>&& particles)
+{
+    return sort(particles);
+}
+
+
+} // namespace std
 
 
 #endif

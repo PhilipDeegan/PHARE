@@ -42,6 +42,8 @@ struct twoParticlesDataNDTouchingPeriodicBorders : public testing::Test
     ParticlesData<ParticleArray<dim>> destPdat{destDomain, ghost};
     ParticlesData<ParticleArray<dim>> sourcePdat{sourceDomain, ghost};
 
+
+
     std::shared_ptr<SAMRAI::hier::BoxGeometry> destGeom{
         std::make_shared<SAMRAI::pdat::CellGeometry>(destPatch.getBox(), ghost)};
 
@@ -67,6 +69,14 @@ struct twoParticlesDataNDTouchingPeriodicBorders : public testing::Test
         particle.weight = 1.0;
         particle.charge = 1.0;
         particle.v      = {{1.0, 1.0, 1.0}};
+    }
+
+    CountingSort<ParticleArray<dim>, dim> counting_sort;
+    ParticleCountSorting<ParticleArray<dim>> sorter{sourcePdat.domainParticles, counting_sort};
+    void push_back_source_domain_particles()
+    {
+        this->sourcePdat.domainParticles.push_back(this->particle);
+        sorter();
     }
 };
 
@@ -104,7 +114,7 @@ TYPED_TEST(twoParticlesDataNDTouchingPeriodicBorders,
     {
         this->particle.iCell = {{rightSourceCell, rightSourceCell, rightSourceCell}};
     }
-    this->sourcePdat.domainParticles.push_back(this->particle);
+    this->push_back_source_domain_particles();
     this->destPdat.copy(this->sourcePdat, *(this->cellOverlap));
 
     EXPECT_THAT(this->destPdat.patchGhostParticles.size(), Eq(1));
@@ -118,7 +128,7 @@ TYPED_TEST(twoParticlesDataNDTouchingPeriodicBorders, preserveParticleAttributes
 
 
     this->particle.iCell = ConstArray<int, dim>(15);
-    this->sourcePdat.domainParticles.push_back(this->particle);
+    this->push_back_source_domain_particles();
     this->destPdat.copy(this->sourcePdat, *(this->cellOverlap));
 
     EXPECT_THAT(this->destPdat.patchGhostParticles.size(), Eq(1));

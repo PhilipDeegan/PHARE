@@ -48,6 +48,15 @@ struct AParticlesDataND : public testing::Test
         particle.charge = 1.0;
         particle.v      = {1.0, 1.0, 1.0};
     }
+
+
+    CountingSort<ParticleArray<dim>, dim> counting_sort;
+    ParticleCountSorting<ParticleArray<dim>> sorter{sourceData.domainParticles, counting_sort};
+    void push_back_source_domain_particles()
+    {
+        this->sourceData.domainParticles.push_back(this->particle);
+        sorter();
+    }
 };
 
 
@@ -67,7 +76,7 @@ TYPED_TEST(AParticlesDataND, copiesSourceDomainParticleIntoGhostForDomainSrcOver
 
     this->particle.iCell = ConstArray<int, dim>(6);
 
-    this->sourceData.domainParticles.push_back(this->particle);
+    this->push_back_source_domain_particles();
     this->destData.copy(this->sourceData);
 
     ASSERT_THAT(this->destData.patchGhostParticles.size(), Eq(1));
@@ -85,7 +94,7 @@ TYPED_TEST(AParticlesDataND, copiesSourceDomainParticleIntoDomainDestForDomainOv
     {
         this->particle.iCell = ConstArray<int, dim>(iCell);
 
-        this->sourceData.domainParticles.push_back(this->particle);
+        this->push_back_source_domain_particles();
         this->destData.copy(this->sourceData);
 
         ASSERT_THAT(this->destData.domainParticles.size(), Eq(1));
@@ -108,7 +117,7 @@ TYPED_TEST(AParticlesDataND, PreservesAllParticleAttributesAfterCopy)
 
     this->particle.iCell = ConstArray<int, dim>(3);
 
-    this->sourceData.domainParticles.push_back(this->particle);
+    this->push_back_source_domain_particles();
     this->destData.copy(this->sourceData);
 
     EXPECT_THAT(this->destData.domainParticles[0].v, Pointwise(DoubleEq(), this->particle.v));
@@ -129,7 +138,7 @@ TYPED_TEST(AParticlesDataND, PreservesAllParticleAttributesAfterCopy)
 
     this->particle.iCell = ConstArray<int, dim>(6);
 
-    this->sourceData.domainParticles.push_back(this->particle);
+    this->push_back_source_domain_particles();
     this->destData.copy(this->sourceData);
 
     EXPECT_THAT(this->destData.patchGhostParticles[0].v, Pointwise(DoubleEq(), this->particle.v));
@@ -177,7 +186,7 @@ TYPED_TEST(AParticlesDataND, copiesDataWithOverlapNoTransform)
 
     this->particle.iCell = ConstArray<int, dim>(3);
 
-    this->sourceData.domainParticles.push_back(this->particle);
+    this->push_back_source_domain_particles();
     this->destData.copy(this->sourceData, overlap);
     this->particle.iCell = {{6}};
     EXPECT_THAT(this->destData.domainParticles.size(), Eq(1));
@@ -194,7 +203,7 @@ TYPED_TEST(AParticlesDataND, copiesDataWithOverlapNoTransform)
 
     this->particle.iCell = ConstArray<int, dim>(6);
 
-    this->sourceData.domainParticles.push_back(this->particle);
+    this->push_back_source_domain_particles();
     this->destData.copy(this->sourceData, overlap);
     EXPECT_THAT(this->destData.patchGhostParticles.size(), Eq(1));
     EXPECT_THAT(this->destData.domainParticles.size(), Eq(0));
@@ -210,7 +219,7 @@ TYPED_TEST(AParticlesDataND, copiesDataWithOverlapNoTransform)
 
     this->particle.iCell = ConstArray<int, dim>(4);
 
-    this->sourceData.domainParticles.push_back(this->particle);
+    this->push_back_source_domain_particles();
     this->destData.copy(this->sourceData, overlap);
     EXPECT_THAT(this->destData.patchGhostParticles.size(), Eq(0));
     EXPECT_THAT(this->destData.domainParticles.size(), Eq(0));
@@ -242,7 +251,7 @@ TYPED_TEST(AParticlesDataND, copiesDataWithOverlapWithTransform)
 
     this->particle.iCell = ConstArray<int, dim>(7);
 
-    this->sourceData.domainParticles.push_back(this->particle);
+    this->push_back_source_domain_particles();
     this->destData.copy(this->sourceData, overlap);
     EXPECT_THAT(this->destData.domainParticles.size(), Eq(1));
     EXPECT_THAT(this->destData.patchGhostParticles.size(), Eq(0));
@@ -259,7 +268,7 @@ TYPED_TEST(AParticlesDataND, copiesDataWithOverlapWithTransform)
 
     this->particle.iCell = ConstArray<int, dim>(8);
 
-    this->sourceData.domainParticles.push_back(this->particle);
+    this->push_back_source_domain_particles();
     this->destData.copy(this->sourceData, overlap);
     EXPECT_THAT(this->destData.patchGhostParticles.size(), Eq(1));
     EXPECT_THAT(this->destData.domainParticles.size(), Eq(0));
@@ -276,7 +285,7 @@ TYPED_TEST(AParticlesDataND, copiesDataWithOverlapWithTransform)
 
     this->particle.iCell = ConstArray<int, dim>(6);
 
-    this->sourceData.domainParticles.push_back(this->particle);
+    this->push_back_source_domain_particles();
     this->destData.copy(this->sourceData, overlap);
     EXPECT_THAT(this->destData.domainParticles.size(), Eq(0));
     EXPECT_THAT(this->destData.patchGhostParticles.size(), Eq(0));

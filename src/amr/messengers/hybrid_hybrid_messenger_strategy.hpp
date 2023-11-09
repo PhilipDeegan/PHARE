@@ -398,17 +398,17 @@ namespace amr
                     auto& density     = pop.density();
                     auto& flux        = pop.flux();
 
-                    interpolate_(makeRange(patchGhosts), density, flux, layout);
+                    interpolate_(patchGhosts, density, flux, layout);
 
                     if (level.getLevelNumber() > 0) // no levelGhost on root level
                     {
                         // then grab levelGhostParticlesOld and levelGhostParticlesNew
                         // and project them with alpha and (1-alpha) coefs, respectively
                         auto& levelGhostOld = pop.levelGhostParticlesOld();
-                        interpolate_(makeRange(levelGhostOld), density, flux, layout, 1. - alpha);
+                        interpolate_(levelGhostOld, density, flux, layout, 1. - alpha);
 
                         auto& levelGhostNew = pop.levelGhostParticlesNew();
-                        interpolate_(makeRange(levelGhostNew), density, flux, layout, alpha);
+                        interpolate_(levelGhostNew, density, flux, layout, alpha);
                     }
                 }
             }

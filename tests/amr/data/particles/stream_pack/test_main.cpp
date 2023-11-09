@@ -82,6 +82,14 @@ struct AParticlesData
         particle.charge = 1.0;
         particle.v      = {1.0, 1.0, 1.0};
     }
+
+    CountingSort<ParticleArray<dim>, dim> counting_sort;
+    ParticleCountSorting<ParticleArray<dim>> sorter{sourceData.domainParticles, counting_sort};
+    void push_back_source_domain_particles()
+    {
+        this->sourceData.domainParticles.push_back(this->particle);
+        sorter();
+    }
 };
 
 
@@ -105,7 +113,7 @@ TYPED_TEST(StreamPackTest, PreserveVelocityWhenPackStreamWithPeriodics)
     auto& destData    = param.destData;
 
     particle.iCell = ConstArray<int, dim>(15);
-    sourceData.domainParticles.push_back(particle);
+    param.push_back_source_domain_particles();
 
     SAMRAI::tbox::MessageStream particlesWriteStream;
 
@@ -137,7 +145,7 @@ TYPED_TEST(StreamPackTest, ShiftTheiCellWhenPackStreamWithPeriodics)
 
     particle.iCell = ConstArray<int, dim>(15);
 
-    sourceData.domainParticles.push_back(particle);
+    param.push_back_source_domain_particles();
 
     SAMRAI::tbox::MessageStream particlesWriteStream;
 
@@ -173,7 +181,7 @@ TYPED_TEST(StreamPackTest, PackInTheCorrectBufferWithPeriodics)
 
     particle.iCell = ConstArray<int, dim>(15);
 
-    sourceData.domainParticles.push_back(particle);
+    param.push_back_source_domain_particles();
 
     SAMRAI::tbox::MessageStream particlesWriteStream;
 
@@ -207,7 +215,7 @@ TYPED_TEST(StreamPackTest,
 
     particle.iCell = ConstArray<int, dim>(16);
 
-    sourceData.domainParticles.push_back(particle);
+    param.push_back_source_domain_particles();
 
     SAMRAI::tbox::MessageStream particlesWriteStream;
 
@@ -250,7 +258,7 @@ TYPED_TEST(StreamPackTest,
 
     particle.iCell = ConstArray<int, dim>(15);
 
-    sourceData.domainParticles.push_back(particle);
+    param.push_back_source_domain_particles();
 
     SAMRAI::tbox::MessageStream particlesWriteStream;
 
