@@ -170,6 +170,8 @@ public:
     // erase all items indexed in the given range from both the cellmap and the
     // array the range is for.
     template<typename Range>
+    void erase(Range& range);
+    template<typename Range>
     void erase(Range&& range);
 
 
@@ -418,9 +420,9 @@ inline auto CellMap<dim, cell_index_t>::partition(Range range, Predicate&& pred,
     auto pivot              = range.iend();
     for (auto const& cell : box_)
     {
-        auto& itemIndexes = cellIndexes_(local_(cell));
         if (!pred(cell))
         {
+            auto& itemIndexes = cellIndexes_(local_(cell));
             for (auto currentIdx : itemIndexes)
             {
                 // partition only indexes in range
@@ -451,7 +453,7 @@ inline auto CellMap<dim, cell_index_t>::partition(Range range, Predicate&& pred,
         }
     }
 
-    return makeRange(range.array(), range.ibegin(), range.ibegin() + pivot);
+    return makeRange(range.array(), range.ibegin(), pivot);
 }
 
 
@@ -459,7 +461,7 @@ inline auto CellMap<dim, cell_index_t>::partition(Range range, Predicate&& pred,
 
 template<std::size_t dim, typename cell_index_t>
 template<typename Range>
-inline void CellMap<dim, cell_index_t>::erase(Range&& range)
+inline void CellMap<dim, cell_index_t>::erase(Range& range)
 {
     auto& items = range.array();
 
@@ -470,6 +472,13 @@ inline void CellMap<dim, cell_index_t>::erase(Range&& range)
         erase(items, i);
     }
     items.erase(range.begin(), range.end());
+}
+
+template<std::size_t dim, typename cell_index_t>
+template<typename Range>
+inline void CellMap<dim, cell_index_t>::erase(Range&& range)
+{
+    erase(range);
 }
 
 

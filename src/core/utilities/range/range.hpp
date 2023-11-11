@@ -72,7 +72,7 @@ namespace core
         NO_DISCARD auto begin() const { return std::begin(*array_) + first_; }
         NO_DISCARD auto end() const { return std::begin(*array_) + end_; }
         NO_DISCARD auto& array() { return *array_; }
-        NO_DISCARD auto const& array() const { return *array_; }
+        NO_DISCARD auto& array() const { return *array_; }
 
         // these ones are not used for now... they give access to the array element
         // via a range index (i.e. not an array index, but relative to the array index
@@ -116,6 +116,11 @@ namespace core
     NO_DISCARD auto makeIndexRange(Container& container)
     {
         return IndexRange<Container>{container, 0, container.size()};
+    }
+    template<typename Container, typename Index>
+    NO_DISCARD auto makeIndexRange(Container& container, Index first, Index end)
+    {
+        return IndexRange<Container>{container, first, end};
     }
 
     template<typename Container>

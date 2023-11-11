@@ -95,7 +95,7 @@ public:
     NO_DISCARD auto back() { return particles_.back(); }
     NO_DISCARD auto front() { return particles_.front(); }
 
-    auto erase(IndexRange_& range) { cellMap_.erase(particles_, range); }
+    auto erase(IndexRange_& range) { cellMap_.erase(range); }
     auto erase(IndexRange_&& range)
     {
         // TODO move ctor for range?
@@ -196,6 +196,12 @@ public:
     auto partition(Predicate&& pred)
     {
         return cellMap_.partition(makeIndexRange(*this), std::forward<Predicate>(pred));
+    }
+
+    template<typename Predicate, typename Range>
+    auto partition(Predicate&& pred, Range& range)
+    {
+        return cellMap_.partition(range, std::forward<Predicate>(pred));
     }
 
     template<typename CellIndex>

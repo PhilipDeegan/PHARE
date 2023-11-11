@@ -257,8 +257,8 @@ NO_DISCARD bool isIn(Point const& point,
 }
 
 
-template<typename Type, std::size_t dim>
-Box<Type, dim> grow(Box<Type, dim> const& box, Type const& size)
+template<typename Type, std::size_t dim, typename OType>
+Box<Type, dim> grow(Box<Type, dim> const& box, OType const& size)
 {
     auto copy{box};
     copy.grow(size);

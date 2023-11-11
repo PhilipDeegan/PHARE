@@ -442,6 +442,34 @@ TEST_F(CellMappedParticleBox, partitionsParticlesInPatchBox)
     }
 }
 
+
+
+TEST_F(CellMappedParticleBox, partitionsParticlesRangeInPatchBox)
+{
+    EXPECT_EQ(cm.size(), particles.size());
+
+    auto isInPatchBox = [&](auto const& cell) { return isIn(Point{cell}, patchBox); };
+    auto allParts     = makeIndexRange(particles, particles.size() / 2, particles.size());
+    auto inPatchRange = cm.partition(allParts, isInPatchBox);
+
+    std::size_t count = 0;
+    for (auto const& p : particles)
+        count += isIn(Point{p.iCell}, patchBox) ? 1 : 0;
+
+    EXPECT_EQ(count, patchBox.size() * nppc);
+    for (std::size_t idx = inPatchRange.ibegin(); idx < inPatchRange.iend(); ++idx)
+    {
+        EXPECT_TRUE(isIn(Point{particles[idx].iCell}, patchBox));
+    }
+    for (std::size_t idx = inPatchRange.iend(); idx < particles.size(); ++idx)
+    {
+        EXPECT_FALSE(isIn(Point{particles[idx].iCell}, patchBox));
+    }
+}
+
+
+
+
 TEST_F(CellMappedParticleBox, allButOneParticleSatisfyPredicate)
 {
     EXPECT_EQ(cm.size(), particles.size());

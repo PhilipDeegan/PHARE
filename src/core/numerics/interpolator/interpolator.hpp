@@ -4,17 +4,53 @@
 
 
 #include <array>
+#include <tuple>
 #include <cstddef>
 
 #include "core/data/grid/gridlayout.hpp"
 #include "core/data/vecfield/vecfield_component.hpp"
 #include "core/utilities/point/point.hpp"
-#include "core/def.hpp"
 
+#include "core/def.hpp"
 #include "core/logger.hpp"
+
+
+#ifndef PHARE_EB_ARRAY_SIZE
+#define PHARE_EB_ARRAY_SIZE 1000000 // = 6MB per thread
+#endif
+
 
 namespace PHARE::core
 {
+struct EB_interop
+{
+    using E_B_tuple      = std::tuple<std::array<double, 3>, std::array<double, 3>>;
+    using E_B_tupleArray = std::array<E_B_tuple, PHARE_EB_ARRAY_SIZE>;
+
+    auto& operator[](std::size_t const& i) { return vals[i]; }
+    auto& operator[](std::size_t const& i) const { return vals[i]; }
+    auto constexpr static size() { return PHARE_EB_ARRAY_SIZE; }
+
+    auto begin() { return vals.begin(); }
+    auto begin() const { return vals.begin(); }
+    auto end() { return vals.begin() + end_; }
+    auto end() const { return vals.begin() + end_; }
+
+    template<typename Particles>
+    auto& operator()(Particles const& particles)
+    {
+        assert(size() >= particles.size());
+        this->end_ = particles.size();
+        return *this;
+    }
+
+    E_B_tupleArray vals{E_B_tuple({{0, 0, 0}}, {{0, 0, 0}})};
+    std::size_t end_ = vals.size();
+};
+
+thread_local static EB_interop eb_interop;
+
+
 //! return the size of the index and weights arrays for
 //! interpolation at a given order
 // Number of points where the interpolator of order interpOrder
@@ -466,8 +502,8 @@ public:
      * onto the particle.
      */
     template<typename ParticleRange, typename Electromag, typename GridLayout>
-    inline void operator()(ParticleRange&& particleRange, Electromag const& Em,
-                           GridLayout const& layout)
+    inline auto& operator()(ParticleRange& particleRange, Electromag const& Em,
+                            GridLayout const& layout)
     {
         PHARE_LOG_SCOPE("Interpolator::operator()");
 
@@ -485,7 +521,8 @@ public:
         // calculated twice, and not for each E,B component.
 
         PHARE_LOG_START("MeshToParticle::operator()");
-        for (auto currPart = begin; currPart != end; ++currPart)
+        std::size_t eb = 0;
+        for (auto currPart = begin; currPart != end; ++currPart, ++eb)
         {
             auto& iCell = currPart->iCell;
             auto& delta = currPart->delta;
@@ -495,21 +532,26 @@ public:
             auto indexWeights = std::forward_as_tuple(dual_startIndex_, dual_weights_,
                                                       primal_startIndex_, primal_weights_);
 
-            currPart->Ex
-                = meshToParticle_.template operator()<GridLayout, Scalar::Ex>(Ex, indexWeights);
-            currPart->Ey
-                = meshToParticle_.template operator()<GridLayout, Scalar::Ey>(Ey, indexWeights);
-            currPart->Ez
-                = meshToParticle_.template operator()<GridLayout, Scalar::Ez>(Ez, indexWeights);
-            currPart->Bx
-                = meshToParticle_.template operator()<GridLayout, Scalar::Bx>(Bx, indexWeights);
-            currPart->By
-                = meshToParticle_.template operator()<GridLayout, Scalar::By>(By, indexWeights);
-            currPart->Bz
-                = meshToParticle_.template operator()<GridLayout, Scalar::Bz>(Bz, indexWeights);
+            auto& [pE, pB]        = eb_interop[eb];
+            auto& [pEx, pEy, pEz] = pE;
+            auto& [pBx, pBy, pBz] = pB;
+
+            pEx = meshToParticle_.template operator()<GridLayout, Scalar::Ex>(Ex, indexWeights);
+            pEy = meshToParticle_.template operator()<GridLayout, Scalar::Ey>(Ey, indexWeights);
+            pEz = meshToParticle_.template operator()<GridLayout, Scalar::Ez>(Ez, indexWeights);
+            pBx = meshToParticle_.template operator()<GridLayout, Scalar::Bx>(Bx, indexWeights);
+            pBy = meshToParticle_.template operator()<GridLayout, Scalar::By>(By, indexWeights);
+            pBz = meshToParticle_.template operator()<GridLayout, Scalar::Bz>(Bz, indexWeights);
         }
         PHARE_LOG_STOP("MeshToParticle::operator()");
+        return eb_interop;
     }
+    template<typename ParticleRange, typename Electromag, typename GridLayout>
+    inline auto& operator()(ParticleRange&& range, Electromag const& Em, GridLayout const& layout)
+    {
+        return (*this)(range, Em, layout);
+    }
+
 
 
     /**\brief interpolate electromagnetic fields on all particles in the range
@@ -521,7 +563,7 @@ public:
      * onto the particle.
      */
     template<typename ParticleRange, typename VecField, typename GridLayout, typename Field>
-    inline void operator()(ParticleRange&& particleRange, Field& density, VecField& flux,
+    inline void operator()(ParticleRange& particleRange, Field& density, VecField& flux,
                            GridLayout const& layout, double coef = 1.)
     {
         auto begin        = particleRange.begin();
@@ -547,6 +589,12 @@ public:
             particleToMesh_(density, flux, *currPart, startIndex_, weights_, coef);
         }
         PHARE_LOG_STOP("ParticleToMesh::operator()");
+    }
+    template<typename ParticleRange, typename VecField, typename GridLayout, typename Field>
+    inline void operator()(ParticleRange&& range, Field& density, VecField& flux,
+                           GridLayout const& layout, double coef = 1.)
+    {
+        (*this)(range, density, flux, layout, coef);
     }
 
 

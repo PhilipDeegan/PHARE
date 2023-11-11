@@ -19,15 +19,6 @@
 
 #include "cppdict/include/dict.hpp"
 
-#if !defined(NDEBUG) || defined(PHARE_FORCE_DEBUG_DO)
-#define PHARE_DEBUG_DO(...) __VA_ARGS__
-#else
-#define PHARE_DEBUG_DO(...)
-#endif
-
-#define _PHARE_TO_STR(x) #x // convert macro text to string
-#define PHARE_TO_STR(x) _PHARE_TO_STR(x)
-
 namespace PHARE
 {
 namespace core
@@ -345,6 +336,16 @@ NO_DISCARD auto none(Container const& container)
 }
 
 
+template<typename F = float, typename T, typename D>
+auto ceil(T const& t, D const& d)
+{
+    return static_cast<T>(std::ceil(static_cast<F>(t) / d));
+}
+template<typename F = float, typename T, typename D>
+auto floor(T const& t, D const& d)
+{
+    return static_cast<T>(std::floor(static_cast<F>(t) / d));
+}
 
 
 } // namespace PHARE::core
