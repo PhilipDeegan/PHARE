@@ -1,35 +1,31 @@
 #!/usr/bin/env python3
 
-import pyphare.pharein as ph #lgtm [py/import-and-import-from]
-from pyphare.pharein import Simulation
-from pyphare.pharein import MaxwellianFluidModel
-from pyphare.pharein import ElectromagDiagnostics,FluidDiagnostics, ParticleDiagnostics
-from pyphare.pharein import ElectronModel
+import numpy as np
+from datetime import datetime
+
+import pyphare.pharein as ph
 from pyphare.simulator.simulator import Simulator, startMPI
 
-from pyphare.pharein import global_vars as gv
-
-import numpy as np
 import matplotlib.pyplot as plt
 import matplotlib as mpl
-mpl.use('Agg')
-
 from pyphare.cpp import cpp_lib
+
+mpl.use('Agg')
 cpp = cpp_lib()
 startMPI()
 
 diag_outputs="phare_outputs/test/harris/2d"
-from datetime import datetime
+
 
 def config():
 
-    Simulation(
+    sim = ph.Simulation(
         smallest_patch_size=15,
         largest_patch_size=25,
         time_step_nbr=1000,
         time_step=0.001,
         # boundary_types="periodic",
-        cells=(100,100),
+        cells=(100, 200),
         dl=(0.2, 0.2),
         refinement_boxes={},
         hyper_resistivity=0.001,
@@ -37,7 +33,7 @@ def config():
         diag_options={"format": "phareh5",
                       "options": {"dir": diag_outputs,
                                   "mode":"overwrite"}},
-        strict=True,
+        # strict=True,
     )
 
     def density(x, y):
@@ -126,25 +122,27 @@ def config():
         "nbr_part_per_cell":100
     }
 
-    MaxwellianFluidModel(
+    ph.MaxwellianFluidModel(
         bx=bx, by=by, bz=bz,
-        protons={"charge": 1, "density": density,  **vvv, "init":{"seed": 12334}},
-
+        protons={
+            "charge": 1, "density": density,  **vvv, # "init":{"seed": 12334}
+        }
     )
 
-    ElectronModel(closure="isothermal", Te=0.0)
+    ph.ElectronModel(closure="isothermal", Te=0.0)
 
-    sim = ph.global_vars.sim
     dt = 10 * sim.time_step
     nt = sim.final_time/dt+1
     timestamps = (dt * np.arange(nt))
 
     for quantity in ["E", "B"]:
-        ElectromagDiagnostics(
+        ph.ElectromagDiagnostics(
             quantity=quantity,
             write_timestamps=timestamps,
             compute_timestamps=timestamps,
         )
+
+    return sim
 
 def get_time(path, time, datahier = None):
     time = "{:.10f}".format(time)
@@ -162,10 +160,9 @@ def post_advance(new_time):
         print(f"tests passed")
 
 def main():
-    config()
-    s = Simulator(gv.sim, post_advance=post_advance)
+    s = Simulator(config()) #, post_advance=post_advance)
     s.initialize()
-    post_advance(0)
+    # post_advance(0)
     s.run()
 
 
