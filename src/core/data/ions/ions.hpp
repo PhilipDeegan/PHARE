@@ -121,13 +121,18 @@ namespace core
                 auto& fy   = flux.getComponent(Component::Y);
                 auto& fz   = flux.getComponent(Component::Z);
 
+                auto fluxSum = [&](auto const& v, auto const& f) { return v + pop.mass() * f; };
+
                 std::transform(std::begin(vx), std::end(vx), std::begin(fx), std::begin(vx),
-                               std::plus<typename field_type::type>{});
+                               fluxSum);
                 std::transform(std::begin(vy), std::end(vy), std::begin(fy), std::begin(vy),
-                               std::plus<typename field_type::type>{});
+                               fluxSum);
                 std::transform(std::begin(vz), std::end(vz), std::begin(fz), std::begin(vz),
-                               std::plus<typename field_type::type>{});
+                               fluxSum);
             }
+            // auto denominator = [&](auto const& v, auto const& r) { return v / (pop.mass() * r);
+            // };
+
 
             std::transform(std::begin(vx), std::end(vx), std::begin(*rho_), std::begin(vx),
                            std::divides<typename field_type::type>{});
