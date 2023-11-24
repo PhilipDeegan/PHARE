@@ -121,6 +121,7 @@ namespace amr
         {
             resourcesManager_->registerResources(Jold_);
             resourcesManager_->registerResources(NiOldUser_);
+            resourcesManager_->registerResources(massDensityOldUser_);
             resourcesManager_->registerResources(ViOld_);
         }
 
@@ -141,6 +142,7 @@ namespace amr
         {
             resourcesManager_->allocate(Jold_, patch, allocateTime);
             resourcesManager_->allocate(NiOldUser_, patch, allocateTime);
+            resourcesManager_->allocate(massDensityOldUser_, patch, allocateTime);
             resourcesManager_->allocate(ViOld_, patch, allocateTime);
         }
 
@@ -186,6 +188,7 @@ namespace amr
             currentGhostsRefiners_.registerLevel(hierarchy, level);
 
             rhoGhostsRefiners_.registerLevel(hierarchy, level);
+            massDensityGhostsRefiners_.registerLevel(hierarchy, level);
             velGhostsRefiners_.registerLevel(hierarchy, level);
 
             patchGhostPartRefiners_.registerLevel(hierarchy, level);
@@ -426,6 +429,7 @@ namespace amr
                                          double const afterPushTime) override
         {
             rhoGhostsRefiners_.fill(level.getLevelNumber(), afterPushTime);
+            massDensityGhostsRefiners_.fill(level.getLevelNumber(), afterPushTime);
             velGhostsRefiners_.fill(level.getLevelNumber(), afterPushTime);
         }
 
@@ -542,19 +546,22 @@ namespace amr
             {
                 auto dataOnPatch = resourcesManager_->setOnPatch(
                     *patch, hybridModel.state.electromag, hybridModel.state.J,
-                    hybridModel.state.ions, Jold_, NiOldUser_, ViOld_);
+                    hybridModel.state.ions, Jold_, NiOldUser_, ViOld_, massDensityOldUser_);
 
                 resourcesManager_->setTime(Jold_, *patch, currentTime);
                 resourcesManager_->setTime(NiOldUser_, *patch, currentTime);
+                resourcesManager_->setTime(massDensityOldUser_, *patch, currentTime);
                 resourcesManager_->setTime(ViOld_, *patch, currentTime);
 
-                auto& J  = hybridModel.state.J;
-                auto& Vi = hybridModel.state.ions.velocity();
-                auto& Ni = hybridModel.state.ions.density();
+                auto& J   = hybridModel.state.J;
+                auto& Vi  = hybridModel.state.ions.velocity();
+                auto& Ni  = hybridModel.state.ions.density();
+                auto& mNi = hybridModel.state.ions.massDensity();
 
                 Jold_.copyData(J);
                 ViOld_.copyData(Vi);
                 NiOldUser_.copyData(Ni);
+                massDensityOldUser_.copyData(Ni);
             }
         }
 
@@ -634,6 +641,7 @@ namespace amr
             magPatchGhostsRefiners_.fill(hybridModel.state.electromag.B, levelNumber, time);
             elecGhostsRefiners_.fill(hybridModel.state.electromag.E, levelNumber, time);
             rhoGhostsRefiners_.fill(levelNumber, time);
+            massDensityGhostsRefiners_.fill(levelNumber, time);
             velGhostsRefiners_.fill(hybridModel.state.ions.velocity(), levelNumber, time);
         }
 
@@ -672,6 +680,10 @@ namespace amr
             rhoGhostsRefiners_.addTimeRefiner(info->modelIonDensity, info->modelIonDensity,
                                               NiOldUser_.name, fieldRefineOp_, fieldTimeOp_,
                                               info->modelIonDensity);
+
+            massDensityGhostsRefiners_.addTimeRefiner(
+                info->modelIonMassDensity, info->modelIonMassDensity, massDensityOldUser_.name,
+                fieldRefineOp_, fieldTimeOp_, info->modelIonMassDensity);
 
             velGhostsRefiners_.addTimeRefiners(info->ghostBulkVelocity, info->modelIonBulkVelocity,
                                                core::VecFieldNames{ViOld_}, fieldRefineOp_,
@@ -990,8 +1002,11 @@ namespace amr
         VecFieldT Jold_{stratName + "_Jold", core::HybridQuantity::Vector::J};
         VecFieldT ViOld_{stratName + "_VBulkOld", core::HybridQuantity::Vector::V};
         FieldT* NiOld_{nullptr};
+        FieldT* massDensityOld_{nullptr};
         FieldUser<FieldT> NiOldUser_{stratName + "_NiOld", NiOld_,
                                      core::HybridQuantity::Scalar::rho};
+        FieldUser<FieldT> massDensityOldUser_{stratName + "_massDensityOld", massDensityOld_,
+                                              core::HybridQuantity::Scalar::rho};
 
 
         //! ResourceManager shared with other objects (like the HybridModel)
@@ -1040,6 +1055,7 @@ namespace amr
         // the GhostField tag, will only assign pur ghost nodes. Border nodes will
         // be overwritten only on level borders, which does not seem to be an issue.
         GhostRefinerPool rhoGhostsRefiners_{resourcesManager_};
+        GhostRefinerPool massDensityGhostsRefiners_{resourcesManager_};
         GhostRefinerPool velGhostsRefiners_{resourcesManager_};
 
         // pool of refiners for interior particles of each population

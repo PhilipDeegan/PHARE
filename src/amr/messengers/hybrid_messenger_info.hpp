@@ -45,6 +45,7 @@ namespace amr
         VecFieldNames modelCurrent;
         VecFieldNames modelIonBulkVelocity;
         std::string modelIonDensity;
+        std::string modelIonMassDensity;
 
         // store names of vector fields that need to be initialized by refinement
         // moments are initialized by particles so only EM fields need to be init.

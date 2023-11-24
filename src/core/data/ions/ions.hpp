@@ -60,13 +60,9 @@ namespace core
         NO_DISCARD field_type const& density() const
         {
             if (isUsable())
-            {
                 return *rho_;
-            }
             else
-            {
                 throw std::runtime_error("Error - cannot access density data");
-            }
         }
 
 
@@ -74,16 +70,29 @@ namespace core
         NO_DISCARD field_type& density()
         {
             if (isUsable())
-            {
                 return *rho_;
-            }
             else
-            {
                 throw std::runtime_error("Error - cannot access density data");
-            }
         }
 
 
+        NO_DISCARD field_type const& massDensity() const
+        {
+            if (isUsable())
+                return *massDensity_;
+            else
+                throw std::runtime_error("Error - cannot access mass density data");
+        }
+
+
+
+        NO_DISCARD field_type& massDensity()
+        {
+            if (isUsable())
+                return *massDensity_;
+            else
+                throw std::runtime_error("Error - cannot access mass density data");
+        }
 
 
         NO_DISCARD vecfield_type const& velocity() const { return bulkVelocity_; }
@@ -91,6 +100,7 @@ namespace core
         NO_DISCARD vecfield_type& velocity() { return bulkVelocity_; }
 
         NO_DISCARD std::string densityName() const { return "rho"; }
+        NO_DISCARD std::string massDensityName() const { return "massDensity"; }
 
 
         void computeDensity()
@@ -222,24 +232,24 @@ namespace core
         NO_DISCARD MomentProperties getFieldNamesAndQuantities() const
         {
             return {{{densityName(), HybridQuantity::Scalar::rho},
-                     {"massDensity", HybridQuantity::Scalar::rho}}};
+                     {massDensityName(), HybridQuantity::Scalar::rho}}};
         }
 
 
 
         void setBuffer(std::string const& bufferName, field_type* field)
         {
-            if (bufferName == "rho")
+            if (bufferName == densityName())
             {
                 rho_ = field;
             }
-            else if (bufferName == "massDensity")
+            else if (bufferName == massDensityName())
             {
                 massDensity_ = field;
             }
             else
             {
-                throw std::runtime_error("Error - invalid density buffer name");
+                throw std::runtime_error("Error - invalid density buffer name : " + bufferName);
             }
         }
 

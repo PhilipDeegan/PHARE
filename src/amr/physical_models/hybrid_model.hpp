@@ -149,6 +149,7 @@ void HybridModel<GridLayoutT, Electromag, Ions, Electrons, AMR_Types>::fillMesse
     hybridInfo.modelMagnetic        = core::VecFieldNames{state.electromag.B};
     hybridInfo.modelElectric        = core::VecFieldNames{state.electromag.E};
     hybridInfo.modelIonDensity      = state.ions.densityName();
+    hybridInfo.modelIonMassDensity  = state.ions.massDensityName();
     hybridInfo.modelIonBulkVelocity = core::VecFieldNames{state.ions.velocity()};
     hybridInfo.modelCurrent         = core::VecFieldNames{state.J};
 
