@@ -561,7 +561,7 @@ namespace amr
                 Jold_.copyData(J);
                 ViOld_.copyData(Vi);
                 NiOldUser_.copyData(Ni);
-                massDensityOldUser_.copyData(Ni);
+                massDensityOldUser_.copyData(mNi);
             }
         }
 
