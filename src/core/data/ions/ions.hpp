@@ -305,7 +305,6 @@ namespace core
         // in the future if some populations are dynamically created during the simulation
         // this should be updated accordingly
         bool sameMasses_{false};
-        ;
     };
 } // namespace core
 } // namespace PHARE
