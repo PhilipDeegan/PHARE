@@ -429,7 +429,7 @@ namespace amr
                                          double const afterPushTime) override
         {
             rhoGhostsRefiners_.fill(level.getLevelNumber(), afterPushTime);
-            massDensityGhostsRefiners_.fill(level.getLevelNumber(), afterPushTime);
+            // massDensityGhostsRefiners_.fill(level.getLevelNumber(), afterPushTime);
             velGhostsRefiners_.fill(level.getLevelNumber(), afterPushTime);
         }
 

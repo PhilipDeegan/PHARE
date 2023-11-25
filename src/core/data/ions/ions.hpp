@@ -49,8 +49,7 @@ namespace core
                 auto const& pop = dict["pop" + std::to_string(ipop)];
                 populations_.emplace_back(pop);
             }
-            if (allSameMass_())
-                sameMasses_ = true;
+            sameMasses_ = allSameMass_();
         }
 
 
@@ -305,7 +304,8 @@ namespace core
         // note this is set at construction when all populations are added
         // in the future if some populations are dynamically created during the simulation
         // this should be updated accordingly
-        bool sameMasses_;
+        bool sameMasses_{false};
+        ;
     };
 } // namespace core
 } // namespace PHARE
