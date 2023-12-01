@@ -502,7 +502,7 @@ def checker(func):
                              'time_step', 'time_step_nbr', 'layout', 'interp_order', 'origin',
                              'boundary_types', 'refined_particle_nbr', 'path', 'nesting_buffer',
                              'diag_export_format', 'refinement_boxes', 'refinement', 'clustering',
-                             'smallest_patch_size', 'largest_patch_size', "diag_options",
+                             'smallest_patch_size', 'largest_patch_size', "diag_options", "description",
                              'resistivity', 'hyper_resistivity', 'strict', "restart_options", 'tag_buffer', ]
 
         accepted_keywords += check_optional_keywords(**kwargs)
@@ -518,6 +518,8 @@ def checker(func):
         kwargs["dl"] = dl
         kwargs["cells"] =  cells
         kwargs["refinement_ratio"] = 2
+
+        kwargs["description"] = kwargs.get('description', None)
 
         kwargs["clustering"] = check_clustering(**kwargs)
 
@@ -692,6 +694,8 @@ Adaptive Mesh Refinement (AMR) parameters
           number of refined particle per coarse particle.
         * *tag_buffer* (``int``) --
           [default=1] value representing the number of cells by which tagged cells are buffered before clustering into boxes.
+        * *description* (``string``) --
+          [default=None] arbitrary string for per simulation context - injected in output files when feasible
     """
 
     @checker
