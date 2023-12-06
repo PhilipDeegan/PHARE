@@ -97,7 +97,8 @@ class Diagnostics(object):
 
         self.quantity = None # set in next line, stops pylint complaining
         self._setSubTypeAttributes(**kwargs)
-        self.flush_every = kwargs.get("flush_every", 1) # flushes every dump, safe, but costly
+        # self.flush_every = kwargs.get("flush_every", 1) # flushes every dump, safe, but costly
+        self.flush_every = kwargs.get("flush_every", 0) # flush on finish
 
         if self.flush_every < 0:
             raise RuntimeError(f"{self.__class__.__name__,}.flush_every cannot be negative")
