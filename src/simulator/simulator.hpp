@@ -325,20 +325,21 @@ void Simulator<_dimension, _interp_order, _nbRefinedPart>::initialize()
         if (isInitialized)
             std::runtime_error("cannot initialize  - simulator already isInitialized");
 
-        if (integrator_ != nullptr)
-            integrator_->initialize();
-        else
+        if (integrator_ == nullptr)
             throw std::runtime_error("Error - Simulator has no integrator");
+
+        PHARE_LOG_SCOPE("Simulator::initialize");
+        integrator_->initialize();
     }
     catch (const std::runtime_error& e)
     {
         std::cerr << "EXCEPTION CAUGHT: " << e.what() << std::endl;
-        std::rethrow_exception(std::current_exception());
+        throw;
     }
     catch (...)
     {
         std::cerr << "UNKNOWN EXCEPTION CAUGHT" << std::endl;
-        std::rethrow_exception(std::current_exception());
+        throw;
     }
 
     if (core::mpi::any(core::Errors::instance().any()))
@@ -361,11 +362,11 @@ double Simulator<_dimension, _interp_order, _nbRefinedPart>::advance(double dt)
 {
     double dt_new = 0;
 
-    if (!integrator_)
-        throw std::runtime_error("Error - no valid integrator in the simulator");
-
     try
     {
+        if (!integrator_)
+            throw std::runtime_error("Error - no valid integrator in the simulator");
+
         PHARE_LOG_SCOPE("Simulator::advance");
         dt_new       = integrator_->advance(dt);
         currentTime_ = startTime_ + ((*timeStamper) += dt);
@@ -373,12 +374,12 @@ double Simulator<_dimension, _interp_order, _nbRefinedPart>::advance(double dt)
     catch (std::runtime_error const& e)
     {
         std::cerr << "EXCEPTION CAUGHT: " << e.what() << std::endl;
-        std::rethrow_exception(std::current_exception());
+        throw;
     }
     catch (...)
     {
         std::cerr << "UNKNOWN EXCEPTION CAUGHT" << std::endl;
-        std::rethrow_exception(std::current_exception());
+        throw;
     }
 
     if (core::mpi::any(core::Errors::instance().any()))

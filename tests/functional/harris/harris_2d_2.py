@@ -2,6 +2,7 @@
 
 import pyphare.pharein as ph
 from pyphare.simulator.simulator import Simulator, startMPI
+from tests.diagnostic import all_timestamps
 
 import numpy as np
 
@@ -22,7 +23,9 @@ def config():
     L = 0.5
     sim = ph.Simulation(
         time_step=0.005,
-        final_time=30.0,
+        # smallest_patch_size=25,
+        # largest_patch_size=25,
+        time_step_nbr=1,
         # boundary_types="periodic",
         cells=(800, 400),
         dl=(0.40, 0.40),
@@ -31,7 +34,7 @@ def config():
         nesting_buffer=1,
         clustering="tile",
         tag_buffer="10",
-        hyper_resistivity=0.002,
+        hyper_resistivity=0.001,
         resistivity=0.001,
         diag_options={
             "format": "phareh5",
@@ -136,10 +139,7 @@ def config():
 
     ph.ElectronModel(closure="isothermal", Te=0.0)
 
-    dt = 10 * sim.time_step
-    nt = sim.final_time / dt + 1
-    timestamps = dt * np.arange(nt)
-
+    timestamps = all_timestamps(sim)
     for quantity in ["E", "B"]:
         ph.ElectromagDiagnostics(
             quantity=quantity,
@@ -172,10 +172,10 @@ def post_advance(new_time):
 
 
 def main():
-    sim = config()
-    s = Simulator(sim)  # , post_advance=post_advance)
+    # sim =
+    s = Simulator(config())  # , post_advance=post_advance)
     s.initialize()
-    post_advance(0)
+    # post_advance(0)
     s.run()
 
 

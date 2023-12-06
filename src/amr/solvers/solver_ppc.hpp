@@ -46,6 +46,9 @@ private:
     using IMessenger       = amr::IMessenger<IPhysicalModel_t>;
     using HybridMessenger  = amr::HybridMessenger<HybridModel>;
 
+    using IonUpdater_t      = PHARE::core::IonUpdater<Ions, Electromag, GridLayout>;
+    using ThreadingStrategy = DefaultSolverPPCThreadingStrategy<HybridModel>;
+
     using HybridModelView_t = HybridPPCModelView<HybridModel>;
     using Faraday_t         = typename HybridModelView_t::Faraday_t;
 
@@ -57,9 +60,16 @@ private:
     PHARE::core::Faraday<GridLayout> faraday_;
     PHARE::core::Ampere<GridLayout> ampere_;
     PHARE::core::Ohm<GridLayout> ohm_;
-    PHARE::core::IonUpdater<Ions, Electromag, GridLayout> ionUpdater_;
+    // IonUpdater_t ionUpdater_;
 
 
+    std::size_t static operating_n_threads(PHARE::initializer::PHAREDict const& dict)
+    {
+        std::size_t n_threads = 1;
+        if (dict.contains("threads"))
+            n_threads = dict["threads"].template to<std::size_t>();
+        return core::get_env_as_defaulted("PHARE_PPC_THREADS", n_threads);
+    }
 
 public:
     using patch_t     = typename AMR_Types::patch_t;
@@ -71,7 +81,9 @@ public:
     explicit SolverPPC(PHARE::initializer::PHAREDict const& dict)
         : ISolver<AMR_Types>{"PPC"}
         , ohm_{dict["ohm"]}
-        , ionUpdater_{dict["ion_updater"]}
+        , n_threads{operating_n_threads(dict)}
+        , updaterDict{dict["ion_updater"]}
+        , threadingStrategy{n_threads}
 
     {
     }
@@ -133,6 +145,13 @@ private:
     // extend lifespan
     std::unordered_map<std::string, ParticleArray> tmpDomain;
     std::unordered_map<std::string, ParticleArray> patchGhost;
+
+
+
+
+    std::size_t n_threads = 1;
+    PHARE::initializer::PHAREDict updaterDict;
+    ThreadingStrategy threadingStrategy;
 
 
 }; // end solverPPC
@@ -439,13 +458,14 @@ void SolverPPC<HybridModel, AMR_Types>::moveIons_(level_t& level, HybridModelVie
     PHARE_DEBUG_DO(_debug_log_move_ions(view);)
 
     auto dt = newTime - currentTime;
+    threadingStrategy.solve(updaterDict, view, dt, mode);
 
     for (auto& state : view)
     {
-        auto const& [layout, ions, em] = state.ppc_update_populations();
-        ionUpdater_.updatePopulations(ions, em, layout, dt, mode);
+        // auto const& [layout, ions, em] = state.ppc_update_populations();
+        // ionUpdater_.updatePopulations(ions, em, layout, dt, mode);
         // this needs to be done before calling the messenger
-        view.model().resourcesManager->setTime(ions, *state.patch, newTime);
+        view.model().resourcesManager->setTime(view.model().state.ions, *state.patch, newTime);
     }
 
     fromCoarser.fillIonGhostParticles(view.model().state.ions, level, newTime);
@@ -453,7 +473,7 @@ void SolverPPC<HybridModel, AMR_Types>::moveIons_(level_t& level, HybridModelVie
 
     for (auto& state : view)
     {
-        ionUpdater_.updateIons(state.ions, state.layout);
+        IonUpdater_t::updateIons(state.ions, state.layout);
         // no need to update time, since it has been done before
     }
 

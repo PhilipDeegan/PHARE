@@ -230,7 +230,6 @@ namespace core
     using tuple_fixed_type = decltype(get_fixed_tuple<T, N>());
 
 
-
     NO_DISCARD inline std::optional<std::string> get_env(std::string const& key)
     {
         if (const char* val = std::getenv(key.c_str()))
@@ -241,6 +240,21 @@ namespace core
     {
         return get_env(key);
     }
+
+    template<typename Ret>
+    NO_DISCARD inline auto get_env_as_defaulted(std::string const& key, Ret default_)
+    {
+        Ret ret                        = default_;
+        std::optional<std::string> env = get_env(key);
+        if (env)
+        {
+            std::stringstream ss;
+            ss << *env;
+            ss >> ret;
+        }
+        return ret;
+    }
+
 
 } // namespace core
 } // namespace PHARE
@@ -260,7 +274,16 @@ NO_DISCARD Return sum(Container const& container, Return r = 0)
     return std::accumulate(container.begin(), container.end(), r);
 }
 
-
+template<typename Container, typename F>
+auto sum_from(Container const& container, F fn)
+{
+    using value_type  = typename Container::value_type;
+    using return_type = std::decay_t<std::result_of_t<F const&(value_type const&)>>;
+    return_type sum   = 0;
+    for (auto const& el : container)
+        sum += fn(el);
+    return sum;
+}
 
 
 template<typename F>

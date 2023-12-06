@@ -59,7 +59,7 @@ public:
                            UpdaterMode = UpdaterMode::all);
 
 
-    void updateIons(Ions& ions, GridLayout const& layout);
+    void static updateIons(Ions& ions, GridLayout const& layout);
 
 
 private:

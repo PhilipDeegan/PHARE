@@ -26,6 +26,7 @@ namespace core
     class Ions
     {
     public:
+        using value_type          = IonPopulation;
         using grid_type           = typename IonPopulation::grid_type;
         using field_type          = typename IonPopulation::field_type;
         using vecfield_type       = typename IonPopulation::vecfield_type;
@@ -54,6 +55,9 @@ namespace core
 
 
         NO_DISCARD auto nbrPopulations() const { return populations_.size(); }
+
+        // span interop
+        NO_DISCARD auto size() const { return populations_.size(); }
 
 
         NO_DISCARD field_type const& density() const

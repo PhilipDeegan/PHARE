@@ -1,11 +1,14 @@
 #ifndef PHARE_SOLVER_SOLVER_PPC_MODEL_VIEW_HPP
 #define PHARE_SOLVER_SOLVER_PPC_MODEL_VIEW_HPP
 
+#include "core/numerics/ohm/ohm.hpp"
 #include "core/numerics/ampere/ampere.hpp"
 #include "core/numerics/faraday/faraday.hpp"
-#include "core/numerics/ohm/ohm.hpp"
+#include "core/numerics/ion_updater/ion_updater.hpp"
 
 #include "amr/solvers/solver.hpp"
+
+#include "core/utilities/thread_pool.hpp"
 
 namespace PHARE::solver
 {
@@ -94,6 +97,7 @@ struct HybridPPCModelView : public ISolverModelView
 
     HybridModel_t& model_;
     std::vector<core::aggregate_adapter<PatchState_t>> states;
+    std::vector<PatchState_t*> state_ptrs;
 
     Electromag electromagPred_{"EMPred"};
     Electromag electromagAvg_{"EMAvg"};
@@ -124,7 +128,16 @@ void HybridPPCModelView<HybridModel>::regrid(level_t& level, HybridModel_t& hybr
             );
         }
         assert(states.back() == true);
+        assert(states.back().total_particles > 0);
     }
+    state_ptrs.reserve(states.size());
+    for (auto& state : states)
+        state_ptrs.emplace_back(&state);
+    std::sort(state_ptrs.begin(), state_ptrs.end(), [](auto const& a, auto const& b) {
+        // assert(a->total_particles > 0);
+        // assert(b->total_particles > 0);
+        return a->total_particles > b->total_particles;
+    });
 }
 
 
@@ -173,6 +186,9 @@ struct HybridPPCModelView<HybridModel>::PatchState_t
     Electromag electromag, electromagPred, electromagAvg;
     Electrons electrons;
     std::shared_ptr<SAMRAI::hier::Patch> patch;
+
+    std::size_t const total_particles
+        = core::sum_from(ions, [](auto const& pop) { return pop.domainParticles().size(); });
 
     auto ppc_predictor1_faraday()
     {
@@ -254,6 +270,77 @@ struct HybridPPCModelView<HybridModel>::PatchState_t
 };
 
 
+template<typename HybridModel>
+class DefaultSolverPPCThreadingStrategy
+{
+    using This         = DefaultSolverPPCThreadingStrategy<HybridModel>;
+    using View_t       = HybridPPCModelView<HybridModel>;
+    using State_t      = typename View_t::PatchState_t;
+    using IonUpdater_t = core::IonUpdater<typename View_t::Ions, typename View_t::Electromag,
+                                          typename View_t::GridLayout>;
+
+    auto static verify_input(std::size_t n_threads)
+    {
+        if (n_threads == 0)
+            throw std::runtime_error("Threads cannot be zero!");
+        return n_threads;
+    }
+
+
+public:
+    DefaultSolverPPCThreadingStrategy(std::size_t n_threads)
+        : n_threads{verify_input(n_threads)}
+        , pool{n_threads - 1}
+        , patch_views_per_thread{n_threads}
+    {
+    }
+
+
+    void solve(initializer::PHAREDict const& updaterDict, View_t& view, double dt,
+               core::UpdaterMode mode)
+    {
+        // auto patch_view_ptrs
+        //     = core::generate([](auto& patch_view) { return &patch_view; }, ion_patch_views);
+
+        // if (n_threads > 1)
+        //     std::sort(patch_view_ptrs.begin(), patch_view_ptrs.end(),
+        //               [](auto& a, auto& b) { return a->total_particles > b->total_particles; });
+
+        for (auto& ppv : patch_views_per_thread)
+            ppv.clear();
+
+        {
+            std::size_t thread_idx = 0;
+            for (auto const& state_ptr : view.state_ptrs)
+            {
+                patch_views_per_thread[thread_idx++].push_back(state_ptr);
+                if (thread_idx == n_threads)
+                    thread_idx = 0;
+            }
+        }
+
+        auto thread_fn = [&](std::size_t thread_idx) {
+            IonUpdater_t ionUpdater{updaterDict};
+            for (auto& state_ptr : patch_views_per_thread[thread_idx])
+            {
+                ionUpdater.updatePopulations(state_ptr->ions, state_ptr->electromag,
+                                             state_ptr->layout, dt, mode);
+            }
+        };
+
+        for (std::size_t i = 1; i < n_threads; ++i)
+            pool.submit([&, i]() { thread_fn(i); });
+
+        thread_fn(0);
+        pool.wait_for_tasks();
+    }
+
+private:
+    std::size_t n_threads = 1;
+    thread_pool pool;
+
+    std::vector<std::vector<State_t*>> patch_views_per_thread;
+};
 
 
 } // namespace PHARE::solver

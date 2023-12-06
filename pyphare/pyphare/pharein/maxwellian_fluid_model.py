@@ -1,5 +1,5 @@
 import numpy as np
-from pyphare.core import phare_utilities
+from pyphare.core import phare_utilities, dbg_print
 from pyphare.core.box import Box
 from pyphare.core.gridlayout import GridLayout, yee_element_is_primal
 from pyphare.pharein import global_vars
@@ -142,7 +142,7 @@ class MaxwellianFluidModel(object):
 #------------------------------------------------------------------------------
 
     def validate(self, sim, atol=1e-15):
-        print(f"validating dim={sim.ndim}")
+        dbg_print(f"validating dim={sim.ndim}")
         if sim.ndim==1:
             self.validate1d(sim, atol)
         elif sim.ndim==2:
@@ -187,7 +187,7 @@ class MaxwellianFluidModel(object):
                 is_periodic &= np.allclose(f(xL), f(xR), atol=atol, rtol=0)
 
         if not is_periodic:
-            print("Warning: Simulation is periodic but some functions are not")
+            dbg_print("Warning: Simulation is periodic but some functions are not")
             if sim.strict:
                 raise RuntimeError("Simulation is not periodic")
 
@@ -213,11 +213,11 @@ class MaxwellianFluidModel(object):
             else:
                 return (np.zeros_like(L),L), (np.zeros_like(R),R)
 
-        print("2d periodic validation")
+        dbg_print("2d periodic validation")
         for idir in np.arange(sim.ndim):
-            print("validating direction ...", idir)
+            dbg_print("validating direction ...", idir)
             if sim.boundary_types[idir] == "periodic":
-                print(f"direction {idir} is periodic?")
+                dbg_print(f"direction {idir} is periodic?")
                 dual_left = (np.arange(-nbrDualGhosts, nbrDualGhosts)+0.5)*sim.dl[0]
                 dual_right = dual_left + domain[0]
                 primal_left = np.arange(-nbrPrimalGhosts, nbrPrimalGhosts)*sim.dl[0]
@@ -247,7 +247,7 @@ class MaxwellianFluidModel(object):
                         fL = f(*coordsL)
                         fR = f(*coordsR)
                         check = np.allclose(fL,fR, atol=atol, rtol=0)
-                        print(f"checked {fn} : fL = {fL} and fR = {fR} and check = {check}")
+                        dbg_print(f"checked {fn} : fL = {fL} and fR = {fR} and check = {check}")
                         if not check:
                             not_periodic += [(fn,idir)]
                         is_periodic &=check
