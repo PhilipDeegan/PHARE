@@ -322,7 +322,7 @@ namespace amr
         template<typename ResourcesUser>
         NO_DISCARD auto restart_patch_data_ids(ResourcesUser const& user) const
         {
-            // // true for now with https://github.com/PHAREHUB/PHARE/issues/664
+            // true for now with https://github.com/PHAREHUB/PHARE/issues/664
             constexpr bool ALL_IDS = true;
 
             std::vector<int> ids;
@@ -571,9 +571,8 @@ namespace amr
 
         //! \brief Allocate the data on the given level
         template<typename ResourcesUser, typename ResourcesProperties>
-        void allocate_([[maybe_unused]] ResourcesUser const& obj,
-                       ResourcesProperties const& resourcesProperties, SAMRAI::hier::Patch& patch,
-                       double const allocateTime) const
+        void allocate_(ResourcesUser const& /*obj*/, ResourcesProperties const& resourcesProperties,
+                       SAMRAI::hier::Patch& patch, double const allocateTime) const
         {
             for (auto const& properties : resourcesProperties)
             {
