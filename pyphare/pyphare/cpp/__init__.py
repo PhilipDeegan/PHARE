@@ -1,4 +1,4 @@
-
+import json
 # continue to use override if set
 _cpp_lib_override = None
 
@@ -22,6 +22,12 @@ def cpp_lib(override=None):
 def cpp_etc_lib():
     import importlib
     return importlib.import_module("pybindlibs.cpp_etc")
+
+def build_config():
+    return cpp_etc_lib().phare_build_config()
+
+def build_config_as_json():
+    return json.dumps(build_config())
 
 
 def splitter_type(dim, interp, n_particles):
