@@ -108,8 +108,8 @@ protected:
         }
 
         if (diagnostic.nAttributes > 0)
-            h5Writer_.writeAttributeDict(file, diagnostic.fileAttributes, "/py_attrs");
-        h5Writer_.writeAttributeDict(file, fileAttributes, "/");
+            h5Writer_.writeGlobalAttributeDict(file, diagnostic.fileAttributes, "/py_attrs");
+        h5Writer_.writeGlobalAttributeDict(file, fileAttributes, "/");
     }
 
     template<typename ParticlePopulation>
@@ -119,14 +119,14 @@ protected:
 
         Attributes popAttributes;
         popAttributes["pop_mass"] = pop.mass();
-        h5Writer.writeAttributeDict(file, popAttributes, "/");
+        h5Writer.writeGlobalAttributeDict(file, popAttributes, "/");
     }
 
     void writeGhostsAttr_(HighFiveFile& file, std::string path, std::size_t ghosts, bool null)
     {
         Attributes dsAttr;
         dsAttr["ghosts"] = ghosts;
-        h5Writer_.writeAttributeDict(file, dsAttr, null ? "" : path);
+        h5Writer_.writeGlobalAttributeDict(file, dsAttr, null ? "" : path);
     }
 
     template<typename FileMap, typename... Quantities>

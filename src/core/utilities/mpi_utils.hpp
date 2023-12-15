@@ -52,6 +52,8 @@ NO_DISCARD auto mpi_type_for()
         return MPI_UINT64_T;
     else if constexpr (std::is_same_v<char, Data>)
         return MPI_CHAR;
+    else if constexpr (std::is_same_v<std::string, Data>)
+        return MPI_CHAR;
 
     // don't return anything = compile failure if tried to use this function
 }
