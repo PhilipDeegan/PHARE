@@ -15,6 +15,7 @@
 namespace PHARE::core
 {
 
+
 /* Grid is the structure owning the field type memory via its inheritance from NdArrayImpl
 Grid exists to decouple the usage of memory by computing routines from the allocation of
 memory. Components needing to own/allocate memory will use a Grid.
@@ -67,6 +68,7 @@ public:
         , field_{name, qty, Super::data(), Super::shape()}
     {
     }
+
 
     NO_DISCARD std::string name() const { return name_; }
 

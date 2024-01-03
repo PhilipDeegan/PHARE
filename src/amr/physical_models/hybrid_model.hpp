@@ -4,6 +4,7 @@
 #include <string>
 
 #include "initializer/data_provider.hpp"
+#include "core/data/grid/grid.hpp" // !?!
 #include "core/models/hybrid_state.hpp"
 #include "amr/physical_models/physical_model.hpp"
 #include "core/data/ions/particle_initializers/particle_initializer_factory.hpp"

@@ -204,9 +204,7 @@ struct ElectronsTest : public ::testing::Test
         auto&& emm = std::get<0>(electrons.getCompileTimeResourcesViewList());
         auto&& fc  = std::get<0>(emm.getCompileTimeResourcesViewList());
 
-
         Ve.set_on(std::get<0>(fc.getCompileTimeResourcesViewList()));
-
 
         auto&& pc          = std::get<1>(emm.getCompileTimeResourcesViewList());
         auto const& [_, P] = pc.getCompileTimeResourcesViewList();
@@ -214,7 +212,6 @@ struct ElectronsTest : public ::testing::Test
 
         auto const& [Jx, Jy, Jz]    = J();
         auto const& [Vix, Viy, Viz] = Vi();
-
 
         if constexpr (dim == 1)
         {
