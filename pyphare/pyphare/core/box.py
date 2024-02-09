@@ -68,6 +68,34 @@ class Box:
     def copy(self):
         return Box(self.lower.copy(), self.upper.copy())
 
+    def __iter__(self):
+        return BoxIterator(self)
+
+
+class BoxIterator:
+    def __init__(self, box):
+        self.l = box.lower
+        self.u = box.upper
+        self.c = self.l.copy()
+        self.c[0] -= 1
+
+    def __iter__(self):
+        return self
+
+    def __next__(self):
+        if (self.c >= self.u).all():
+            raise StopIteration()
+        self.c[0] += 1
+        if len(self.c) > 1:
+            if self.c[0] > self.u[0]:
+                self.c[1] += 1
+                self.c[0] = self.l[0]
+        if len(self.c) > 2:
+            if self.c[1] > self.u[1]:
+                self.c[2] += 1
+                self.c[1] = self.l[1]
+        return self.c
+
 
 class nDBox(Box):
     def __init__(self, dim, l, u):
