@@ -38,6 +38,21 @@ def print_rank0(*args, **kwargs):
     cpp_lib().mpi_barrier()
 
 
+def plot_timestep_time(timestep_times):
+    from pyphare.cpp import cpp_lib
+
+    if cpp_lib().mpi_rank() == 0:
+        import matplotlib.pyplot as plt
+
+        fig, ax = plt.subplots()
+        ax.plot(timestep_times)
+        plt.ylabel("timestep time")
+        plt.xlabel("timestep")
+        fig.savefig("timestep_times.png")
+
+    cpp_lib().mpi_barrier()
+
+
 class Simulator:
     def __init__(self, simulation, auto_dump=True, **kwargs):
         import pyphare.pharein as ph
@@ -142,7 +157,7 @@ class Simulator:
             self.timeStep(),
         )
 
-    def run(self):
+    def run(self, plot_times=False):
         from pyphare.cpp import cpp_lib
 
         self._check_init()
@@ -163,6 +178,9 @@ class Simulator:
 
         print_rank0(f"mean advance time = {np.mean(perf)}")
         print_rank0(f"total advance time = {datetime.timedelta(seconds=np.sum(perf))}")
+
+        if plot_times:
+            plot_timestep_time(perf)
 
         return self.reset()
 
