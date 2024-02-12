@@ -262,26 +262,39 @@ void Simulator<dim, _interp, nbRefinedPart>::hybrid_init(initializer::PHAREDict 
     multiphysInteg_->registerTagger(0, maxLevelNumber_ - 1, std::move(hybridTagger_));
 
 
-
-
     auto lbm_ = std::make_unique<amr::LoadBalancerManager<dim>>(dict);
-
-    auto lbe_ = std::make_unique<amr::LoadBalancerEstimatorHybrid<PHARETypes>>(
+    auto lbe_ = std::make_shared<amr::LoadBalancerEstimatorHybrid<PHARETypes>>(
         dict["simulation"]["AMR"]["loadbalancing"].template to<std::string>(), lbm_->getId());
 
-    lbm_->addLoadBalancerEstimator(0, maxLevelNumber_ - 1, std::move(lbe_));
-    lbm_->addLoadBalancer(std::make_unique<SAMRAI::mesh::CascadePartitioner>(
-        SAMRAI::tbox::Dimension{dim}, "cascade"));
+    auto loadBalancer_db = std::make_shared<SAMRAI::tbox::MemoryDatabase>("LoadBalancerDB");
+    double flexible_load_tolerance
+        = cppdict::get_value(dict, "simulation/advanced/integrator/flexible_load_tolerance", .5);
+
+    loadBalancer_db->putDouble("flexible_load_tolerance", flexible_load_tolerance);
+    auto loadBalancer = std::make_shared<SAMRAI::mesh::CascadePartitioner>(
+        SAMRAI::tbox::Dimension{dimension}, "LoadBalancer", loadBalancer_db);
+
+    PHARE_LOG_LINE_STR(dict["simulation"]["AMR"]["refinement"].contains("tagging"));
+    if (dict["simulation"]["AMR"]["refinement"].contains("tagging"))
+    { // Load balancers break with refinement boxes - only tagging supported
+        /*
+          P=0000000:Program abort called in file ``/.../SAMRAI/xfer/RefineSchedule.cpp'' at line 369
+          P=0000000:ERROR MESSAGE:
+          P=0000000:RefineSchedule:RefineSchedule error: We are not currently
+          P=0000000:supporting RefineSchedules with the source level finer
+          P=0000000:than the destination level
+        */
+        lbm_->addLoadBalancerEstimator(0, maxLevelNumber_ - 1, std::move(lbe_));
+        lbm_->setLoadBalancer(loadBalancer);
+    }
+
     multiphysInteg_->setLoadBalancerManager(std::move(lbm_));
-
-
-
 
     if (dict["simulation"].contains("restarts"))
         startTime_ = restarts_init(dict["simulation"]["restarts"]);
 
     integrator_ = std::make_unique<Integrator>(dict, hierarchy_, multiphysInteg_, multiphysInteg_,
-                                               startTime_, finalTime_);
+                                               loadBalancer, startTime_, finalTime_);
 
     timeStamper = core::TimeStamperFactory::create(dict["simulation"]);
 

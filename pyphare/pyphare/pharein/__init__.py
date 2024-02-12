@@ -78,9 +78,7 @@ class py_fn_wrapper:
         self.fn = fn
 
     def __call__(self, *xyz):
-        args = []
-        for i, arg in enumerate(xyz):
-            args.append(np.asarray(arg))
+        args = [np.asarray(arg) for arg in xyz]
         ret = self.fn(*args)
         if isinstance(ret, list):
             ret = np.asarray(ret)
@@ -215,6 +213,15 @@ def populateDict():
     add_double("simulation/algo/ohm/resistivity", simulation.resistivity)
     add_double("simulation/algo/ohm/hyper_resistivity", simulation.hyper_resistivity)
 
+    for k, v in simulation.advanced.items():
+        path = f"simulation/advanced/{k}"
+        if isinstance(v, int):
+            add_int(path, v)
+        elif isinstance(v, float):
+            add_double(path, v)
+        else:
+            add_string(path, v)
+
     init_model = simulation.model
     modelDict = init_model.model_dict
 
@@ -238,11 +245,19 @@ def populateDict():
         addInitFunction(partinit_path + "thermal_velocity_x", fn_wrapper(d["vthx"]))
         addInitFunction(partinit_path + "thermal_velocity_y", fn_wrapper(d["vthy"]))
         addInitFunction(partinit_path + "thermal_velocity_z", fn_wrapper(d["vthz"]))
-        add_int(partinit_path + "nbr_part_per_cell", d["nbrParticlesPerCell"])
         add_double(partinit_path + "charge", d["charge"])
         add_string(partinit_path + "basis", "cartesian")
         if "init" in d and "seed" in d["init"]:
             pp.add_optional_size_t(partinit_path + "init/seed", d["init"]["seed"])
+
+        if isinstance(d["nbrParticlesPerCell"], tuple):
+            addInitFunction(
+                partinit_path + "nbr_part_per_cell_fn",
+                fn_wrapper(d["nbrParticlesPerCell"][0]),
+            )
+            add_int(partinit_path + "nbr_part_per_cell", d["nbrParticlesPerCell"][1])
+        else:
+            add_int(partinit_path + "nbr_part_per_cell", d["nbrParticlesPerCell"])
 
     add_string("simulation/electromag/name", "EM")
     add_string("simulation/electromag/electric/name", "E")

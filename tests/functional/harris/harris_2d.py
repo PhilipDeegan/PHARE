@@ -1,7 +1,10 @@
 #!/usr/bin/env python3
 
+from datetime import datetime
+
 import pyphare.pharein as ph
 from pyphare.simulator.simulator import Simulator, startMPI
+from pyphare.pharesee.run import Run
 
 import numpy as np
 import matplotlib.pyplot as plt
@@ -14,27 +17,45 @@ from pyphare.cpp import cpp_lib
 cpp = cpp_lib()
 startMPI()
 
-diag_outputs = "phare_outputs/test/harris/2d"
-from datetime import datetime
+diag_outputs0 = "phare_outputs/balanceL1/harris/2d"
+diag_outputs1 = "phare_outputs/balanceL1/harris/2d_rebal"
+
+time_step = 0.001
+time_step_nbr = 1
+restart_time = 0
+final_time = time_step * time_step_nbr
+
+# array([10., 20., 30., 40., 50.])
+timestamps = np.arange(
+    restart_time, final_time + time_step, time_step * time_step_nbr / 5, dtype=float
+)
+timestamps = [0]
 
 
-def config():
+def config(diag_dig, **kwargs):
     sim = ph.Simulation(
-        smallest_patch_size=15,
-        largest_patch_size=25,
-        time_step_nbr=1000,
-        time_step=0.001,
-        # boundary_types="periodic",
-        cells=(100, 100),
         dl=(0.2, 0.2),
-        refinement_boxes={},
+        cells=(100, 100),
+        tag_buffer=1,
+        time_step=time_step,
+        time_step_nbr=time_step_nbr,
+        # smallest_patch_size=15,
+        # largest_patch_size=25,
+        max_nbr_levels=2,
+        refinement="tagging",
         hyper_resistivity=0.001,
         resistivity=0.001,
         diag_options={
             "format": "phareh5",
-            "options": {"dir": diag_outputs, "mode": "overwrite"},
+            "options": {"dir": diag_dig, "mode": "overwrite"},
         },
-        strict=True,
+        # restart_options=dict(
+        #     dir=diag_dig,
+        #     mode="overwrite",
+        #     timestamps=timestamps,
+        #     restart_time=restart_time,
+        # ),
+        **kwargs,
     )
 
     def density(x, y):
@@ -93,31 +114,19 @@ def config():
         assert np.all(temp > 0)
         return temp
 
-    def vx(x, y):
+    def vxyz(x, y):
         return 0.0
 
-    def vy(x, y):
-        return 0.0
-
-    def vz(x, y):
-        return 0.0
-
-    def vthx(x, y):
-        return np.sqrt(T(x, y))
-
-    def vthy(x, y):
-        return np.sqrt(T(x, y))
-
-    def vthz(x, y):
+    def vthxyz(x, y):
         return np.sqrt(T(x, y))
 
     vvv = {
-        "vbulkx": vx,
-        "vbulky": vy,
-        "vbulkz": vz,
-        "vthx": vthx,
-        "vthy": vthy,
-        "vthz": vthz,
+        "vbulkx": vxyz,
+        "vbulky": vxyz,
+        "vbulkz": vxyz,
+        "vthx": vthxyz,
+        "vthy": vthxyz,
+        "vthz": vthxyz,
         "nbr_part_per_cell": 100,
     }
 
@@ -127,49 +136,94 @@ def config():
         bz=bz,
         protons={"charge": 1, "density": density, **vvv, "init": {"seed": 12334}},
     )
-
     ph.ElectronModel(closure="isothermal", Te=0.0)
-
-    dt = 10 * sim.time_step
-    nt = sim.final_time / dt + 1
-    timestamps = dt * np.arange(nt)
-
     for quantity in ["E", "B"]:
-        ph.ElectromagDiagnostics(
-            quantity=quantity,
-            write_timestamps=timestamps,
-            compute_timestamps=timestamps,
-        )
+        ph.ElectromagDiagnostics(quantity=quantity, write_timestamps=timestamps)
 
+    pop = "protons"
+    ph.ParticleDiagnostics(
+        quantity="domain",
+        write_timestamps=timestamps,
+        population_name="protons",
+    )
+    ph.FluidDiagnostics(
+        quantity="density", write_timestamps=timestamps, population_name="protons"
+    )
+
+    ph.global_vars.sim = None
     return sim
 
 
-def get_time(path, time, datahier=None):
-    time = "{:.10f}".format(time)
-    from pyphare.pharesee.hierarchy import hierarchy_from
-
-    datahier = hierarchy_from(h5_filename=path + "/EM_E.h5", time=time, hier=datahier)
-    datahier = hierarchy_from(h5_filename=path + "/EM_B.h5", time=time, hier=datahier)
-    return datahier
-
-
-def post_advance(new_time):
+def plot(diag_dir):
     if cpp.mpi_rank() == 0:
-        print(f"running tests at time {new_time}")
-        from tests.simulator.test_advance import AdvanceTestBase
+        run = Run(diag_dir)
+        for time in timestamps:
+            run.GetN(time, pop_name="protons").plot(
+                filename=f"{diag_dir}/harris_N_t{time}.png",
+                plot_patches=True,
+            )
 
-        test = AdvanceTestBase()
-        test.base_test_overlaped_fields_are_equal(
-            get_time(diag_outputs, new_time), new_time
-        )
-        print(f"tests passed")
+            for i in range(2):
+                run.GetRanks(time).plot(
+                    filename=f"{diag_dir}/harris_RANKS_L{i}_t{time}.png",
+                    plot_patches=True,
+                    levels=(i,),
+                )
+
+            run.GetRanks(time).plot(
+                filename=f"{diag_dir}/harris_RANKS__t{time}.png", plot_patches=True
+            )
+
+            run.GetDivB(time).plot(
+                filename=f"{diag_dir}/harris_divb_t{time}.png", plot_patches=True
+            )
+            run.GetB(time).plot(
+                filename=f"{diag_dir}/harris_bx_t{time}.png",
+                qty="Bx",
+                plot_patches=True,
+            )
+            run.GetB(time).plot(
+                filename=f"{diag_dir}/harris_by_t{time}.png",
+                qty="By",
+                plot_patches=True,
+            )
+            run.GetB(time).plot(
+                filename=f"{diag_dir}/harris_bz_t{time}.png",
+                qty="Bz",
+                plot_patches=True,
+            )
+
+            run.GetJ(time).plot(
+                filename=f"{diag_dir}/harris_Jz_t{time}.png",
+                qty="Jz",
+                plot_patches=True,
+                vmin=-2,
+                vmax=2,
+            )
+
+    cpp.mpi_barrier()
+
+
+def run(sim, diag_dir):
+    ph.global_vars.sim = sim
+    Simulator(sim).run().reset()
+    plot(diag_dir)
+    ph.global_vars.sim = None
 
 
 def main():
-    s = Simulator(config(), post_advance=post_advance)
-    s.initialize()
-    post_advance(0)
-    s.run()
+    # sim0 = config(diag_outputs0)
+    sim1 = config(
+        diag_outputs1,
+        advanced={
+            "integrator/rebalance_coarsest": 1,
+            "integrator/rebalance_coarsest_every": 500,
+            "integrator/flexible_load_tolerance": 0.05,
+        },
+    )
+
+    # run(sim0, diag_outputs0)
+    run(sim1, diag_outputs1)
 
 
 if __name__ == "__main__":
