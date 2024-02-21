@@ -1,0 +1,148 @@
+#! clean build -x mpi -dtKOp py
+
+# test nanobind
+# MKN_PYTHON_LIB_EMBED=1 KLOG=3 mkn clean build -p test_nanobind -tgO 0 db
+
+name: phare
+
+property:
+  MPI_INC: /usr/include #/hdf5/mpich #/usr/include/hdf5/openmpi #/usr/local/netcdf/include
+  MPI_LIB: hdf5
+  MPI_PTH: /usr/local/lib #/opt/conda/envs/vscode/lib
+
+
+profile:
+- name: base
+  arg:  -DPHARE_HAS_HIGHFIVE=0
+
+- name: core
+  parent: base
+  inc: src subprojects
+  src: src/core
+  out: phare_core
+
+- name: amr
+  parent: base
+  self: core
+  dep: llnl.samrai(https://github.com/mkn-nix/llnl.samrai)
+  # lib: hdf5_openmpi
+  src: src/amr
+  out: phare_amr
+
+
+- name: diagnostic
+  self: amr
+  dep: hpc.highfive(https://github.com/mkn-nix/hpc.highfive)
+  inc: build/subprojects/highfive/include
+       ${MPI_INC}
+  lib: ${MPI_LIB}
+  path: ${MPI_PTH}
+
+- name: simulator
+  parent: base
+  self: diagnostic
+  out: phare_simulator
+
+- name: exe
+  parent: base
+  self: simulator init
+  dep: lang.pybind11 
+  main: src/phare/phare.cpp
+  mod: lang.python3
+  env: PYTHONPATH=${MKN_ROOT}:${MKN_ROOT}/tests/diagnostic:${MKN_ROOT}/build:${MKN_ROOT}/pyphare
+
+- name: init
+  src: src/initializer/data_provider.cpp
+  self: core
+  out: phare_initializer
+  mode: shared # static singleton dict lives here
+
+- name: pybind
+  # parent: base
+  mode: shared
+  dep: lang.pybind11
+  mod: lang.pybind11 lang.python3
+
+- name: dictator
+  parent: pybind
+  self: init
+  src: src/initializer/dictator.cpp
+  install: build/pybindlibs
+  out: dictator
+
+- name: cpp
+  parent: pybind
+  self: simulator init
+  src: src/python3/cpp_simulator.cpp
+  install: build/pybindlibs
+  out: cpp
+
+- name: cpp_etc
+  parent: pybind
+  self: simulator
+  src: src/python3/cpp_etc.cpp
+  install: build/pybindlibs
+  out: cpp_etc
+  arg:  -DPHARE_HAS_HIGHFIVE=0
+
+- name: py
+  self: dictator cpp_etc simulator
+
+
+
+- name: test_base
+  inc: .
+  dep: google.test
+
+- name: test_core
+  parent: test_base
+  self: core
+
+- name: test_amr
+  parent: test_base
+  self: amr
+
+- name: test
+  parent: base
+  self: init simulator
+  dep: lang.pybind11 google.test
+  mod: lang.python3
+  inc: .
+  link: -pthread
+
+- name: nanobind
+  inc: subprojects/nanobind/include
+       subprojects/nanobind/ext/robin_map/include
+  src: subprojects/nanobind/src
+  mod: lang.python3
+  out: nanobind
+
+- name: test_nanobind
+  parent: test_core
+  # self: nanobind
+  inc: subprojects/nanobind/include
+       subprojects/nanobind/ext/robin_map/include
+  src: subprojects/nanobind/src
+  main: tests/python3/test_python_interop_main.cpp
+  mod: lang.python3
+  out: test_nanobind
+
+- name: test_diagnostics
+  parent: test
+  mode: none
+  mod: lang.python3
+  test:
+    tests/diagnostic/test-diagnostics_1d.cpp
+    tests/diagnostic/test-diagnostics_2d.cpp
+  env: PYTHONPATH=${MKN_ROOT}:${MKN_ROOT}/build/tests/diagnostic:${MKN_ROOT}/build:${MKN_ROOT}/pyphare
+
+- name: bench
+  self: core
+  inc: . tools
+  dep: google.benchmark
+  main: tools/bench/core/data/particles/interop.cpp
+  link: -pthread
+
+- name: format
+  mod: |
+    clang.format{init{style: file, paths: src}}

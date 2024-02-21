@@ -14,7 +14,7 @@ configure_file(${CMAKE_CURRENT_SOURCE_DIR}/phare_init.py ${CMAKE_CURRENT_BINARY_
 target_link_libraries(phare-exe PUBLIC
     ${PHARE_BASE_LIBS}
     phare_simulator
-    pybind11::embed
+
 )
 set_property(TARGET ${PROJECT_NAME} APPEND_STRING PROPERTY LINK_FLAGS " ${PHARE_LINK_FLAGS}")
 

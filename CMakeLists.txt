@@ -22,7 +22,7 @@ set(CMAKE_POSITION_INDEPENDENT_CODE ON)
 
 include(CheckCXXCompilerFlag)
 find_program(Git git)
-find_package(PythonInterp  3.8 REQUIRED)
+find_package(Python 3.8 REQUIRED COMPONENTS Interpreter Development)
 
 set(PHARE_PROJECT_DIR ${CMAKE_CURRENT_SOURCE_DIR})
 set(CMAKE_EXPORT_COMPILE_COMMANDS 1)
@@ -59,3 +59,4 @@ include("${PHARE_PROJECT_DIR}/res/cmake/test.cmake")
 include("${PHARE_PROJECT_DIR}/res/cmake/bench.cmake")
 
 print_phare_options()
+# print

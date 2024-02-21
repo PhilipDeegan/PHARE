@@ -23,8 +23,8 @@ target_include_directories(${PROJECT_NAME}  PUBLIC
 
 
 # this is the python module that wraps the add() method
-pybind11_add_module(dictator dictator.cpp)
-target_link_libraries(dictator PUBLIC phare_initializer pybind11::embed)
+nanobind_add_module(dictator dictator.cpp)
+target_link_libraries(dictator PUBLIC phare_initializer )
 set_property(TARGET dictator PROPERTY INTERPROCEDURAL_OPTIMIZATION ${PHARE_INTERPROCEDURAL_OPTIMIZATION})
 set_target_properties(dictator
     PROPERTIES

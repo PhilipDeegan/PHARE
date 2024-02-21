@@ -9,7 +9,7 @@ namespace py = pybind11;
 
 namespace PHARE::pydata
 {
-PYBIND11_MODULE(PHARE_CPP_MOD_NAME, m)
+NB_MODULE(PHARE_CPP_MOD_NAME, m)
 {
     declare_essential(m);
 

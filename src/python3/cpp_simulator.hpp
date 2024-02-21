@@ -14,11 +14,11 @@
 #include "simulator/simulator.hpp"
 
 #include "python3/pybind_def.hpp"
-#include "pybind11/stl.h"
-#include "pybind11/numpy.h"
-#include "pybind11/chrono.h"
-#include "pybind11/complex.h"
-#include "pybind11/functional.h"
+// #include "pybind11/stl.h"
+// #include "pybind11/numpy.h"
+// #include "pybind11/chrono.h"
+// #include "pybind11/complex.h"
+// #include "pybind11/functional.h"
 
 #include "python3/particles.hpp"
 #include "python3/patch_data.hpp"
@@ -27,12 +27,12 @@
 
 
 
-namespace py = pybind11;
+namespace py = nanobind;
 
 namespace PHARE::pydata
 {
-template<typename Type, std::size_t dimension>
-void declarePatchData(py::module& m, std::string key)
+template<typename Type, std::size_t dimension, typename Module>
+void declarePatchData(Module& m, std::string key)
 {
     using PatchDataType = PatchData<Type, dimension>;
     py::class_<PatchDataType>(m, key.c_str())
@@ -44,8 +44,8 @@ void declarePatchData(py::module& m, std::string key)
         .def_readonly("data", &PatchDataType::data);
 }
 
-template<std::size_t dim>
-void declareDim(py::module& m)
+template<std::size_t dim, typename Module>
+void declareDim(Module& m)
 {
     using CP         = core::ContiguousParticles<dim>;
     std::string name = "ContiguousParticles_" + std::to_string(dim);
@@ -77,8 +77,8 @@ void declareSimulator(PyClass&& sim)
         .def("dump", &Simulator::dump, py::arg("timestamp"), py::arg("timestep"));
 }
 
-template<typename _dim, typename _interp, typename _nbRefinedPart>
-void declare_etc(py::module& m)
+template<typename _dim, typename _interp, typename _nbRefinedPart, typename Module>
+void declare_etc(Module& m)
 {
     constexpr auto dim           = _dim{}();
     constexpr auto interp        = _interp{}();
@@ -134,8 +134,8 @@ void declare_etc(py::module& m)
     m.def(name.c_str(), splitPyArrayParticles<_Splitter>);
 }
 
-template<typename _dim, typename _interp, typename _nbRefinedPart>
-void declare_sim(py::module& m)
+template<typename _dim, typename _interp, typename _nbRefinedPart, typename Module>
+void declare_sim(Module& m)
 {
     constexpr auto dim           = _dim{}();
     constexpr auto interp        = _interp{}();
@@ -160,8 +160,8 @@ void declare_sim(py::module& m)
     });
 }
 
-template<typename Dimension, typename InterpOrder, typename... NbRefinedParts>
-void declare_all(py::module& m, std::tuple<Dimension, InterpOrder, NbRefinedParts...> const&)
+template<typename Module, typename Dimension, typename InterpOrder, typename... NbRefinedParts>
+void declare_all(Module& m, std::tuple<Dimension, InterpOrder, NbRefinedParts...> const&)
 {
     core::apply(std::tuple<NbRefinedParts...>{}, [&](auto& nbRefinedPart) {
         declare_sim<Dimension, InterpOrder, std::decay_t<decltype(nbRefinedPart)>>(m);
@@ -169,7 +169,8 @@ void declare_all(py::module& m, std::tuple<Dimension, InterpOrder, NbRefinedPart
     });
 }
 
-void declare_essential(py::module& m)
+template<typename Module>
+void declare_essential(Module& m)
 {
     py::class_<SamraiLifeCycle, std::shared_ptr<SamraiLifeCycle>>(m, "SamraiLifeCycle")
         .def(py::init<>())
