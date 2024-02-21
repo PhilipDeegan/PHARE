@@ -8,6 +8,8 @@
 
 #include "core/def/pragma_disable.hpp"
 
+#if __has_include("pybind11/embed.h")
+
 // clang-format off
 DISABLE_WARNING(shadow, shadow-field-in-constructor-modified, 42)
 
@@ -18,6 +20,13 @@ DISABLE_WARNING(shadow, shadow-field-in-constructor-modified, 42)
 #include <pybind11/functional.h>
 ENABLE_WARNING(shadow, shadow-field-in-constructor-modified, 42)
 // clang-format on
+
+#else
+// assume nanobind for now
+#include "python3/interpreter"
+#endif
+
+
 
 namespace py = pybind11;
 

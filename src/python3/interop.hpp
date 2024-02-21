@@ -1,5 +1,5 @@
-#ifndef PHARE_PYTHON_PYBIND_DEF_HPP
-#define PHARE_PYTHON_PYBIND_DEF_HPP
+#ifndef PHARE_PYTHON_INTEROP_HPP
+#define PHARE_PYTHON_INTEROP_HPP
 
 #include <tuple>
 #include <cassert>
@@ -8,25 +8,20 @@
 
 #include "core/utilities/span.hpp"
 
-
 #undef HAVE_SYS_TIMES_H // included in python again, possibly with different value
 #undef HAVE_UNISTD_H
 
 #if __has_include("pybind11/stl.h")
-#include "pybind11/stl.h"
-#include "pybind11/numpy.h"
-#else
-// assume nanobind for now
-#include "nanobind/ndarray.h"
-// using pybind11 = nanobind;
-#endif
+#include "python3/pybind/pybind_array.hpp"
 
+#else // assume nanobind for now
+#include "python3/nanobind/nanobind_array.hpp"
+
+#endif
 
 
 namespace PHARE::pydata
 {
-template<typename T>
-using py_array_t = nanobind::ndarray<T, nanobind::c_contig>;
 
 
 using pyarray_particles_t = std::tuple<py_array_t<std::int32_t>, py_array_t<double>,

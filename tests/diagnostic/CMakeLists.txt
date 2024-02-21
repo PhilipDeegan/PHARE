@@ -22,7 +22,7 @@ if(HighFive)
 
     target_link_libraries(${src_name} PRIVATE
       phare_simulator
-      pybind11::embed
+
       ${GTEST_LIBS}
       ${HDF5_LIBRARIES})
 

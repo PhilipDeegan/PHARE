@@ -10,7 +10,8 @@ include("${PHARE_PROJECT_DIR}/res/cmake/dep/samrai.cmake")
 include("${PHARE_PROJECT_DIR}/res/cmake/dep/caliper.cmake")
 
 # pybind
-include("${PHARE_PROJECT_DIR}/res/cmake/dep/pybind.cmake")
+# include("${PHARE_PROJECT_DIR}/res/cmake/dep/pybind.cmake")
+include("${PHARE_PROJECT_DIR}/res/cmake/dep/nanobind.cmake")
 
 
 # HighFive

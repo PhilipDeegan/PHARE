@@ -21,7 +21,7 @@ target_include_directories(${PROJECT_NAME} PRIVATE
 
 target_link_libraries(${PROJECT_NAME} PRIVATE
   phare_simulator
-  pybind11::embed
+
   ${GTEST_LIBS})
 
 
