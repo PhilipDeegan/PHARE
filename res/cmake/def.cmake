@@ -29,6 +29,11 @@ set (PHARE_WERROR_FLAGS ${PHARE_FLAGS} ${PHARE_WERROR_FLAGS})
 set (PHARE_PYTHONPATH "${CMAKE_BINARY_DIR}:${CMAKE_SOURCE_DIR}/pyphare")
 
 
+find_package(Threads REQUIRED)
+
+set (PHARE_BASE_LIBS Threads::Threads)
+
+
 # now we see if we are running with configurator
 if (phare_configurator)
   execute_process(
