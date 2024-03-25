@@ -175,3 +175,9 @@ def deep_copy(item, memo, excludes=[]):
         else:
             setattr(that, key, deepcopy(value, memo))
     return that
+
+
+def NO_GUI():
+    import matplotlib as mpl
+
+    mpl.use("Agg")
