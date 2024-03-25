@@ -281,9 +281,9 @@ NO_DISCARD auto generate(F&& f, std::size_t count)
 
 
 template<typename F, typename Container>
-NO_DISCARD auto generate(F&& f, Container& container)
+NO_DISCARD auto generate(F&& f, Container&& container)
 {
-    using T          = typename Container::value_type;
+    using T          = typename std::decay_t<Container>::value_type;
     using value_type = std::decay_t<std::result_of_t<F&(T&)>>;
     std::vector<value_type> v1;
     if (container.size() > 0)
