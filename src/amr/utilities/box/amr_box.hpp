@@ -12,6 +12,16 @@
 
 namespace PHARE::amr
 {
+template<std::size_t dim, typename Type = int>
+auto to_array(SAMRAI::hier::IntVector const& vec)
+{
+    std::array<Type, dim> arr;
+    for (std::size_t idir = 0; idir < dim; ++idir)
+        arr[idir] = vec[idir];
+    return arr;
+}
+
+
 template<typename Type, std::size_t dim>
 NO_DISCARD auto samrai_box_from(PHARE::core::Box<Type, dim> const& box, int samrai_blockId = 0)
 {
@@ -24,11 +34,14 @@ NO_DISCARD auto samrai_box_from(PHARE::core::Box<Type, dim> const& box, int samr
 template<std::size_t dim, typename Type = int>
 NO_DISCARD auto phare_box_from(SAMRAI::hier::Box const& box)
 {
+    static_assert(sizeof(Type) == sizeof(int)); // bad
+
     std::array<Type, dim> lower = *reinterpret_cast<std::array<int, dim> const*>(&box.lower()[0]);
     std::array<Type, dim> upper = *reinterpret_cast<std::array<int, dim> const*>(&box.upper()[0]);
 
     return PHARE::core::Box<Type, dim>{core::Point{lower}, core::Point{upper}};
 }
+
 
 NO_DISCARD inline bool operator==(SAMRAI::hier::Box const& b1, SAMRAI::hier::Box const& b2)
 {

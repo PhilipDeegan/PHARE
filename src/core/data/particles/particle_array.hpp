@@ -165,6 +165,13 @@ public:
         cellMap_.export_to(box, particles_.data(), dest, std::forward<Fn>(fn));
     }
 
+
+    void export_particles(box_t const& box, std::vector<Particle_t>& dest) const
+    {
+        PHARE_LOG_SCOPE("ParticleArray::export_particles (box, vector)");
+        cellMap_.export_to(box, particles_, dest);
+    }
+
     template<typename Fn>
     void export_particles(box_t const& box, std::vector<Particle_t>& dest, Fn&& fn) const
     {

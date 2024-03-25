@@ -65,8 +65,16 @@ namespace core
 
         constexpr Point() { core::fill(Type{0}, r); }
 
-        NO_DISCARD auto& operator[](std::size_t i) { return r[i]; }
-        NO_DISCARD auto const& operator[](std::size_t i) const { return r[i]; }
+        template<typename Integer>
+        NO_DISCARD auto& operator[](Integer const& i)
+        {
+            return r[i];
+        }
+        template<typename Integer>
+        NO_DISCARD auto const& operator[](Integer const& i) const
+        {
+            return r[i];
+        }
 
 
         NO_DISCARD bool operator==(Point const& p) const
@@ -192,6 +200,14 @@ namespace core
 
 } // namespace core
 } // namespace PHARE
+
+
+template<typename Type, std::size_t S>
+void operator+=(std::array<Type, S>& arr, PHARE::core::Point<Type, S> const& p)
+{
+    for (std::size_t i = 0; i < S; ++i)
+        arr[i] += p[i];
+}
 
 namespace std
 {

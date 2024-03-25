@@ -511,19 +511,8 @@ namespace amr
 
             // first copy particles that fall into our domain array
             // they can come from the source domain or patch ghost
-            auto destBox  = myDomainBox * overlapBox;
-            auto new_size = domainParticles.size();
-            auto offset   = transformation.getOffset();
-            auto offseter = [&](auto const& particle) {
-                // we make a copy because we do not want to
-                // shift the original particle...
-                auto shiftedParticle{particle};
-                for (std::size_t idir = 0; idir < dim; ++idir)
-                {
-                    shiftedParticle.iCell[idir] += offset[idir];
-                }
-                return shiftedParticle;
-            };
+            auto destBox = myDomainBox * overlapBox;
+            auto offset  = core::Point{to_array<dim>(transformation.getOffset())};
 
             PHARE_LOG_START("DomainToDomain (transform)");
             if (!destBox.empty())
@@ -537,13 +526,13 @@ namespace amr
                 // this is done by applying the INVERSE transformation
                 // since a *transformation* is from source to destination.
 
+                auto curr_size = domainParticles.size();
                 transformation.inverseTransform(destBox);
                 auto destBox_p = phare_box_from<dim>(destBox);
-                new_size += srcDomainParticles.nbr_particles_in(destBox_p);
-
-                if (domainParticles.capacity() < new_size)
-                    domainParticles.reserve(new_size);
-                srcDomainParticles.export_particles(destBox_p, domainParticles, offseter);
+                domainParticles.reserve(curr_size + srcDomainParticles.nbr_particles_in(destBox_p));
+                srcDomainParticles.export_particles(destBox_p, domainParticles);
+                for (std::size_t i = curr_size; i < domainParticles.size(); ++i)
+                    domainParticles[i].iCell += offset;
             }
             PHARE_LOG_STOP("DomainToDomain (transform)");
 
@@ -556,31 +545,26 @@ namespace amr
             SAMRAI::hier::BoxContainer ghostLayerBoxes{};
             ghostLayerBoxes.removeIntersections(overlapBox, myDomainBox);
 
-            new_size = patchGhostParticles.size();
             for (auto& selectionBox : ghostLayerBoxes)
-            {
-                if (!selectionBox.empty())
-                {
-                    transformation.inverseTransform(selectionBox);
-                    auto selectionBox_p = phare_box_from<dim>(selectionBox);
-                    new_size += srcDomainParticles.nbr_particles_in(selectionBox_p);
-                }
-            }
-            if (patchGhostParticles.capacity() < new_size)
-                patchGhostParticles.reserve(new_size);
+                transformation.inverseTransform(selectionBox);
 
+            auto curr_size = patchGhostParticles.size();
+            auto new_size  = curr_size;
+            for (auto const& selectionBox : ghostLayerBoxes)
+                if (!selectionBox.empty())
+                    new_size
+                        += srcDomainParticles.nbr_particles_in(phare_box_from<dim>(selectionBox));
+            patchGhostParticles.reserve(new_size);
 
             // ghostLayer boxes already have been inverse transformed
             // in previous loop, not to do again...
             for (auto const& selectionBox : ghostLayerBoxes)
-            {
                 if (!selectionBox.empty())
-                {
-                    auto selectionBox_p = phare_box_from<dim>(selectionBox);
-                    srcDomainParticles.export_particles(selectionBox_p, patchGhostParticles,
-                                                        offseter);
-                }
-            }
+                    srcDomainParticles.export_particles(phare_box_from<dim>(selectionBox),
+                                                        patchGhostParticles);
+
+            for (std::size_t i = curr_size; i < patchGhostParticles.size(); ++i)
+                patchGhostParticles[i].iCell += offset;
 
             PHARE_LOG_STOP("DomainToGhosts (transform)");
             PHARE_LOG_STOP("ParticleData::copy_ (transform)");
@@ -639,32 +623,27 @@ namespace amr
             // destination space.  Therefore we need to inverse transform the
             // overlap box into our index space, intersect each of them with
             // our ghost box and put export them with the transformation offset
-            auto overlapBoxes = overlap.getDestinationBoxContainer();
-            auto offset       = transformation.getOffset();
-            std::size_t size  = 0;
-            auto offseter     = [&](auto const& particle) {
-                auto shiftedParticle{particle};
-                for (std::size_t idir = 0; idir < dim; ++idir)
-                {
-                    shiftedParticle.iCell[idir] += offset[idir];
-                }
-                return shiftedParticle;
+
+            auto const& overlapBoxes  = overlap.getDestinationBoxContainer();
+            auto const& outBufferSize = outBuffer.size(); // before adding particles;
+            auto const& offset        = core::Point{to_array<dim>(transformation.getOffset())};
+
+            auto transformed_box = [&](auto box) {
+                transformation.inverseTransform(box);
+                return box;
             };
+
+            std::size_t size = 0;
             for (auto const& box : overlapBoxes)
-            {
-                auto toTakeFrom{box};
-                transformation.inverseTransform(toTakeFrom);
-                auto toTakeFrom_p = phare_box_from<dim>(toTakeFrom);
-                size += domainParticles.nbr_particles_in(toTakeFrom_p);
-            }
+                size += domainParticles.nbr_particles_in(phare_box_from<dim>(transformed_box(box)));
             outBuffer.reserve(size);
+
             for (auto const& box : overlapBoxes)
-            {
-                auto toTakeFrom{box};
-                transformation.inverseTransform(toTakeFrom);
-                auto toTakeFrom_p = phare_box_from<dim>(toTakeFrom);
-                domainParticles.export_particles(toTakeFrom_p, outBuffer, offseter);
-            }
+                domainParticles.export_particles(phare_box_from<dim>(transformed_box(box)),
+                                                 outBuffer);
+
+            for (std::size_t i = outBufferSize; i < outBuffer.size(); ++i)
+                outBuffer[i].iCell += offset;
         }
     };
 } // namespace amr
