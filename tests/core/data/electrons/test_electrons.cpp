@@ -13,6 +13,7 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+#include "tests/core/data/field/test_field_fixtures.hpp"
 #include "tests/initializer/init_functions.hpp"
 
 
@@ -126,8 +127,8 @@ struct ElectronsTest : public ::testing::Test
 
     using GridYee = GridLayout<GridLayoutImplYee<dim, interp>>;
 
-    using VecFieldND       = VecField<NdArrayVector<dim>, HybridQuantity>;
-    using SymTensorFieldND = SymTensorField<NdArrayVector<dim>, HybridQuantity>;
+    using VecFieldND       = VecField<Field_t<dim>, HybridQuantity>;
+    using SymTensorFieldND = SymTensorField<Field_t<dim>, HybridQuantity>;
     using FieldND          = typename VecFieldND::field_type;
 
     using IonPopulationND
@@ -503,7 +504,7 @@ TYPED_TEST(ElectronsTest, ThatElectronsVelocityEqualIonVelocityMinusJ)
     auto& electrons = this->electrons;
     auto& layout    = this->layout;
 
-    using VecFieldND = VecField<NdArrayVector<dim>, HybridQuantity>;
+    using VecFieldND = VecField<Field_t<dim>, HybridQuantity>;
     using FieldND    = typename VecFieldND::field_type;
     using GridYee    = GridLayout<GridLayoutImplYee<dim, interp>>;
 

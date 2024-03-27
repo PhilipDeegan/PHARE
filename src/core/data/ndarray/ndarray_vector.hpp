@@ -10,6 +10,8 @@
 #include <numeric>
 #include <iostream>
 
+#include "core/utilities/types.hpp"
+
 
 namespace PHARE::core
 {
@@ -208,7 +210,7 @@ public:
 
     explicit NdArrayVector(std::array<std::uint32_t, dim> const& ncells)
         : nCells_{ncells}
-        , data_(std::accumulate(ncells.begin(), ncells.end(), 1, std::multiplies<int>()))
+        , data_(product(ncells))
     {
     }
 

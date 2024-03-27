@@ -18,6 +18,8 @@
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
+#include "tests/core/data/field/test_field_fixtures.hpp"
+
 #include "tests/initializer/init_functions.hpp"
 using namespace PHARE::initializer::test_fn::func_1d; // density/etc are here
 
@@ -34,8 +36,8 @@ using MaxwellianParticleInitializer1D = MaxwellianParticleInitializer<ParticleAr
 class theIons : public ::testing::Test
 {
 protected:
-    using VecField1D       = VecField<NdArrayVector<1>, HybridQuantity>;
-    using SymTensorField1D = SymTensorField<NdArrayVector<1>, HybridQuantity>;
+    using VecField1D       = VecField<Field_t<1>, HybridQuantity>;
+    using SymTensorField1D = SymTensorField<Field_t<1>, HybridQuantity>;
     using InitFunctionT    = PHARE::initializer::InitFunction<1>;
 
     using IonPopulation1D

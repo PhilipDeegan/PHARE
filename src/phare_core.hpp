@@ -34,9 +34,9 @@ struct PHARE_Types
     static auto constexpr interp_order = interp_order_;
 
     using Array_t          = PHARE::core::NdArrayVector<dimension>;
-    using SymTensorField_t = PHARE::core::SymTensorField<Array_t, PHARE::core::HybridQuantity>;
-    using VecField_t       = PHARE::core::VecField<Array_t, PHARE::core::HybridQuantity>;
     using Field_t          = PHARE::core::Field<Array_t, PHARE::core::HybridQuantity::Scalar>;
+    using SymTensorField_t = PHARE::core::SymTensorField<Field_t, PHARE::core::HybridQuantity>;
+    using VecField_t       = PHARE::core::VecField<Field_t, PHARE::core::HybridQuantity>;
     using Electromag_t     = PHARE::core::Electromag<VecField_t>;
     using YeeLayout_t      = PHARE::core::GridLayoutImplYee<dimension, interp_order>;
     using GridLayout_t     = PHARE::core::GridLayout<YeeLayout_t>;

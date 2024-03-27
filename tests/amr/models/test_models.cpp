@@ -18,6 +18,8 @@
 #include <SAMRAI/tbox/SAMRAIManager.h>
 #include <SAMRAI/tbox/SAMRAI_MPI.h>
 
+#include "tests/core/data/field/test_field_fixtures.hpp"
+
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
@@ -32,8 +34,8 @@ using namespace PHARE::initializer::test_fn::func_1d; // density/etc are here
 
 static constexpr std::size_t dim         = 1;
 static constexpr std::size_t interpOrder = 1;
-using VecField1D                         = VecField<NdArrayVector<1>, HybridQuantity>;
-using SymTensorField1D                   = SymTensorField<NdArrayVector<1>, HybridQuantity>;
+using VecField1D                         = VecField<Field_t<1>, HybridQuantity>;
+using SymTensorField1D                   = SymTensorField<Field_t<1>, HybridQuantity>;
 using GridImplYee1D                      = GridLayoutImplYee<dim, interpOrder>;
 using ParticleArray1D                    = ParticleArray<dim>;
 using GridYee1D                          = GridLayout<GridImplYee1D>;

@@ -12,6 +12,7 @@
 #include "core/data/vecfield/vecfield.hpp"
 #include "core/numerics/ohm/ohm.hpp"
 #include "core/utilities/index/index.hpp"
+#include "tests/core/data/field/test_field_fixtures.hpp"
 
 #include "phare_core.hpp"
 
@@ -82,10 +83,10 @@ struct OhmTest : public ::testing::Test
     Field<NdArrayVector<dim>, HybridQuantity::Scalar> Exnew;
     Field<NdArrayVector<dim>, HybridQuantity::Scalar> Eynew;
     Field<NdArrayVector<dim>, HybridQuantity::Scalar> Eznew;
-    VecField<NdArrayVector<dim>, HybridQuantity> V;
-    VecField<NdArrayVector<dim>, HybridQuantity> B;
-    VecField<NdArrayVector<dim>, HybridQuantity> J;
-    VecField<NdArrayVector<dim>, HybridQuantity> Enew;
+    VecField<Field_t<dim>, HybridQuantity> V;
+    VecField<Field_t<dim>, HybridQuantity> B;
+    VecField<Field_t<dim>, HybridQuantity> J;
+    VecField<Field_t<dim>, HybridQuantity> Enew;
     Ohm<GridYee> ohm;
 
     OhmTest()

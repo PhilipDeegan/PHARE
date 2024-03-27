@@ -7,13 +7,13 @@
 #include "core/data/ndarray/ndarray_vector.hpp"
 #include "core/data/vecfield/vecfield.hpp"
 #include "core/hybrid/hybrid_quantities.hpp"
-
+#include "tests/core/data/field/test_field_fixtures.hpp"
 
 using namespace PHARE::core;
 
 
 
-template<class NdArrayImpl>
+template<class Field_>
 class VecFieldGeneric : public ::testing::Test
 {
 public:
@@ -26,10 +26,10 @@ public:
 
 protected:
     std::string vf2_name = "vf";
-    VecField<NdArrayImpl, HybridQuantity::Scalar> vf2;
+    VecField<Field_, HybridQuantity::Scalar> vf2;
 };
 
-using NdArrays = ::testing::Types<NdArrayVector<1>, NdArrayVector<2>, NdArrayVector<3>>;
+using NdArrays = ::testing::Types<Field_t<1>, Field_t<2>, Field_t<3>>;
 
 
 TYPED_TEST_SUITE(VecFieldGeneric, NdArrays);
@@ -100,9 +100,9 @@ protected:
     Field<NdArrayVector<3>, typename HybridQuantity::Scalar> by3d_;
     Field<NdArrayVector<3>, typename HybridQuantity::Scalar> bz3d_;
 
-    VecField<NdArrayVector<1>, HybridQuantity> B1D_;
-    VecField<NdArrayVector<2>, HybridQuantity> B2D_;
-    VecField<NdArrayVector<3>, HybridQuantity> B3D_;
+    VecField<Field_t<1>, HybridQuantity> B1D_;
+    VecField<Field_t<2>, HybridQuantity> B2D_;
+    VecField<Field_t<3>, HybridQuantity> B3D_;
 };
 
 const std::uint32_t VecFieldTest::nx = 10;
@@ -302,7 +302,7 @@ TEST(aVecField, dataCanBeCopiedIntoAnother)
     Field<NdArrayVector<3>, Scalar> bx1{"B1_bx1", Scalar::Bx, 2u, 3u, 4u};
     Field<NdArrayVector<3>, Scalar> by1{"B1_by1", Scalar::By, 2u, 3u, 4u};
     Field<NdArrayVector<3>, Scalar> bz1{"B1_bz1", Scalar::Bz, 2u, 3u, 4u};
-    VecField<NdArrayVector<3>, HybridQuantity> B1{"B1", HybridQuantity::Vector::B};
+    VecField<Field_t<3>, HybridQuantity> B1{"B1", HybridQuantity::Vector::B};
     B1.setBuffer("B1_x", &bx1);
     B1.setBuffer("B1_y", &by1);
     B1.setBuffer("B1_z", &bz1);
@@ -314,7 +314,7 @@ TEST(aVecField, dataCanBeCopiedIntoAnother)
     Field<NdArrayVector<3>, Scalar> bx2{"B2_bx2", Scalar::Bx, 2u, 3u, 4u};
     Field<NdArrayVector<3>, Scalar> by2{"B2_by2", Scalar::By, 2u, 3u, 4u};
     Field<NdArrayVector<3>, Scalar> bz2{"B2_bz2", Scalar::Bz, 2u, 3u, 4u};
-    VecField<NdArrayVector<3>, HybridQuantity> B2{"B2", HybridQuantity::Vector::B};
+    VecField<Field_t<3>, HybridQuantity> B2{"B2", HybridQuantity::Vector::B};
     B2.setBuffer("B2_x", &bx2);
     B2.setBuffer("B2_y", &by2);
     B2.setBuffer("B2_z", &bz2);

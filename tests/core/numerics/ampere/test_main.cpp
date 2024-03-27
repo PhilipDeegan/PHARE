@@ -17,6 +17,7 @@
 #include "tests/core/data/field/test_field.hpp"
 #include "tests/core/data/vecfield/test_vecfield.hpp"
 #include "tests/core/data/gridlayout/gridlayout_test.hpp"
+#include "tests/core/data/field/test_field_fixtures.hpp"
 
 
 using namespace PHARE::core;
@@ -146,8 +147,8 @@ protected:
     Field<NdArrayVector<1>, HybridQuantity::Scalar> Jy;
     Field<NdArrayVector<1>, HybridQuantity::Scalar> Jz;
 
-    VecField<NdArrayVector<1>, HybridQuantity> B;
-    VecField<NdArrayVector<1>, HybridQuantity> J;
+    VecField<Field_t<1>, HybridQuantity> B;
+    VecField<Field_t<1>, HybridQuantity> J;
 
     Ampere<GridLayout<GridLayoutImpl>> ampere;
 
@@ -187,8 +188,8 @@ protected:
     Field<NdArrayVector<2>, HybridQuantity::Scalar> Jy;
     Field<NdArrayVector<2>, HybridQuantity::Scalar> Jz;
 
-    VecField<NdArrayVector<2>, HybridQuantity> B;
-    VecField<NdArrayVector<2>, HybridQuantity> J;
+    VecField<Field_t<2>, HybridQuantity> B;
+    VecField<Field_t<2>, HybridQuantity> J;
 
     Ampere<GridLayout<GridLayoutImpl>> ampere;
 
@@ -228,8 +229,8 @@ protected:
     Field<NdArrayVector<3>, HybridQuantity::Scalar> Jy;
     Field<NdArrayVector<3>, HybridQuantity::Scalar> Jz;
 
-    VecField<NdArrayVector<3>, HybridQuantity> B;
-    VecField<NdArrayVector<3>, HybridQuantity> J;
+    VecField<Field_t<3>, HybridQuantity> B;
+    VecField<Field_t<3>, HybridQuantity> J;
 
     Ampere<GridLayout<GridLayoutImpl>> ampere;
 

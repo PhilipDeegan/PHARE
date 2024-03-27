@@ -18,6 +18,7 @@
 #include "tests/core/data/field/test_field.hpp"
 #include "tests/core/data/vecfield/test_vecfield.hpp"
 #include "tests/core/data/gridlayout/gridlayout_test.hpp"
+#include "tests/core/data/field/test_field_fixtures.hpp"
 
 using namespace PHARE::core;
 
@@ -170,9 +171,9 @@ protected:
     Field<NdArrayVector<1>, HybridQuantity::Scalar> Bxnew;
     Field<NdArrayVector<1>, HybridQuantity::Scalar> Bynew;
     Field<NdArrayVector<1>, HybridQuantity::Scalar> Bznew;
-    VecField<NdArrayVector<1>, HybridQuantity> B;
-    VecField<NdArrayVector<1>, HybridQuantity> E;
-    VecField<NdArrayVector<1>, HybridQuantity> Bnew;
+    VecField<Field_t<1>, HybridQuantity> B;
+    VecField<Field_t<1>, HybridQuantity> E;
+    VecField<Field_t<1>, HybridQuantity> Bnew;
     Faraday<GridLayout<GridLayoutImpl>> faraday;
 
 public:
@@ -221,9 +222,9 @@ protected:
     Field<NdArrayVector<2>, HybridQuantity::Scalar> Bxnew;
     Field<NdArrayVector<2>, HybridQuantity::Scalar> Bynew;
     Field<NdArrayVector<2>, HybridQuantity::Scalar> Bznew;
-    VecField<NdArrayVector<2>, HybridQuantity> B;
-    VecField<NdArrayVector<2>, HybridQuantity> E;
-    VecField<NdArrayVector<2>, HybridQuantity> Bnew;
+    VecField<Field_t<2>, HybridQuantity> B;
+    VecField<Field_t<2>, HybridQuantity> E;
+    VecField<Field_t<2>, HybridQuantity> Bnew;
     Faraday<GridLayout<GridLayoutImpl>> faraday;
 
 public:
@@ -272,9 +273,9 @@ protected:
     Field<NdArrayVector<3>, HybridQuantity::Scalar> Bxnew;
     Field<NdArrayVector<3>, HybridQuantity::Scalar> Bynew;
     Field<NdArrayVector<3>, HybridQuantity::Scalar> Bznew;
-    VecField<NdArrayVector<3>, HybridQuantity> B;
-    VecField<NdArrayVector<3>, HybridQuantity> E;
-    VecField<NdArrayVector<3>, HybridQuantity> Bnew;
+    VecField<Field_t<3>, HybridQuantity> B;
+    VecField<Field_t<3>, HybridQuantity> E;
+    VecField<Field_t<3>, HybridQuantity> Bnew;
     Faraday<GridLayout<GridLayoutImpl>> faraday;
 
 public:

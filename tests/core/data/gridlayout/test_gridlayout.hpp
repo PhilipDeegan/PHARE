@@ -21,6 +21,9 @@ public:
     {
     }
 
+    GridLayout& operator*() { return *this; }
+    GridLayout& operator*() const { return *this; }
+
     auto static make(std::uint32_t cells) { return TestGridLayout{cells}; }
 };
 
