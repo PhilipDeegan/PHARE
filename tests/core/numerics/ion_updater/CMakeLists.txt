@@ -2,7 +2,7 @@ cmake_minimum_required (VERSION 3.20.1)
 
 project(test-updater)
 
-set(SOURCES test_updater.cpp)
+set(SOURCES test_fixtures.cpp)
 
 add_executable(${PROJECT_NAME} ${SOURCES})
 
