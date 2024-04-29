@@ -257,6 +257,18 @@ NO_DISCARD Return sum(Container const& container, Return r = 0)
 }
 
 
+template<typename Container, typename F>
+NO_DISCARD auto sum_from(Container const& container, F fn)
+{
+    using value_type  = typename Container::value_type;
+    using return_type = std::decay_t<std::result_of_t<F(value_type const&)>>;
+    return_type sum   = 0;
+    for (auto const& el : container)
+        sum += fn(el);
+    return sum;
+}
+
+
 
 
 template<typename F>
@@ -273,6 +285,8 @@ NO_DISCARD auto generate(F&& f, std::size_t from, std::size_t to)
     return v;
 }
 
+
+
 template<typename F>
 NO_DISCARD auto generate(F&& f, std::size_t count)
 {
@@ -281,9 +295,9 @@ NO_DISCARD auto generate(F&& f, std::size_t count)
 
 
 template<typename F, typename Container>
-NO_DISCARD auto generate(F&& f, Container& container)
+NO_DISCARD auto generate(F&& f, Container&& container)
 {
-    using T          = typename Container::value_type;
+    using T          = typename std::decay_t<Container>::value_type;
     using value_type = std::decay_t<std::result_of_t<F&(T&)>>;
     std::vector<value_type> v1;
     if (container.size() > 0)
@@ -299,24 +313,46 @@ NO_DISCARD auto generate(F&& f, std::vector<T>&& v)
     return generate(std::forward<F>(f), v);
 }
 
+
+
+// generate array block
+// const form
+template<std::size_t Idx, typename F, typename Type, std::size_t Size>
+NO_DISCARD auto constexpr generate_array__(F& f, std::array<Type, Size> const& arr)
+{
+    return f(arr[Idx]);
+}
+template<typename Type, std::size_t Size, typename F, std::size_t... Is>
+NO_DISCARD auto constexpr generate_array_(F& f, std::array<Type, Size> const& arr,
+                                          std::integer_sequence<std::size_t, Is...>)
+{
+    return std::array{generate_array__<Is>(f, arr)...};
+}
+template<typename F, typename Type, std::size_t Size>
+NO_DISCARD auto constexpr generate(F&& f, std::array<Type, Size> const& arr)
+{
+    return generate_array_(f, arr, std::make_integer_sequence<std::size_t, Size>{});
+}
+
+
+// non-const form
 template<std::size_t Idx, typename F, typename Type, std::size_t Size>
 NO_DISCARD auto constexpr generate_array__(F& f, std::array<Type, Size>& arr)
 {
     return f(arr[Idx]);
 }
-
 template<typename Type, std::size_t Size, typename F, std::size_t... Is>
 NO_DISCARD auto constexpr generate_array_(F& f, std::array<Type, Size>& arr,
                                           std::integer_sequence<std::size_t, Is...>)
 {
     return std::array{generate_array__<Is>(f, arr)...};
 }
-
 template<typename F, typename Type, std::size_t Size>
-NO_DISCARD auto constexpr generate(F&& f, std::array<Type, Size> const& arr)
+NO_DISCARD auto constexpr generate(F&& f, std::array<Type, Size>& arr)
 {
     return generate_array_(f, arr, std::make_integer_sequence<std::size_t, Size>{});
 }
+// generate array block end
 
 
 // calls operator bool() or copies bool
@@ -352,6 +388,8 @@ auto inline float_equals(double const& a, double const& b, double diff = 1e-12)
 {
     return std::abs(a - b) < diff;
 }
+
+
 
 } // namespace PHARE::core
 
