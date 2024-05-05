@@ -2,6 +2,7 @@
 
 # Per compiler CXXFLAGS
 set (PHARE_FLAGS ${PHARE_FLAGS} )
+
 # mostly for silencing spurious Werrors
 if ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
   # --param=min-pagesize=0    https://gcc.gnu.org/bugzilla/show_bug.cgi?id=105523
@@ -18,6 +19,7 @@ if ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
   if (${CHECK_SUPPORTS_FLAG})
     set (PHARE_FLAGS ${PHARE_FLAGS} --param=evrp-mode=legacy )
   endif()
+
 endif() # clang
 
 
