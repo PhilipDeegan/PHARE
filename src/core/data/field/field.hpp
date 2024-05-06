@@ -57,6 +57,17 @@ namespace core
         {
         }
 
+
+        template<typename GridLayout_t>
+        Field(std::string const& name, GridLayout_t const& layout, PhysicalQuantity qty)
+            : NdArrayImpl{layout.allocSize(qty)}
+            , name_{name}
+            , qty_{qty}
+        {
+        }
+
+
+
         NO_DISCARD std::string name() const { return name_; }
 
 

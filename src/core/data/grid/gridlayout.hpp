@@ -325,10 +325,8 @@ namespace core
 
 
 
-        template<typename NdArrayImpl>
-        NO_DISCARD std::uint32_t
-        physicalStartIndex(Field<NdArrayImpl, HybridQuantity::Scalar> const& field,
-                           Direction direction) const
+        template<typename Field_t>
+        NO_DISCARD std::uint32_t physicalStartIndex(Field_t const& field, Direction direction) const
         {
             return physicalStartIndex(field.physicalQuantity(), direction);
         }
@@ -369,13 +367,12 @@ namespace core
 
 
 
-        template<typename NdArrayImpl>
-        NO_DISCARD std::uint32_t
-        physicalEndIndex(Field<NdArrayImpl, HybridQuantity::Scalar> const& field,
-                         Direction direction) const
+        template<typename Field_t>
+        NO_DISCARD std::uint32_t physicalEndIndex(Field_t const& field, Direction direction) const
         {
             return physicalEndIndex(field.physicalQuantity(), direction);
         }
+
 
 
         NO_DISCARD auto physicalEndIndex(QtyCentering centering) const
@@ -408,10 +405,9 @@ namespace core
         }
 
 
-        template<typename NdArrayImpl>
-        NO_DISCARD std::uint32_t
-        ghostStartIndex([[maybe_unused]] Field<NdArrayImpl, HybridQuantity::Scalar> const& field,
-                        [[maybe_unused]] Direction direction) const
+        template<typename Field_t>
+        NO_DISCARD std::uint32_t ghostStartIndex(Field_t const& /*field*/,
+                                                 Direction /*direction*/) const
         {
             // ghostStartIndex is always the first node
             return 0;
@@ -451,10 +447,8 @@ namespace core
 
 
 
-        template<typename NdArrayImpl>
-        NO_DISCARD std::uint32_t
-        ghostEndIndex(Field<NdArrayImpl, HybridQuantity::Scalar> const& field,
-                      Direction direction) const
+        template<typename Field_t>
+        NO_DISCARD std::uint32_t ghostEndIndex(Field_t const& field, Direction direction) const
         {
             return ghostEndIndex(field.physicalQuantity(), direction);
         }
@@ -1173,8 +1167,47 @@ namespace core
             evalOnBox_(field, fn, indices);
         }
 
+        template<typename Field>
+        auto domainBoxFor(Field const& field) const
+        {
+            return _BoxFor(field, [&](auto const& centering, auto const direction) {
+                return this->physicalStartToEnd(centering, direction);
+            });
+        }
+
+        template<typename Field>
+        auto ghostBoxFor(Field const& field) const
+        {
+            return _BoxFor(field, [&](auto const& centering, auto const direction) {
+                return this->ghostStartToEnd(centering, direction);
+            });
+        }
+
 
     private:
+        template<typename Field, typename Fn>
+        auto _BoxFor(Field const& field, Fn startToEnd) const
+        {
+            std::array<std::uint32_t, dimension> lower, upper;
+
+            auto const [ix0, ix1] = startToEnd(field, Direction::X);
+            lower[0]              = ix0;
+            upper[0]              = ix1;
+            if constexpr (dimension > 1)
+            {
+                auto const [iy0, iy1] = startToEnd(field, Direction::Y);
+                lower[1]              = iy0;
+                upper[1]              = iy1;
+            }
+            if constexpr (dimension == 3)
+            {
+                auto const [iz0, iz1] = startToEnd(field, Direction::Z);
+                lower[2]              = iz0;
+                upper[2]              = iz1;
+            }
+            return Box<std::uint32_t, dimension>{lower, upper};
+        }
+
         template<typename Field, typename IndicesFn, typename Fn>
         static void evalOnBox_(Field& field, Fn& fn, IndicesFn& startToEnd)
         {

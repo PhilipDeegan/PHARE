@@ -19,6 +19,7 @@
 
 #include "gtest/gtest.h"
 
+#include "tests/core/data/field/test_field_fixtures.hpp"
 
 
 #include "tests/initializer/init_functions.hpp"
@@ -29,8 +30,8 @@ static constexpr std::size_t interpOrder = 1;
 using GridImplYee1D                      = GridLayoutImplYee<dim, interpOrder>;
 using GridYee1D                          = GridLayout<GridImplYee1D>;
 
-using VecField1D       = VecField<NdArrayVector<1>, HybridQuantity>;
-using SymTensorField1D = SymTensorField<NdArrayVector<1>, HybridQuantity>;
+using VecField1D       = VecField<Field_t<1>, HybridQuantity>;
+using SymTensorField1D = SymTensorField<Field_t<1>, HybridQuantity>;
 using IonPopulation1D  = IonPopulation<ParticleArray<1>, VecField1D, SymTensorField1D, GridYee1D>;
 using Ions1D           = Ions<IonPopulation1D, GridYee1D>;
 using Electromag1D     = Electromag<VecField1D>;

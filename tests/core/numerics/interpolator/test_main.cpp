@@ -24,7 +24,7 @@
 #include "core/data/vecfield/vecfield.hpp"
 #include "core/hybrid/hybrid_quantities.hpp"
 #include "core/numerics/interpolator/interpolator.hpp"
-
+#include "tests/core/data/field/test_field_fixtures.hpp"
 
 using namespace PHARE::core;
 
@@ -227,7 +227,7 @@ public:
     using GridLayout_t    = typename PHARE_TYPES::GridLayout_t;
     using NdArray_t       = typename PHARE_TYPES::Array_t;
     using ParticleArray_t = typename PHARE_TYPES::ParticleArray_t;
-    using VF              = VecField<NdArray_t, HybridQuantity>;
+    using VF              = VecField<Field_t<dimension>, HybridQuantity>;
 
     Electromag<VF> em;
     GridLayout_t layout{{0.1}, {nx}, {0.}};
@@ -335,7 +335,7 @@ public:
     using GridLayoutImpl  = GridLayoutImplYee<dimension, interp_order>;
     using NdArray_t       = typename PHARE_TYPES::Array_t;
     using ParticleArray_t = typename PHARE_TYPES::ParticleArray_t;
-    using VF              = VecField<NdArray_t, HybridQuantity>;
+    using VF              = VecField<Field_t<dimension>, HybridQuantity>;
 
     Electromag<VF> em;
     GridLayout<GridLayoutImpl> layout{{0.1, 0.1}, {nx, ny}, {0., 0.}};
@@ -446,7 +446,7 @@ public:
     using GridLayoutImpl  = GridLayoutImplYee<dimension, interp_order>;
     using NdArray_t       = typename PHARE_TYPES::Array_t;
     using ParticleArray_t = typename PHARE_TYPES::ParticleArray_t;
-    using VF              = VecField<NdArray_t, HybridQuantity>;
+    using VF              = VecField<Field_t<dimension>, HybridQuantity>;
 
     GridLayout<GridLayoutImpl> layout{{0.1, 0.1, 0.1}, {nx, ny, nz}, {0., 0., 0.}};
     constexpr static auto safeLayer = static_cast<int>(1 + ghostWidthForParticles<interp_order>());
@@ -580,7 +580,7 @@ public:
     Field<NdArray_t, typename HybridQuantity::Scalar> vx;
     Field<NdArray_t, typename HybridQuantity::Scalar> vy;
     Field<NdArray_t, typename HybridQuantity::Scalar> vz;
-    VecField<NdArray_t, HybridQuantity> v;
+    VecField<Field_t<dimension>, HybridQuantity> v;
     std::array<double, nbrPointsSupport(Interpolator::interp_order)> weights;
 
 
@@ -773,7 +773,7 @@ struct ACollectionOfParticles_2d : public ::testing::Test
 
     ParticleArray_t particles;
     Field<NdArray_t, typename HybridQuantity::Scalar> rho, vx, vy, vz;
-    VecField<NdArray_t, HybridQuantity> v;
+    VecField<Field_t<dim>, HybridQuantity> v;
     Interpolator interpolator;
 };
 TYPED_TEST_SUITE_P(ACollectionOfParticles_2d);
