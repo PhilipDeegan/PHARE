@@ -71,7 +71,7 @@ class Simulator:
             self.print_eol = "\r"
         self.print_eol = kwargs.get("print_eol", self.print_eol)
         self.log_to_file = kwargs.get("log_to_file", True)
-
+        self.write_system_state_time = 0
         self.auto_dump = auto_dump
         import pyphare.simulator._simulator as _simulator
 
@@ -161,6 +161,7 @@ class Simulator:
 
         if self._auto_dump() and self.post_advance != None:
             self.post_advance(self.cpp_sim.currentTime())
+        self.write_system_state_stats()
         return self
 
     def times(self):
@@ -254,6 +255,23 @@ class Simulator:
     def _check_init(self):
         if self.cpp_sim is None:
             self.initialize()
+
+    def write_system_state_stats(self):
+        import pyphare.core.phare_utilities as pu
+        from pyphare.cpp import cpp_lib
+
+        if self.simulation.system_state_write_every_t == 0:
+            return
+        diff_time = self.cpp_sim.currentTime() - self.write_system_state_time
+        if (
+            pu.fp_equal(diff_time, self.simulation.system_state_write_every_t)
+            or diff_time > self.simulation.system_state_write_every_t
+        ):
+            self.write_system_state_time = self.cpp_sim.currentTime()
+            time = "{:.10f}".format(self.cpp_sim.currentTime())
+            pu.write_system_state_stats(
+                f".phare/sys/stats/{cpp_lib().mpi_rank()}/{time}"
+            )
 
     def _log_to_file(self):
         """

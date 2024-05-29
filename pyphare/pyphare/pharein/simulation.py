@@ -581,14 +581,16 @@ def check_clustering(**kwargs):
     return clustering
 
 
-def check_loadbalancing(**kwargs):
-    valid_keys = ["nppc", "homogeneous"]
-    loadbalancing = kwargs.get("loadbalancing", "nppc")
-    if loadbalancing not in valid_keys:
-        raise ValueError(
-            f"Error: loadbalancing type is not supported, supported types are {valid_keys}"
-        )
-    return loadbalancing
+def check_system_state_writes(**kwargs):
+    write_time = kwargs.get("system_state_write_every_t", 0)
+    if write_time > 0:
+        try:
+            import psutil
+        except ImportError as e:
+            raise ValueError(
+                "psutil is not available for writing system usage information"
+            )
+    return write_time
 
 
 # ------------------------------------------------------------------------------
@@ -626,6 +628,7 @@ def checker(func):
             "description",
             "dry_run",
             "write_reports",
+            "system_state_write_every_t",
         ]
 
         accepted_keywords += check_optional_keywords(**kwargs)
@@ -698,6 +701,8 @@ def checker(func):
         kwargs["write_reports"] = kwargs.get(  # on by default except for tests
             "write_reports", os.environ.get("PHARE_TESTING", "0") != "1"
         )
+
+        kwargs["system_state_write_every_t"] = check_system_state_writes(**kwargs)
 
         return func(simulation_object, **kwargs)
 
