@@ -25,19 +25,15 @@ cpp = cpp_lib()
 startMPI()
 
 diag_outputs = "phare_outputs/test/harris/2d"
-time_step_nbr = 1000
 time_step = 0.001
-final_time = time_step * time_step_nbr
-dt = 10 * time_step
-nt = final_time / dt + 1
-timestamps = dt * np.arange(nt)
-
+final_time = 30
+timestamps = np.arange(0, final_time + time_step, final_time / 3)
 
 def config():
     sim = ph.Simulation(
         smallest_patch_size=15,
         largest_patch_size=25,
-        time_step_nbr=time_step_nbr,
+        final_time=final_time,
         time_step=time_step,
         # boundary_types="periodic",
         cells=(200, 400),
@@ -153,6 +149,38 @@ def config():
     return sim
 
 
+def plot(diag_dir):
+    run = Run(diag_dir)
+    for time in timestamps:
+        run.GetDivB(time).plot(
+            filename=plot_file_for_qty("divb", time),
+            plot_patches=True,
+            vmin=1e-11,
+            vmax=2e-10,
+        )
+        run.GetRanks(time).plot(
+            filename=plot_file_for_qty("Ranks", time),
+            plot_patches=True,
+        )
+        run.GetN(time, pop_name="protons").plot(
+            filename=plot_file_for_qty("N", time),
+            plot_patches=True,
+        )
+        for c in ["x", "y", "z"]:
+            run.GetB(time).plot(
+                filename=plot_file_for_qty(f"b{c}", time),
+                qty=f"B{c}",
+                plot_patches=True,
+            )
+        run.GetJ(time).plot(
+            filename=plot_file_for_qty("jz", time),
+            qty="Jz",
+            plot_patches=True,
+            vmin=-2,
+            vmax=2,
+        )
+
+
 def main():
     Simulator(config()).run()
     try:
@@ -161,6 +189,8 @@ def main():
         m_plotting.plot_run_timer_data(diag_outputs, cpp.mpi_rank())
     except ImportError:
         print("Phlop not found - install with: `pip install phlop`")
+    if cpp.mpi_rank() == 0:
+        plot(diag_outputs)
     cpp.mpi_barrier()
 
 
