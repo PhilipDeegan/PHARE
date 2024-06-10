@@ -23,8 +23,8 @@ def config():
     # hence the length of the box is 33, and the fourier mode will be 1
 
     sim = ph.Simulation(
-        smallest_patch_size=20,
-        largest_patch_size=60,
+        # smallest_patch_size=20,
+        # largest_patch_size=60,
         final_time=100,
         time_step=0.001,
         boundary_types="periodic",

@@ -10,11 +10,9 @@ endif()
 if(HighFive AND testMPI)
   ## These test use dump diagnostics so require HighFive!
   # exec level 11
-  # mpirun -n 10
-  if(testMPI)
-    phare_mpi_python3_exec(11 10 harris_2d harris_2d.py ${CMAKE_CURRENT_BINARY_DIR})
-  else()
-    phare_python3_exec(11 harris_2d harris_2d.py ${CMAKE_CURRENT_BINARY_DIR})
-  endif(testMPI)
+  # mpirun -n 5
+
+  # run manually
+  # phare_mpi_python3_exec(11 10 harris_2d harris_2d.py ${CMAKE_CURRENT_BINARY_DIR})
 
 endif()

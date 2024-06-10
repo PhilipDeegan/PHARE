@@ -22,8 +22,8 @@ def config(interp_order):
     user initialization model and diagnostics.
     """
     sim = ph.Simulation(
-        smallest_patch_size=20,
-        largest_patch_size=20,
+        # smallest_patch_size=20,
+        # largest_patch_size=20,
         time_step=0.005,  # number of time steps (not specified if time_step and final_time provided)
         final_time=30,  # simulation final time (not specified if time_step and time_step_nbr provided)
         boundary_types="periodic",  # boundary condition, string or tuple, length == len(cell) == len(dl)

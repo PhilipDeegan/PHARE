@@ -3,27 +3,34 @@
 
 #include "test_diagnostics.ipp"
 
-static std::string const job_file = "job_1d";
-static std::string const out_dir  = "phare_outputs/diags_1d/";
+static std::string const job_file()
+{
+    return "job_1d_" + std::to_string(PHARE::core::mpi::size()) + "core";
+}
+static std::string const out_dir()
+{
+    return "phare_outputs/diags_1d/" + std::to_string(PHARE::core::mpi::size());
+}
+
 
 TYPED_TEST(Simulator1dTest, fluid)
 {
-    fluid_test(TypeParam{job_file}, out_dir);
+    fluid_test(TypeParam{job_file()}, out_dir());
 }
 
 TYPED_TEST(Simulator1dTest, particles)
 {
-    particles_test(TypeParam{job_file}, out_dir);
+    particles_test(TypeParam{job_file()}, out_dir());
 }
 
 TYPED_TEST(Simulator1dTest, electromag)
 {
-    electromag_test(TypeParam{job_file}, out_dir);
+    electromag_test(TypeParam{job_file()}, out_dir());
 }
 
 TYPED_TEST(Simulator1dTest, allFromPython)
 {
-    allFromPython_test(TypeParam{job_file}, out_dir);
+    allFromPython_test(TypeParam{job_file()}, out_dir());
 }
 
 

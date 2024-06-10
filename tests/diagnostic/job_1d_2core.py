@@ -5,7 +5,7 @@ from pyphare.pharein import ElectronModel
 from tests.simulator import basicSimulatorArgs, makeBasicModel
 from tests.diagnostic import dump_all_diags
 
-out = "phare_outputs/diags_1d/"
+out = "phare_outputs/diags_1d/2"
 simInput = {"diag_options": {"format": "phareh5", "options": {"dir": out, "mode" : "overwrite"}}}
 
 ph.Simulation(**basicSimulatorArgs(dim = 1, interp = 1, **simInput))
