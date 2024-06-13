@@ -15,6 +15,7 @@ from tools.python3 import plotting as m_plotting
 
 mpl.use("Agg")
 
+FINAL_TIME = os.getenv("PHARE_FINAL_TIME", None)
 LOAD_BALANCE = os.getenv("LOAD_BALANCE", "True").lower() in ("true", "1", "t")
 
 cpp = cpp_lib()
@@ -22,8 +23,10 @@ startMPI()
 
 cells = (800, 800)
 time_step = 0.005
-final_time = 50
-timestamps = np.arange(0, final_time + time_step, final_time / 5)
+final_time = float(FINAL_TIME) if FINAL_TIME else 50
+timestamps = [0, final_time]  # default
+if final_time == 50:
+    timestamps = np.arange(0, final_time + time_step, final_time / 5)
 
 if cpp.mpi_rank() == 0:
     print(LOAD_BALANCE, "diag timestamps:", timestamps)
