@@ -1,4 +1,10 @@
 
+#  TO activate phlop with PHARE
+#   1. configure cmake -DwithPhlop=ON
+#   2. export PHARE_SCOPE_TIMING=1
+#     for function scope timings
+##
+
 if (withPhlop)
 
   set(PHLOP_SRCDIR ${CMAKE_CURRENT_SOURCE_DIR}/subprojects/phlop)

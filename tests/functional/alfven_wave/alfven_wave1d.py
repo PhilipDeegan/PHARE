@@ -24,8 +24,8 @@ def config():
     # configure the simulation
 
     sim = ph.Simulation(
-        smallest_patch_size=50,
-        largest_patch_size=50,
+        # smallest_patch_size=50,
+        # largest_patch_size=50,
         time_step_nbr=100000,  # number of time steps (not specified if time_step and final_time provided)
         final_time=1000,  # simulation final time (not specified if time_step and time_step_nbr provided)
         boundary_types="periodic",  # boundary condition, string or tuple, length == len(cell) == len(dl)

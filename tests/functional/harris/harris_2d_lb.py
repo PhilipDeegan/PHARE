@@ -1,43 +1,54 @@
 #!/usr/bin/env python3
 
+import os
+import numpy as np
+import matplotlib as mpl
 from pathlib import Path
 
 import pyphare.pharein as ph
-from pyphare.simulator.simulator import Simulator, startMPI
+from pyphare.cpp import cpp_lib
 from pyphare.pharesee.run import Run
+from pyphare.simulator.simulator import Simulator, startMPI
 
-import numpy as np
-
-import matplotlib as mpl
+from tests.simulator import SimulatorTest
+from tools.python3 import plotting as m_plotting
 
 mpl.use("Agg")
 
-from pyphare.cpp import cpp_lib
-from tests.simulator import SimulatorTest
-
+FINAL_TIME = os.getenv("PHARE_FINAL_TIME", None)
+LOAD_BALANCE = os.getenv("LOAD_BALANCE", "True").lower() in ("true", "1", "t")
 
 cpp = cpp_lib()
 startMPI()
 
+cells = (800, 800)
 time_step = 0.005
-final_time = 0.1
-time_step_nbr = int(final_time / time_step)
-timestamps = np.arange(0, final_time + 0.01, 0.05)
-diag_dir = "phare_outputs/test_run"
+final_time = float(FINAL_TIME) if FINAL_TIME else 50
+timestamps = [0, final_time]  # default
+if final_time == 50:
+    timestamps = np.arange(0, final_time + time_step, final_time / 5)
+
+if cpp.mpi_rank() == 0:
+    print(LOAD_BALANCE, "diag timestamps:", timestamps)
+
+diag_dir = "phare_outputs/harris_lb"
+if not LOAD_BALANCE:
+    diag_dir = "phare_outputs/harris"
+
 plot_dir = Path(f"{diag_dir}_plots")
 plot_dir.mkdir(parents=True, exist_ok=True)
 
 
-def config(diag_outputs):
+def config():
     L = 0.5
 
     sim = ph.Simulation(
         time_step=time_step,
         final_time=final_time,
-        cells=(40, 40),
+        cells=cells,
         dl=(0.40, 0.40),
         refinement="tagging",
-        max_nbr_levels=3,
+        max_nbr_levels=2,
         nesting_buffer=1,
         clustering="tile",
         tag_buffer="1",
@@ -45,7 +56,13 @@ def config(diag_outputs):
         resistivity=0.001,
         diag_options={
             "format": "phareh5",
-            "options": {"dir": diag_outputs, "mode": "overwrite"},
+            "options": {"dir": diag_dir, "mode": "overwrite"},
+        },
+        restart_options={
+            "dir": "checkpoints",
+            "mode": "overwrite",
+            "timestamps": timestamps,
+            # "restart_time": 0.0,
         },
     )
 
@@ -104,43 +121,16 @@ def config(diag_outputs):
         assert np.all(temp > 0)
         return temp
 
-    def vx(x, y):
+    def vxyz(x, y):
         return 0.0
 
-    def vy(x, y):
-        return 0.0
-
-    def vz(x, y):
-        return 0.0
-
-    def vthx(x, y):
+    def vthxyz(x, y):
         return np.sqrt(T(x, y))
 
-    def vthy(x, y):
-        return np.sqrt(T(x, y))
-
-    def vthz(x, y):
-        return np.sqrt(T(x, y))
-
-    vvv = {
-        "vbulkx": vx,
-        "vbulky": vy,
-        "vbulkz": vz,
-        "vthx": vthx,
-        "vthy": vthy,
-        "vthz": vthz,
-        "nbr_part_per_cell": 44,
-    }
+    vvv = {**{f"vbulk{c}": vxyz for c in "xyz"}, **{f"vth{c}": vthxyz for c in "xyz"}}
 
     ph.MaxwellianFluidModel(
-        bx=bx,
-        by=by,
-        bz=bz,
-        protons={
-            "charge": 1,
-            "density": density,
-            **vvv,
-        },
+        bx=bx, by=by, bz=bz, protons={"charge": 1, "density": density, **vvv}
     )
     ph.ElectronModel(closure="isothermal", Te=0.0)
 
@@ -149,15 +139,13 @@ def config(diag_outputs):
     for quantity in ["density", "bulkVelocity"]:
         ph.FluidDiagnostics(quantity=quantity, write_timestamps=timestamps)
 
-    pop = "protons"
-    ph.ParticleDiagnostics(
-        quantity="domain",
-        write_timestamps=timestamps,
-        population_name=pop,
-    )
     ph.FluidDiagnostics(
-        quantity="density", write_timestamps=timestamps, population_name=pop
+        quantity="density", write_timestamps=timestamps, population_name="protons"
     )
+    ph.InfoDiagnostics(quantity="particle_count")
+
+    if LOAD_BALANCE:
+        ph.LoadBalancer(active=True, auto=True, mode="nppc", tol=0.05)
 
     return sim
 
@@ -198,48 +186,27 @@ def plot(diag_dir):
         )
 
 
-def assert_file_exists_with_size_at_least(file, size=10000):
-    path = Path(file)
-    if not path.exists():
-        raise FileNotFoundError("file not found: " + file)
-    if path.stat().st_size < size:
-        raise ValueError(
-            "file has unexpected size, possibly corrupt or not written properly: "
-            + file
-        )
-
-
-class RunTest(SimulatorTest):
+class HarrisTest(SimulatorTest):
     def __init__(self, *args, **kwargs):
-        super(RunTest, self).__init__(*args, **kwargs)
+        super(HarrisTest, self).__init__(*args, **kwargs)
         self.simulator = None
 
     def tearDown(self):
-        super(RunTest, self).tearDown()
+        super(HarrisTest, self).tearDown()
         if self.simulator is not None:
             self.simulator.reset()
         self.simulator = None
         ph.global_vars.sim = None
 
     def test_run(self):
-        diag_outputs = self.unique_diag_dir_for_test_case(diag_dir, ndim=2, interp=1)
-        sim = config(diag_outputs)
-        self.register_diag_dir_for_cleanup(diag_outputs)
-        Simulator(sim).run()
+        self.register_diag_dir_for_cleanup(diag_dir)
+        Simulator(config()).run().reset()
         if cpp.mpi_rank() == 0:
-            plot(diag_outputs)
-
-        for time in timestamps:
-            for q in ["divb", "Ranks", "N", "jz"]:
-                assert_file_exists_with_size_at_least(plot_file_for_qty(q, time))
-
-            for c in ["x", "y", "z"]:
-                assert_file_exists_with_size_at_least(plot_file_for_qty(f"b{c}", time))
-
+            plot(diag_dir)
+        m_plotting.plot_run_timer_data(diag_dir, cpp.mpi_rank())
         cpp.mpi_barrier()
+        return self
 
 
 if __name__ == "__main__":
-    import unittest
-
-    unittest.main()
+    HarrisTest().test_run().tearDown()

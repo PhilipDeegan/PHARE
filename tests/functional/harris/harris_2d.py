@@ -1,11 +1,14 @@
 #!/usr/bin/env python3
 import os
 import numpy as np
+from pathlib import Path
 
 import pyphare.pharein as ph
 from pyphare.cpp import cpp_lib
 from pyphare.simulator.simulator import Simulator
 from pyphare.simulator.simulator import startMPI
+from pyphare.pharesee.run import Run
+from tools.python3 import plotting as m_plotting
 
 os.environ["PHARE_SCOPE_TIMING"] = "1"  # turn on scope timing
 """
@@ -25,23 +28,23 @@ cpp = cpp_lib()
 startMPI()
 
 diag_outputs = "phare_outputs/test/harris/2d"
-time_step_nbr = 1000
 time_step = 0.001
-final_time = time_step * time_step_nbr
-dt = 10 * time_step
-nt = final_time / dt + 1
-timestamps = dt * np.arange(nt)
+final_time = 40
+timestamps = np.arange(0, final_time + time_step, final_time / 10)
+
+plot_dir = Path(f"{diag_outputs}_plots")
+plot_dir.mkdir(parents=True, exist_ok=True)
 
 
 def config():
     sim = ph.Simulation(
-        smallest_patch_size=15,
-        largest_patch_size=25,
-        time_step_nbr=time_step_nbr,
+        # smallest_patch_size=15,
+        # largest_patch_size=25,
+        final_time=final_time,
         time_step=time_step,
         # boundary_types="periodic",
-        cells=(200, 400),
-        dl=(0.2, 0.2),
+        cells=(400, 400),
+        dl=(0.4, 0.4),
         refinement="tagging",
         max_nbr_levels=1,
         hyper_resistivity=0.001,
@@ -50,7 +53,7 @@ def config():
             "format": "phareh5",
             "options": {"dir": diag_outputs, "mode": "overwrite"},
         },
-        strict=True,
+        # strict=True,
     )
 
     def density(x, y):
@@ -146,6 +149,11 @@ def config():
 
     ph.ElectronModel(closure="isothermal", Te=0.0)
 
+    for quantity in ["density", "bulkVelocity"]:
+        ph.FluidDiagnostics(quantity=quantity, write_timestamps=timestamps)
+    ph.FluidDiagnostics(
+        quantity="density", write_timestamps=timestamps, population_name="protons"
+    )
     for quantity in ["E", "B"]:
         ph.ElectromagDiagnostics(quantity=quantity, write_timestamps=timestamps)
     ph.InfoDiagnostics(quantity="particle_count")  # defaults all coarse time steps
@@ -153,14 +161,47 @@ def config():
     return sim
 
 
+def plot_file_for_qty(qty, time):
+    return f"{plot_dir}/harris_{qty}_t{time}.png"
+
+
+def plot(diag_dir):
+    run = Run(diag_dir)
+    for time in timestamps:
+        run.GetDivB(time).plot(
+            filename=plot_file_for_qty("divb", time),
+            plot_patches=True,
+            vmin=1e-11,
+            vmax=2e-10,
+        )
+        run.GetRanks(time).plot(
+            filename=plot_file_for_qty("Ranks", time),
+            plot_patches=True,
+        )
+        run.GetN(time, pop_name="protons").plot(
+            filename=plot_file_for_qty("N", time),
+            plot_patches=True,
+        )
+        for c in ["x", "y", "z"]:
+            run.GetB(time).plot(
+                filename=plot_file_for_qty(f"b{c}", time),
+                qty=f"B{c}",
+                plot_patches=True,
+            )
+        run.GetJ(time).plot(
+            filename=plot_file_for_qty("jz", time),
+            qty="Jz",
+            plot_patches=True,
+            vmin=-2,
+            vmax=2,
+        )
+
+
 def main():
     Simulator(config()).run()
-    try:
-        from tools.python3 import plotting as m_plotting
-
-        m_plotting.plot_run_timer_data(diag_outputs, cpp.mpi_rank())
-    except ImportError:
-        print("Phlop not found - install with: `pip install phlop`")
+    m_plotting.plot_run_timer_data(diag_outputs, cpp.mpi_rank())
+    if cpp.mpi_rank() == 0:
+        plot(diag_outputs)
     cpp.mpi_barrier()
 
 

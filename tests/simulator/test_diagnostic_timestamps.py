@@ -14,6 +14,7 @@ from pyphare.core.box import Box1D
 from pyphare.pharein import ElectromagDiagnostics, ElectronModel
 from pyphare.pharesee.hierarchy import h5_filename_from, h5_time_grp_key, hierarchy_from
 from pyphare.simulator.simulator import Simulator
+from tests.simulator import SimulatorTest
 
 
 def setup_model(ppc):
@@ -81,7 +82,7 @@ simArgs = {
 
 
 @ddt
-class DiagnosticsTest(unittest.TestCase):
+class DiagnosticsTest(SimulatorTest):
     def __init__(self, *args, **kwargs):
         super(DiagnosticsTest, self).__init__(*args, **kwargs)
         self.simulator = None
@@ -101,6 +102,11 @@ class DiagnosticsTest(unittest.TestCase):
 
     def test_dump_diags_timestamps(self):
         print("test_dump_diags dim/interp:{}/{}".format(1, 1))
+
+        simInput = simArgs.copy()
+        diag_outputs = self.unique_diag_dir_for_test_case(out, 1, 1)
+        self.register_diag_dir_for_cleanup(diag_outputs)
+        simInput["diag_options"]["options"]["dir"] = diag_outputs
 
         simulation = ph.Simulation(**simArgs.copy())
         sim = simulation
@@ -125,7 +131,7 @@ class DiagnosticsTest(unittest.TestCase):
             return "{:.10f}".format(stamp)
 
         for diagname, diagInfo in ph.global_vars.sim.diagnostics.items():
-            h5_filename = os.path.join(out, h5_filename_from(diagInfo))
+            h5_filename = os.path.join(diag_outputs, h5_filename_from(diagInfo))
             self.assertTrue(os.path.exists(h5_filename))
 
             h5_file = h5py.File(h5_filename, "r")
@@ -138,7 +144,7 @@ class DiagnosticsTest(unittest.TestCase):
     )
     def test_hierarchy_timestamp_cadence(self, refinement_boxes):
         dim = refinement_boxes["L0"]["B0"].ndim
-
+        interp = 1
         time_step = 0.001
         # time_step_nbr chosen to force diagnostics dumping double imprecision cadence calculations accuracy testing
         time_step_nbr = 101
@@ -147,8 +153,11 @@ class DiagnosticsTest(unittest.TestCase):
         for trailing in [0, 1]:  # 1 = skip init dumps
             for i in [2, 3]:
                 simInput = simArgs.copy()
-                diag_outputs = f"phare_outputs_hierarchy_timestamp_cadence_{dim}_{self.ddt_test_id()}_{i}"
+                diag_outputs = self.unique_diag_dir_for_test_case(
+                    f"{out}/{i}", dim, interp
+                )
                 simInput["diag_options"]["options"]["dir"] = diag_outputs
+                self.register_diag_dir_for_cleanup(diag_outputs)
                 simInput["time_step_nbr"] = time_step_nbr
 
                 ph.global_vars.sim = None

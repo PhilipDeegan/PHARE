@@ -2,7 +2,7 @@
 #
 #
 
-
+import datetime
 import atexit
 import time as timem
 import numpy as np
@@ -35,6 +35,28 @@ def startMPI():
         life_cycles["samrai"] = cpp_lib().SamraiLifeCycle()
 
 
+def print_rank0(*args, **kwargs):
+    from pyphare.cpp import cpp_lib
+
+    if cpp_lib().mpi_rank() == 0:
+        print(*args, **kwargs)
+
+
+def plot_timestep_time(timestep_times):
+    from pyphare.cpp import cpp_lib
+
+    if cpp_lib().mpi_rank() == 0:
+        import matplotlib.pyplot as plt
+
+        fig, ax = plt.subplots()
+        ax.plot(timestep_times)
+        plt.ylabel("timestep time")
+        plt.xlabel("timestep")
+        fig.savefig("timestep_times.png")
+
+    cpp_lib().mpi_barrier()
+
+
 class Simulator:
     def __init__(self, simulation, auto_dump=True, **kwargs):
         assert isinstance(simulation, ph.Simulation)  # pylint: disable=no-member
@@ -49,7 +71,7 @@ class Simulator:
             self.print_eol = "\r"
         self.print_eol = kwargs.get("print_eol", self.print_eol)
         self.log_to_file = kwargs.get("log_to_file", True)
-
+        self.write_system_state_time = 0
         self.auto_dump = auto_dump
         import pyphare.simulator._simulator as _simulator
 
@@ -120,8 +142,7 @@ class Simulator:
         import sys
         from pyphare.cpp import cpp_lib
 
-        if cpp_lib().mpi_rank() == 0:
-            print(e)
+        print_rank0(e)
         sys.exit(1)
 
     def advance(self, dt=None):
@@ -140,6 +161,7 @@ class Simulator:
 
         if self._auto_dump() and self.post_advance != None:
             self.post_advance(self.cpp_sim.currentTime())
+        self.write_system_state_stats()
         return self
 
     def times(self):
@@ -149,7 +171,7 @@ class Simulator:
             self.timeStep(),
         )
 
-    def run(self):
+    def run(self, plot_times=False):
         from pyphare.cpp import cpp_lib
 
         self._check_init()
@@ -170,8 +192,11 @@ class Simulator:
                 out = f"t = {t:8.5f}  -  {ticktock:6.5f}sec  - total {np.sum(perf):7.4}sec"
                 print(out, end=self.print_eol)
 
-        print("mean advance time = {}".format(np.mean(perf)))
-        print("total advance time = {}".format(np.sum(perf)))
+        print_rank0(f"mean advance time = {np.mean(perf)}")
+        print_rank0(f"total advance time = {datetime.timedelta(seconds=np.sum(perf))}")
+
+        if plot_times:
+            plot_timestep_time(perf)
 
         return self.reset()
 
@@ -230,6 +255,23 @@ class Simulator:
     def _check_init(self):
         if self.cpp_sim is None:
             self.initialize()
+
+    def write_system_state_stats(self):
+        import pyphare.core.phare_utilities as pu
+        from pyphare.cpp import cpp_lib
+
+        if self.simulation.system_state_write_every_t == 0:
+            return
+        diff_time = self.cpp_sim.currentTime() - self.write_system_state_time
+        if (
+            pu.fp_equal(diff_time, self.simulation.system_state_write_every_t)
+            or diff_time > self.simulation.system_state_write_every_t
+        ):
+            self.write_system_state_time = self.cpp_sim.currentTime()
+            time = "{:.10f}".format(self.cpp_sim.currentTime())
+            pu.write_system_state_stats(
+                f".phare/sys/stats/{cpp_lib().mpi_rank()}/{time}"
+            )
 
     def _log_to_file(self):
         """

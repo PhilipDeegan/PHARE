@@ -1,3 +1,4 @@
+import os
 import math
 import numpy as np
 
@@ -174,3 +175,22 @@ def deep_copy(item, memo, excludes=[]):
         else:
             setattr(that, key, deepcopy(value, memo))
     return that
+
+
+def write_system_state_stats(file_path):
+    import json, psutil, pathlib, datetime
+
+    file_path = pathlib.Path(file_path) if isinstance(file_path, str) else file_path
+    proc = psutil.Process(pid=os.getpid())
+    file_path.parent.mkdir(exist_ok=True, parents=True)
+
+    with open(file_path, "w") as file:
+        json.dump(
+            dict(
+                time=datetime.datetime.utcnow().timestamp(),
+                cpu_use=proc.cpu_percent(interval=0.1),
+                open_files=len(proc.open_files()),
+                mem_use=proc.memory_info().rss / 1024**2,
+            ),
+            file,
+        )

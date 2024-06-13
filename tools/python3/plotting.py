@@ -9,17 +9,28 @@ import matplotlib.pyplot as plt
 from pathlib import Path
 
 from pyphare.pharesee.run import Run
-import tools.python3.phloping as phloping
 
-logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
-
-logging.getLogger("PIL").setLevel(logging.INFO)  # noise
-logging.getLogger("h5py").setLevel(logging.INFO)  # noise
-plt.set_loglevel(level="warning")  # noise
 
 
 def plot_run_timer_data(diag_dir=None, rank=0):
+    try:
+        import tools.python3.phloping as phloping  # check if available
+
+        _plot_run_timer_data(diag_dir, rank)
+    except (ImportError, FileNotFoundError) as e:
+        if rank == 0:
+            logger.info(
+                f"Phlop timings are not active, see: res/cmake/dep/phlop.cmake`: \n{e}"
+            )
+    except Exception as e:
+        if rank == 0:
+            logger.error(f"Unknown exception handled during timer plotting: {e}")
+
+
+def _plot_run_timer_data(diag_dir=None, rank=0):
+    import tools.python3.phloping as phloping
+
     if diag_dir is None:  # assume cli
         parser = argparse.ArgumentParser()
         parser.add_argument("-d", "--dir", default=".", help="Diagnostics directory")

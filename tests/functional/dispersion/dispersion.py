@@ -17,8 +17,8 @@ def fromNoise():
     # will be visible
 
     sim = ph.Simulation(
-        smallest_patch_size=20,
-        largest_patch_size=20,
+        # smallest_patch_size=20,
+        # largest_patch_size=20,
         # the following time step number
         # and final time mean that the
         # smallest frequency will be 2/100

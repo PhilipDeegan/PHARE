@@ -22,8 +22,8 @@ def config(diag_outputs, model_init={}, refinement_boxes=None):
     ph.global_vars.sim = None
 
     sim = ph.Simulation(
-        smallest_patch_size=10,
-        largest_patch_size=20,
+        # smallest_patch_size=10,
+        # largest_patch_size=20,
         time_step_nbr=1,
         final_time=0.001,
         # boundary_types="periodic",
@@ -197,7 +197,7 @@ def main():
     startMPI()
     rando = random.randint(0, int(1e10))
     Simulator(config(L0_diags, {"seed": rando})).run().reset()
-    refinement_boxes = {"L0": {"B0": [(7, 40), (20, 60)]}}
+    refinement_boxes = {"L0": {"B0": [(5, 40), (20, 59)]}}
     sim = config(L0L1_diags, {"seed": rando}, refinement_boxes)
     Simulator(sim, post_advance=post_advance).run()
 
