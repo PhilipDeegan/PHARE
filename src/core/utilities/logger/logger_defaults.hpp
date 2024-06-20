@@ -2,14 +2,29 @@
 #define PHARE_CORE_UTILITIES_LOGGER_LOGGER_DEFAULTS_HPP
 
 #include "core/def/phlop.hpp"
+#include "core/def/kokkos_tools.hpp"
 
-#if PHARE_HAVE_PHLOP
+
+#if PHARE_HAVE_PHLOP && PHARE_HAVE_KOKKOS_TOOLS
+#define PHARE_SCOPE_TIMER(str)                                                                     \
+    PHLOP_SCOPE_TIMER(str);                                                                        \
+    PHARE_STR_CAT(Kokkos::Profiling::ScopedRegion __phare_scope_, __line__)(str)
+#endif // PHARE_HAVE_PHLOP && PHARE_HAVE_KOKKOS_TOOLS
+
+
+#if !defined(PHARE_SCOPE_TIMER) && PHARE_HAVE_PHLOP
 #define PHARE_SCOPE_TIMER PHLOP_SCOPE_TIMER
-#endif // PHARE_WITH_PHLOP
+#endif // PHARE_HAVE_PHLOP
+
+
+#if !defined(PHARE_SCOPE_TIMER) && PHARE_HAVE_KOKKOS_TOOLS
+#define PHARE_SCOPE_TIMER PHARE_STR_CAT(Kokkos::Profiling::ScopedRegion __phare_scope_, __line__)
+#endif // PHARE_HAVE_PHLOP
+
 
 #ifndef PHARE_SCOPE_TIMER
-#define PHARE_SCOPE_TIMER(str) // nothing
-#endif                         // PHARE_SCOPE_TIMER
+#define PHARE_SCOPE_TIMER(str)
+#endif // PHARE_SCOPE_TIMER
 
 
 #if PHARE_LOG_LEVEL >= 1
@@ -31,7 +46,6 @@
 #else
 #define PHARE_LOG_SCOPE_3(str)
 #endif // LOG_LEVEL == 3
-
 
 #define PHARE_LOG_START(lvl, str)
 #define PHARE_LOG_STOP(lvl, str)
