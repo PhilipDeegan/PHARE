@@ -3,6 +3,7 @@
 #define PHARE_PHARE_INCLUDE_HPP
 
 #include "core/def/phlop.hpp" // scope timing
+#include "core/def/kokkos_tools.hpp"
 
 #include "simulator/simulator.hpp"
 #include "core/utilities/algorithm.hpp"
@@ -40,11 +41,15 @@ public:
         std::shared_ptr<SAMRAI::tbox::Logger::Appender> appender
             = std::make_shared<StreamAppender>(StreamAppender{&std::cout});
         SAMRAI::tbox::Logger::getInstance()->setWarningAppender(appender);
-        PHARE_WITH_PHLOP( //
+        PHARE_WITH_PHLOP(
             if (auto e = core::get_env("PHARE_SCOPE_TIMING", "false"); e == "1" || e == "true")
                 phlop::ScopeTimerMan::INSTANCE()
                     .file_name(".phare_times." + std::to_string(core::mpi::rank()) + ".txt")
                     .init(); //
+        )
+
+        PHARE_WITH_KOKKOS_TOOLS(                                                    //
+            Kokkos::initialize(argc, argv); Kokkos::print_configuration(std::cout); //
         )
     }
 
@@ -54,6 +59,10 @@ public:
         SAMRAI::tbox::SAMRAIManager::shutdown();
         SAMRAI::tbox::SAMRAIManager::finalize();
         SAMRAI::tbox::SAMRAI_MPI::finalize();
+
+        PHARE_WITH_KOKKOS_TOOLS( //
+            Kokkos::finalize();  //
+        )
     }
 
     static void reset()
