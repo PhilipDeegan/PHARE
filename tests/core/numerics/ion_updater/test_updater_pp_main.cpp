@@ -23,10 +23,10 @@ namespace PHARE::core
 template<std::size_t dim, typename internals> // used by gtest
 void PrintTo(ParticleArray<dim, internals> const& arr, std::ostream* os)
 {
-    assert(arr.size());
-    *os << arr;
+    // assert(arr.size());
+    // *os << arr;
 }
-
+auto static const bytes   = 1024ull * 1024ull * 1024ull;
 auto static const ppc     = get_env_as("PHARE_PPC", std::size_t{3});
 auto static const seed    = get_env_as("PHARE_SEED", std::size_t{114});
 auto static const cells   = get_env_as("PHARE_CELLS", std::uint32_t{3});
@@ -40,6 +40,7 @@ bool static const premain = []() {
         std::size_t const size = (cells * cells * cells) * ppc * 80 * 10;
         PHARE_LOG_LINE_STR("size : " << size);
         // cudaDeviceSetLimit(cudaLimitMallocHeapSize, size);
+        cudaDeviceSetLimit(cudaLimitMallocHeapSize, bytes);
         using namespace PHARE; //
         using namespace std::literals;
         if (auto e = core::get_env("PHARE_SCOPE_TIMING", "false"); e == "1" || e == "true")

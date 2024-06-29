@@ -4,8 +4,7 @@ property:
     -Xclang -fcuda-allow-variadic-functions
     -x cuda --cuda-gpu-arch=sm_80
     -DPHARE_HAVE_MKN_GPU=1 -DPHARE_FORCE_LOG_LINE
-  lnk.flags: -lcudart -lineinfo # -rdynamic # -fuse-ld=gold
-  # lnk.flags: -Wl,-z,defs -lcudart -lineinfo # -rdynamic # -fuse-ld=gold
+  lnk.flags: -Wl,-z,defs -lcudart -rdynamic # -fuse-ld=gold
 
 local:
   repo: /mkn/r
@@ -15,19 +14,19 @@ remote:
   repo: git@github.com:mkn/
   mod-repo: git@github.com:mkn-mod/
 
-# env: |
-#   OMPI_CXX=clang++-18
-#   PATH=/opt/mpi/cuda/bin:${PATH}
+env: |
+  OMPI_CXX=clang++-18
+  PATH=/opt/mpi/cuda/bin:${PATH}
 
 path: /usr/local/cuda/targets/x86_64-linux/lib
 
 compiler:
   mask:
     g++:
-      clang++-18
+      mpicxx
 
 file:
   - type: cpp:cxx:cc
     archiver: ar -cr
-    compiler:  clang++-18 ${cxx.flags}
-    linker:  nvcc ${lnk.flags}
+    compiler:  mpicxx ${cxx.flags}
+    linker:  mpicxx ${lnk.flags}
