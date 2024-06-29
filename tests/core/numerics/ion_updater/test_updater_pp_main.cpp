@@ -6,7 +6,7 @@
 //  - env:      PHARE_SCOPE_TIMING=1
 
 #define PHARE_UNDEF_ASSERT
-#define PHARE_SKIP_MPI_IN_CORE
+// #define PHARE_SKIP_MPI_IN_CORE
 
 #include "core/numerics/ion_updater/ion_updater.hpp"
 #include "core/numerics/ion_updater/ion_updater_pc.hpp"
@@ -33,14 +33,14 @@ auto static const cells   = get_env_as("PHARE_CELLS", std::uint32_t{3});
 auto static const dt      = get_env_as("PHARE_TIMESTEP", double{.001});
 auto static const shufle  = get_env_as("PHARE_UNSORTED", std::size_t{0});
 bool static const premain = []() {
+    PHARE_WITH_MKN_GPU(                          //
+        mkn::gpu::setLimitMallocHeapSize(bytes); //
+    )
     PHARE_WITH_PHLOP( //
-
         PHARE_LOG_LINE_STR("cells: " << cells); PHARE_LOG_LINE_STR("ppc  : " << ppc);
         PHARE_LOG_LINE_STR("seed : " << seed);
-        std::size_t const size = (cells * cells * cells) * ppc * 80 * 10;
-        PHARE_LOG_LINE_STR("size : " << size);
-        // cudaDeviceSetLimit(cudaLimitMallocHeapSize, size);
-        cudaDeviceSetLimit(cudaLimitMallocHeapSize, bytes);
+        // std::size_t const size = (cells * cells * cells) * ppc * 80 * 10;
+        // PHARE_LOG_LINE_STR("size : " << size); //
         using namespace PHARE; //
         using namespace std::literals;
         if (auto e = core::get_env("PHARE_SCOPE_TIMING", "false"); e == "1" || e == "true")

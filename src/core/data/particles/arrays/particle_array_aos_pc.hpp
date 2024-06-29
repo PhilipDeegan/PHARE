@@ -588,7 +588,8 @@ template<std::size_t dim, auto alloc_mode, std::uint8_t impl>
 template<std::uint8_t PHASE, auto type>
 void AoSPCVector<dim, alloc_mode, impl>::sync()
 {
-    PHARE_LOG_LINE_STR("sync " << static_cast<std::uint32_t>(PHASE) << " " << magic_enum::enum_name(type));
+    PHARE_LOG_LINE_STR("sync " << static_cast<std::uint32_t>(PHASE) << " "
+                               << magic_enum::enum_name(type));
 
     static_assert(std::is_same_v<decltype(type), ParticleType>);
     static_assert(type != ParticleType::All);
@@ -731,13 +732,14 @@ struct AoSPCParticles : public Super_
         else if constexpr (alloc_mode == AllocatorMode::GPU_UNIFIED)
         {
             using Op = Operators<typename Super::SIZE_T, true>;
-            
-            auto const kidx  = mkn::gpu::idx();
-            auto const nc = Super::local_cell(newcell);
-            auto const oc = Super::local_cell(p.iCell());
+
+            auto const kidx = mkn::gpu::idx();
+            auto const nc   = Super::local_cell(newcell);
+            auto const oc   = Super::local_cell(p.iCell());
             __threadfence();
             auto const nidx = Op{Super::gap_idx_(cell)}.increment_return_old();
-            // printf("L:%d k %u c %u,%u oc %u,%u nc %u,%u i %lu x %lu ni %llu\n", __LINE__, kidx, cell[0], cell[1], oc[0], oc[1], nc[0], nc[1], p.id, idx, nidx);
+            // printf("L:%d k %u c %u,%u oc %u,%u nc %u,%u i %lu x %lu ni %llu\n", __LINE__, kidx,
+            // cell[0], cell[1], oc[0], oc[1], nc[0], nc[1], p.id, idx, nidx);
 
             __threadfence();
             // __syncthreads();
@@ -955,11 +957,11 @@ template<std::size_t dim, auto alloc_mode, std::uint8_t impl>
 template<auto type>
 void AoSPCSpan<dim, alloc_mode, impl>::sync_gpu_gaps_and_tmp_impl1() _PHARE_ALL_FN_
 {
-    
+    PHARE_WITH_MKN_GPU({
         using Op = Operators<SIZE_T, true>;
 
         __syncthreads();
-    
+
         auto const& kidx  = mkn::gpu::idx();
         auto const& gabox = local_ghost_box_;
         // printf("L:%d k %u n %lu \n", __LINE__, kidx, gabox.size());
@@ -977,24 +979,25 @@ void AoSPCSpan<dim, alloc_mode, impl>::sync_gpu_gaps_and_tmp_impl1() _PHARE_ALL_
 
             // printf("L:%d k %u n %llu bix %u,%u \n", __LINE__, kidx, n_gaps, bix[0], bix[1]);
             // __threadfence();
-            
+
             if (n_gaps == 0)
                 return;
-            
+
             std::size_t const it = 1;
             {
                 auto& gaps = gaps_(bix);
-                thrust::sort(thrust::seq, gaps.data(), gaps.data() + n_gaps/*, std::greater<>()*/);
+                thrust::sort(thrust::seq, gaps.data(), gaps.data() + n_gaps /*, std::greater<>()*/);
             }
             auto& real       = particles_(bix);
             auto const& gaps = gaps_(bix);
             for (std::size_t i = 0; i < n_gaps; ++i)
             {
-                auto const& part   = real[gaps[n_gaps - (1+i)]];
+                auto const& part   = real[gaps[n_gaps - (1 + i)]];
                 auto const newcell = local_cell(part.iCell());
                 if constexpr (dim > 1)
                 {
-                    // printf("L:%d k %u n %lu bix %u,%u newcell %u,%u i %lu \n", __LINE__, kidx, gaps[i], bix[0], bix[1], newcell[0], newcell[1], part.id);
+                    // printf("L:%d k %u n %lu bix %u,%u newcell %u,%u i %lu \n", __LINE__, kidx,
+                    // gaps[i], bix[0], bix[1], newcell[0], newcell[1], part.id);
                 }
                 auto& nparts = particles_(newcell);
                 __threadfence();
@@ -1013,11 +1016,11 @@ void AoSPCSpan<dim, alloc_mode, impl>::sync_gpu_gaps_and_tmp_impl1() _PHARE_ALL_
         // __threadfence();
         __syncthreads();
 
-        auto const sync_left = [&]() {            
-            auto const& bix  = *(gabox.begin() + kidx);
-            
+        auto const sync_left = [&]() {
+            auto const& bix = *(gabox.begin() + kidx);
+
             // printf("L:%d k %u p %lu bix %u,%u \n", __LINE__, kidx, pop, bix[0], bix[1]);
-            
+
             auto& real       = particles_(bix);
             auto const& gaps = gaps_(bix);
             auto& gaps_size  = gap_idx_(bix);
@@ -1035,7 +1038,7 @@ void AoSPCSpan<dim, alloc_mode, impl>::sync_gpu_gaps_and_tmp_impl1() _PHARE_ALL_
             sync_left();
 
         // __syncthreads();
-    
+    });
 }
 
 
