@@ -733,9 +733,9 @@ struct AoSPCParticles : public Super_
         {
             using Op = Operators<typename Super::SIZE_T, true>;
 
-            auto const kidx = mkn::gpu::idx();
-            auto const nc   = Super::local_cell(newcell);
-            auto const oc   = Super::local_cell(p.iCell());
+            // auto const kidx = mkn::gpu::idx();
+            auto const nc = Super::local_cell(newcell);
+            // auto const oc   = Super::local_cell(p.iCell());
             __threadfence();
             auto const nidx = Op{Super::gap_idx_(cell)}.increment_return_old();
             // printf("L:%d k %u c %u,%u oc %u,%u nc %u,%u i %lu x %lu ni %llu\n", __LINE__, kidx,
