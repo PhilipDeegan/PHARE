@@ -86,6 +86,19 @@ class FieldData(PatchData):
     def __repr__(self):
         return self.__str__()
 
+    def compare(self, that, rtol=0, atol=1e-14):
+        if not isinstance(that, FieldData):
+            return False
+        try:
+            np.testing.assert_allclose(self.dataset, that.dataset, rtol=rtol, atol=atol)
+        except AssertionError as e:
+            print(e)
+            return False
+        return True
+
+    def __eq__(self, that):
+        return self.compare(that)
+
     def select(self, box):
         """
         return view of internal data based on overlap of input box
@@ -244,6 +257,12 @@ class Patch:
     def __str__(self):
         return f"Patch: box( {self.box}), id({self.id})"
 
+    def __getitem__(self, s):
+        return self.patch_datas[s]
+
+    def keys(self):
+        return list(self.patch_datas.keys())
+
     def __repr__(self):
         return self.__str__()
 
@@ -285,6 +304,9 @@ class PatchLevel:
 
     def __iter__(self):
         return self.patches.__iter__()
+
+    def __getitem__(self, i):
+        return self.patches[i]
 
     def level_range(self):
         name = list(self.patches[0].patch_datas.keys())[0]
@@ -1088,6 +1110,9 @@ class PatchHierarchy(object):
 
         return final, dp(final, **kwargs)
 
+    def __eq__(self, that):
+        return hierarchy_compare(self, that)
+
 
 def amr_grid(hierarchy, time):
     """returns a non-uniform contiguous primal grid
@@ -1792,3 +1817,41 @@ def getPatch(hier, point):
             print("error : ", k, v)
             raise RuntimeError("more than one patch found for point")
     return patches
+
+
+def hierarchy_compare(this, that):
+    if not isinstance(this, PatchHierarchy) or not isinstance(that, PatchHierarchy):
+        return False
+
+    if this.ndim != that.ndim or this.domain_box != that.domain_box:
+        return False
+
+    if this.time_hier.keys() != that.time_hier.keys():
+        return False
+
+    for tidx in this.times():
+        patch_levels_ref = this.time_hier[tidx]
+        patch_levels_cmp = that.time_hier[tidx]
+
+        if patch_levels_ref.keys() != patch_levels_cmp.keys():
+            return False
+
+        for level_idx in patch_levels_cmp.keys():
+            patch_level_ref = patch_levels_ref[level_idx]
+            patch_level_cmp = patch_levels_cmp[level_idx]
+
+            for patch_idx in range(len(patch_level_cmp.patches)):
+                patch_ref = patch_level_ref.patches[patch_idx]
+                patch_cmp = patch_level_cmp.patches[patch_idx]
+
+                if patch_ref.patch_datas.keys() != patch_cmp.patch_datas.keys():
+                    return False
+
+                for patch_data_key in patch_ref.patch_datas.keys():
+                    patch_data_ref = patch_ref.patch_datas[patch_data_key]
+                    patch_data_cmp = patch_cmp.patch_datas[patch_data_key]
+
+                    if patch_data_cmp != patch_data_ref:
+                        return False
+
+    return True

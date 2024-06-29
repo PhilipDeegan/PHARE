@@ -2,14 +2,17 @@
 #ifndef PHARE_PHARE_INCLUDE_HPP
 #define PHARE_PHARE_INCLUDE_HPP
 
-#include "core/def/phlop.hpp" // scope timing
+#include <memory>
+#include <cassert>
+#include <iostream>
 
-#include "simulator/simulator.hpp"
+#include "core/def/phlop.hpp" // scope timing
 #include "core/utilities/algorithm.hpp"
 #include "core/utilities/mpi_utils.hpp"
 
-#include <memory>
-#include <iostream>
+#include "simulator/simulator.hpp"
+#include "initializer/python_data_provider.hpp"
+
 
 namespace PHARE
 {
@@ -54,6 +57,7 @@ public:
         SAMRAI::tbox::SAMRAIManager::shutdown();
         SAMRAI::tbox::SAMRAIManager::finalize();
         SAMRAI::tbox::SAMRAI_MPI::finalize();
+        PHARE::initializer::PHAREDictHandler::INSTANCE().stop();
     }
 
     static void reset()
@@ -65,6 +69,29 @@ public:
     }
 };
 
+
+
+std::unique_ptr<PHARE::initializer::DataProvider> fromCommandLine(int argc, char** argv)
+{
+    using dataProvider [[maybe_unused]] = std::unique_ptr<PHARE::initializer::DataProvider>;
+
+    switch (argc)
+    {
+        case 1: return nullptr;
+        case 2:
+            std::string arg = argv[1];
+            auto moduleName = arg.substr(0, arg.find_last_of("."));
+            if (arg.substr(arg.find_last_of(".") + 1) == "py")
+            {
+                std::replace(moduleName.begin(), moduleName.end(), '/', '.');
+                std::cout << "python input detected, building with python provider...\n";
+                return std::make_unique<PHARE::initializer::PythonDataProvider>(moduleName);
+            }
+
+            break;
+    }
+    return nullptr;
+}
 
 } // namespace PHARE
 

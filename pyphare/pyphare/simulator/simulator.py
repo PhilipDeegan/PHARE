@@ -14,24 +14,28 @@ life_cycles = {}
 
 @atexit.register
 def simulator_shutdown():
+    import gc
     from ._simulator import obj
 
     if obj is not None:  # needs to be killed before MPI
         obj.reset()
     life_cycles.clear()
+    gc.collect()  # force cause we need to be sure it's unloaded
 
 
-def make_cpp_simulator(dim, interp, nbrRefinedPart, hier):
-    from pyphare.cpp import cpp_lib
-
-    make_sim = f"make_simulator_{dim}_{interp}_{nbrRefinedPart}"
-    return getattr(cpp_lib(), make_sim)(hier)
+# see src/core/data/particles/particle_array_def.hpp
+def make_cpp_simulator(
+    cpp_lib, dim, interp, nbrRefinedPart, hier, layout=1, allocator=0
+):
+    make_sim = f"make_simulator_{dim}_{interp}_{nbrRefinedPart}_{layout}_{allocator}"
+    print("make_sim", make_sim)
+    return getattr(cpp_lib, make_sim)(hier)
 
 
 def startMPI():
-    if "samrai" not in life_cycles:
-        from pyphare.cpp import cpp_lib
+    from pyphare.cpp import cpp_lib
 
+    if "samrai" not in life_cycles:
         life_cycles["samrai"] = cpp_lib().SamraiLifeCycle()
 
 
@@ -54,14 +58,16 @@ class Simulator:
         import pyphare.simulator._simulator as _simulator
 
         _simulator.obj = self
+        from pyphare.cpp import cpp_lib
+
+        self.cpp_lib = cpp_lib()
 
     def __del__(self):
         self.reset()
 
-    def setup(self):
+    def setup(self, **kwargs):
         # mostly to detach C++ class construction/dict parsing from C++ Simulator::init
         try:
-            from pyphare.cpp import cpp_lib
             import pyphare.cpp.validate as validate_cpp
 
             startMPI()
@@ -74,13 +80,14 @@ class Simulator:
             if self.log_to_file:
                 self._log_to_file()
             ph.populateDict()
-            self.cpp_hier = cpp_lib().make_hierarchy()
-
+            self.cpp_hier = self.cpp_lib.make_hierarchy()
             self.cpp_sim = make_cpp_simulator(
+                self.cpp_lib,
                 self.simulation.ndim,
                 self.simulation.interp_order,
                 self.simulation.refined_particle_nbr,
                 self.cpp_hier,
+                **kwargs,
             )
             return self
         except:
@@ -92,10 +99,6 @@ class Simulator:
             raise ValueError("Error in Simulator.setup(), see previous error")
 
     def initialize(self):
-        if self.cpp_sim is not None:
-            raise ValueError(
-                "Simulator already initialized: requires reset to re-initialize"
-            )
         try:
             if self.cpp_hier is None:
                 self.setup()
@@ -115,12 +118,12 @@ class Simulator:
                 )
             )
             raise ValueError("Error in Simulator.initialize(), see previous error")
+        print("initialize ")
 
     def _throw(self, e):
         import sys
-        from pyphare.cpp import cpp_lib
 
-        if cpp_lib().mpi_rank() == 0:
+        if self.cpp_lib.mpi_rank() == 0:
             print(e)
         sys.exit(1)
 
@@ -150,8 +153,6 @@ class Simulator:
         )
 
     def run(self):
-        from pyphare.cpp import cpp_lib
-
         self._check_init()
         if self.simulation.dry_run:
             return self
@@ -166,7 +167,7 @@ class Simulator:
             ticktock = tock - tick
             perf.append(ticktock)
             t = self.cpp_sim.currentTime()
-            if cpp_lib().mpi_rank() == 0:
+            if self.cpp_lib.mpi_rank() == 0:
                 out = f"t = {t:8.5f}  -  {ticktock:6.5f}sec  - total {np.sum(perf):7.4}sec"
                 print(out, end=self.print_eol)
 
@@ -243,9 +244,8 @@ class Simulator:
 
         if "PHARE_LOG" not in os.environ:
             os.environ["PHARE_LOG"] = "RANK_FILES"
-        from pyphare.cpp import cpp_lib
 
-        if os.environ["PHARE_LOG"] != "NONE" and cpp_lib().mpi_rank() == 0:
+        if os.environ["PHARE_LOG"] != "NONE" and self.cpp_lib.mpi_rank() == 0:
             from pathlib import Path
 
             Path(".log").mkdir(exist_ok=True)

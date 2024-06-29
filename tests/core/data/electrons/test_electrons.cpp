@@ -210,8 +210,8 @@ struct ElectronsTest : public ::testing::Test
         auto const& [_, P] = pc.getCompileTimeResourcesViewList();
         P.setBuffer(&Pe);
 
-        auto const& [Jx, Jy, Jz]    = J();
-        auto const& [Vix, Viy, Viz] = Vi();
+        auto& [Jx, Jy, Jz]    = J();
+        auto& [Vix, Viy, Viz] = Vi();
 
         if constexpr (dim == 1)
         {
@@ -420,7 +420,6 @@ TYPED_TEST(ElectronsTest, ThatElectronsVelocityEqualIonVelocityMinusJ)
     auto& layout    = this->layout;
 
     electrons.update(layout);
-
     auto& Ne = electrons.density();
 
     auto check = [&layout](auto const& Vecomp, auto const& Vicomp, auto const& Jcomp,

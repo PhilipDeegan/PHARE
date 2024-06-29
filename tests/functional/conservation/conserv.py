@@ -172,9 +172,7 @@ def mag_energy(B, lvlNbr=0):
                 bz = 0.5 * (bztmp[1:] + bztmp[:-1])
 
                 # sum 0.5B^2 * dx over all nodes
-                per_patch = np.sum(
-                    (bx**2 + by**2 + bz**2) * 0.5 * pdata.layout.dl[0]
-                )
+                per_patch = np.sum((bx**2 + by**2 + bz**2) * 0.5 * pdata.layout.dl[0])
                 tot += per_patch
         return tot
 
