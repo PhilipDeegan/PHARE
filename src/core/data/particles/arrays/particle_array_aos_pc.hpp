@@ -736,12 +736,12 @@ struct AoSPCParticles : public Super_
             // auto const kidx = mkn::gpu::idx();
             auto const nc = Super::local_cell(newcell);
             // auto const oc   = Super::local_cell(p.iCell());
-            __threadfence();
+            PHARE_WITH_MKN_GPU(__threadfence());
             auto const nidx = Op{Super::gap_idx_(cell)}.increment_return_old();
             // printf("L:%d k %u c %u,%u oc %u,%u nc %u,%u i %lu x %lu ni %llu\n", __LINE__, kidx,
             // cell[0], cell[1], oc[0], oc[1], nc[0], nc[1], p.id, idx, nidx);
 
-            __threadfence();
+            PHARE_WITH_MKN_GPU(__threadfence());
             // __syncthreads();
             Op{Super::add_into_(nc)}.increment_return_old();
             // __syncthreads();
