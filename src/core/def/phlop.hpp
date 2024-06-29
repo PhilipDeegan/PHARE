@@ -6,7 +6,9 @@
 #include "phlop/timing/scope_timer.hpp"
 #define PHARE_HAVE_PHLOP 1
 #define PHARE_WITH_PHLOP(...) __VA_ARGS__
+
 #else
+
 #define PHARE_HAVE_PHLOP 0
 #define PHARE_WITH_PHLOP(...)
 

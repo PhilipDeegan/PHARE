@@ -45,7 +45,7 @@ PRINT = int(os.environ["PRINT"]) if "PRINT" in os.environ else 0
 
 def test_cmd(clazz, test_id):
     return (
-        f"mpirun -n {MPI_RUN} python3 -m {clazz.__module__} {clazz.__name__}.{test_id}"
+        f"mpirun -n {MPI_RUN} python3 -Om {clazz.__module__} {clazz.__name__}.{test_id}"
     )
 
 
@@ -68,10 +68,10 @@ if __name__ == "__main__":
         for suite in loader.loadTestsFromTestCase(test_class):
             tests += [test_cmd(type(suite), suite._testMethodName)]
 
-    from tools.python3 import run_mp
-
     if PRINT:
         for test in tests:
             print(test)
     else:
+        from tools.python3 import run_mp
+
         run_mp(tests, N_CORES, check=True)

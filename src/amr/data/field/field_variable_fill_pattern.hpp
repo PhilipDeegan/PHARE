@@ -112,10 +112,7 @@ public:
                                              transformation);
     }
 
-    std::string const& getPatternName() const
-    {
-        return s_name_id;
-    }
+    std::string const& getPatternName() const { return s_name_id; }
 
 private:
     FieldFillPattern(FieldFillPattern const&)            = delete;

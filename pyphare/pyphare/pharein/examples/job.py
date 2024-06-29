@@ -19,7 +19,7 @@ Simulation(
     boundary_types="periodic",  # boundary condition, string or tuple, length == len(cell) == len(dl)
     cells=80,  # integer or tuple length == dimension
     dl=0.1,  # mesh size of the root level, float or tuple
-    path="test5"  # directory where INI file and diagnostics directories will be
+    path="test5",  # directory where INI file and diagnostics directories will be
     # time_step = 0.005,                  # simulation time step (not specified if time_step_nbr and final_time given)
     # domain_size = 8.,                   # float or tuple, not specified if dl and cells are
     # interp_order = 1,                   # interpolation order, [default = 1] can be 1, 2, 3 or 4
@@ -72,7 +72,7 @@ FluidDiagnostics(
     compute_every=5,  # compute diagnostics every x iterations ( x <= write_every)
     start_iteration=0,  # iteration at which diag is enabled
     last_iteration=990,  # iteration at which diag is turned off
-    population_name="protons"  # name of the population for which the diagnostics is made
+    population_name="protons",  # name of the population for which the diagnostics is made
     # ,path = 'FluidDiagnostics1'      # where output files will be written, [default: name]
 )
 

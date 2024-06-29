@@ -35,9 +35,13 @@
 
 namespace PHARE::amr
 {
-template<std::size_t dimension_, std::size_t interp_order_, std::size_t nbRefinedPart_>
+template<std::size_t dimension_, std::size_t interp_order_, std::size_t nbRefinedPart_, //
+         auto L_ = core::LayoutMode::AoSMapped, auto A_ = AllocatorMode::CPU>
 struct PHARE_Types
 {
+    static_assert(std::is_same_v<decltype(L_), core::LayoutMode>);
+    static_assert(std::is_same_v<decltype(A_), AllocatorMode>);
+
     static auto constexpr dimension     = dimension_;
     static auto constexpr interp_order  = interp_order_;
     static auto constexpr nbRefinedPart = nbRefinedPart_;
@@ -48,7 +52,7 @@ struct PHARE_Types
                                             PHARE::core::InterpConst<interp_order>,
                                             PHARE::core::RefinedParticlesConst<nbRefinedPart>>;
 
-    using core_types = PHARE::core::PHARE_Types<dimension, interp_order>;
+    using core_types = PHARE::core::PHARE_Types<dimension, interp_order, L_, A_>;
 
     using RefinementParams
         = PHARE::amr::RefinementParams<typename core_types::ParticleArray_t, Splitter_t>;

@@ -23,8 +23,6 @@
 
 using namespace PHARE::core;
 
-
-
 struct GridLayoutMock1D
 {
     static const auto dimension = 1u;
@@ -200,7 +198,7 @@ TEST_F(Ampere1DTest, ampere1DCalculatedOk)
     std::uint32_t gsi_d_X = this->layout.ghostStartIndex(QtyCentering::dual, Direction::X);
     std::uint32_t gei_d_X = this->layout.ghostEndIndex(QtyCentering::dual, Direction::X);
 
-    auto const& [Bx, By, Bz] = B();
+    auto& [Bx, By, Bz]       = B();
     auto const& [Jx, Jy, Jz] = J();
 
     for (std::uint32_t ix = gsi_d_X; ix <= gei_d_X; ++ix)
@@ -242,7 +240,7 @@ TEST_F(Ampere2DTest, ampere2DCalculatedOk)
     std::uint32_t gsi_d_Y = this->layout.ghostStartIndex(QtyCentering::dual, Direction::Y);
     std::uint32_t gei_d_Y = this->layout.ghostEndIndex(QtyCentering::dual, Direction::Y);
 
-    auto const& [Bx, By, Bz] = B();
+    auto& [Bx, By, Bz]       = B();
     auto const& [Jx, Jy, Jz] = J();
 
     for (std::uint32_t ix = gsi_p_X; ix <= gei_p_X; ++ix)
@@ -342,7 +340,7 @@ TEST_F(Ampere3DTest, ampere3DCalculatedOk)
     std::uint32_t gsi_d_Z = this->layout.ghostStartIndex(QtyCentering::dual, Direction::Z);
     std::uint32_t gei_d_Z = this->layout.ghostEndIndex(QtyCentering::dual, Direction::Z);
 
-    auto const& [Bx, By, Bz] = B();
+    auto& [Bx, By, Bz]       = B();
     auto const& [Jx, Jy, Jz] = J();
 
     for (std::uint32_t ix = gsi_p_X; ix <= gei_p_X; ++ix)

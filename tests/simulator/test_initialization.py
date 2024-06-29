@@ -1,25 +1,31 @@
+import unittest
+
 from pyphare.cpp import cpp_lib
 
 cpp = cpp_lib()
 
-import unittest
-
 import numpy as np
 from ddt import ddt
+
 from pyphare.core.box import nDBox
+
 from pyphare.core.phare_utilities import assert_fp_any_all_close
 from pyphare.pharein import ElectronModel, MaxwellianFluidModel
+
 from pyphare.pharein.diagnostics import (
     ElectromagDiagnostics,
     FluidDiagnostics,
     ParticleDiagnostics,
 )
 from pyphare.pharein.simulation import Simulation
-from pyphare.pharesee.geometry import level_ghost_boxes
+from pyphare.pharesee.geometry import (
+    hierarchy_overlaps,
+    level_ghost_boxes,
+    touch_domain_border,
+)
 from pyphare.pharesee.hierarchy import hierarchy_from, merge_particles
 from pyphare.pharesee.particles import aggregate as aggregate_particles
 from pyphare.simulator.simulator import Simulator
-
 from tests.simulator import SimulatorTest
 
 
@@ -271,6 +277,9 @@ class InitializationTest(SimulatorTest):
             **kwargs,
         )
 
+        if cpp.mpi_rank() > 0:
+            return
+
         from pyphare.pharein import global_vars
 
         model = global_vars.sim.model
@@ -281,6 +290,7 @@ class InitializationTest(SimulatorTest):
         for ilvl, level in hier.levels().items():
             self.assertTrue(ilvl == 0)  # only level 0 is expected perfect precision
             print("checking level {}".format(ilvl))
+
             for patch in level.patches:
                 bx_pd = patch.patch_datas["Bx"]
                 by_pd = patch.patch_datas["By"]
@@ -336,6 +346,9 @@ class InitializationTest(SimulatorTest):
             nbr_part_per_cell=100,
             beam=True,
         )
+
+        if cpp.mpi_rank() > 0:
+            return
 
         from pyphare.pharein import global_vars
 
@@ -465,6 +478,9 @@ class InitializationTest(SimulatorTest):
             beam=True,
         )
 
+        if cpp.mpi_rank() > 0:
+            return
+
         from pyphare.pharein import global_vars
 
         model = global_vars.sim.model
@@ -554,7 +570,8 @@ class InitializationTest(SimulatorTest):
                 dl=0.0125,
             )
 
-            from pyphare.pharein import global_vars
+            if cpp.mpi_rank() == 0:
+                from pyphare.pharein import global_vars
 
             model = global_vars.sim.model
             density_fn = model.model_dict["protons"]["density"]
@@ -582,6 +599,9 @@ class InitializationTest(SimulatorTest):
                 plt.title(r"$\sigma =$ {}".format(noise[inbr]))
                 plt.savefig(f"noise_{nbrpart}_interp_{dim}_{interp_order}.png")
                 plt.close("all")
+
+        if cpp.mpi_rank() > 0:
+            return
 
         plt.figure()
         plt.plot(nbr_particles, noise / noise[0], label=r"$\sigma/\sigma_0$")
@@ -619,6 +639,9 @@ class InitializationTest(SimulatorTest):
             {"L0": {"B0": nDBox(dim, 10, 20)}},
             "particles",
         )
+
+        if cpp.mpi_rank() > 0:
+            return
 
         for patch in datahier.level(0).patches:
             pd = patch.patch_datas["protons_particles"]
@@ -658,6 +681,9 @@ class InitializationTest(SimulatorTest):
             cells=30,
             **kwargs,
         )
+
+        if cpp.mpi_rank() > 0:
+            return
 
         from pyphare.pharein.global_vars import sim
 
@@ -709,6 +735,9 @@ class InitializationTest(SimulatorTest):
             qty="particles_patch_ghost",
             **kwargs,
         )
+
+        if cpp.mpi_rank() > 0:
+            return
 
         self.assertTrue(
             any(
