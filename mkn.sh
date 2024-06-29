@@ -35,3 +35,7 @@ exit 0
 )
 
 # which mlr &&  mlr --csv --opprint   --from   .phare_times.0.csv sort -nr dim -nr time then cut -x -f storage || echo "miller not installed"
+
+# KLOG=3 MKN_DBG="cuda-gdb --args" PHARE_CELLS=13 PHARE_PPC=44 mkn $ARGS dbg -g -- --gtest_filter=IonUpdaterPPTest/12.updater 1> >(tee $CWD/mkn.sh.out ) 2> >(tee $CWD/mkn.sh.err >&2 )
+
+# cls; MKN_DBG="compute-sanitizer --tool memcheck" PHARE_CELLS=3 PHARE_PPC=6 mkn $ARGS dbg -g -- --gtest_filter=IonUpdaterPPTest/12.updater 1> >(tee $CWD/mkn.sh.out ) 2> >(tee $CWD/mkn.sh.err >&2 )
