@@ -279,9 +279,9 @@ public:
                         particle.icell_changer(newCell);
                         particle.iCell() = newCell;
                     }
-                    if constexpr (Particles::impl_v == 1)
-                        ParticleArrayService::sync<0, type>(view);
                 });
+            if constexpr (Particles::impl_v == 1)
+                ParticleArrayService::sync<0, type>(view);
         })
 
         ParticleArrayService::sync<0, type>(particles);
@@ -303,9 +303,9 @@ public:
                     particle.icell_changer(newCell);
                     particle.iCell() = newCell;
                 }
-                if constexpr (Particles::impl_v == 1)
-                    ParticleArrayService::sync<1, type>(view);
             });
+            if constexpr (Particles::impl_v == 1)
+                ParticleArrayService::sync<1, type>(view);
         })
 
         ParticleArrayService::sync<1, type>(particles);

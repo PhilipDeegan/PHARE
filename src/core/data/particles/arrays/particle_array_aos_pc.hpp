@@ -117,6 +117,12 @@ public:
     }
 
 protected:
+    template<std::uint8_t PHASE = 0, auto type = ParticleType::Domain>
+    void sync_add_new() _PHARE_ALL_FN_;
+
+    template<std::uint8_t PHASE = 0, auto type = ParticleType::Domain>
+    void sync_rm_left() _PHARE_ALL_FN_;
+
     template<auto type>
     void sync_gpu_gaps_and_tmp_impl0() _PHARE_ALL_FN_;
 
@@ -556,7 +562,6 @@ template<std::size_t dim, auto alloc_mode, std::uint8_t impl>
 template<auto type>
 void AoSPCVector<dim, alloc_mode, impl>::sync_gpu_gaps_and_tmp_impl1()
 {
-    // nothing
 }
 
 
@@ -1045,12 +1050,71 @@ template<std::size_t dim, auto alloc_mode, std::uint8_t impl>
 template<std::uint8_t PHASE, auto type>
 void AoSPCSpan<dim, alloc_mode, impl>::sync() _PHARE_ALL_FN_
 {
-    if constexpr (impl == 0)
-        sync_gpu_gaps_and_tmp_impl0<type>();
-    else if constexpr (impl == 1)
-        sync_gpu_gaps_and_tmp_impl1<type>();
+    // if constexpr (impl == 0)
+    //     sync_gpu_gaps_and_tmp_impl0<type>();
+    // else if constexpr (impl == 1)
+    //     sync_gpu_gaps_and_tmp_impl1<type>();
+
+    auto view = *this;
+    PHARE_WITH_MKN_GPU({
+        auto const& gabox = local_ghost_box_;
+        mkn::gpu::GDLauncher{gabox.size()}(
+            [=] _PHARE_ALL_FN_() mutable { view.template sync_add_new<PHASE, type>(); });
+        mkn::gpu::GDLauncher{gabox.size()}(
+            [=] _PHARE_ALL_FN_() mutable { view.template sync_rm_left<PHASE, type>(); });
+    })
 }
 
+
+template<std::size_t dim, auto alloc_mode, std::uint8_t impl>
+template<std::uint8_t PHASE, auto type>
+void AoSPCSpan<dim, alloc_mode, impl>::sync_add_new() _PHARE_ALL_FN_
+{
+    PHARE_WITH_MKN_GPU({
+        using Op           = Operators<SIZE_T, true>;
+        auto const& kidx   = mkn::gpu::idx();
+        auto const& bix    = *(local_ghost_box_.begin() + kidx);
+        auto const& n_gaps = gap_idx_(bix);
+        {
+            auto& gaps = gaps_(bix);
+            thrust::sort(thrust::seq, gaps.data(), gaps.data() + n_gaps /*, std::greater<>()*/);
+        }
+        auto& real       = particles_(bix);
+        auto const& gaps = gaps_(bix);
+        for (std::size_t i = 0; i < n_gaps; ++i)
+        {
+            auto const& part   = real[gaps[n_gaps - (1 + i)]];
+            auto const newcell = local_cell(part.iCell());
+            auto& nparts       = particles_(newcell);
+            auto const npidx   = Op{nparts.s}.increment_return_old();
+            PHARE_ASSERT(npidx < cap_(newcell));
+            // if (cap_(newcell) > npidx) // TBC
+            {
+                nparts[npidx] = part;
+            }
+        }
+    })
+}
+
+template<std::size_t dim, auto alloc_mode, std::uint8_t impl>
+template<std::uint8_t PHASE, auto type>
+void AoSPCSpan<dim, alloc_mode, impl>::sync_rm_left() _PHARE_ALL_FN_
+{
+    PHARE_WITH_MKN_GPU({
+        auto const& kidx = mkn::gpu::idx();
+        auto const& bix  = *(local_ghost_box_.begin() + kidx);
+        auto const& gaps = gaps_(bix);
+        auto& real       = particles_(bix);
+        auto& gaps_size  = gap_idx_(bix);
+        while (gaps_size)
+        {
+            auto const& pidx = gaps[gaps_size - 1];
+            real[pidx]       = real[real.s - 1];
+            --real.s;
+            --gaps_size;
+        }
+    })
+}
 
 
 
