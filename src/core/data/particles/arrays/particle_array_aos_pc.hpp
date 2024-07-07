@@ -156,10 +156,6 @@ public:
     using Particle_t                   = Particle<dim>;
     using value_type                   = Particle_t;
 
-    // template<typename T>
-    // using vec_helper = std::conditional_t<alloc_mode == AllocatorMode::CPU, //
-    //                                       PHARE::Vector<T, alloc_mode>,
-    //                                       PHARE::BufferedVectorHelper<T, alloc_mode>>;
     template<typename T>
     using vec_helper = PHARE::Vector<T, alloc_mode>;
 
@@ -391,7 +387,8 @@ auto& AoSPCVector<dim, alloc_mode, impl>::reserve_ppc(std::size_t const& ppc)
 {
     static_assert(std::is_same_v<decltype(type), ParticleType>);
 
-    std::size_t const additional = ppc < 10 ? 5 : ppc * .3; // 30% overallocate
+    std::size_t const additional = ppc < 10 ? 5 : ppc /** .3*/; // 100% overallocate
+    std::size_t const buffered   = ppc + additional;
 
     auto const on_box = [&](auto&& box, auto&& fn) {
         for (auto const& bix : box)
@@ -412,7 +409,7 @@ auto& AoSPCVector<dim, alloc_mode, impl>::reserve_ppc(std::size_t const& ppc)
 
     if constexpr (type == ParticleType::Domain)
     {
-        on_domain([&](auto const& bix) { particles_(bix).reserve(ppc + additional); });
+        on_domain([&](auto const& bix) { particles_(bix).reserve(buffered); });
         on_ghost_box([&](auto const& bix) { gaps_(bix).reserve(additional); });
         on_ghost_layer([&](auto const& bix) { particles_(bix).reserve(additional); });
     }
@@ -423,7 +420,7 @@ auto& AoSPCVector<dim, alloc_mode, impl>::reserve_ppc(std::size_t const& ppc)
             particles_(bix).reserve(additional);
             gaps_(bix).reserve(additional);
         });
-        on_ghost_layer([&](auto const& bix) { particles_(bix).reserve(ppc + additional); });
+        on_ghost_layer([&](auto const& bix) { particles_(bix).reserve(buffered); });
     }
 
     return *this;
@@ -545,7 +542,6 @@ void AoSPCVector<dim, alloc_mode, impl>::sync_gpu_gaps_and_tmp_impl0()
             for (std::size_t gidx = 0; gidx < gaps_size; ++gidx)
             {
                 auto const& idx = gaps[gidx];
-                PHARE_ASSERT(idx >= 0 and idx < 1000);
                 if (idx < real.size() - 1)
                     real[idx] = real.back();
                 real.pop_back();
@@ -736,12 +732,12 @@ struct AoSPCParticles : public Super_
             // auto const kidx = mkn::gpu::idx();
             auto const nc = Super::local_cell(newcell);
             // auto const oc   = Super::local_cell(p.iCell());
-            PHARE_WITH_MKN_GPU(__threadfence());
+            // PHARE_WITH_MKN_GPU(__threadfence());
             auto const nidx = Op{Super::gap_idx_(cell)}.increment_return_old();
             // printf("L:%d k %u c %u,%u oc %u,%u nc %u,%u i %lu x %lu ni %llu\n", __LINE__, kidx,
             // cell[0], cell[1], oc[0], oc[1], nc[0], nc[1], p.id, idx, nidx);
 
-            PHARE_WITH_MKN_GPU(__threadfence());
+            // PHARE_WITH_MKN_GPU(__threadfence());
             // __syncthreads();
             Op{Super::add_into_(nc)}.increment_return_old();
             // __syncthreads();
@@ -960,14 +956,18 @@ void AoSPCSpan<dim, alloc_mode, impl>::sync_gpu_gaps_and_tmp_impl1() _PHARE_ALL_
     PHARE_WITH_MKN_GPU({
         using Op = Operators<SIZE_T, true>;
 
-        __syncthreads();
-
         auto const& kidx  = mkn::gpu::idx();
         auto const& gabox = local_ghost_box_;
+
+        std::size_t pop = 0;
+
+        printf("L:%d k %u PRESYNC \n", __LINE__, kidx);
+        __syncthreads();
+        printf("L:%d k %u PSTSYNC \n", __LINE__, kidx);
+
         // printf("L:%d k %u n %lu \n", __LINE__, kidx, gabox.size());
         // __threadfence();
 
-        std::size_t pop = 0;
         // printf("k %u n %u \n", kidx, n_gaps);
 
         // Op{Super::add_into_(Super::local_cell(newcell))}.increment_return_old();
@@ -980,10 +980,6 @@ void AoSPCSpan<dim, alloc_mode, impl>::sync_gpu_gaps_and_tmp_impl1() _PHARE_ALL_
             // printf("L:%d k %u n %llu bix %u,%u \n", __LINE__, kidx, n_gaps, bix[0], bix[1]);
             // __threadfence();
 
-            if (n_gaps == 0)
-                return;
-
-            std::size_t const it = 1;
             {
                 auto& gaps = gaps_(bix);
                 thrust::sort(thrust::seq, gaps.data(), gaps.data() + n_gaps /*, std::greater<>()*/);
@@ -1000,9 +996,10 @@ void AoSPCSpan<dim, alloc_mode, impl>::sync_gpu_gaps_and_tmp_impl1() _PHARE_ALL_
                     // gaps[i], bix[0], bix[1], newcell[0], newcell[1], part.id);
                 }
                 auto& nparts = particles_(newcell);
-                __threadfence();
+                // __threadfence();
                 auto const npidx = Op{nparts.s}.increment_return_old();
-                // if (cap_(newcell) > npidx)
+                PHARE_ASSERT(npidx < cap_(newcell));
+                // if (cap_(newcell) > npidx) // TBC
                 {
                     nparts[npidx] = part;
                     ++pop;
@@ -1010,34 +1007,35 @@ void AoSPCSpan<dim, alloc_mode, impl>::sync_gpu_gaps_and_tmp_impl1() _PHARE_ALL_
             }
         };
 
-        if (kidx < gabox.size())
-            copy_out();
-
-        // __threadfence();
-        __syncthreads();
 
         auto const sync_left = [&]() {
             auto const& bix = *(gabox.begin() + kidx);
 
             // printf("L:%d k %u p %lu bix %u,%u \n", __LINE__, kidx, pop, bix[0], bix[1]);
 
-            auto& real       = particles_(bix);
             auto const& gaps = gaps_(bix);
+            auto& real       = particles_(bix);
             auto& gaps_size  = gap_idx_(bix);
-            for (std::size_t i = 0; i < pop; ++i)
+            while (pop)
             {
                 auto const& pidx = gaps[gaps_size - 1];
                 // if (pidx != real.s - 1)
                 real[pidx] = real[real.s - 1];
                 --real.s;
                 --gaps_size;
+                --pop;
             }
         };
 
-        if (kidx < gabox.size() && pop)
+        if (kidx < gabox.size())
+            copy_out();
+
+        __syncthreads();
+
+        if (kidx < gabox.size())
             sync_left();
 
-        // __syncthreads();
+        __syncthreads();
     });
 }
 
