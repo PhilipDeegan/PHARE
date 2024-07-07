@@ -6,7 +6,7 @@ alias cls="clear; printf '\033[3J'"
 cls
 set -e
 
-export KLOG=${KLOG:="0"}
+export KLOG=${KLOG:-0}
 export PHARE_SCOPE_TIMING=1
 PHARE_CELLS=${PHARE_CELLS:-8}
 PHARE_PPC=${PHARE_PPC:-20}
@@ -17,7 +17,7 @@ ARGS="${TEST} -P mkn.base=gpu_ -x "
 set -x
 
 ( # build
-  mkn clean build -p test_core ${ARGS} run $@ -- --gtest_filter=IonUpdaterPPTest/12.updater
+  mkn clean build -p test_core ${ARGS}  $@ -- --gtest_filter=IonUpdaterPPTest/12.updater
 ) 1> >(tee $CWD/.mkn.sh.out ) 2> >(tee $CWD/.mkn.sh.err >&2 )
 exit 0
 
