@@ -23,9 +23,9 @@ public:
     auto static constexpr impl_v     = impl_;
     auto static constexpr alloc_mode = alloc_mode_;
     using This                       = AoSPCSpan<dim, alloc_mode, impl_v>;
+    using lobox_t                    = Box<std::uint32_t, dim>;
 
 private:
-    using lobox_t  = Box<std::uint32_t, dim>;
     using locell_t = std::array<std::uint32_t, dim>;
 
     template<typename AoSPCArray>
@@ -77,7 +77,7 @@ public:
     auto size() const _PHARE_ALL_FN_ { return size_; }
     auto size(std::size_t const& idx) const _PHARE_ALL_FN_ { return particles_.data()[idx].size(); }
 
-    void resize(std::size_t s) { particles_.s = s; }
+    // void resize(std::size_t s) { particles_.s = s; }
 
     auto& box() const _PHARE_ALL_FN_ { return box_; }
     auto& ghost_box() const _PHARE_ALL_FN_ { return ghost_box_; }
@@ -89,32 +89,20 @@ public:
     {
         return local_cell(icell.toArray());
     }
-    auto local_box() const _PHARE_ALL_FN_
-    {
-        return box_from_zero_to_upper_minus_one(
-            safe_box_.shape().template toArray<std::uint32_t>());
-    }
+
+    auto& local_box() const _PHARE_ALL_FN_ { return local_ghost_box_; }
+
     auto local_box(Box<int, dim> const& from) const _PHARE_ALL_FN_
     {
         return lobox_t{local_cell(from.lower), local_cell(from.upper)};
     }
 
     auto& operator()() const { return particles_; }
-    auto& operator()(locell_t const& cell) const { return particles_(cell); }
+    auto& operator()(locell_t const& cell) _PHARE_ALL_FN_ { return particles_(cell); }
+    auto& operator()(locell_t const& cell) const _PHARE_ALL_FN_ { return particles_(cell); }
 
     template<std::uint8_t PHASE = 0, auto type = ParticleType::Domain>
     void sync() _PHARE_ALL_FN_;
-
-    template<typename Vec>
-    void cap(Vec& v)
-    {
-        if constexpr (impl_v == 1)
-        {
-            for (auto& p : v())
-                p.resize(p.capacity());
-            _cap = true;
-        }
-    }
 
 protected:
     template<std::uint8_t PHASE = 0, auto type = ParticleType::Domain>
@@ -138,8 +126,8 @@ protected:
     Box<int, dim> box_, ghost_box_, safe_box_;
     lobox_t local_ghost_box_;
 
-    bool _cap = false;
-};
+
+}; // AoSPCSpan
 
 
 template<std::size_t dim, auto alloc_mode_, std::uint8_t impl_ = 0>
@@ -163,7 +151,7 @@ public:
     using value_type                   = Particle_t;
 
     template<typename T>
-    using vec_helper = PHARE::Vector<T, alloc_mode>;
+    using vec_helper = PHARE::Vector<T, alloc_mode, 1>;
 
     using size_t_vec_helper   = vec_helper<std::size_t>;
     using size_t_vector       = typename size_t_vec_helper::vector_t;
@@ -210,11 +198,24 @@ public:
     template<bool inc_ = true>
     Particle_t& emplace_back(Particle_t const& p)
     {
-        auto& np = particles_(local_cell(p.iCell())).emplace_back(p);
+        auto& np = get_vec(particles_(local_cell(p.iCell()))).emplace_back(p);
         if constexpr (inc_)
             _inc(np);
         return np;
     }
+
+    template<typename V>
+    static auto& get_vec(V& v)
+    {
+        if constexpr (CompileOptions::WithMknGpu and alloc_mode == AllocatorMode::GPU_UNIFIED)
+        {
+            PHARE_WITH_MKN_GPU(return mkn::gpu::as_super(v));
+        }
+        else
+        {
+            return v;
+        }
+    };
 
     void push_back(Particle_t&& p) { emplace_back(p); }
     void push_back(Particle_t const& p) { emplace_back(p); }
@@ -222,10 +223,15 @@ public:
     void reset_views()
     {
         particles_views_ = generate_from<alloc_mode>(
-            [&](auto const i) { return make_span(*(particles_.data() + i)); }, particles_);
+            [&](auto const i) {
+                return make_span(*(particles_.data() + i), *(cell_size_.data() + i));
+            },
+            particles_);
         gap_views_ = generate_from<alloc_mode>(
             [&](auto const i) { return make_span(*(gaps_.data() + i)); }, gaps_);
     }
+
+    void reset_index_wrapper_map();
 
     auto& box() const { return box_; }
     auto& ghost_box() const { return ghost_box_; }
@@ -275,11 +281,23 @@ public:
 
     void check() const
     {
-        for (auto const& particles : particles_)
-            for (auto const& particle : particles)
-            {
-                PHARE_ASSERT(particle.iCell()[0] < 1000);
-            }
+        // PHARE_LOG_LINE_STR(impl_);        
+        // if constexpr (impl_ < 2)
+        // {
+        //     for (auto const& particles : particles_)
+        //         for (auto const& particle : particles)
+        //         {
+        //             PHARE_ASSERT(particle.iCell()[0] < 1000);
+        //         }
+        // }
+        // else
+        // {
+        //     for (auto const& particles : particles_)
+        //         for (auto const& p : particles)
+        //         {
+        //             abort_if(!float_not_equals(p.delta()[0],0));
+        //         }
+        // }
     }
 
     void replace_from(This const& that)
@@ -296,6 +314,36 @@ public:
 
         // cell_size_ = that.cell_size_;
         // cell_size_ = that.cell_size_;
+    }
+
+    void cap()
+    {
+        PHARE_LOG_SCOPE(1, "AoSPCVector::cap");
+        if constexpr (any_in(impl_v, 1, 2))
+            for (auto& p : particles_)
+                resize(p, p.capacity());
+    }
+
+    template<typename V>
+    void static resize(V& v, std::size_t const& s)
+    {
+        if constexpr (CompileOptions::WithMknGpu and alloc_mode == AllocatorMode::GPU_UNIFIED)
+        {
+            PHARE_WITH_MKN_GPU(mkn::gpu::resize(v, s));
+        }
+        else
+            v.resize(s);
+    }
+
+    template<typename V>
+    void static reserve(V& v, std::size_t const& s)
+    {
+        if constexpr (CompileOptions::WithMknGpu and alloc_mode == AllocatorMode::GPU_UNIFIED)
+        {
+            PHARE_WITH_MKN_GPU(mkn::gpu::reserve(v, s));
+        }
+        else
+            v.reserve(s);
     }
 
 protected:
@@ -337,6 +385,21 @@ protected:
     template<auto type>
     void sync_gpu_gaps_and_tmp_impl1();
 
+    static void  on_box(auto&& box, auto&& fn) {
+        for (auto const& bix : box)
+            fn(bix);
+    };
+
+    static void on_box_list(auto&& boxlist, auto&& fn) {
+        for (auto const& box : boxlist)
+            on_box(box, fn);
+    };
+
+    void on_domain(auto&& fn) const { on_box(local_box(box()), fn); };
+    void on_ghost_box(auto&& fn) { on_box(local_box(), fn); };
+    void on_ghost_layer(auto&& fn) const{ on_box_list(local_box().remove(local_box(box())), fn); };
+    void on_ghost_layer_plus_1_domain(auto&& fn) const { on_box_list(local_box().remove(shrink(local_box(box()), 1)), fn); };
+
 }; // AoSPCVector<dim, alloc_mode>
 
 
@@ -350,7 +413,7 @@ auto& AoSPCVector<dim, alloc_mode, impl>::insert(AoSPCVector const& src)
         auto& from = src(bix);
         auto& to   = (*this)(bix);
         added += from.size();
-        to.reserve(to.size() + from.size());
+        reserve(to, to.size() + from.size());
         std::copy(from.begin(), from.end(), std::back_inserter(to));
     }
     if (added)
@@ -373,16 +436,27 @@ auto& AoSPCVector<dim, alloc_mode, impl>::insert_domain_from(AoSPCVector const& 
 
     std::size_t added = 0;
 
+    this->check();
+    src.check();
+
     on_box_list(local_box(box()).remove(shrink(local_box(box()), 1)), [&](auto const& bix) {
         auto& from = src(bix);
-        auto& to   = (*this)(bix);
+        auto& to   = get_vec((*this)(bix));
         added += from.size();
-        to.reserve(to.size() + from.size());
-        std::copy(from.begin(), from.end(), std::back_inserter(to));
+        reserve((*this)(bix), to.size() + from.size());
+        
+        for(auto const& p : from) to.emplace_back(p);
+        
+        // std::copy(from.begin(), from.end(), std::back_inserter(to));
     });
+    
+    this->check();
+    
 
     if (added)
         sync<2>();
+    
+    this->check();
 
     return *this;
 }
@@ -396,37 +470,20 @@ auto& AoSPCVector<dim, alloc_mode, impl>::reserve_ppc(std::size_t const& ppc)
     std::size_t const additional = ppc < 10 ? 5 : ppc /** .3*/; // 100% overallocate
     std::size_t const buffered   = ppc + additional;
 
-    auto const on_box = [&](auto&& box, auto&& fn) {
-        for (auto const& bix : box)
-            fn(bix);
-    };
-
-    auto const on_box_list = [&](auto&& boxlist, auto&& fn) {
-        for (auto const& box : boxlist)
-            on_box(box, fn);
-    };
-
-    auto const on_domain    = [&](auto&& fn) { on_box(local_box(box()), fn); };
-    auto const on_ghost_box = [&](auto&& fn) { on_box(local_box(), fn); };
-    auto const on_ghost_layer
-        = [&](auto&& fn) { on_box_list(local_box().remove(local_box(box())), fn); };
-    auto const on_ghost_layer_plus_1_domain
-        = [&](auto&& fn) { on_box_list(local_box().remove(shrink(local_box(box()), 1)), fn); };
-
     if constexpr (type == ParticleType::Domain)
     {
-        on_domain([&](auto const& bix) { particles_(bix).reserve(buffered); });
-        on_ghost_box([&](auto const& bix) { gaps_(bix).reserve(additional); });
-        on_ghost_layer([&](auto const& bix) { particles_(bix).reserve(additional); });
+        on_domain([&](auto const& bix) { reserve(particles_(bix), buffered); });
+        on_ghost_box([&](auto const& bix) { reserve(gaps_(bix), additional); });
+        on_ghost_layer([&](auto const& bix) { reserve(particles_(bix), additional); });
     }
 
     if constexpr (type == ParticleType::Ghost)
     {
         on_ghost_layer_plus_1_domain([&](auto const& bix) {
-            particles_(bix).reserve(additional);
-            gaps_(bix).reserve(additional);
+            reserve(particles_(bix), additional);
+            reserve(gaps_(bix), additional);
         });
-        on_ghost_layer([&](auto const& bix) { particles_(bix).reserve(buffered); });
+        on_ghost_layer([&](auto const& bix) { reserve(particles_(bix), buffered); });
     }
 
     return *this;
@@ -507,12 +564,13 @@ void AoSPCVector<dim, alloc_mode, impl>::sync_gpu_gaps_and_tmp_impl0()
         for (auto const& bix : lbox)
         { // calculate reserve size
             auto& real = particles_(bix);
-            if constexpr (impl_v == 1)
+            if constexpr (any_in(impl_v, 1, 2))
             {
                 // push_back is done on device requires over allocation
-                real.resize(particles_views_(bix).size());
+                // cell_size_(bix) = particles_views_(bix).size();
+                resize(real, particles_views_(bix).size());
             }
-            real.reserve(real.size() + add_into_(bix));
+            reserve(real, real.size() + add_into_(bix));
         }
     }
 
@@ -529,7 +587,7 @@ void AoSPCVector<dim, alloc_mode, impl>::sync_gpu_gaps_and_tmp_impl0()
                 PHARE_ASSERT(idx >= 0 and idx < 1000);
                 auto const& p = real[idx];
                 PHARE_ASSERT(Point{p.iCell()} != bix);
-                particles_(local_cell(p.iCell())).emplace_back(p);
+                /*particles_(local_cell(p.iCell())).*/ emplace_back(p);
             }
         }
     }
@@ -586,14 +644,37 @@ void AoSPCVector<dim, alloc_mode, impl>::sync_gpu_gaps_and_tmp()
 }
 
 template<std::size_t dim, auto alloc_mode, std::uint8_t impl>
+void AoSPCVector<dim, alloc_mode, impl>::reset_index_wrapper_map()
+{
+    resize(p2c_, total_size);
+    std::size_t offset = 0;
+    for (auto const& bix : local_box())
+    {
+        auto const& cs = cell_size_(bix);
+        resize(gaps_(bix), cs);
+        off_sets_(bix) = offset;
+        if (cs)
+            std::fill(p2c_.begin() + offset, p2c_.begin() + offset + cs, *bix);
+
+        // thrust::fill(thrust::device, p2c_.begin() + offset, p2c_.begin() + offset +
+        // cs, *bix); thrust::fill(v.begin(), v.end(),
+        // std::numeric_limits<float>::max());
+
+        offset += cs;
+        cap_(bix) = particles_(bix).capacity();
+    }
+}
+
+template<std::size_t dim, auto alloc_mode, std::uint8_t impl>
 template<std::uint8_t PHASE, auto type>
 void AoSPCVector<dim, alloc_mode, impl>::sync()
 {
-    PHARE_LOG_LINE_STR("sync " << static_cast<std::uint32_t>(PHASE) << " "
-                               << magic_enum::enum_name(type));
-
     static_assert(std::is_same_v<decltype(type), ParticleType>);
     static_assert(type != ParticleType::All);
+
+    PHARE_LOG_SCOPE(1, "AoSPCVector::sync");
+    PHARE_LOG_LINE_STR("sync " << static_cast<std::uint32_t>(PHASE) << " "
+                               << magic_enum::enum_name(type));
 
     auto const lbox = local_box();
 
@@ -610,32 +691,38 @@ void AoSPCVector<dim, alloc_mode, impl>::sync()
     for (auto const& bix : lbox)
         total_size += (cell_size_(bix) = particles_(bix).size());
 
-
     if constexpr (alloc_mode == AllocatorMode::GPU_UNIFIED)
     {
-        p2c_.resize(total_size);
-        std::size_t offset = 0;
-        for (auto const& bix : lbox)
+        PHARE_LOG_SCOPE(1, "AoSPCVector::sync::reset");
+        static_assert(impl < 3); // otherwise unhandled
+        if constexpr (impl < 2)
         {
-            auto const& cs = cell_size_(bix);
-            gaps_(bix).resize(cs, 0);
-            off_sets_(bix) = offset;
-            if (cs)
-                std::fill(p2c_.begin() + offset, p2c_.begin() + offset + cs, *bix);
-            offset += cs;
+            reset_index_wrapper_map();
+        }
+        else // if (PHASE == 2)
+        {
+            auto const per_cell = [&](auto& bix){
+                auto const& cs = cell_size_(bix);
+                auto const& cap = particles_(bix).capacity();
+                auto& gaps = gaps_(bix);
+                if(gaps.size() < cs){
+                    reserve(gaps, cap);
+                    resize(gaps, cs);
+                }
+                cap_(bix) = cap;
+            };
 
-            cap_(bix) = particles_(bix).capacity();
+            if constexpr (type == ParticleType::Domain)
+                on_domain(per_cell);
+            
+            // if constexpr (ParticleType::Domain)
+            //     on_ghost_layer(per_cell);
         }
     }
 
-    reset_views();
-
-    if constexpr (alloc_mode == AllocatorMode::GPU_UNIFIED)
     {
-        for (auto const& p2c : p2c_)
-        {
-            PHARE_ASSERT(particles_(p2c).size());
-        }
+        PHARE_LOG_SCOPE(1, "AoSPCVector::sync::reset_views");
+        reset_views();
     }
 }
 
@@ -726,30 +813,21 @@ struct AoSPCParticles : public Super_
     {
         if constexpr (alloc_mode == AllocatorMode::CPU)
         {
-            Super::gaps_(cell).emplace_back(idx);
+            Super::get_vec(Super::gaps_(cell)).emplace_back(idx);
             if (isIn(newcell, Super::ghost_box()))
-                particles_(Super::local_cell(newcell)).emplace_back(p).iCell() = newcell;
+                Super::get_vec(particles_(Super::local_cell(newcell))).emplace_back(p).iCell()
+                    = newcell;
         }
         else if constexpr (alloc_mode == AllocatorMode::GPU_UNIFIED)
         {
             using Op = Operators<typename Super::SIZE_T, true>;
 
-            // auto const kidx = mkn::gpu::idx();
             auto const nc = Super::local_cell(newcell);
-            // auto const oc   = Super::local_cell(p.iCell());
-            // PHARE_WITH_MKN_GPU(__threadfence());
-            auto const nidx = Op{Super::gap_idx_(cell)}.increment_return_old();
-            // printf("L:%d k %u c %u,%u oc %u,%u nc %u,%u i %lu x %lu ni %llu\n", __LINE__, kidx,
-            // cell[0], cell[1], oc[0], oc[1], nc[0], nc[1], p.id, idx, nidx);
 
-            // PHARE_WITH_MKN_GPU(__threadfence());
-            // __syncthreads();
+            // printf("L:%d i %llu ic %u,%u change \n", __LINE__, idx, cell[0], cell[1]);
+
             Op{Super::add_into_(nc)}.increment_return_old();
-            // __syncthreads();
-            Super::gaps_(cell)[nidx] = idx;
-            // __syncthreads();
-
-            // Super::gaps_(cell)[idx] = 1;
+            Super::gaps_(cell)[Op{Super::gap_idx_(cell)}.increment_return_old()] = idx;
         }
         else
             throw std::runtime_error("no");
@@ -768,16 +846,24 @@ struct AoSPCParticles : public Super_
 
     void print() const {}
 
-    void check() const
-    {
-        if (size() == 0)
-            return;
+    // void check() const
+    // {
+    //     if (size() == 0)
+    //         return;
+        
+    //     if constexpr (alloc_mode == AllocatorMode::GPU_UNIFIED)
+    //     {
+    //         auto& c = Super::p2c_[0];
+    //         PHARE_ASSERT(&*(*this)[0] == &*this->begin());
+    //     }
+    // }
 
-        if constexpr (alloc_mode == AllocatorMode::GPU_UNIFIED)
-        {
-            auto& c = Super::p2c_[0];
-            PHARE_ASSERT(&*(*this)[0] == &*this->begin());
-        }
+
+    auto max_size() const
+    {
+        PHARE_LOG_LINE_STR("AoSPC::max_size")
+        return max_from(this->particles_,
+                        [](auto const& v, auto const& i) { return v.data()[i].size(); });
     }
 
 
@@ -1054,6 +1140,8 @@ void AoSPCSpan<dim, alloc_mode, impl>::sync() _PHARE_ALL_FN_
     //     sync_gpu_gaps_and_tmp_impl0<type>();
     // else if constexpr (impl == 1)
     //     sync_gpu_gaps_and_tmp_impl1<type>();
+
+    PHARE_LOG_SCOPE(1, "AoSPCSpan::sync()");
 
     auto view = *this;
     PHARE_WITH_MKN_GPU({

@@ -54,7 +54,7 @@ struct Allocator
     Actual actual{};
 };
 
-template<typename Type, auto allocator_mode>
+template<typename Type, auto allocator_mode, std::uint8_t mode = 0>
 auto constexpr allocator()
 {
     static_assert(std::is_same_v<decltype(allocator_mode), AllocatorMode>);
@@ -68,8 +68,12 @@ auto constexpr allocator()
     {
         if constexpr (CompileOptions::WithMknGpu)
         {
-            PHARE_WITH_MKN_GPU(
-                return Allocator<allocator_mode, mkn::gpu::ManagedAllocator<Type>>{});
+            PHARE_WITH_MKN_GPU({
+                if constexpr (mode == 0) // for fields
+                    return Allocator<allocator_mode, mkn::gpu::ManagedAllocator<Type>>{};
+                else // for particles
+                    return Allocator<allocator_mode, mkn::gpu::NoConstructAllocator<Type>>{};
+            });
         }
         if constexpr (CompileOptions::WithUmpire)
         {
@@ -82,16 +86,16 @@ auto constexpr allocator()
     throw std::runtime_error("NOOO");
 }
 
-template<typename Type, auto allocator_mode>
-using allocator_type_t = decltype(allocator<Type, allocator_mode>());
+template<typename Type, auto allocator_mode, std::uint8_t mode>
+using allocator_type_t = decltype(allocator<Type, allocator_mode, mode>());
 
 // ^ bi directionality v
 
-template<typename Type, typename allocator_type>
+template<typename Type, typename allocator_type, std::uint8_t mode = 0>
 auto constexpr get_allocator_mode()
 {
-    if constexpr (std::is_same_v<allocator_type,
-                                 typename allocator_type_t<Type, AllocatorMode::CPU>::value_type>)
+    if constexpr (std::is_same_v<allocator_type, typename allocator_type_t<Type, AllocatorMode::CPU,
+                                                                           mode>::value_type>)
         return AllocatorMode::CPU;
     else
     {
@@ -100,18 +104,18 @@ auto constexpr get_allocator_mode()
 }
 
 
-template<typename Type, auto allocator_mode_ = AllocatorMode::CPU,
+template<typename Type, auto allocator_mode_ = AllocatorMode::CPU, std::uint8_t mode = 0,
          typename vector_t_
-         = std::vector<Type, typename allocator_type_t<Type, allocator_mode_>::value_type>>
+         = std::vector<Type, typename allocator_type_t<Type, allocator_mode_, mode>::value_type>>
 struct Vector
 {
     auto static constexpr allocator_mode = allocator_mode_;
 
     using value_type     = Type;
-    using Allocator_t    = allocator_type_t<Type, allocator_mode>;
+    using Allocator_t    = allocator_type_t<Type, allocator_mode, mode>;
     using allocator_type = typename Allocator_t::value_type;
     using vector_t       = vector_t_;
-    static_assert(allocator_mode == get_allocator_mode<Type, allocator_type>());
+    static_assert(allocator_mode == get_allocator_mode<Type, allocator_type, mode>());
 
     Vector() = delete; // not meant to be instantiated.
 
@@ -237,6 +241,8 @@ struct Vector
                 throw std::runtime_error("Vector::fill NO ALTERNATIVE");
         }
     }
+
+    // add resize for mkn::gpu
 };
 
 
@@ -246,7 +252,7 @@ struct BufferedVector
 {
     using value_type                 = T;
     auto constexpr static alloc_mode = Alloc;
-    using Allocator_t                = allocator_type_t<T, alloc_mode>;
+    using Allocator_t                = allocator_type_t<T, alloc_mode, 0>;
     using allocator_type             = typename Allocator_t::value_type;
 
     BufferedVector()
@@ -324,7 +330,7 @@ void BufferedVector<T, Alloc, SIZE>::add_to_top(T const& t)
 
 
 template<typename Type, auto alloc = AllocatorMode::CPU>
-using BufferedVectorHelper = Vector<Type, alloc, BufferedVector<Type, alloc>>;
+using BufferedVectorHelper = Vector<Type, alloc, 0, BufferedVector<Type, alloc>>;
 
 
 } // namespace PHARE

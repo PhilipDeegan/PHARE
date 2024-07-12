@@ -70,6 +70,11 @@ auto make_span(Container& container)
     return Span<typename Container::value_type>{container.data(), container.size()};
 }
 template<typename Container, std::enable_if_t<core::is_span_like_v<Container>, bool> = 0>
+auto make_span(Container& container, std::size_t const& size)
+{
+    return Span<typename Container::value_type>{container.data(), size};
+}
+template<typename Container, std::enable_if_t<core::is_span_like_v<Container>, bool> = 0>
 auto make_span(Container const& container)
 {
     return Span<typename Container::value_type>{container.data(), container.size()};

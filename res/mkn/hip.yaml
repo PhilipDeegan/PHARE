@@ -2,7 +2,6 @@ property:
   cxx.flags: >-
     --std=c++20 -fsized-deallocation -fPIC
     -DPHARE_HAVE_MKN_GPU
-    -DPHARE_SKIP_MPI_IN_CORE
   lnk.flags: -pthread
 local:
   repo: /mkn/r

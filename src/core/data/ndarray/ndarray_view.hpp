@@ -91,6 +91,7 @@ class NdArrayView
 public:
     std::size_t static const dimension = dim;
     using type                         = DataType;
+    using value_type                   = DataType;
     using pointer_type                 = DataType*;
 
 

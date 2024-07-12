@@ -28,9 +28,30 @@ namespace PHARE::core
 {
 
 
+template<auto alloc, typename Particle_t, typename Float, std::size_t dim>
+auto static advancePosition_(Particle_t& p,
+                             std::array<Float, dim> const halfDtOverDl) _PHARE_ALL_FN_
+{
+    auto newCell = p.iCell();
+
+    for (std::size_t iDim = 0; iDim < dim; ++iDim)
+    {
+        Float delta = p.delta()[iDim] + static_cast<Float>(halfDtOverDl[iDim] * p.v()[iDim]);
+        if constexpr (alloc == AllocatorMode::CPU)
+            if (std::abs(delta) > 2)
+                throw_runtime_error("Error, particle moves more than 1 cell, delta >2");
+
+        Float iCell     = std::floor(delta);
+        p.delta()[iDim] = delta - iCell;
+        newCell[iDim]   = static_cast<int>(iCell + p.iCell()[iDim]);
+    }
+
+    return newCell;
+}
+
 
 template<typename Particle, typename Float, typename ParticleEB>
-void c_boris_accelerate(Particle& p, Float const& dto2m, ParticleEB const& eb) _PHARE_ALL_FN_
+void boris_accelerate(Particle& p, ParticleEB const& eb, Float const& dto2m) _PHARE_ALL_FN_
 {
     static constexpr Float one = 1;
     static constexpr Float two = 2;
@@ -180,40 +201,11 @@ public:
     {
         // PHARE_LOG_LINE_STR(particle.copy());
         particle.iCell() = advancePosition_<alloc>(particle, halfDtOverDl);
-        accelerate_(particle, interp.m2p(particle, em, layout), dto2m);
+        boris_accelerate(particle, interp.m2p(particle, em, layout), dto2m);
         particle.iCell() = advancePosition_<alloc>(particle, halfDtOverDl);
         // PHARE_LOG_LINE_STR(particle.copy());
     }
 
-
-    template<auto alloc, typename Particle_t, typename Float>
-    auto static advancePosition_(Particle_t& p,
-                                 std::array<Float, dim> const halfDtOverDl) _PHARE_ALL_FN_
-    {
-        auto newCell = p.iCell();
-
-        for (std::size_t iDim = 0; iDim < dim; ++iDim)
-        {
-            Float delta = p.delta()[iDim] + static_cast<Float>(halfDtOverDl[iDim] * p.v()[iDim]);
-            if constexpr (alloc == AllocatorMode::CPU)
-                if (std::abs(delta) > 2)
-                    throw_runtime_error("Error, particle moves more than 1 cell, delta >2");
-
-            Float iCell     = std::floor(delta);
-            p.delta()[iDim] = delta - iCell;
-            newCell[iDim]   = static_cast<int>(iCell + p.iCell()[iDim]);
-        }
-
-        return newCell;
-    }
-
-
-
-    template<typename Particle_t, typename ParticleEB>
-    void static accelerate_(Particle_t& p, ParticleEB const& eb, double const& dto2m) _PHARE_ALL_FN_
-    {
-        c_boris_accelerate(p, dto2m, eb);
-    }
 
     template<auto type, typename Particles, typename Electromag>
     void move_aos_pc_cpu(Particles& particles, Electromag const& em) const
@@ -225,8 +217,10 @@ public:
                     fn(bix, i);
         };
 
+        PHARE_LOG_SCOPE(1, "boris::move_aos_pc_cpu");
+
         {
-            PHARE_LOG_SCOPE(3, "boris::advance_0");
+            PHARE_LOG_SCOPE(1, "boris::move_aos_pc_cpu::advance_0");
 
             ppp([&](auto const& bix, auto const& idx) {
                 auto& particle = particles(bix)[idx];
@@ -242,11 +236,11 @@ public:
         ParticleArrayService::sync<0, type>(particles);
 
         {
-            PHARE_LOG_SCOPE(3, "boris::advance_accelerate");
+            PHARE_LOG_SCOPE(1, "boris::move_aos_pc_cpu::advance_accelerate");
 
             ppp([&](auto const& bix, auto const& idx) {
                 auto& particle = particles(bix)[idx];
-                accelerate_(particle, interpolator_.m2p(particle, em, layout_), dto2m);
+                boris_accelerate(particle, interpolator_.m2p(particle, em, layout_), dto2m);
                 auto const& newCell = advancePosition_<alloc_mode>(particle, halfDtOverDl_);
                 if (newCell != particle.iCell())
                 {
@@ -264,14 +258,21 @@ public:
     {
         auto constexpr static alloc_mode = Particles::alloc_mode;
         PHARE_LOG_SCOPE(1, "boris::move_aos_pc_gpu");
+        using lobox_t  = Particles::lobox_t;
+        using Launcher = gpu::BoxCellNLauncher<lobox_t>;
+
+        auto const dto2m_       = dto2m;
+        auto const layout       = layout_;
+        auto const halfDtOverDl = halfDtOverDl_;
 
         PHARE_WITH_MKN_GPU({
-            PHARE_LOG_SCOPE(1, "boris::advance");
             auto view = *particles;
-            view.cap(particles);
+            // particles.cap(); // needs to be after view creation!
 
-            mkn::gpu::GDLauncher{particles.size()}(
-                [=, halfDtOverDl = halfDtOverDl_] _PHARE_ALL_FN_() mutable {
+            if constexpr (any_in(Particles::impl_v, 0, 1))
+            {
+                PHARE_LOG_SCOPE(1, "boris::move_aos_pc_gpu::advance_0/1");
+                mkn::gpu::GDLauncher{particles.size()}([=] _PHARE_ALL_FN_() mutable {
                     auto particle       = view[mkn::gpu::idx()];
                     auto const& newCell = advancePosition_<alloc_mode>(particle, halfDtOverDl);
                     if (!array_equals(newCell, particle.iCell()))
@@ -280,32 +281,86 @@ public:
                         particle.iCell() = newCell;
                     }
                 });
-            if constexpr (Particles::impl_v == 1)
+            }
+
+            if constexpr (any_in(Particles::impl_v, 2))
+            {
+                particles.check();
+                PHARE_LOG_SCOPE(1, "boris::move_aos_pc_gpu::advance_2");
+                auto lobox = view.local_box();
+                Launcher{lobox, particles.max_size()}([=] _PHARE_ALL_FN_() mutable {
+                    auto const blockidx  = Launcher::block_idx();
+                    auto const threadIdx = Launcher::thread_idx();
+                    auto const& locell   = *(lobox.begin() + blockidx);
+                    auto& parts          = view(locell);
+                    if (threadIdx >= parts.size())
+                        return;
+                    auto& particle      = parts[threadIdx];
+                    auto const& newCell = advancePosition_<alloc_mode>(particle, halfDtOverDl);
+                    if (!array_equals(newCell, particle.iCell()))
+                    {
+                        view.icell_changer(particle, locell, threadIdx, newCell);
+                        particle.iCell() = newCell;
+                    }
+                });
+                particles.check();
+            }
+
+            if constexpr (any_in(Particles::impl_v, 1, 2))
                 ParticleArrayService::sync<0, type>(view);
+            particles.check();
         })
 
         ParticleArrayService::sync<0, type>(particles);
 
         PHARE_WITH_MKN_GPU({
-            PHARE_LOG_SCOPE(1, "boris::advance_accelerate");
-
             auto view = *particles;
-            view.cap(particles);
-            mkn::gpu::GDLauncher{particles.size()}([=, layout = layout_,
-                                                    halfDtOverDl = halfDtOverDl_,
-                                                    dto2m_       = dto2m] _PHARE_ALL_FN_() mutable {
-                Interpolator interp;
-                auto particle = view[mkn::gpu::idx()];
-                accelerate_(particle, interp.m2p(particle, em, layout), dto2m_);
-                auto const& newCell = advancePosition_<alloc_mode>(particle, halfDtOverDl);
-                if (!array_equals(newCell, particle.iCell()))
-                {
-                    particle.icell_changer(newCell);
-                    particle.iCell() = newCell;
-                }
-            });
-            if constexpr (Particles::impl_v == 1)
+            // particles.cap();
+
+            if constexpr (any_in(Particles::impl_v, 0, 1))
+            {
+                PHARE_LOG_SCOPE(1, "boris::move_aos_pc_gpu::advance_accelerate_0/1");
+                mkn::gpu::GDLauncher{particles.size()}([=] _PHARE_ALL_FN_() mutable {
+                    Interpolator interp;
+                    auto particle = view[mkn::gpu::idx()];
+                    boris_accelerate(particle, interp.m2p(particle, em, layout), dto2m_);
+                    auto const& newCell = advancePosition_<alloc_mode>(particle, halfDtOverDl);
+                    if (!array_equals(newCell, particle.iCell()))
+                    {
+                        particle.icell_changer(newCell);
+                        particle.iCell() = newCell;
+                    }
+                });
+            }
+
+            if constexpr (any_in(Particles::impl_v, 2))
+            {
+                particles.check();
+                PHARE_LOG_SCOPE(1, "boris::move_aos_pc_gpu::advance_accelerate_2");
+                auto lobox = view.local_box();
+                Launcher{lobox, particles.max_size()}([=] _PHARE_ALL_FN_() mutable {
+                    auto const blockidx  = Launcher::block_idx();
+                    auto const threadIdx = Launcher::thread_idx();
+                    auto const& locell   = *(lobox.begin() + blockidx);
+                    auto& parts          = view(locell);
+                    if (threadIdx >= parts.size())
+                        return;
+                    auto& particle = parts[threadIdx];
+                    Interpolator interp;
+                    boris_accelerate(particle, interp.m2p(particle, em, layout), dto2m_);
+                    auto const& newCell = advancePosition_<alloc_mode>(particle, halfDtOverDl);
+                    if (!array_equals(newCell, particle.iCell()))
+                    {
+                        view.icell_changer(particle, locell, threadIdx, newCell);
+                        particle.iCell() = newCell;
+                    }
+                });
+                particles.check();
+            }
+
+            if constexpr (any_in(Particles::impl_v, 1, 2))
                 ParticleArrayService::sync<1, type>(view);
+            particles.check();
         })
 
         ParticleArrayService::sync<1, type>(particles);

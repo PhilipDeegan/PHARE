@@ -424,6 +424,32 @@ NO_DISCARD auto constexpr none(Container const& container, Fn fn = to_bool)
     return std::none_of(container.begin(), container.end(), fn);
 }
 
+auto constexpr static accessor = [](auto const& v, auto const& i) -> auto& { return v[i]; };
+template<typename Container, typename Fn = decltype(accessor)>
+NO_DISCARD auto constexpr max_from(Container const& container, Fn fn = accessor)
+{
+    using T = Container::value_type;
+    assert(container.size());
+    auto t = fn(container, 0);
+    for (std::size_t i = 1; i < container.size(); ++i)
+        if (auto const& e = fn(container, i); e > t)
+            t = e;
+    PHARE_LOG_LINE_STR(t);
+    return t;
+}
+
+template<typename Container, typename Fn = decltype(accessor)>
+NO_DISCARD auto constexpr min_from(Container const& container, Fn fn = accessor)
+{
+    using T = Container::value_type;
+    assert(container.size());
+    auto t = fn(container, 0);
+    for (std::size_t i = 1; i < container.size(); ++i)
+        if (auto const& e = fn(container, i); e < t)
+            t = e;
+    return t;
+}
+
 
 
 template<typename SignedInt, typename UnsignedInt>
@@ -482,6 +508,24 @@ auto inline float_equals(double const& a, double const& b, double diff = 1e-12)
     return pred;
 #else
     return std::abs(a - b) < diff;
+#endif
+}
+
+
+auto inline float_not_equals(double const& a, double const& b, double diff = 1e-12)
+{
+#ifndef NDEBUG
+    auto ret  = std::abs(a - b);
+    auto pred = ret > diff;
+    if (!pred)
+    {
+        PHARE_LOG_LINE_STR(to_string_with_precision(a, 22));
+        PHARE_LOG_LINE_STR(to_string_with_precision(b, 22));
+        PHARE_LOG_LINE_STR(to_string_with_precision(ret, 22));
+    }
+    return pred;
+#else
+    return std::abs(a - b) > diff;
 #endif
 }
 
@@ -681,11 +725,7 @@ template<typename T, T t>
 static constexpr auto to_string_view_v = to_string_view<T, t>::value;
 
 
-// template<typename... Args>
-// bool _array_equals(Args... args)
-// {
-//     return (... && args);
-// }
+
 
 template<typename T0, typename T1, std::size_t... Is>
 bool _array_equals(T0 const& a, T1 const& b, std::index_sequence<Is...> const&&) _PHARE_ALL_FN_
@@ -712,6 +752,14 @@ template<typename As, typename T, std::size_t S>
 auto array_minus(std::array<T, S> const& a, std::array<T, S> const& b) _PHARE_ALL_FN_
 {
     return _array_minus<As>(a, b, std::make_index_sequence<S>{});
+}
+
+
+
+// template<typename A, typename T...>
+auto constexpr any_in(auto const a, auto&&... ts) _PHARE_ALL_FN_
+{
+    return ((a == ts) || ...);
 }
 
 

@@ -66,7 +66,7 @@ void IonUpdaterPC<Ions, Electromag, GridLayout>::updatePopulations(Ions& ions, E
                                                                    double const& dt,
                                                                    UpdaterMode mode)
 {
-    PHARE_LOG_SCOPE(3, "IonUpdaterPC::updatePopulations");
+    PHARE_LOG_SCOPE(1, "IonUpdaterPC::updatePopulations");
     resetMoments(ions);
     dt_ = dt;
     if (mode == UpdaterMode::domain_only)
@@ -93,7 +93,7 @@ void IonUpdaterPC<Ions, Electromag, GridLayout>::updateAndDepositDomain_(Ions& i
                                                                          Electromag const& em,
                                                                          GridLayout const& layout)
 {
-    PHARE_LOG_SCOPE(3, "IonUpdaterPC::updateAndDepositDomain_");
+    PHARE_LOG_SCOPE(1, "IonUpdaterPC::updateAndDepositDomain_");
 
     for (auto& pop : ions)
     {
@@ -125,20 +125,24 @@ void IonUpdaterPC<Ions, Electromag, GridLayout>::updateAndDepositAll_(Ions& ions
                                                                       Electromag const& em,
                                                                       GridLayout const& layout)
 {
-    PHARE_LOG_SCOPE(3, "IonUpdaterPC::updateAndDepositAll_");
+    PHARE_LOG_SCOPE(1, "IonUpdaterPC::updateAndDepositAll_");
 
     for (auto& pop : ions)
     {
         auto& domain = pop.domainParticles();
         Pusher_t pusher{layout, layout.meshSize(), dt_, pop.mass()};
         pusher.template push<ParticleType::Domain>(domain, em);
+        domain.check();
 
         auto pushGhosts = [&](auto& particles) {
             pusher.template push<ParticleType::Ghost>(particles, em);
             ParticleArrayService::copy_ghost_into_domain(particles, domain);
         };
+        
         pushGhosts(pop.patchGhostParticles());
+        domain.check();
         pushGhosts(pop.levelGhostParticles());
+        domain.check();
 
         interpolator_.particleToMesh(*domain, layout, pop.density(), pop.flux());
     }

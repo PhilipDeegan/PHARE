@@ -40,9 +40,10 @@ class ParticleArrayInternals
         std::string_view static constexpr storage_mode = magic_enum::enum_name(storage_mode_);
         std::string_view static constexpr cma          = ",";
         std::string_view static constexpr _dim         = to_string_view_v<std::size_t, dim>;
+        std::string_view static constexpr _impl        = to_string_view_v<std::uint8_t, impl_>;
 
         std::string_view static constexpr type_id
-            = join_string_views_v<_dim, cma, layout_mode, cma, alloc_mode, cma, storage_mode>;
+            = join_string_views_v<_dim, cma, layout_mode, cma, alloc_mode, cma, storage_mode,cma, _impl>;
     };
 
 public:

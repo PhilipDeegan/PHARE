@@ -243,6 +243,9 @@ auto& sort(ParticleArray<D, I0>& ps, Box_t const& box)
     if constexpr (S.by_delta)
         sorter.by_delta();
 
+    if constexpr (ParticleArray<D, I0>::layout_mode == LayoutMode::AoSPC)
+        ps.reset_index_wrapper_map();
+
     return ps;
 }
 

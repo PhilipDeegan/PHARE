@@ -18,27 +18,34 @@ class Interpolating
     using Interpolator_t      = Interpolator<dim, interpOrder, atomic_ops>;
 
 public:
+    template<auto type, typename ModelViews>
+    void particleToMesh(ModelViews& views, double coef = 1.) _PHARE_ALL_FN_
+    {
+        //
+    }
+
     template<typename Particles, typename GridLayout, typename VecField, typename Field>
     void particleToMesh(Particles const& particles, GridLayout const& layout, Field& density,
                         VecField& flux, double coef = 1.) _PHARE_ALL_FN_
     {
         static_assert(Particles::storage_mode == StorageMode::SPAN);
         auto constexpr static alloc_mode = ParticleArray_t::alloc_mode;
+        auto constexpr static impl       = ParticleArray_t::impl;
+
+        PHARE_LOG_SCOPE(1, "Interpolating::particleToMesh");
 
         if constexpr (Particles::layout_mode == LayoutMode::AoSPC)
         {
             if constexpr (alloc_mode == AllocatorMode::CPU)
             {
-                // interp_(particles, density, flux, layout, coef);
-                // Interpolator<dim, interpOrder, false> _interp; // force CPU
                 for (auto const& bix : particles.local_box())
                     for (auto const& p : particles(bix))
                         interp_.particleToMesh(p, density, flux, layout, coef);
             }
-            else if (alloc_mode == AllocatorMode::GPU_UNIFIED)
+            else if (alloc_mode == AllocatorMode::GPU_UNIFIED and impl < 2)
             {
                 particles.print();
-                particles.check();
+                // particles.check();
                 assert(mkn::gpu::Pointer{density.data()}.is_device_ptr());
                 assert(mkn::gpu::Pointer{flux[0].data()}.is_device_ptr());
                 assert(mkn::gpu::Pointer{&particles[0].delta()[0]}.is_device_ptr());
@@ -49,6 +56,21 @@ public:
                                                         layout, coef);
                     }); //
                 )
+            }
+            else if (alloc_mode == AllocatorMode::GPU_UNIFIED and impl == 2)
+            {
+                using lobox_t  = Particles::lobox_t;
+                using Launcher = gpu::BoxCellNLauncher<lobox_t>;
+
+                auto lobox = particles.local_box();
+                Launcher{lobox, particles.max_size()}([=] _PHARE_ALL_FN_() mutable {
+                    auto const blockidx  = Launcher::block_idx();
+                    auto const threadIdx = Launcher::thread_idx();
+                    auto& parts          = particles(*(lobox.begin() + blockidx));
+                    if (threadIdx >= parts.size())
+                        return;
+                    Interpolator_t{}.particleToMesh(parts[threadIdx], density, flux, layout, coef);
+                });
             }
             else
                 throw std::runtime_error("fail");

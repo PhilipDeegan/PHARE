@@ -6,7 +6,9 @@
 //  - env:      PHARE_SCOPE_TIMING=1
 
 #define PHARE_UNDEF_ASSERT
-// #define PHARE_SKIP_MPI_IN_CORE
+#define PHARE_SKIP_MPI_IN_CORE
+
+#include "core/data/mkn.gpu.hpp"
 
 #include "core/numerics/ion_updater/ion_updater.hpp"
 #include "core/numerics/ion_updater/ion_updater_pc.hpp"
@@ -17,6 +19,8 @@
 
 #include "gtest/gtest.h"
 
+#include "core/numerics/pusher/multi_boris.hpp"
+
 namespace PHARE::core
 {
 
@@ -24,23 +28,22 @@ template<std::size_t dim, typename internals> // used by gtest
 void PrintTo(ParticleArray<dim, internals> const& arr, std::ostream* os)
 {
     // assert(arr.size());
-    // *os << arr;
+    *os << arr;
 }
 auto static const bytes   = 1024ull * 1024ull * 1024ull;
-auto static const ppc     = get_env_as("PHARE_PPC", std::size_t{3});
-auto static const seed    = get_env_as("PHARE_SEED", std::size_t{114});
 auto static const cells   = get_env_as("PHARE_CELLS", std::uint32_t{3});
+auto static const ppc     = get_env_as("PHARE_PPC", std::size_t{3});
+auto static const seed    = get_env_as("PHARE_SEED", std::size_t{1012});
 auto static const dt      = get_env_as("PHARE_TIMESTEP", double{.001});
 auto static const shufle  = get_env_as("PHARE_UNSORTED", std::size_t{0});
 bool static const premain = []() {
-    PHARE_WITH_MKN_GPU(                          //
-        mkn::gpu::setLimitMallocHeapSize(bytes); //
+    PHARE_WITH_MKN_GPU(
+        // mkn::gpu::setLimitMallocHeapSize(bytes); // ?
     )
     PHARE_WITH_PHLOP( //
         PHARE_LOG_LINE_STR("cells: " << cells); PHARE_LOG_LINE_STR("ppc  : " << ppc);
         PHARE_LOG_LINE_STR("seed : " << seed);
-        // std::size_t const size = (cells * cells * cells) * ppc * 80 * 10;
-        // PHARE_LOG_LINE_STR("size : " << size); //
+
         using namespace PHARE; //
         using namespace std::literals;
         if (auto e = core::get_env("PHARE_SCOPE_TIMING", "false"); e == "1" || e == "true")
@@ -141,8 +144,7 @@ auto from_ions(GridLayout_t const& layout, Ions const& from)
     auto& ions  = *ions_p;
     EXPECT_EQ(ions.populations[0].particles.domain_particles.size(), 0);
 
-    auto _add_particles_from = [&]<auto type>(auto& src, auto& dst)
-    {
+    auto _add_particles_from = [&]<auto type>(auto& src, auto& dst) {
         ParticleArrayService::reserve_ppc_in<type>(dst, ppc);
         add_particles_from<type>(src, dst);
     };
@@ -310,6 +312,12 @@ struct IonUpdaterPPTest : public ::testing::Test
     std::shared_ptr<RefIons_t>& ref_ions = DefIons::I().ions;
     std::shared_ptr<CmpIons_t> cmp_ions = from_ions<CmpParticleArray_t>(layout, *DefIons::I().init);
 
+    IonUpdaterPPTest()
+    {
+        // auto ref = make_ions<RefParticleArray_t>(layout);
+        // auto cmp = from_ions<CmpParticleArray_t>(layout, *ref);
+        // compare(*this->layout, *ref, *cmp); // pre update check
+    }
     // make_ions<CmpParticleArray_t>(layout);
 };
 
@@ -322,6 +330,7 @@ PHARE_WITH_MKN_GPU(
     ,TestParam<1, LayoutMode::AoS, AllocatorMode::GPU_UNIFIED>   // 3
     ,TestParam<1, LayoutMode::AoSPC, AllocatorMode::GPU_UNIFIED> // 4
     ,TestParam<1, LayoutMode::AoSPC, AllocatorMode::GPU_UNIFIED, /*impl=*/1> // 5
+    ,TestParam<1, LayoutMode::AoSPC, AllocatorMode::GPU_UNIFIED, /*impl=*/2>
     ,TestParam<1, LayoutMode::SoA, AllocatorMode::GPU_UNIFIED>
 )
     ,TestParam<2, LayoutMode::AoS>
@@ -330,7 +339,8 @@ PHARE_WITH_MKN_GPU(
     ,TestParam<2, LayoutMode::SoA>
     ,TestParam<2, LayoutMode::AoS, AllocatorMode::GPU_UNIFIED>
     ,TestParam<2, LayoutMode::AoSPC, AllocatorMode::GPU_UNIFIED>
-    ,TestParam<2, LayoutMode::AoSPC, AllocatorMode::GPU_UNIFIED, /*impl=*/1> // 12
+    ,TestParam<2, LayoutMode::AoSPC, AllocatorMode::GPU_UNIFIED, /*impl=*/1> // 13
+    ,TestParam<2, LayoutMode::AoSPC, AllocatorMode::GPU_UNIFIED, /*impl=*/2> // 14 
     ,TestParam<2, LayoutMode::SoA, AllocatorMode::GPU_UNIFIED>
 )
     ,TestParam<3, LayoutMode::AoS>
@@ -339,7 +349,8 @@ PHARE_WITH_MKN_GPU(
     ,TestParam<3, LayoutMode::SoA>
     ,TestParam<3, LayoutMode::AoS, AllocatorMode::GPU_UNIFIED>
     ,TestParam<3, LayoutMode::AoSPC, AllocatorMode::GPU_UNIFIED>
-    ,TestParam<3, LayoutMode::AoSPC, AllocatorMode::GPU_UNIFIED, /*impl=*/1> // 19
+    ,TestParam<3, LayoutMode::AoSPC, AllocatorMode::GPU_UNIFIED, /*impl=*/1> //
+    ,TestParam<3, LayoutMode::AoSPC, AllocatorMode::GPU_UNIFIED, /*impl=*/2> // 22
     ,TestParam<3, LayoutMode::SoA, AllocatorMode::GPU_UNIFIED>
 )
 >;
@@ -380,12 +391,9 @@ TYPED_TEST(IonUpdaterPPTest, updater)
 
 int main(int argc, char** argv)
 {
-    assert(phlop::ScopeTimerMan::INSTANCE().active);
+    // assert(phlop::ScopeTimerMan::INSTANCE().active);
     ::testing::InitGoogleTest(&argc, argv);
     auto r = RUN_ALL_TESTS();
-    PHARE_WITH_PHLOP(                  //
-                                       // static_assert(false);          //
-        phlop::ScopeTimerMan::reset(); //
-    )
+    PHARE_WITH_PHLOP(phlop::ScopeTimerMan::reset());
     return r;
 }
