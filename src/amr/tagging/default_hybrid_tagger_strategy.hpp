@@ -29,7 +29,7 @@ void DefaultHybridTaggerStrategy<HybridModel>::tag(HybridModel& model,
     auto& By = model.state.electromag.B.getComponent(PHARE::core::Component::Y);
     auto& Bz = model.state.electromag.B.getComponent(PHARE::core::Component::Z);
 
-    auto& N = model.state.ions.density();
+    // auto& N = model.state.ions.density();
 
     double threshold = 0.1;
 

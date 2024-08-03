@@ -15,8 +15,6 @@ namespace PHARE::hdf5::h5
 using HiFile = HighFive::File;
 
 
-
-
 template<std::size_t dim, typename Data>
 NO_DISCARD auto decay_to_pointer(Data& data)
 {

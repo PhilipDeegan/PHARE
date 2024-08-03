@@ -8,6 +8,7 @@ if(PHARE_COMPILER_WORKAROUNDS)
   if ("${CMAKE_CXX_COMPILER_ID}" STREQUAL "GNU")
     unset(CHECK_SUPPORTS_FLAG CACHE)
     # --param=min-pagesize=0    https://gcc.gnu.org/bugzilla/show_bug.cgi?id=105523
+    unset(CHECK_SUPPORTS_FLAG CACHE)
     check_cxx_compiler_flag( --param=min-pagesize=0 CHECK_SUPPORTS_FLAG)
     if (${CHECK_SUPPORTS_FLAG})
       set (PHARE_FLAGS ${PHARE_FLAGS} --param=min-pagesize=0 )
@@ -15,10 +16,12 @@ if(PHARE_COMPILER_WORKAROUNDS)
 
     unset(CHECK_SUPPORTS_FLAG CACHE)
     # --param=evrp-mode=legacy  https://gcc.gnu.org/bugzilla/show_bug.cgi?id=105329
+    unset(CHECK_SUPPORTS_FLAG CACHE)
     check_cxx_compiler_flag( --param=evrp-mode=legacy CHECK_SUPPORTS_FLAG)
     if (${CHECK_SUPPORTS_FLAG})
       set (PHARE_FLAGS ${PHARE_FLAGS} --param=evrp-mode=legacy )
     endif()
+    unset(CHECK_SUPPORTS_FLAG CACHE)
   endif() # compiler is GNU
 endif(PHARE_COMPILER_WORKAROUNDS)
 
@@ -231,25 +234,6 @@ if (test AND ${PHARE_EXEC_LEVEL_MIN} GREATER 0) # 0 = no tests
   function(add_phare_build_test binary directory)
   endfunction(add_phare_build_test)
 
-
-  if(DEFINED GTEST_ROOT)
-    set(GTEST_ROOT ${GTEST_ROOT} CACHE PATH "Path to googletest")
-    find_package(GTest REQUIRED)
-    set(GTEST_LIBS GTest::GTest GTest::Main)
-  else()
-    set(GTEST_ROOT ${CMAKE_CURRENT_SOURCE_DIR}/subprojects/googletest)
-
-    if (NOT EXISTS ${GTEST_ROOT})
-      execute_process(COMMAND ${Git} clone https://github.com/google/googletest ${GTEST_ROOT})
-    endif()
-
-    add_subdirectory(subprojects/googletest)
-    set(GTEST_INCLUDE_DIRS
-      $<BUILD_INTERFACE:${gtest_SOURCE_DIR}/include>
-      $<BUILD_INTERFACE:${gmock_SOURCE_DIR}/include>)
-    set(GTEST_LIBS gtest gmock)
-
-  endif()
 
   function(phare_exec level target exe directory)
     if(${level} GREATER_EQUAL ${PHARE_EXEC_LEVEL_MIN} AND ${level} LESS_EQUAL ${PHARE_EXEC_LEVEL_MAX})

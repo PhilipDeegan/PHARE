@@ -21,18 +21,20 @@ template<typename ParticleArray_, std::size_t interp_>
 struct UsableIonsDefaultTypes
 {
 public:
-    auto static constexpr dim    = ParticleArray_::dimension;
-    auto static constexpr interp = interp_;
+    auto static constexpr dim        = ParticleArray_::dimension;
+    auto static constexpr interp     = interp_;
+    auto static constexpr alloc_mode = ParticleArray_::alloc_mode;
 
     using PHARE_Types         = PHARE::core::PHARE_Types<dim, interp>;
     using ParticleArray_t     = ParticleArray_;
-    using Array_t             = NdArrayVector<dim, double, /*c_ordering*/ true>;
+    using Array_t             = NdArrayVector<dim, double, /*c_ordering*/ true, alloc_mode>;
     using Grid_t              = Grid<Array_t, HybridQuantity::Scalar>;
-    using UsableVecField_t    = UsableVecField<dim>;
-    using UsableTensorField_t = UsableTensorField<dim, /*rank = */ 2>;
-    using GridLayout_t        = typename PHARE_Types::GridLayout_t;
-    using VecField_t          = typename UsableVecField_t::Super;
-    using TensorField_t       = typename UsableTensorField_t::Super;
+    using UsableVecField_t    = UsableVecField<dim, alloc_mode>;
+    using UsableTensorField_t = UsableTensorField<dim, /*rank = */ 2, alloc_mode>;
+
+    using GridLayout_t  = typename PHARE_Types::GridLayout_t;
+    using VecField_t    = typename UsableVecField_t::Super;
+    using TensorField_t = typename UsableTensorField_t::Super;
 
     using IonPopulation_t = IonPopulation<ParticleArray_t, VecField_t, TensorField_t>;
 };
@@ -53,7 +55,7 @@ public:
         , rho{this->name() + "_rho", layout, HybridQuantity::Scalar::rho}
         , F{this->name() + "_flux", layout, HybridQuantity::Vector::V}
         , M{this->name() + "_momentumTensor", layout, HybridQuantity::Tensor::M}
-        , particles{this->name(), layout.AMRBox()}
+        , particles{this->name(), make_particles<ParticleArray_t>(layout)}
     {
         auto&& [_F, _M, _d, _particles] = Super::getCompileTimeResourcesViewList();
         F.set_on(_F);
@@ -63,10 +65,10 @@ public:
     }
 
 
-    Super& view() { return *this; }
-    Super const& view() const { return *this; }
-    auto& operator*() { return view(); }
-    auto& operator*() const { return view(); }
+    Super& super() { return *this; }
+    Super const& super() const { return *this; }
+    auto& operator*() { return super(); }
+    auto& operator*() const { return super(); }
 
     typename _defaults::Grid_t rho;
     typename _defaults::UsableVecField_t F;
@@ -125,10 +127,10 @@ public:
     {
     }
 
-    Super& view() { return *this; }
-    Super const& view() const { return *this; }
-    auto& operator*() { return view(); }
-    auto& operator*() const { return view(); }
+    Super& super() { return *this; }
+    Super const& super() const { return *this; }
+    auto& operator*() { return super(); }
+    auto& operator*() const { return super(); }
 
     typename _defaults::Grid_t rho;
     typename _defaults::UsableVecField_t Vi;
@@ -143,6 +145,7 @@ using UsableIonsPopulation_t
 
 template<typename ParticleArray_t, std::size_t interp = 1>
 using UsableIons_t = UsableIons<UsableIonsDefaultTypes<ParticleArray_t, interp>>;
+
 
 
 } // namespace PHARE::core
