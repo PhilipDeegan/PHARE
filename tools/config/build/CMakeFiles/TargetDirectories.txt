@@ -1,0 +1,3 @@
+/home/deegan/git/phare/mkn/tools/config/build/CMakeFiles/phare_configurator.dir
+/home/deegan/git/phare/mkn/tools/config/build/CMakeFiles/edit_cache.dir
+/home/deegan/git/phare/mkn/tools/config/build/CMakeFiles/rebuild_cache.dir

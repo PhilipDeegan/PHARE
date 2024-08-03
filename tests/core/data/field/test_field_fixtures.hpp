@@ -6,8 +6,8 @@
 namespace PHARE::core
 {
 
-template<std::size_t dim>
-using Field_t = Field<dim, HybridQuantity::Scalar, double>;
+template<std::size_t dim, auto alloc_mode = AllocatorMode::CPU>
+using Field_t = Field<dim, HybridQuantity::Scalar, double, alloc_mode>;
 
 } // namespace PHARE::core
 
