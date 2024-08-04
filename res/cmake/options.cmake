@@ -67,6 +67,10 @@ option(withCaliper "Use LLNL Caliper" OFF)
 option(withPhlop "Use phlop" OFF)
 
 
+# -DwithKokkosTools=OFF
+option(withKokkosTools "Use Kokkos Tooling" OFF)
+
+
 # -DlowResourceTests=ON
 option(lowResourceTests "Disable heavy tests for CI (2d/3d/etc" OFF)
 

@@ -5,17 +5,7 @@ if(HighFive)
 
   set (HIGHFIVE_SRC ${CMAKE_CURRENT_SOURCE_DIR}/subprojects/highfive)
 
-  if (NOT EXISTS ${HIGHFIVE_SRC})
-    execute_process(
-      COMMAND ${Git} clone https://github.com/BlueBrain/HighFive ${HIGHFIVE_SRC} -b master --depth 1
-    )
-
-  else()
-    if(devMode)
-      message("downloading latest HighFive updates")
-      execute_process(COMMAND ${Git} pull origin master WORKING_DIRECTORY ${HIGHFIVE_SRC})
-    endif(devMode)
-  endif()
+  phare_github_get_or_update(HighFive ${HIGHFIVE_SRC} BlueBrain/HighFive master)
 
   include_directories(
     ${HIGHFIVE_SRC}/include

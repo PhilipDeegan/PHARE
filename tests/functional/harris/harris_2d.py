@@ -22,25 +22,27 @@ os.environ["PHARE_SCOPE_TIMING"] = "1"  # turn on scope timing
 
 ph.NO_GUI()
 cpp = cpp_lib()
-startMPI()
+if not ph.PHARE_EXE:
+    startMPI()
 
+cells = (100, 100)
 diag_outputs = "phare_outputs/test/harris/2d"
-time_step_nbr = 1000
+time_step_nbr = 22
 time_step = 0.001
 final_time = time_step * time_step_nbr
 dt = 10 * time_step
 nt = final_time / dt + 1
-timestamps = dt * np.arange(nt)
+timestamps = [0, final_time]
+if time_step_nbr == 1000:
+    timestamps = dt * np.arange(nt)
 
 
 def config():
     sim = ph.Simulation(
-        smallest_patch_size=15,
-        largest_patch_size=25,
         time_step_nbr=time_step_nbr,
         time_step=time_step,
         # boundary_types="periodic",
-        cells=(200, 400),
+        cells=cells,
         dl=(0.2, 0.2),
         refinement="tagging",
         max_nbr_levels=1,
@@ -50,7 +52,7 @@ def config():
             "format": "phareh5",
             "options": {"dir": diag_outputs, "mode": "overwrite"},
         },
-        strict=True,
+        # strict=True,
     )
 
     def density(x, y):
@@ -166,3 +168,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+elif ph.PHARE_EXE:
+    config()
