@@ -6,6 +6,7 @@
 #include <string>
 
 #include "boris.hpp"
+#include "boris_simpler.hpp"
 #include "pusher.hpp"
 
 namespace PHARE
@@ -17,7 +18,9 @@ namespace core
     public:
         template<std::size_t dim, typename ParticleRange, typename Electromag,
                  typename Interpolator, typename BoundaryCondition, typename GridLayout>
-        static auto makePusher(std::string pusherName)
+        static std::unique_ptr<
+            Pusher<dim, ParticleRange, Electromag, Interpolator, BoundaryCondition, GridLayout>>
+        makePusher(std::string pusherName)
         {
             if (pusherName == "modified_boris")
             {
