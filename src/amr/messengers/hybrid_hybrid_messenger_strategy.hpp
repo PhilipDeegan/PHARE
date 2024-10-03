@@ -47,6 +47,7 @@ namespace PHARE
 namespace amr
 {
 
+
     /** \brief An HybridMessenger is the specialization of a HybridMessengerStrategy for hybrid to
      * hybrid data communications.
      */
@@ -410,7 +411,7 @@ namespace amr
          * calculated from particles Note : the ghost schedule only fills the total density
          * and bulk velocity and NOT population densities and fluxes. These partial
          * densities and fluxes are thus not available on ANY ghost node.*/
-        virtual void fillIonMomentGhosts(IonsT& ions, SAMRAI::hier::PatchLevel& level,
+        virtual void fillIonMomentGhosts(IonsT& /*ions*/, SAMRAI::hier::PatchLevel& level,
                                          double const afterPushTime) override
         {
             rhoGhostsRefiners_.fill(level.getLevelNumber(), afterPushTime);
@@ -757,11 +758,9 @@ namespace amr
         void debug_print(VecFieldT const& B, GridLayoutT const& layout, int loc, int ix, int iy,
                          std::string const& aftbef)
         {
-            auto& Bx       = B(core::Component::X);
-            auto& By       = B(core::Component::Y);
-            auto& Bz       = B(core::Component::Z);
-            auto const& dx = layout.meshSize()[0];
-            auto const& dy = layout.meshSize()[1];
+            auto const& [Bx, By, Bz] = B();
+            auto const& dx           = layout.meshSize()[0];
+            auto const& dy           = layout.meshSize()[1];
 
             if (loc == 3) // w hi, y hi
             {
@@ -801,13 +800,10 @@ namespace amr
             {
                 if constexpr (dimension == 2)
                 {
-                    auto _         = resourcesManager_->setOnPatch(*patch, B);
-                    auto layout    = layoutFromPatch<GridLayoutT>(*patch);
-                    auto& Bx       = B(core::Component::X);
-                    auto& By       = B(core::Component::Y);
-                    auto& Bz       = B(core::Component::Z);
-                    auto const& dx = layout.meshSize()[0];
-                    auto const& dy = layout.meshSize()[1];
+                    auto _               = resourcesManager_->setOnPatch(*patch, B);
+                    auto layout          = layoutFromPatch<GridLayoutT>(*patch);
+                    auto const& [dx, dy] = layout.meshSize();
+                    auto& [Bx, By, Bz]   = B();
 
                     auto boundaries = lvlBoundary.getEdgeBoundaries(patch->getGlobalId());
                     for (auto& boundary : boundaries)
