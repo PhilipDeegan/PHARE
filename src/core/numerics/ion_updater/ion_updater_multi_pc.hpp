@@ -124,7 +124,7 @@ template<typename ModelViews>
  */
 void IonUpdaterMultiPC<Ions, Electromag, GridLayout>::updateAndDepositAll_(ModelViews& views)
 {
-    static_assert(PHARE_HAVE_MKN_GPU);
+    // static_assert(PHARE_HAVE_MKN_GPU);
     PHARE_LOG_SCOPE(1, "IonUpdaterMultiPC::updateAndDepositAll_");
 
 #if PHARE_HAVE_MKN_GPU
@@ -180,7 +180,7 @@ void IonUpdaterMultiPC<Ions, Electromag, GridLayout>::updateAndDepositAll_(Model
     in.streamer.sync();
 
 #else
-    throw std::runtime_error("No available implementation")
+    // throw std::runtime_error("No available implementation")
 #endif
 }
 

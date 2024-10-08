@@ -12,7 +12,7 @@
 namespace PHARE::core
 {
 
-enum class LayoutMode : std::uint16_t { AoS = 0, AoSMapped, AoSPC, SoA /*, SoAPC*/ };
+enum class LayoutMode : std::uint16_t { AoS = 0, AoSMapped, AoSPC, AoSSB, SoA /*, SoAPC*/ };
 enum class StorageMode : std::uint16_t { ARRAY = 0, VECTOR, SPAN };
 enum class ParticleType : std::uint16_t { Domain = 0, Ghost, All }; //
 

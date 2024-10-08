@@ -6,6 +6,7 @@
 #include "core/data/particles/particle_array_def.hpp"
 #include "core/data/particles/arrays/particle_array_aos.hpp"
 #include "core/data/particles/arrays/particle_array_aos_pc.hpp"
+#include "core/data/particles/arrays/particle_array_aos_sb.hpp"
 #include "core/data/particles/arrays/particle_array_soa.hpp"
 #include "core/data/particles/arrays/particle_array_soa_pc.hpp"
 
@@ -42,8 +43,8 @@ class ParticleArrayInternals
         std::string_view static constexpr _dim         = to_string_view_v<std::size_t, dim>;
         std::string_view static constexpr _impl        = to_string_view_v<std::uint8_t, impl_>;
 
-        std::string_view static constexpr type_id
-            = join_string_views_v<_dim, cma, layout_mode, cma, alloc_mode, cma, storage_mode,cma, _impl>;
+        auto static constexpr type_id = join_string_views_v<_dim, cma, layout_mode, cma, alloc_mode,
+                                                            cma, storage_mode, cma, _impl>;
     };
 
 public:
@@ -124,7 +125,17 @@ struct ParticleArrayLayoutResolver<LayoutMode::AoSPC, dim, storage_mode, alloc_m
     }
 };
 
-
+template<std::size_t dim, auto storage_mode, auto alloc_mode, std::uint8_t impl>
+struct ParticleArrayLayoutResolver<LayoutMode::AoSSB, dim, storage_mode, alloc_mode, impl>
+{
+    auto static constexpr resolve_t()
+    {
+        if constexpr (storage_mode == StorageMode::VECTOR)
+            return _as_nullptr_<AoSSBParticles<AoSSBVector<dim, alloc_mode, impl>>*>();
+        if constexpr (storage_mode == StorageMode::SPAN)
+            return _as_nullptr_<AoSSBParticles<AoSSBSpan<dim, alloc_mode, impl>>*>();
+    }
+};
 
 
 } // namespace PHARE::core

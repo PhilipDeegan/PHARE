@@ -1,14 +1,12 @@
-//  tests/core/numerics/ion_updater/test_multi_updater.cpp
+//  tests/core/numerics/ion_updater/test_sub_box_updater.cpp
 //
 //  requires
 //  - cmake:    -DwithPhlop
 //  - cxxflags: -DPHARE_LOG_LEVEL=1
 //  - env:      PHARE_SCOPE_TIMING=1
 
-#define PHARE_UNDEF_ASSERT
+// #define PHARE_UNDEF_ASSERT
 #define PHARE_SKIP_MPI_IN_CORE
-
-#include "core/data/mkn.gpu.hpp"
 
 #include "core/numerics/ion_updater/ion_updater.hpp"
 #include "core/numerics/ion_updater/ion_updater_pc.hpp"
@@ -20,10 +18,8 @@
 
 #include "gtest/gtest.h"
 
-
 namespace PHARE::core
 {
-
 
 template<std::size_t dim, typename internals> // used by gtest
 void PrintTo(ParticleArray<dim, internals> const& arr, std::ostream* os)
@@ -41,12 +37,9 @@ auto static const shufle    = get_env_as("PHARE_UNSORTED", std::size_t{0});
 auto static const do_cmp    = get_env_as("PHARE_COMPARE", std::size_t{1});
 
 bool static const premain = []() {
-    PHARE_WITH_MKN_GPU({
-        // mkn::gpu::setLimitMallocHeapSize(bytes);
-        // cudaSetDevice(0);
-    })
-    PHARE_WITH_PHLOP( //
-        PHARE_LOG_LINE_STR("cells: " << cells); PHARE_LOG_LINE_STR("ppc  : " << ppc);
+    PHARE_WITH_PHLOP(                           //
+        PHARE_LOG_LINE_STR("cells: " << cells); //
+        PHARE_LOG_LINE_STR("ppc  : " << ppc);   //
         PHARE_LOG_LINE_STR("seed : " << seed);
 
         using namespace PHARE; //
@@ -75,7 +68,7 @@ auto get_updater_for(Ions& /*ions*/, EM const& /*em*/, GridLayout_t const& /*lay
     using Particles = typename Ions::particle_array_type;
     if constexpr (Particles::is_mapped)
         return construct_<IonUpdater<Ions, EM, GridLayout_t>>();
-    else if constexpr (Particles::layout_mode == LayoutMode::AoSPC)
+    else if constexpr (Particles::layout_mode == LayoutMode::AoSSB)
         return construct_<IonUpdaterMultiPC<Ions, EM, GridLayout_t>>();
     else
         return construct_<IonUpdaterPP<Ions, EM, GridLayout_t>>();
@@ -290,7 +283,8 @@ struct IonUpdaterPPTest : public ::testing::Test
     IonUpdaterPPTest()
     {
         patches.resize(n_patches);
-        /* // uncomment to do init value check
+        // uncomment to do init value check
+        /*
         auto ref = make_ions<RefParticleArray_t>(layout);
         auto cmp = from_ions<CmpParticleArray_t>(layout, *ref);
         compare(*this->layout, *ref, *cmp); // pre update check
@@ -307,7 +301,7 @@ struct IonUpdaterPPTest : public ::testing::Test
         std::shared_ptr<CmpIons_t> ions = from_ions<CmpParticleArray_t>(layout, *DefIons::I().init);
         UsableElectromag_t em{layout};
 
-        Patch() { mkn::gpu::print_gpu_mem_used(); }
+        Patch() {}
     };
 
     std::vector<Patch> patches{};
@@ -316,11 +310,7 @@ struct IonUpdaterPPTest : public ::testing::Test
 // clang-format off
 using Permutations_t = testing::Types< // ! notice commas !
 
-PHARE_WITH_MKN_GPU(
-
-    TestParam<3, LayoutMode::AoSPC, AllocatorMode::GPU_UNIFIED, /*impl=*/2>
-
-)
+    TestParam<3, LayoutMode::AoSSB>
 
 >;
 // clang-format on

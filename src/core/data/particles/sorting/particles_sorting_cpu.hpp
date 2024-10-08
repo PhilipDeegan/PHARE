@@ -3,6 +3,7 @@
 
 // no includes, is included
 
+#include <stdexcept>
 namespace PHARE::core::detail
 {
 
@@ -44,31 +45,7 @@ public:
     {
     }
 
-    // ParticleSorter& operator()(std::int64_t const& l, std::int64_t const& r) // basically
-    // quicksort
-    // {
-    //     auto i          = l;
-    //     auto j          = r;
-    //     auto const half = particles.iCell((l + r) / 2);
-    //     do
-    //     {
-    //         while (flat_less(particles.iCell(i), half))
-    //             i++;
-    //         while (flat_gr8r(particles.iCell(j), half))
-    //             j--;
-    //         if (i <= j)
-    //         {
-    //             particles.swap(i, j);
-    //             i++;
-    //             j--;
-    //         }
-    //     } while (i <= j);
-    //     if (l < j)
-    //         (*this)(l, j);
-    //     if (i < r)
-    //         (*this)(i, r);
-    //     return *this;
-    // }
+
 
 
     ParticleSorter& operator()(std::int64_t const& l, std::int64_t const& r) // basically quicksort
@@ -83,6 +60,10 @@ public:
                                      < cf(SoAIteratorAdaptor::iCell(b));
                           }); //
             )
+        }
+        else if constexpr (ParticleArray::layout_mode == LayoutMode::AoSSB)
+        {
+            throw std::runtime_error("no sort for LayoutMode::AoSSB");
         }
         else
         {
@@ -109,7 +90,7 @@ public:
         };
     }
 
-    void by_deltas(std::uint64_t l, std::uint64_t r)
+    void by_deltas(std::uint64_t const& l, std::uint64_t const& r)
     {
         if constexpr (ParticleArray::layout_mode == LayoutMode::SoA)
         {
@@ -122,35 +103,17 @@ public:
                           }); //
             )
         }
+        else if constexpr (ParticleArray::layout_mode == LayoutMode::AoSSB)
+        {
+            throw std::runtime_error("no sort for LayoutMode::AoSSB");
+        }
         else
         {
             std::sort(particles.begin() + l, particles.begin() + r, by_deltas());
         }
     }
 
-    // void by_deltas(std::uint64_t l, std::uint64_t r)
-    // {
-    //     auto i          = l;
-    //     auto j          = r;
-    //     auto const half = particles.delta((l + r) / 2);
-    //     do
-    //     {
-    //         while (flat_less(particles.delta(i), half))
-    //             i++;
-    //         while (flat_gr8r(particles.delta(j), half))
-    //             j--;
-    //         if (i <= j)
-    //         {
-    //             particles.swap(i, j);
-    //             i++;
-    //             j--;
-    //         }
-    //     } while (i <= j);
-    //     if (l < j)
-    //         (*this).by_deltas(l, j);
-    //     if (i < r)
-    //         (*this).by_deltas(i, r);
-    // }
+
 
     ParticleSorter& by_delta()
     {
@@ -161,6 +124,10 @@ public:
         if constexpr (ParticleArray::layout_mode == LayoutMode::AoSPC)
             for (auto const& bix : particles.local_box())
                 std::sort(particles(bix).begin(), particles(bix).end(), by_deltas());
+        else if constexpr (ParticleArray::layout_mode == LayoutMode::AoSSB)
+        {
+            throw std::runtime_error("no sort for LayoutMode::AoSSB");
+        }
         else
         {
             auto const end = particles.end();
@@ -208,7 +175,6 @@ public:
 
     void operator()(std::int64_t const& l, std::int64_t const& r) // basically quicksort
     {
-        // PHARE_LOG_LINE_STR("");
         auto i          = l;
         auto j          = r;
         auto const half = particles.iCell((l + r) / 2);

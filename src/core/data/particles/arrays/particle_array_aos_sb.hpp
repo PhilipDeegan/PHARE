@@ -1,5 +1,5 @@
-#ifndef PHARE_CORE_DATA_PARTICLES_PARTICLE_ARRAY_AoS_PC_HPP
-#define PHARE_CORE_DATA_PARTICLES_PARTICLE_ARRAY_AoS_PC_HPP
+#ifndef PHARE_CORE_DATA_PARTICLES_PARTICLE_ARRAY_AoS_SB_HPP
+#define PHARE_CORE_DATA_PARTICLES_PARTICLE_ARRAY_AoS_SB_HPP
 
 #include "core/operators.hpp"
 #include "core/utilities/span.hpp"
@@ -14,7 +14,7 @@ namespace PHARE::core
 {
 
 template<std::size_t dim, auto alloc_mode_, std::uint8_t impl_ = 0>
-class AoSPCSpan
+class AoSSBSpan
 {
 protected:
     using SIZE_T = unsigned long long int;
@@ -22,16 +22,16 @@ protected:
 public:
     auto static constexpr impl_v     = impl_;
     auto static constexpr alloc_mode = alloc_mode_;
-    using This                       = AoSPCSpan<dim, alloc_mode, impl_v>;
+    using This                       = AoSSBSpan<dim, alloc_mode, impl_v>;
     using lobox_t                    = Box<std::uint32_t, dim>;
 
 private:
     using locell_t = std::array<std::uint32_t, dim>;
 
-    template<typename AoSPCArray>
-    auto resolve(AoSPCArray& arr)
+    template<typename AoSSBArray>
+    auto resolve(AoSSBArray& arr)
     {
-        if constexpr (AoSPCArray::storage_mode == StorageMode::SPAN)
+        if constexpr (AoSSBArray::storage_mode == StorageMode::SPAN)
             return arr.particles_;
         else
         {
@@ -40,10 +40,10 @@ private:
         }
     }
 
-    template<typename AoSPCArray>
-    auto resolve_gaps(AoSPCArray& arr)
+    template<typename AoSSBArray>
+    auto resolve_gaps(AoSSBArray& arr)
     {
-        if constexpr (AoSPCArray::storage_mode == StorageMode::SPAN)
+        if constexpr (AoSSBArray::storage_mode == StorageMode::SPAN)
             return arr.gaps_;
         else
         {
@@ -57,8 +57,8 @@ public:
     auto static constexpr storage_mode = StorageMode::SPAN;
     using Particle_t                   = Particle<dim>;
 
-    template<typename AoSPCArray>
-    AoSPCSpan(AoSPCArray& arr)
+    template<typename AoSSBArray>
+    AoSSBSpan(AoSSBArray& arr)
         : particles_{resolve(arr)}
         , gaps_{resolve_gaps(arr)}
         , off_sets_{arr.off_sets_}
@@ -132,14 +132,14 @@ protected:
     lobox_t local_ghost_box_;
 
 
-}; // AoSPCSpan
+}; // AoSSBSpan
 
 
 template<std::size_t dim, auto alloc_mode_, std::uint8_t impl_ = 0>
-class AoSPCVector
+class AoSSBVector
 {
-    using This = AoSPCVector<dim, alloc_mode_, impl_>;
-    friend class AoSPCSpan<dim, alloc_mode_, impl_>;
+    using This = AoSSBVector<dim, alloc_mode_, impl_>;
+    friend class AoSSBSpan<dim, alloc_mode_, impl_>;
 
 protected:
     using SIZE_T = unsigned long long int; // cuda issues
@@ -163,7 +163,7 @@ public:
     using particle_vec_helper = vec_helper<Particle_t>;
     using particle_vector     = typename particle_vec_helper::vector_t;
 
-    AoSPCVector(box_t const& box = {}, std::size_t ghost_cells = 0)
+    AoSSBVector(box_t const& box = {}, std::size_t ghost_cells = 0)
         : ghost_cells_{ghost_cells}
         , box_{box}
         , ghost_box_{grow(box, ghost_cells)}
@@ -176,10 +176,10 @@ public:
         cap_.zero();
     }
 
-    AoSPCVector(AoSPCVector const& from)            = default;
-    AoSPCVector(AoSPCVector&& from)                 = default;
-    AoSPCVector& operator=(AoSPCVector&& from)      = default;
-    AoSPCVector& operator=(AoSPCVector const& from) = default;
+    AoSSBVector(AoSSBVector const& from)            = default;
+    AoSSBVector(AoSSBVector&& from)                 = default;
+    AoSSBVector& operator=(AoSSBVector&& from)      = default;
+    AoSSBVector& operator=(AoSSBVector const& from) = default;
 
     template<auto type = ParticleType::Domain>
     auto& reserve_ppc(std::size_t const& ppc);
@@ -280,31 +280,12 @@ public:
     }
 
 
-    auto& insert(AoSPCVector const& src);
+    auto& insert(AoSSBVector const& src);
 
-    auto& insert_domain_from(AoSPCVector const& src);
+    auto& insert_domain_from(AoSSBVector const& src);
 
 
-    void check() const
-    {
-        // PHARE_LOG_LINE_STR(impl_);
-        // if constexpr (impl_ < 2)
-        // {
-        //     for (auto const& particles : particles_)
-        //         for (auto const& particle : particles)
-        //         {
-        //             PHARE_ASSERT(particle.iCell()[0] < 1000);
-        //         }
-        // }
-        // else
-        // {
-        //     for (auto const& particles : particles_)
-        //         for (auto const& p : particles)
-        //         {
-        //             abort_if(!float_not_equals(p.delta()[0],0));
-        //         }
-        // }
-    }
+    void check() const {}
 
     void replace_from(This const& that)
     {
@@ -317,14 +298,11 @@ public:
         box_       = that.box_;
         ghost_box_ = that.ghost_box_;
         p2c_       = that.p2c_;
-
-        // cell_size_ = that.cell_size_;
-        // cell_size_ = that.cell_size_;
     }
 
     void cap()
     {
-        PHARE_LOG_SCOPE(1, "AoSPCVector::cap");
+        PHARE_LOG_SCOPE(1, "AoSSBVector::cap");
         if constexpr (any_in(impl_v, 1, 2))
             for (auto& p : particles_)
                 resize(p, p.capacity());
@@ -412,12 +390,12 @@ protected:
         on_box_list(local_box().remove(shrink(local_box(box()), 1)), fn);
     };
 
-}; // AoSPCVector<dim, alloc_mode>
+}; // AoSSBVector<dim, alloc_mode>
 
 
 
 template<std::size_t dim, auto alloc_mode, std::uint8_t impl>
-auto& AoSPCVector<dim, alloc_mode, impl>::insert(AoSPCVector const& src)
+auto& AoSSBVector<dim, alloc_mode, impl>::insert(AoSSBVector const& src)
 {
     std::size_t added = 0;
     for (auto const& bix : local_box(box()))
@@ -435,7 +413,7 @@ auto& AoSPCVector<dim, alloc_mode, impl>::insert(AoSPCVector const& src)
 }
 
 template<std::size_t dim, auto alloc_mode, std::uint8_t impl>
-auto& AoSPCVector<dim, alloc_mode, impl>::insert_domain_from(AoSPCVector const& src)
+auto& AoSSBVector<dim, alloc_mode, impl>::insert_domain_from(AoSSBVector const& src)
 {
     auto const on_box = [&](auto&& box, auto&& fn) {
         for (auto const& bix : box)
@@ -476,7 +454,7 @@ auto& AoSPCVector<dim, alloc_mode, impl>::insert_domain_from(AoSPCVector const& 
 
 template<std::size_t dim, auto alloc_mode, std::uint8_t impl>
 template<auto type>
-auto& AoSPCVector<dim, alloc_mode, impl>::reserve_ppc(std::size_t const& ppc)
+auto& AoSSBVector<dim, alloc_mode, impl>::reserve_ppc(std::size_t const& ppc)
 {
     static_assert(std::is_same_v<decltype(type), ParticleType>);
 
@@ -506,7 +484,7 @@ auto& AoSPCVector<dim, alloc_mode, impl>::reserve_ppc(std::size_t const& ppc)
 
 template<std::size_t dim, auto alloc_mode, std::uint8_t impl>
 template<auto type>
-void AoSPCVector<dim, alloc_mode, impl>::trim()
+void AoSSBVector<dim, alloc_mode, impl>::trim()
 {
     static_assert(std::is_same_v<decltype(type), ParticleType>);
 
@@ -527,7 +505,7 @@ void AoSPCVector<dim, alloc_mode, impl>::trim()
 
 template<std::size_t dim, auto alloc_mode, std::uint8_t impl>
 template<auto type>
-void AoSPCVector<dim, alloc_mode, impl>::sync_cpu_gaps_and_tmp()
+void AoSSBVector<dim, alloc_mode, impl>::sync_cpu_gaps_and_tmp()
 {
     // PHARE_LOG_LINE_STR("sync_cpu_gaps_and_tmp " << magic_enum::enum_name(type));
     auto const lbox = local_box();
@@ -568,12 +546,12 @@ void AoSPCVector<dim, alloc_mode, impl>::sync_cpu_gaps_and_tmp()
 
 template<std::size_t dim, auto alloc_mode, std::uint8_t impl>
 template<auto type>
-void AoSPCVector<dim, alloc_mode, impl>::sync_gpu_gaps_and_tmp_impl0()
+void AoSSBVector<dim, alloc_mode, impl>::sync_gpu_gaps_and_tmp_impl0()
 {
     auto const lbox = local_box();
 
     {
-        PHARE_LOG_SCOPE(1, "AoSPCVector::sync_gpu_gaps_and_tmp::reserve_scan ");
+        PHARE_LOG_SCOPE(1, "AoSSBVector::sync_gpu_gaps_and_tmp::reserve_scan ");
         for (auto const& bix : lbox)
         { // calculate reserve size
             auto& real = particles_(bix);
@@ -588,7 +566,7 @@ void AoSPCVector<dim, alloc_mode, impl>::sync_gpu_gaps_and_tmp_impl0()
     }
 
     {
-        PHARE_LOG_SCOPE(1, "AoSPCVector::sync_gpu_gaps_and_tmp::add ");
+        PHARE_LOG_SCOPE(1, "AoSSBVector::sync_gpu_gaps_and_tmp::add ");
         for (auto const& bix : lbox)
         { // add incoming particles
             auto& real            = particles_(bix);
@@ -606,7 +584,7 @@ void AoSPCVector<dim, alloc_mode, impl>::sync_gpu_gaps_and_tmp_impl0()
     }
 
     {
-        PHARE_LOG_SCOPE(1, "AoSPCVector::sync_gpu_gaps_and_tmp::delete ");
+        PHARE_LOG_SCOPE(1, "AoSSBVector::sync_gpu_gaps_and_tmp::delete ");
         for (auto const& bix : lbox)
         { // delete outgoing particles
             auto const& gaps_size = gap_idx_(bix);
@@ -631,7 +609,7 @@ void AoSPCVector<dim, alloc_mode, impl>::sync_gpu_gaps_and_tmp_impl0()
 
 template<std::size_t dim, auto alloc_mode, std::uint8_t impl>
 template<auto type>
-void AoSPCVector<dim, alloc_mode, impl>::sync_gpu_gaps_and_tmp_impl1()
+void AoSSBVector<dim, alloc_mode, impl>::sync_gpu_gaps_and_tmp_impl1()
 {
 }
 
@@ -639,10 +617,10 @@ void AoSPCVector<dim, alloc_mode, impl>::sync_gpu_gaps_and_tmp_impl1()
 
 template<std::size_t dim, auto alloc_mode, std::uint8_t impl>
 template<auto type>
-void AoSPCVector<dim, alloc_mode, impl>::sync_gpu_gaps_and_tmp()
+void AoSSBVector<dim, alloc_mode, impl>::sync_gpu_gaps_and_tmp()
 {
     // PHARE_LOG_LINE_STR("sync_gpu_gaps_and_tmp " << magic_enum::enum_name(type));
-    PHARE_LOG_SCOPE(1, "AoSPCVector::sync_gpu_gaps_and_tmp ");
+    PHARE_LOG_SCOPE(1, "AoSSBVector::sync_gpu_gaps_and_tmp ");
 
     // if constexpr (impl == 0)
     // {
@@ -657,7 +635,7 @@ void AoSPCVector<dim, alloc_mode, impl>::sync_gpu_gaps_and_tmp()
 }
 
 template<std::size_t dim, auto alloc_mode, std::uint8_t impl>
-void AoSPCVector<dim, alloc_mode, impl>::reset_index_wrapper_map()
+void AoSSBVector<dim, alloc_mode, impl>::reset_index_wrapper_map()
 {
     resize(p2c_, total_size);
     std::size_t offset = 0;
@@ -680,12 +658,12 @@ void AoSPCVector<dim, alloc_mode, impl>::reset_index_wrapper_map()
 
 template<std::size_t dim, auto alloc_mode, std::uint8_t impl>
 template<std::uint8_t PHASE, auto type>
-void AoSPCVector<dim, alloc_mode, impl>::sync()
+void AoSSBVector<dim, alloc_mode, impl>::sync()
 {
     static_assert(std::is_same_v<decltype(type), ParticleType>);
     static_assert(type != ParticleType::All);
 
-    PHARE_LOG_SCOPE(1, "AoSPCVector::sync");
+    PHARE_LOG_SCOPE(1, "AoSSBVector::sync");
     PHARE_LOG_LINE_STR("sync " << static_cast<std::uint32_t>(PHASE) << " "
                                << magic_enum::enum_name(type));
 
@@ -706,7 +684,7 @@ void AoSPCVector<dim, alloc_mode, impl>::sync()
 
     if constexpr (alloc_mode == AllocatorMode::GPU_UNIFIED)
     {
-        PHARE_LOG_SCOPE(1, "AoSPCVector::sync::reset");
+        PHARE_LOG_SCOPE(1, "AoSSBVector::sync::reset");
         static_assert(impl < 3); // otherwise unhandled
         if constexpr (impl < 2)
         {
@@ -735,17 +713,17 @@ void AoSPCVector<dim, alloc_mode, impl>::sync()
     }
 
     {
-        PHARE_LOG_SCOPE(1, "AoSPCVector::sync::reset_views");
+        PHARE_LOG_SCOPE(1, "AoSSBVector::sync::reset_views");
         reset_views();
     }
 }
 
 
 template<typename Super_>
-struct AoSPCParticles : public Super_
+struct AoSSBParticles : public Super_
 {
     using Super      = Super_;
-    using This       = AoSPCParticles<Super>;
+    using This       = AoSSBParticles<Super>;
     using Particle_t = typename Super::Particle_t;
 
     auto static constexpr impl_v       = Super::impl_v;
@@ -764,15 +742,15 @@ struct AoSPCParticles : public Super_
     // using Super::sync;
 
     template<typename... Args>
-    AoSPCParticles(Args&&... args)
+    AoSSBParticles(Args&&... args)
         : Super{std::forward<Args>(args)...}
     {
     }
 
-    AoSPCParticles(AoSPCParticles const& from)            = default;
-    AoSPCParticles(AoSPCParticles&& from)                 = default;
-    AoSPCParticles& operator=(AoSPCParticles&& from)      = default;
-    AoSPCParticles& operator=(AoSPCParticles const& from) = default;
+    AoSSBParticles(AoSSBParticles const& from)            = default;
+    AoSSBParticles(AoSSBParticles&& from)                 = default;
+    AoSSBParticles& operator=(AoSSBParticles&& from)      = default;
+    AoSSBParticles& operator=(AoSSBParticles const& from) = default;
 
     template<typename T>
     struct iterator_impl;
@@ -868,14 +846,14 @@ struct AoSPCParticles : public Super_
     }
 
 
-}; // AoSPCParticles<Super>
+}; // AoSSBParticles<Super>
 
 
 
 
 template<typename OuterSuper>
 template<typename T>
-struct AoSPCParticles<OuterSuper>::iterator_impl
+struct AoSSBParticles<OuterSuper>::iterator_impl
 {
     auto static constexpr dimension = OuterSuper::dimension;
 
@@ -973,7 +951,7 @@ struct AoSPCParticles<OuterSuper>::iterator_impl
 
 template<typename Super_>
 template<typename T>
-struct AoSPCParticles<Super_>::index_wrapper
+struct AoSSBParticles<Super_>::index_wrapper
 {
     using outer_t = std::decay_t<T>;
 
@@ -1036,9 +1014,9 @@ struct AoSPCParticles<Super_>::index_wrapper
 
 template<std::size_t dim, auto alloc_mode, std::uint8_t impl>
 template<std::uint8_t PHASE, auto type>
-void AoSPCSpan<dim, alloc_mode, impl>::sync() _PHARE_ALL_FN_
+void AoSSBSpan<dim, alloc_mode, impl>::sync() _PHARE_ALL_FN_
 {
-    PHARE_LOG_SCOPE(1, "AoSPCSpan::sync()");
+    PHARE_LOG_SCOPE(1, "AoSSBSpan::sync()");
 
     auto view = *this;
     PHARE_WITH_MKN_GPU({
@@ -1052,9 +1030,9 @@ void AoSPCSpan<dim, alloc_mode, impl>::sync() _PHARE_ALL_FN_
 
 template<std::size_t dim, auto alloc_mode, std::uint8_t impl>
 template<std::uint8_t PHASE, auto type, typename... Args>
-void AoSPCSpan<dim, alloc_mode, impl>::sync(Args&&... args) _PHARE_ALL_FN_
+void AoSSBSpan<dim, alloc_mode, impl>::sync(Args&&... args) _PHARE_ALL_FN_
 {
-    PHARE_LOG_SCOPE(1, "AoSPCSpan::sync(stream)");
+    PHARE_LOG_SCOPE(1, "AoSSBSpan::sync(stream)");
 
     auto view = *this;
     PHARE_WITH_MKN_GPU({
@@ -1070,7 +1048,7 @@ void AoSPCSpan<dim, alloc_mode, impl>::sync(Args&&... args) _PHARE_ALL_FN_
 
 template<std::size_t dim, auto alloc_mode, std::uint8_t impl>
 template<std::uint8_t PHASE, auto type>
-void AoSPCSpan<dim, alloc_mode, impl>::sync_add_new() _PHARE_ALL_FN_
+void AoSSBSpan<dim, alloc_mode, impl>::sync_add_new() _PHARE_ALL_FN_
 {
 #if PHARE_HAVE_MKN_GPU
     using Op           = Operators<SIZE_T, true>;
@@ -1115,43 +1093,10 @@ void AoSPCSpan<dim, alloc_mode, impl>::sync_add_new() _PHARE_ALL_FN_
 }
 
 
-// // working version guaranteed overallocated, no atomics
-// template<std::size_t dim, auto alloc_mode, std::uint8_t impl>
-// template<std::uint8_t PHASE, auto type>
-// void AoSPCSpan<dim, alloc_mode, impl>::sync_add_new() _PHARE_ALL_FN_
-// {
-// #if PHARE_HAVE_MKN_GPU
-//     using Op           = Operators<SIZE_T, true>;
-//     auto const& kidx   = mkn::gpu::idx();
-//     auto const& bix    = *(local_ghost_box_.begin() + kidx);
-//     auto const& n_gaps = gap_idx_(bix);
-//     {
-//         auto& gaps = gaps_(bix);
-//         thrust::sort(thrust::seq, gaps.data(), gaps.data() + n_gaps /*, std::greater<>()*/);
-//     }
-//     auto& real       = particles_(bix);
-//     auto const& gaps = gaps_(bix);
-//     auto& left       = left_(bix);
-//     for (std::size_t i = 0; i < n_gaps; ++i)
-//     {
-//         auto const& part   = real[gaps[n_gaps - (1 + i)]];
-//         auto const newcell = local_cell(part.iCell());
-//         auto& nparts       = particles_(newcell);
-//         auto const npidx   = Op{nparts.s}.increment_return_old();
-//         PHARE_ASSERT(npidx < cap_(newcell));
-//         // if (cap_(newcell) > npidx) // TBC
-//         {
-//             nparts[npidx] = part;
-//             ++left;
-//         }
-//     }
-// #endif // PHARE_HAVE_MKN_GPU
-// }
-
 
 template<std::size_t dim, auto alloc_mode, std::uint8_t impl>
 template<std::uint8_t PHASE, auto type>
-void AoSPCSpan<dim, alloc_mode, impl>::sync_rm_left() _PHARE_ALL_FN_
+void AoSSBSpan<dim, alloc_mode, impl>::sync_rm_left() _PHARE_ALL_FN_
 {
 #if PHARE_HAVE_MKN_GPU
     auto const& kidx = mkn::gpu::idx();
@@ -1175,4 +1120,4 @@ void AoSPCSpan<dim, alloc_mode, impl>::sync_rm_left() _PHARE_ALL_FN_
 } // namespace PHARE::core
 
 
-#endif /* PHARE_CORE_DATA_PARTICLES_PARTICLE_ARRAY_AoS_PC_HPP */
+#endif /* PHARE_CORE_DATA_PARTICLES_PARTICLE_ARRAY_AoS_SB_HPP */

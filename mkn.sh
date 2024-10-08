@@ -13,8 +13,8 @@ export PHARE_PPC=${PHARE_PPC:-100}
 
 TEST="-M tests/core/numerics/ion_updater/test_updater_pp_main.cpp"
 TEST="-M tests/core/numerics/ion_updater/test_multi_updater.cpp"
-ARGS="${TEST} -P mkn.base=gpu_ -x "
-[ -d /opt/rocm/bin ] && ARGS+="res/mkn/hip" || ARGS+="res/mkn/clang_cuda "
+ARGS="" #${TEST} -P mkn.base=gpu_ -x "
+#[ -d /opt/rocm/bin ] && ARGS+="res/mkn/hip" || ARGS+="res/mkn/clang_cuda "
 
 set -x
 
@@ -24,9 +24,11 @@ set -x
       mkn clean build -tOqp core -a "-DPHARE_SKIP_MPI_IN_CORE -fPIC"
   )
 
-  mkn clean build run -p test_core ${ARGS} $@ # -- --gtest_filter=IonUpdaterPPTest/14.updater
+  mkn clean build -p test_core -OtM tests/core/numerics/ion_updater/test_sub_box_updater.cpp
+
+  #mkn clean build run -p test_core ${ARGS} $@ # -- --gtest_filter=IonUpdaterPPTest/14.updater
 ) #1> >(tee $CWD/.mkn.sh.out ) 2> >(tee $CWD/.mkn.sh.err >&2 )
-# exit 0 # comment out to do soak test
+exit 0 # comment out to do soak test
 
 (
   date && rm -rf tee && mkdir tee
