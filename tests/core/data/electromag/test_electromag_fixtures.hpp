@@ -13,26 +13,64 @@
 namespace PHARE::core
 {
 
-template<std::size_t dim>
-class UsableElectromag : public Electromag<VecField_t<dim>>
+
+template<typename EM, typename GridLayout>
+auto default_em_init(EM& em, GridLayout const& layout)
 {
+    auto constexpr static dim = GridLayout::dimension;
+
+    auto setter = [&](auto& v) {
+        auto box = layout.ghostBoxFor(v);
+        for (std::size_t i = 0; i < box.upper[0]; i += 2)
+        {
+            if constexpr (dim == 1)
+            {
+                v(std::array{i}) += .05;
+            }
+            else
+            {
+                for (std::size_t j = 0; j < box.upper[1]; j += 2)
+                {
+                    if constexpr (dim == 2)
+                    {
+                        v(i, j) += .05;
+                    }
+                    else
+                    {
+                        if constexpr (dim == 3)
+                        {
+                            for (std::size_t k = 0; k < box.upper[2]; k += 2)
+                            {
+                                v(i, j, k) += .05;
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    };
+    for (auto& xyz : em.E)
+        setter(xyz);
+    for (auto& xyz : em.B)
+        setter(xyz);
+}
+
+
+template<std::size_t dim, auto alloc_mode = AllocatorMode::CPU>
+class UsableElectromag : public Electromag<VecField_t<dim, alloc_mode>>
+{
+    static_assert(std::is_same_v<decltype(alloc_mode), AllocatorMode>);
+
     void _set()
     {
         E.set_on(Super::E);
         B.set_on(Super::B);
+        assert(Super::isUsable());
     }
 
 public:
-    using Super = Electromag<VecField_t<dim>>;
+    using Super = Electromag<VecField_t<dim, alloc_mode>>;
 
-    template<typename GridLayout>
-    UsableElectromag(GridLayout const& layout)
-        : Super{"EM"}
-        , E{"EM_E", layout, HybridQuantity::Vector::E}
-        , B{"EM_B", layout, HybridQuantity::Vector::B}
-    {
-        _set();
-    }
 
     UsableElectromag(UsableElectromag&& that)
         : Super{std::forward<Super>(that)}
@@ -42,14 +80,28 @@ public:
         _set();
     }
 
+    UsableElectromag(Super const&) = delete;
+    UsableElectromag(Super&&)      = delete;
 
-    Super& view() { return *this; }
-    Super const& view() const { return *this; }
-    auto& operator*() { return view(); }
-    auto& operator*() const { return view(); }
+    template<typename GridLayout>
+    UsableElectromag(GridLayout const& layout)
+        : Super{"EM"}
+        , E{"EM_E", layout, HybridQuantity::Vector::E, .1}
+        , B{"EM_B", layout, HybridQuantity::Vector::B, .1}
+    {
+        _set();
+        default_em_init(super(), layout);
+    }
 
 
-    UsableVecField<dim> E, B;
+
+    Super& super() { return *this; }
+    Super const& super() const { return *this; }
+    auto& operator*() { return super(); }
+    auto& operator*() const { return super(); }
+
+
+    UsableVecField<dim, alloc_mode> E, B;
 };
 
 

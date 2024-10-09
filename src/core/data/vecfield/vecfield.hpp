@@ -18,6 +18,7 @@ namespace core
     using VecField = TensorField<Field_t, PhysicalQuantity, /*rank=*/1>;
 
 
+
     template<typename VecField, typename = tryToInstanciate<typename VecField::field_type>>
     void average(VecField const& vf1, VecField const& vf2, VecField& Vavg)
     {
