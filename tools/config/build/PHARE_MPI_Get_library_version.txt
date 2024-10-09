@@ -1,0 +1,1 @@
+Open MPI v5.0.2, package: Open MPI mockbuild@02dc1f9e2ab145fdb212b01bdd462369 Distribution, ident: 5.0.2, repo rev: v5.0.2, Feb 06, 2024

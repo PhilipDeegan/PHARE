@@ -1,0 +1,1 @@
+/usr/lib64/ccache/g++ -O3 -DNDEBUG -Wl,-rpath -Wl,/usr/lib64/openmpi/lib -Wl,--enable-new-dtags CMakeFiles/phare_configurator.dir/main.cpp.o -o phare_configurator  -Wl,-rpath,/usr/lib64/openmpi/lib /usr/lib64/openmpi/lib/libmpi.so /usr/lib64/openmpi/lib/libhdf5.so 
