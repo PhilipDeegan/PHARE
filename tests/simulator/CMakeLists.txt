@@ -33,6 +33,7 @@ endif()
 configure_file(${CMAKE_CURRENT_SOURCE_DIR}/config.py ${CMAKE_CURRENT_BINARY_DIR}/config.py @ONLY)
 
 add_subdirectory(initialize)
+add_subdirectory(scheduling)
 add_subdirectory(refinement)
 add_subdirectory(advance)
 

@@ -17,4 +17,21 @@ namespace core
 } // namespace core
 } // namespace PHARE
 
+
+namespace PHARE::core
+{
+
+// if you want to handle particle init manually
+template<typename ParticleArray, typename GridLayout>
+class NoopParticleInitializer : public ParticleInitializer<ParticleArray, GridLayout>
+{
+public:
+    NoopParticleInitializer() {}
+
+    void loadParticles(ParticleArray& /*particles*/, GridLayout const& /*layout*/) const override {}
+};
+
+
+} // namespace PHARE::core
+
 #endif

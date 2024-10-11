@@ -82,7 +82,10 @@ namespace core
                         magneticField, densityCutOff);
                 }
             }
-            // TODO throw?
+
+            if (initializerName == "none")
+                return std::make_unique<NoopParticleInitializer<ParticleArray, GridLayout>>();
+
             return nullptr;
         }
     };

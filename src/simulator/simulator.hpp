@@ -183,6 +183,11 @@ private:
     double restarts_init(initializer::PHAREDict const&);
     void diagnostics_init(initializer::PHAREDict const&);
     void hybrid_init(initializer::PHAREDict const&);
+
+
+#ifdef PHARE_FRIEND_CLASS_HACKERY
+    PHARE_FRIEND_CLASS_HACKERY; // used in tests for private access
+#endif
 };
 
 

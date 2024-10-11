@@ -131,6 +131,12 @@ private:
     };
 
     std::function<bool()> _rebalance_check;
+
+
+#ifdef PHARE_FRIEND_CLASS_HACKERY
+    PHARE_FRIEND_CLASS_HACKERY; // don't ask
+#endif
+    //
 };
 
 
