@@ -2,6 +2,11 @@
 #define PHARE_TEST_CORE_DATA_PARTICLES_TEST_PARTICLES_FIXTURES_HPP
 
 #include <string>
+#include <cassert>
+#include <functional>
+
+#include "test_particles.hpp"
+
 
 namespace PHARE::core
 {
@@ -24,7 +29,7 @@ struct UsableParticlesPopulation
     ParticleArray_t patch_ghost_particles = domain_particles;
     ParticleArray_t level_ghost_particles = domain_particles;
     core::ParticlesPack<ParticleArray_t> particles_pack{name,
-                                                        &domain_particles, //
+                                                        &domain_particles,
                                                         &patch_ghost_particles,
                                                         &level_ghost_particles,
                                                         /*levelGhostParticlesOld=*/nullptr,
