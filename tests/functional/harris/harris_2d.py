@@ -24,6 +24,7 @@ ph.NO_GUI()
 cpp = cpp_lib()
 startMPI()
 
+
 diag_outputs = "phare_outputs/test/harris/2d"
 time_step_nbr = 1000
 time_step = 0.001
@@ -31,16 +32,17 @@ final_time = time_step * time_step_nbr
 dt = 10 * time_step
 nt = final_time / dt + 1
 timestamps = dt * np.arange(nt)
+cells = (200, 200)
 
 
-def config():
+def config(diag_dir):
+    ph.global_vars.sim = None
     sim = ph.Simulation(
-        smallest_patch_size=15,
-        largest_patch_size=25,
+        # smallest_patch_size=15,
+        # largest_patch_size=25,
         time_step_nbr=time_step_nbr,
         time_step=time_step,
-        # boundary_types="periodic",
-        cells=(200, 400),
+        cells=cells,
         dl=(0.2, 0.2),
         refinement="tagging",
         max_nbr_levels=1,
@@ -48,9 +50,9 @@ def config():
         resistivity=0.001,
         diag_options={
             "format": "phareh5",
-            "options": {"dir": diag_outputs, "mode": "overwrite"},
+            "options": {"dir": diag_dir, "mode": "overwrite"},
         },
-        strict=True,
+        strict=False,
     )
 
     def density(x, y):
@@ -143,7 +145,6 @@ def config():
         bz=bz,
         protons={"charge": 1, "density": density, **vvv, "init": {"seed": 12334}},
     )
-
     ph.ElectronModel(closure="isothermal", Te=0.0)
 
     for quantity in ["E", "B"]:
@@ -153,14 +154,40 @@ def config():
     return sim
 
 
+def get_time(path, time, datahier=None):
+    time = "{:.10f}".format(time)
+    from pyphare.pharesee.hierarchy import hierarchy_from
+
+    datahier = hierarchy_from(h5_filename=path + "/EM_E.h5", time=time, hier=datahier)
+    datahier = hierarchy_from(h5_filename=path + "/EM_B.h5", time=time, hier=datahier)
+    return datahier
+
+
+def cmp():
+    ch = get_time(diag_outputs, 0.001)
+    gh = get_time(diag_outputs + "_gpu", 0.001)
+    assert ch == gh
+
+    # for key in ch.level(0)[0].keys():
+    #     print(ch.level(0)[0].box, gh.level(0)[0].box)
+    #     assert ch.level(0)[0][key] == gh.level(0)[0][key], f"{key} failed"
+
+
 def main():
-    Simulator(config()).run()
+    Simulator(config(diag_outputs)).setup().initialize().run()
+
     try:
         from tools.python3 import plotting as m_plotting
 
         m_plotting.plot_run_timer_data(diag_outputs, cpp.mpi_rank())
     except ImportError:
         print("Phlop not found - install with: `pip install phlop`")
+
+    Simulator(config(diag_outputs + "_gpu")).setup(
+        layout=0, allocator=1
+    ).initialize().run()
+    cmp()
+
     cpp.mpi_barrier()
 
 
