@@ -6,6 +6,7 @@
 //  - env:      PHARE_SCOPE_TIMING=1
 
 // #define PHARE_HAVE_MKN_GPU
+#include "core/numerics/ion_updater/ion_updater_def.hpp"
 #define PHARE_UNDEF_ASSERT
 #define PHARE_SKIP_MPI_IN_CORE
 
@@ -92,19 +93,18 @@ namespace detail::strings
 } // namespace detail::strings
 
 template<typename Ions, typename EM, typename GridLayout_t>
-void update(Ions& ions, EM const& em, GridLayout_t const& layout)
+void update(UpdaterMode mode, Ions& ions, EM const& em, GridLayout_t const& layout)
 {
     using Particles = typename Ions::particle_array_type;
     auto constexpr function_id
         = join_string_views_v<detail::strings::update, Particles::type_id, detail::strings::cma>;
     PHARE_LOG_LINE_STR(function_id);
     PHARE_LOG_SCOPE(1, function_id);
-    get_updater_for(ions, em, layout)
-        .updatePopulations(ions, em, layout, dt /*, UpdaterMode::domain_only*/);
+    get_updater_for(ions, em, layout).updatePopulations(ions, em, layout, dt, mode);
 }
 
 template<typename Patches>
-void update(Patches& patches)
+void update(UpdaterMode mode, Patches& patches)
 {
     using Particles = Patches::value_type::ParticleArray_t;
     auto constexpr function_id
@@ -112,7 +112,7 @@ void update(Patches& patches)
     PHARE_LOG_LINE_STR(function_id);
     PHARE_LOG_SCOPE(1, function_id);
     get_updater_for(*patches[0].ions, *patches[0].em, patches[0].layout)
-        .updatePopulations(patches, dt /*, UpdaterMode::domain_only*/);
+        .updatePopulations(patches, dt, mode);
 }
 
 
@@ -179,14 +179,14 @@ auto from_ions(GridLayout_t const& layout, Ions const& from)
     return ions_p;
 }
 
-template<typename Patches>
+template<auto updater_mode, typename Patches>
 auto& evolve(Patches& patches)
 {
-    update(patches);
+    update(updater_mode, patches);
     return patches;
 }
 
-template<typename Ions, typename GridLayout_t>
+template<auto updater_mode, typename Ions, typename GridLayout_t>
 auto& evolve(Ions& ions, GridLayout_t const& layout)
 {
     using Particles_t                = typename Ions::particle_array_type;
@@ -194,7 +194,7 @@ auto& evolve(Ions& ions, GridLayout_t const& layout)
     auto constexpr static dim        = GridLayout_t::dimension;
 
     UsableElectromag<dim, alloc_mode> em{layout};
-    update(*ions, *em, layout);
+    update(updater_mode, *ions, *em, layout);
     assert(ions.populations[0].particles.domain_particles.size() > 0);
     return ions;
 }
@@ -239,19 +239,20 @@ void compare(GridLayout_t const& layout, R& ref, C& cmp)
 }
 
 
-template<std::size_t _dim, auto _layout_mode, auto _alloc_mode = PHARE::AllocatorMode::CPU,
-         std::uint8_t _impl = 0>
+template<std::size_t _dim, auto _layout_mode, auto _alloc_mode, std::uint8_t _impl,
+         auto _updater_mode>
 struct TestParam
 {
     static_assert(std::is_same_v<decltype(_layout_mode), LayoutMode>);
     static_assert(std::is_same_v<decltype(_alloc_mode), PHARE::AllocatorMode>);
-    auto constexpr static dim         = _dim;
-    auto constexpr static layout_mode = _layout_mode;
-    auto constexpr static alloc_mode  = _alloc_mode;
-    auto constexpr static impl        = _impl;
+    auto constexpr static dim          = _dim;
+    auto constexpr static layout_mode  = _layout_mode;
+    auto constexpr static alloc_mode   = _alloc_mode;
+    auto constexpr static impl         = _impl;
+    auto constexpr static updater_mode = _updater_mode;
 };
 
-template<typename Ions, std::size_t dim, std::size_t interp>
+template<typename Ions, std::size_t dim, std::size_t interp, auto updater_mode>
 struct DefaultIons
 {
     using GridLayout_t = TestGridLayout<typename PHARE_Types<dim, interp>::GridLayout_t>;
@@ -260,7 +261,7 @@ struct DefaultIons
     std::shared_ptr<Ions> init = make_ions<typename Ions::particle_array_type>(layout);
     std::shared_ptr<Ions> ions = make_ions<typename Ions::particle_array_type>(layout);
 
-    DefaultIons() { evolve(*ions, *layout); }
+    DefaultIons() { evolve<updater_mode>(*ions, *layout); }
 
     static auto& I()
     {
@@ -272,11 +273,13 @@ struct DefaultIons
 template<typename Param>
 struct MultiPatchIonUpdaterTest : public ::testing::Test
 {
-    auto constexpr static dim         = Param::dim;
-    auto constexpr static interp      = 1;
-    auto constexpr static layout_mode = Param::layout_mode;
-    auto constexpr static alloc_mode  = Param::alloc_mode;
-    auto constexpr static impl        = Param::impl;
+    auto constexpr static dim          = Param::dim;
+    auto constexpr static interp       = 1;
+    auto constexpr static layout_mode  = Param::layout_mode;
+    auto constexpr static alloc_mode   = Param::alloc_mode;
+    auto constexpr static impl         = Param::impl;
+    auto constexpr static updater_mode = Param::updater_mode;
+
 
     using GridLayout_t       = TestGridLayout<typename PHARE_Types<dim, interp>::GridLayout_t>;
     using RefParticleArray_t = AoSMappedParticleArray<dim>;
@@ -285,7 +288,7 @@ struct MultiPatchIonUpdaterTest : public ::testing::Test
 
     using RefIons_t = UsableIons_t<RefParticleArray_t, interp>;
     using CmpIons_t = UsableIons_t<CmpParticleArray_t, interp>;
-    using DefIons   = DefaultIons<RefIons_t, dim, interp>;
+    using DefIons   = DefaultIons<RefIons_t, dim, interp, Param::updater_mode>;
 
     GridLayout_t const& layout           = DefIons::I().layout;
     std::shared_ptr<RefIons_t>& ref_ions = DefIons::I().ions;
@@ -323,8 +326,11 @@ using Permutations_t = testing::Types< // ! notice commas !
 
 PHARE_WITH_MKN_GPU(
 
-    TestParam<3, LayoutMode::AoSPC, AllocatorMode::GPU_UNIFIED, /*impl=*/2>,
-    TestParam<3, LayoutMode::SoAPC, AllocatorMode::GPU_UNIFIED, /*impl=*/2>
+    TestParam<3, LayoutMode::AoSPC, AllocatorMode::GPU_UNIFIED, 2,UpdaterMode::domain_only>,
+    TestParam<3, LayoutMode::SoAPC, AllocatorMode::GPU_UNIFIED, 2,UpdaterMode::domain_only>/*,
+
+    TestParam<3, LayoutMode::AoSPC, AllocatorMode::GPU_UNIFIED, 2,UpdaterMode::all>,
+    TestParam<3, LayoutMode::SoAPC, AllocatorMode::GPU_UNIFIED, 2,UpdaterMode::all>*/
 
 )
 
@@ -333,14 +339,20 @@ PHARE_WITH_MKN_GPU(
 
 TYPED_TEST_SUITE(MultiPatchIonUpdaterTest, Permutations_t, );
 
-TYPED_TEST(MultiPatchIonUpdaterTest, updater)
+template<typename MultiPatchIonUpdaterTest_t>
+auto run(MultiPatchIonUpdaterTest_t& self)
 {
-    evolve(this->patches);
+    evolve<MultiPatchIonUpdaterTest_t::updater_mode>(self.patches);
     if (do_cmp)
-        for (auto const& patch : this->patches)
-            compare(*this->layout, *this->ref_ions, *patch.ions);
+        for (auto const& patch : self.patches)
+            compare(*self.layout, *self.ref_ions, *patch.ions);
 }
 
+
+TYPED_TEST(MultiPatchIonUpdaterTest, updater_domain_only)
+{
+    run(*this);
+}
 
 } // namespace PHARE::core
 

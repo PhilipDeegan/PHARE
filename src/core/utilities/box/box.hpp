@@ -337,6 +337,23 @@ NO_DISCARD Box<Type, dim> shrink(Box<Type, dim> const& box, T2 const& size)
     return copy;
 }
 
+template<typename Type, std::size_t dim>
+NO_DISCARD Box<Type, dim> shift(Box<Type, dim> const& box, Type const& offset)
+{
+    auto copy{box};
+    copy.lower += offset;
+    copy.upper += offset;
+    return copy;
+}
+
+template<std::uint8_t idx, typename Type, std::size_t dim>
+NO_DISCARD Box<Type, dim> shift_idx(Box<Type, dim> const& box, Type const& offset)
+{
+    auto copy{box};
+    copy.lower[idx] += offset;
+    copy.upper[idx] += offset;
+    return copy;
+}
 
 template<typename Type, std::size_t dim>
 NO_DISCARD Box<Type, dim> emptyBox()
@@ -438,8 +455,18 @@ bool any_overlaps(Boxes const& boxes)
     return false;
 }
 
-template<typename Box, typename Boxes>
-bool any_overlaps(Boxes const& boxes, Box const& box)
+template<typename BoxHavers, typename Accessor>
+bool any_overlaps(BoxHavers const& havers, Accessor&& fn)
+{
+    for (std::size_t i = 0; i < havers.size() - 1; ++i)
+        for (std::size_t j = i + 1; j < havers.size(); ++j)
+            if (auto overlap = fn(havers[i]) * fn(havers[j]))
+                return true;
+    return false;
+}
+
+template<typename Boxes>
+bool any_overlaps(Boxes const& boxes, typename Boxes::value_type const& box)
 {
     for (std::size_t i = 0; i < boxes.size(); ++i)
         if (auto overlap = boxes[i] * box)

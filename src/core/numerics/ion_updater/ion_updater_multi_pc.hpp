@@ -92,11 +92,15 @@ void IonUpdaterMultiPC<Ions, Electromag, GridLayout>::updateAndDepositDomain_(Mo
 {
     PHARE_LOG_SCOPE(1, "IonUpdaterMultiPC::updateAndDepositDomain_");
 
+    constexpr static std::uint8_t N_ARRAYS       = 3;
+    constexpr static std::uint8_t DOMAIN_ID      = 0;
+    constexpr static std::uint8_t LEVEL_GHOST_ID = 2;
+
     if (views.size() == 0)
         return;
 
 #if PHARE_HAVE_MKN_GPU
-    std::uint16_t const group_size = 3 * views[0].ions->size();
+    std::uint16_t const group_size = N_ARRAYS * views[0].ions->size();
     MultiBoris<ModelViews> in{dt_, views};
     Pusher_t::move(in);
 
@@ -130,10 +134,12 @@ void IonUpdaterMultiPC<Ions, Electromag, GridLayout>::updateAndDepositDomain_(Mo
     // finished adding new domain particles
     in.streamer.group_barrier(group_size);
 
-    // TODO interp levelghost now in domain
-
-    in.streamer.async_dev([=](auto const i) { //
-        Interpolating_t::template box_kernel<true>(pps[i], layouts[i], fluxes[i], rhos[i]);
+    in.streamer.async_dev_idx(N_ARRAYS, 0, [=](auto const i) { // 0 = domain
+        Interpolating_t::box_kernel(pps[i], layouts[i], fluxes[i], rhos[i]);
+    });
+    // no patch ghost as they're injected into domain
+    in.streamer.async_dev_idx(N_ARRAYS, 2, [=](auto const i) { // 2 = level ghosts
+        Interpolating_t::box_kernel(pps[i], layouts[i], fluxes[i], rhos[i]);
     });
 
     in.streamer();

@@ -8,11 +8,12 @@ set -e
 
 export KLOG=${KLOG:-0}
 export PHARE_SCOPE_TIMING=1
-export PHARE_CELLS=${PHARE_CELLS:-5}
-export PHARE_PPC=${PHARE_PPC:-100}
+export PHARE_CELLS=${PHARE_CELLS:-3}
+export PHARE_PPC=${PHARE_PPC:-1}
 
 TEST="-M tests/core/numerics/ion_updater/test_updater_pp_main.cpp"
 TEST="-M tests/core/numerics/ion_updater/test_multi_updater.cpp"
+TEST="-M tests/core/data/particles/test_particles_selecting.cpp"
 ARGS="${TEST} -P mkn.base=gpu_ -x "
 [ -d /opt/rocm/bin ] && ARGS+="res/mkn/hip" || ARGS+="res/mkn/clang_cuda "
 
@@ -26,7 +27,7 @@ set -x
   # mkn run -p test_core ${ARGS} $@ # -- --gtest_filter=IonUpdaterPPTest/14.updater
   mkn clean build run -p test_core ${ARGS} $@ # -- --gtest_filter=IonUpdaterPPTest/14.updater
 ) 1> >(tee $CWD/.mkn.sh.out ) 2> >(tee $CWD/.mkn.sh.err >&2 )
-# exit 0 # comment out to do soak test
+exit 0 # comment out to do soak test
 
 (
   date && rm -rf tee && mkdir tee

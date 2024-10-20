@@ -90,6 +90,37 @@ struct BoxStreamDeviceFunction : mkn::gpu::StreamFunction<Strat>
 };
 
 
+template<typename Box_t, typename Strat, typename Fn, std::uint16_t impl = 0>
+struct BoxStreamDeviceGroupIndexFunction : BoxStreamDeviceFunction<Box_t, Strat, Fn, impl>
+{
+    using Super = BoxStreamDeviceFunction<Box_t, Strat, Fn, impl>;
+    using Super::strat;
+
+
+    BoxStreamDeviceGroupIndexFunction(std::size_t const& gs_, std::size_t const& gid_, Strat& strat,
+                                      Fn&& fn, std::vector<Box_t> const& boxes)
+        : Super{strat, std::forward<Fn>(fn), boxes}
+        , gs{gs_}
+        , gid{gid_}
+    {
+        assert(gs > 0); // groups imply one
+    }
+
+    void run(std::uint32_t const i) override
+    {
+        if (i % gs == gid)
+            Super::run(i);
+        else
+            Super::strat.status[i] = mkn::gpu::SFS::FIN;
+    }
+
+
+    std::size_t const gs;
+    std::size_t const gid;
+};
+
+
+
 
 template<typename Boxes, typename Vectors>
 struct BoxStreamLauncher : public mkn::gpu::StreamLauncher<Vectors>
@@ -134,6 +165,15 @@ struct ThreadedBoxStreamLauncher : public mkn::gpu::ThreadedStreamLauncher<Vecto
     {
         using DevFn = BoxStreamDeviceFunction<Box_t, Super, Fn, impl>;
         Super::fns.emplace_back(std::make_shared<DevFn>(**this, std::forward<Fn>(fn), boxes));
+        return *this;
+    };
+
+    template<std::uint16_t impl = 0, typename Fn>
+    auto& async_dev_idx(std::size_t const& gs, std::size_t const& gid, Fn&& fn)
+    {
+        using DevFn = BoxStreamDeviceGroupIndexFunction<Box_t, Super, Fn, impl>;
+        Super::fns.emplace_back(
+            std::make_shared<DevFn>(gs, gid, *this, std::forward<Fn>(fn), boxes));
         return *this;
     };
 

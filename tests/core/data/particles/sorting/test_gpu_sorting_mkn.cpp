@@ -78,9 +78,9 @@ TYPED_TEST(ParticleArraySortingTest, _3d_sorting_test)
 
     TypeParam fixture{};
 
-    std::vector<std::array<int, 3>> iCells{{2, 2, 2}, {2, 1, 0}, {1, 1, 1}, //
-                                           {1, 0, 1}, {0, 2, 0}, {0, 0, 0},
-                                           {1, 1, 2}, {0, 1, 0}, {2, 0, 2}};
+    std::vector<std::array<int, 3>> const iCells{{2, 2, 2}, {2, 1, 0}, {1, 1, 1}, //
+                                                 {1, 0, 1}, {0, 2, 0}, {0, 0, 0},
+                                                 {1, 1, 2}, {0, 1, 0}, {2, 0, 2}};
     for (std::size_t j = 0; j < N; ++j)
         for (auto const& iCell : iCells)
             fixture.add(iCell);
@@ -89,9 +89,9 @@ TYPED_TEST(ParticleArraySortingTest, _3d_sorting_test)
 
     fixture.sort();
 
-    std::vector<std::array<int, 3>> expected{{0, 0, 0}, {0, 1, 0}, {0, 2, 0}, //
-                                             {1, 0, 1}, {1, 1, 1}, {1, 1, 2},
-                                             {2, 0, 2}, {2, 1, 0}, {2, 2, 2}};
+    std::vector<std::array<int, 3>> const expected{{0, 0, 0}, {0, 1, 0}, {0, 2, 0}, //
+                                                   {1, 0, 1}, {1, 1, 1}, {1, 1, 2},
+                                                   {2, 0, 2}, {2, 1, 0}, {2, 2, 2}};
 
     ASSERT_EQ(fixture.ps_cpu.size(), expected.size() * N);
 

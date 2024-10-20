@@ -141,15 +141,14 @@ protected:
 template<typename Particles, std::uint8_t impl_ = 0>
 class PerCellVector
 {
-    auto static constexpr dim = Particles::dimension;
-    using This                = PerCellVector<Particles, impl_>;
+    using This   = PerCellVector<Particles, impl_>;
+    using SIZE_T = unsigned long long int; // cuda issues
 
     template<typename P, std::uint8_t i>
     friend class PerCellSpan;
 
-    using SIZE_T = unsigned long long int; // cuda issues
-
 public:
+    auto static constexpr dim          = Particles::dimension;
     auto static constexpr impl_v       = impl_;
     auto static constexpr alloc_mode   = Particles::alloc_mode;
     auto static constexpr layout_mode  = Particles::layout_mode;

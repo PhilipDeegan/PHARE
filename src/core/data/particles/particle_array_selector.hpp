@@ -14,25 +14,22 @@ struct ParticleArraySelector
     using box_t = Box<int, ParticleArray_t::dimension>;
     using _impl = detail::ParticleArraySelector<ParticleArray_t, impl>;
 
-    void operator()(box_t const& box) { _impl{particles, box}(); }
-
     template<typename P2>
-    void operator()(box_t const& box, P2& into)
+    void operator()(box_t const& box, P2& dst)
     {
-        _impl{particles}(box, into);
+        _impl{src}(dst, box);
     }
 
     template<typename P2, typename Transformer>
-    // Transformer == [](auto const& particle){ return modify(particle); }
-    void operator()(box_t const& box, P2& into, Transformer&& fn)
+    /*= [](auto const& particle){ return modify(particle); }*/
+    void operator()(box_t const& box, P2& dst, Transformer&& fn)
     {
-        _impl{particles}(box, into, std::forward<Transformer>(fn));
+        _impl{src}(dst, box, std::forward<Transformer>(fn));
     }
 
-    ParticleArray_t const& particles;
-
-    // scratch space for samrai boxes conversion
-    static inline thread_local std::vector<box_t> boxes;
+    ParticleArray_t const& src;
+    // // scratch space for samrai boxes conversion
+    // static inline thread_local std::vector<box_t> boxes;
 };
 
 } // namespace PHARE::core
