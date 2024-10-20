@@ -455,6 +455,15 @@ bool any_overlaps(Boxes const& boxes)
     return false;
 }
 
+template<typename Boxes>
+bool any_overlaps(Boxes const& boxes, typename Boxes::value_type const& box)
+{
+    for (std::size_t i = 0; i < boxes.size(); ++i)
+        if (auto overlap = boxes[i] * box)
+            return true;
+    return false;
+}
+
 template<typename BoxHavers, typename Accessor>
 bool any_overlaps(BoxHavers const& havers, Accessor&& fn)
 {
@@ -462,15 +471,6 @@ bool any_overlaps(BoxHavers const& havers, Accessor&& fn)
         for (std::size_t j = i + 1; j < havers.size(); ++j)
             if (auto overlap = fn(havers[i]) * fn(havers[j]))
                 return true;
-    return false;
-}
-
-template<typename Boxes>
-bool any_overlaps(Boxes const& boxes, typename Boxes::value_type const& box)
-{
-    for (std::size_t i = 0; i < boxes.size(); ++i)
-        if (auto overlap = boxes[i] * box)
-            return true;
     return false;
 }
 
