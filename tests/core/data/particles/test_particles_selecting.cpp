@@ -70,10 +70,9 @@ struct MultiPatchIonUpdaterTest : public ::testing::Test
     auto constexpr static alloc_mode  = Param::alloc_mode;
     auto constexpr static impl        = Param::impl;
 
-    using GridLayout_t       = TestGridLayout<typename PHARE_Types<dim, interp>::GridLayout_t>;
-    using Box_t              = Box<int, dim>;
-    using RefParticleArray_t = AoSMappedParticleArray<dim>;
-    using CmpParticleArray_t = ParticleArray<
+    using GridLayout_t    = TestGridLayout<typename PHARE_Types<dim, interp>::GridLayout_t>;
+    using Box_t           = Box<int, dim>;
+    using ParticleArray_t = ParticleArray<
         dim, ParticleArrayInternals<dim, layout_mode, StorageMode::VECTOR, alloc_mode, impl>>;
 
 
@@ -106,8 +105,8 @@ struct MultiPatchIonUpdaterTest : public ::testing::Test
         }
 
         GridLayout_t layout;
-        CmpParticleArray_t domain = make_particles<CmpParticleArray_t>(*layout);
-        CmpParticleArray_t ghost  = make_particles<CmpParticleArray_t>(*layout);
+        ParticleArray_t domain = make_particles<ParticleArray_t>(*layout);
+        ParticleArray_t ghost  = make_particles<ParticleArray_t>(*layout);
     };
 
     bool at_periodic_border(Box<int, dim> const& box) const
@@ -173,6 +172,12 @@ struct MultiPatchIonUpdaterTest : public ::testing::Test
         return periodic_neighbours;
     }
 
+    template<typename... Args>
+    void select(Patch const* src, Args&&... args) const
+    {
+        ParticleArraySelector<ParticleArray_t>{src->domain}(args...);
+    }
+
 
     GridLayout_t layout{cells * 3};
     Box_t const domainBox = layout.AMRBox();
@@ -192,10 +197,10 @@ auto run(MultiPatchIonUpdaterTest_t& self)
         auto& dst = self.patches[pid];
 
         for (auto const& [src, overlap] : self.neighbours_for(pid))
-            ParticleArraySelector{src->domain}(overlap, dst.ghost);
+            self.select(src, overlap, dst.ghost);
 
         for (auto const& [src, overlap, shift] : self.periodic_neighbours_for(pid))
-            ParticleArraySelector{src->domain}(overlap, dst.ghost, shift);
+            self.select(src, overlap, dst.ghost, shift);
     }
 
     for (auto& patch : self.patches)
