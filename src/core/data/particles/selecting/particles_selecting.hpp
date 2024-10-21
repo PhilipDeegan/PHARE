@@ -161,6 +161,22 @@ public:
                        Transformer&& fn)
     {
         static_assert(std::is_same_v<ParticleArray_t, ParticleArray_t0>);
+        auto const lcl_src_box = src.local_box(select);
+        auto const lcl_dst_box = dst.local_box(select - fn); // BEWARE
+        assert(lcl_src_box.shape() == lcl_dst_box.shape());
+        auto src_it = lcl_src_box.begin();
+        auto dst_it = lcl_dst_box.begin();
+        for (; src_it != lcl_src_box.end(); ++src_it, ++dst_it)
+        {
+            auto& sv = src(*src_it);
+            auto& dv = dst(*dst_it);
+            dv.reserve(dv.size() + sv.size());
+            for (auto p : sv)
+            {
+                p.iCell() = (Point{p.iCell()} + fn).toArray();
+                dv.emplace_back(p);
+            }
+        }
     }
 };
 
@@ -174,7 +190,7 @@ public:
     static void select(ParticleArray_t const& src, ParticleArray_t0& dst, box_t const& select)
     {
         static_assert(std::is_same_v<ParticleArray_t, ParticleArray_t0>);
-        // PHARE_LOG_LINE_SS("");
+
         auto const lcl_src_box = src.local_box(select);
         auto const lcl_dst_box = dst.local_box(select);
         assert(lcl_src_box.shape() == lcl_dst_box.shape());
@@ -194,6 +210,24 @@ public:
                        Transformer&& fn)
     {
         static_assert(std::is_same_v<ParticleArray_t, ParticleArray_t0>);
+
+        auto const lcl_src_box = src.local_box(select);
+        auto const lcl_dst_box = dst.local_box(select - fn); // BEWARE
+        assert(lcl_src_box.shape() == lcl_dst_box.shape());
+        auto src_it = lcl_src_box.begin();
+        auto dst_it = lcl_dst_box.begin();
+        for (; src_it != lcl_src_box.end(); ++src_it, ++dst_it)
+        {
+            auto& sv = src(*src_it);
+            auto& dv = dst(*dst_it);
+            dv.reserve(dv.size() + sv.size());
+            for (auto const& pit : sv)
+            {
+                auto p    = pit.copy();
+                p.iCell() = (Point{p.iCell()} + fn).toArray();
+                dv.emplace_back(p);
+            }
+        }
     }
 };
 

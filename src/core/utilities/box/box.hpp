@@ -43,14 +43,14 @@ template<typename Type, std::size_t dim>
 struct Box
 {
     auto static constexpr dimension = dim;
+    using Point_t                   = Point<Type, dim>;
     using value_type                = Point<Type, dim>;
     using This                      = Box<Type, dim>;
 
-    Point<Type, dim> lower;
-    Point<Type, dim> upper;
+    Point_t lower;
+    Point_t upper;
 
-    Box() = default;
-
+    Box()                      = default;
     Box(Box const&)            = default;
     Box(Box&&)                 = default;
     Box& operator=(Box const&) = default;
@@ -95,6 +95,18 @@ struct Box
     {
         return Box{lower - that.lower, upper - that.upper};
     }
+
+
+    NO_DISCARD auto operator+(Point_t const& shift) const
+    {
+        return Box{lower + shift, upper + shift};
+    }
+
+    NO_DISCARD auto operator-(Point_t const& shift) const
+    {
+        return Box{lower - shift, upper - shift};
+    }
+
 
     NO_DISCARD bool isEmpty() const { return (*this) == Box{}; }
 
@@ -346,6 +358,15 @@ NO_DISCARD Box<Type, dim> shift(Box<Type, dim> const& box, Type const& offset)
     return copy;
 }
 
+template<template<typename, std::size_t> typename Point_t, typename Type, std::size_t dim>
+NO_DISCARD Box<Type, dim> shift(Box<Type, dim> const& box, Point_t<Type, dim> const& offset)
+{
+    auto copy{box};
+    for (std::uint8_t i = 0; i < dim; ++i)
+        copy.lower[i] += offset[i], copy.upper[i] += offset[i];
+    return copy;
+}
+
 template<std::uint8_t idx, typename Type, std::size_t dim>
 NO_DISCARD Box<Type, dim> shift_idx(Box<Type, dim> const& box, Type const& offset)
 {
@@ -465,7 +486,7 @@ bool any_overlaps(Boxes const& boxes, typename Boxes::value_type const& box)
 }
 
 template<typename BoxHavers, typename Accessor>
-bool any_overlaps(BoxHavers const& havers, Accessor&& fn)
+bool any_overlaps_in(BoxHavers const& havers, Accessor&& fn)
 {
     for (std::size_t i = 0; i < havers.size() - 1; ++i)
         for (std::size_t j = i + 1; j < havers.size(); ++j)

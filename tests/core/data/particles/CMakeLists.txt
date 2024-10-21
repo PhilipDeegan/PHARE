@@ -2,15 +2,21 @@ cmake_minimum_required (VERSION 3.20.1)
 
 project(test_particles)
 
-add_executable(${PROJECT_NAME} ${PROJECT_NAME}.cpp)
+function(_add_core_particles_test src_name)
 
-target_include_directories(${PROJECT_NAME} PRIVATE
-  ${GTEST_INCLUDE_DIRS}
-)
+  add_executable(${src_name} ${src_name}.cpp)
 
-target_link_libraries(${PROJECT_NAME} PRIVATE
-  phare_core
-  ${GTEST_LIBS})
+  target_include_directories(${src_name} PRIVATE
+    ${GTEST_INCLUDE_DIRS}
+  )
 
-add_phare_test(${PROJECT_NAME} ${CMAKE_CURRENT_BINARY_DIR})
+  target_link_libraries(${src_name} PRIVATE
+    phare_core
+    ${GTEST_LIBS})
 
+  add_phare_test(${src_name} ${CMAKE_CURRENT_BINARY_DIR})
+
+endfunction(_add_ion_updater_test)
+
+_add_core_particles_test(test_particles)
+_add_core_particles_test(test_particles_selecting)

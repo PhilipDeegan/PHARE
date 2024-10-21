@@ -17,8 +17,8 @@ namespace PHARE::core
 {
 
 auto static const bytes = get_env_as("PHARE_GPU_BYTES", std::uint64_t{8000000000});
-auto static const cells = get_env_as("PHARE_CELLS", std::uint32_t{10});
-auto static const ppc   = get_env_as("PHARE_PPC", std::size_t{10});
+auto static const cells = get_env_as("PHARE_CELLS", std::uint32_t{3});
+auto static const ppc   = get_env_as("PHARE_PPC", std::size_t{1});
 auto static const seed  = get_env_as("PHARE_SEED", std::size_t{1039});
 // auto static const n_patches = get_env_as("PHARE_PATCHES", std::size_t{3});
 auto static const dt = get_env_as("PHARE_TIMESTEP", double{.001});
@@ -71,6 +71,7 @@ struct MultiPatchIonUpdaterTest : public ::testing::Test
     auto constexpr static impl        = Param::impl;
 
     using GridLayout_t       = TestGridLayout<typename PHARE_Types<dim, interp>::GridLayout_t>;
+    using Box_t              = Box<int, dim>;
     using RefParticleArray_t = AoSMappedParticleArray<dim>;
     using CmpParticleArray_t = ParticleArray<
         dim, ParticleArrayInternals<dim, layout_mode, StorageMode::VECTOR, alloc_mode, impl>>;
@@ -79,7 +80,7 @@ struct MultiPatchIonUpdaterTest : public ::testing::Test
 
     MultiPatchIonUpdaterTest()
     {
-        // cube of 3*3*3 cubes
+        // 27 patches of cells*3 in 3*3*3 config
         patches.reserve(3 * 3 * 3);
         int const off = cells - 1;
         for (std::uint8_t i = 0; i < 3; ++i)
@@ -93,11 +94,17 @@ struct MultiPatchIonUpdaterTest : public ::testing::Test
                         Point{cellx, celly, cellz}, Point{cellx + off, celly + off, cellz + off}});
                 }
 
-        assert(!any_overlaps(patches, [](auto const& patch) { return patch.layout.AMRBox(); }));
+        assert(!any_overlaps_in(patches, [](auto const& patch) { return patch.layout.AMRBox(); }));
     }
 
     struct Patch
     {
+        Patch(GridLayout_t const& _layout)
+            : layout{_layout}
+        {
+            add_particles_in(domain, layout.AMRBox(), ppc);
+        }
+
         GridLayout_t layout;
         CmpParticleArray_t domain = make_particles<CmpParticleArray_t>(*layout);
         CmpParticleArray_t ghost  = make_particles<CmpParticleArray_t>(*layout);
@@ -109,9 +116,70 @@ struct MultiPatchIonUpdaterTest : public ::testing::Test
         return domainBox * ghostbox != ghostbox;
     }
 
+    auto& neighbours_for(std::size_t const pid)
+    {
+        neighbours.clear();
+        auto const ghostbox = grow(patches[pid].layout.AMRBox(), 1);
+        for (std::size_t i = 0; i < pid; ++i)
+            if (auto const overlap = ghostbox * patches[i].layout.AMRBox())
+                neighbours.emplace_back(&patches[i], *overlap);
+        for (std::size_t i = pid + 1; i < patches.size(); ++i)
+            if (auto const overlap = ghostbox * patches[i].layout.AMRBox())
+                neighbours.emplace_back(&patches[i], *overlap);
+
+        return neighbours;
+    }
+
+    struct Periodic
+    {
+        Point<int, 3> const shift;
+        Box_t const overlap; // shifted
+    };
+
+    auto& periodic_neighbours_for(std::size_t const pid)
+    {
+        periodic_neighbours.clear();
+        if (!at_periodic_border(patches[pid].layout.AMRBox()))
+            return periodic_neighbours;
+
+        auto const& patch = patches[pid];
+        int const icells  = cells;
+        int const mid     = icells * 3 / 2;
+        auto shifts
+            = for_N<7, for_N_R_mode::make_array>([&](auto i) { return Point<int, 3>{0, 0, 0}; });
+        for_N<3>([&](auto i) {
+            int const span  = icells * 3;
+            int const shift = patch.layout.AMRBox().upper[i] < mid ? 1 : -1;
+            shifts[i][i]    = span * shift;
+        });
+
+        shifts[3] = {shifts[0][0], shifts[1][1], 0};
+        shifts[4] = {0, shifts[1][1], shifts[2][2]};
+        shifts[5] = {shifts[0][0], 0, shifts[2][2]};
+        shifts[6] = {shifts[0][0], shifts[1][1], shifts[2][2]};
+
+        for (auto const& shifter : shifts)
+        {
+            auto const shift_box = shift(patch.layout.AMRBox(), shifter);
+            auto const ghostbox  = grow(shift_box, 1);
+            for (std::size_t i = 0; i < pid; ++i)
+                if (auto const overlap = ghostbox * patches[i].layout.AMRBox())
+                    periodic_neighbours.emplace_back(&patches[i], *overlap, shifter);
+            for (std::size_t i = pid + 1; i < patches.size(); ++i)
+                if (auto const overlap = ghostbox * patches[i].layout.AMRBox())
+                    periodic_neighbours.emplace_back(&patches[i], *overlap, shifter);
+        }
+
+        return periodic_neighbours;
+    }
+
+
     GridLayout_t layout{cells * 3};
-    Box<int, dim> const domainBox = layout.AMRBox();
+    Box_t const domainBox = layout.AMRBox();
     std::vector<Patch> patches{};
+
+    std::vector<std::tuple<Patch*, Box_t>> neighbours{};
+    std::vector<std::tuple<Patch*, Box_t, Point<int, 3>>> periodic_neighbours{};
 };
 
 
@@ -119,77 +187,34 @@ struct MultiPatchIonUpdaterTest : public ::testing::Test
 template<typename MultiPatchIonUpdaterTest_t>
 auto run(MultiPatchIonUpdaterTest_t& self)
 {
-    auto const select = [](auto const& src, auto& dst /*, auto const& box*/) {
-        auto const dst_box = grow(dst.layout.AMRBox(), 1);
-        if (auto const overlap = dst_box * src.layout.AMRBox())
-            ParticleArraySelector{src.domain}(*overlap, dst.ghost);
-    };
-    auto const select_transformed
-        = [](auto const& src, auto& dst, auto const& box, auto&& transformer) {
-              auto const dst_box = grow(box, 1);
-              if (auto const overlap = dst_box * src.layout.AMRBox())
-                  ParticleArraySelector{src.domain}(*overlap, dst.ghost, transformer);
-          };
-
-    for (auto& patch : self.patches)
+    for (std::size_t pid = 0; pid < self.patches.size(); ++pid)
     {
-        add_particles_in(patch.domain, patch.layout.AMRBox(), ppc);
-        PHARE_LOG_LINE_SS(patch.domain.size());
-    }
+        auto& dst = self.patches[pid];
 
-    for (auto& patch : self.patches)
-    {
-        auto const domain_border_patch = self.at_periodic_border(patch.layout.AMRBox());
+        for (auto const& [src, overlap] : self.neighbours_for(pid))
+            ParticleArraySelector{src->domain}(overlap, dst.ghost);
 
-        for (auto const& src : self.patches)
-        {
-            if (&patch == &src)
-                continue;
-            select(src, patch /*, patch.layout.AMRBox()*/);
-        }
-
-        if (domain_border_patch)
-        {
-            // !triple transform!
-            for (auto const& src : self.patches)
-            {
-                if (&patch == &src || !self.at_periodic_border(src.layout.AMRBox()))
-                    continue;
-                for_N<3>([&](auto i) {
-                    int const span     = cells * 3;
-                    int const shift    = patch.layout.AMRBox().lower[i] < cells ? 1 : -1;
-                    auto const dst_box = shift_idx<i>(patch.layout.AMRBox(), shift * span);
-                    select_transformed(src, patch, dst_box, [&](auto const& particle) {
-                        auto copy    = particle;
-                        copy.iCell() = (Point{copy.iCell()} + (shift * span)).toArray();
-                        return copy;
-                    });
-                });
-            }
-        }
+        for (auto const& [src, overlap, shift] : self.periodic_neighbours_for(pid))
+            ParticleArraySelector{src->domain}(overlap, dst.ghost, shift);
     }
 
     for (auto& patch : self.patches)
     {
         ParticleArrayService::template sync<2, ParticleType::Ghost>(patch.ghost);
-        PHARE_LOG_LINE_STR(patch.ghost.size());
-        EXPECT_EQ(9 * ppc, patch.ghost.size());
+        EXPECT_EQ(98, patch.ghost.size());
     }
 }
 
 // clang-format off
 using Permutations_t = testing::Types< // ! notice commas !
 
+     TestParam<3, LayoutMode::AoSPC, AllocatorMode::CPU>
+    ,TestParam<3, LayoutMode::SoAPC, AllocatorMode::CPU>
+
 PHARE_WITH_MKN_GPU(
 
-    // TestParam<3, LayoutMode::AoSPC, AllocatorMode::CPU>,
-    // TestParam<3, LayoutMode::SoAPC, AllocatorMode::CPU>,
-    // TestParam<3, LayoutMode::AoSPC, AllocatorMode::GPU_UNIFIED, 2>,
-    TestParam<3, LayoutMode::SoAPC, AllocatorMode::GPU_UNIFIED, 2>/*,
-
-    TestParam<3, LayoutMode::AoSPC, AllocatorMode::GPU_UNIFIED, 2,UpdaterMode::all>,
-    TestParam<3, LayoutMode::SoAPC, AllocatorMode::GPU_UNIFIED, 2,UpdaterMode::all>*/
-
+    ,TestParam<3, LayoutMode::AoSPC, AllocatorMode::GPU_UNIFIED, 2>
+    ,TestParam<3, LayoutMode::SoAPC, AllocatorMode::GPU_UNIFIED, 2>
 )
 
 >;
