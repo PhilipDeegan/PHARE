@@ -2,9 +2,11 @@
 #define PHARE_CORE_LOGGER_HPP
 
 #include <cstdint>
+#include <string>
+#include <utility>
 
 #if !defined(PHARE_LOG_LEVEL)
-#define PHARE_LOG_LEVEL 0 // 0 == off
+#define PHARE_LOG_LEVEL 1 // 0 == off
 #endif
 
 namespace PHARE
@@ -12,7 +14,8 @@ namespace PHARE
 constexpr static std::uint8_t LOG_LEVEL = PHARE_LOG_LEVEL;
 }
 
-#if !defined(NDEBUG) || defined(PHARE_FORCE_DEBUG_DO)
+#if !defined(NDEBUG) || defined(PHARE_FORCE_DEBUG_DO) || defined(PHARE_FORCE_LOG_LINE)
+#include <iostream>
 #define PHARE_LOG_LINE_STR(str)                                                                    \
     std::cout << __FILE__ << ":" << __LINE__ << " - " << str << std::endl;
 #define PHARE_LOG_LINE_SS(s) PHARE_LOG_LINE_STR((std::stringstream{} << s).str());
@@ -22,7 +25,9 @@ constexpr static std::uint8_t LOG_LEVEL = PHARE_LOG_LEVEL;
 #endif
 #define PHARE_LOG_LINE PHARE_LOG_LINE_STR("")
 
+
 #if PHARE_WITH_CALIPER
+
 #include "caliper/cali.h"
 
 #define PHARE_LOG_START(lvl, str) CALI_MARK_BEGIN(str)
@@ -36,8 +41,7 @@ constexpr static std::uint8_t LOG_LEVEL = PHARE_LOG_LEVEL;
 
 #endif // PHARE_WITH_CALIPER
 
-#include <string>
-#include <utility>
+
 
 namespace PHARE
 {
