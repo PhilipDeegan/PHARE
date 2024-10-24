@@ -1,9 +1,12 @@
-#include "gmock/gmock.h"
-#include "gtest/gtest.h"
 
-#include <fstream>
 #include <memory>
+#include <fstream>
 
+#if defined(HAVE_RAJA) and defined(HAVE_UMPIRE)
+#include "SAMRAI/tbox/Collectives.h" // tbox::parallel_synchronize();
+#include "core/def.h"
+#include "simulator/simulator.h" // static allocator init - probably should be isolated
+#endif
 
 #include "core/data/field/field.hpp"
 #include "core/data/grid/gridlayout.hpp"
@@ -13,7 +16,8 @@
 #include "core/numerics/ohm/ohm.hpp"
 #include "core/utilities/index/index.hpp"
 
-#include "phare_core.hpp"
+#include "gmock/gmock.h"
+#include "gtest/gtest.h"
 
 #include "tests/core/data/vecfield/test_vecfield_fixtures.hpp"
 
@@ -86,10 +90,10 @@ struct OhmTest : public ::testing::Test
         , Enew{"Enew", layout, HybridQuantity::Vector::E}
         , ohm{createDict()}
     {
-        auto const& [Bx, By, Bz]          = B();
-        auto const& [Jx, Jy, Jz]          = J();
-        auto const& [Vx, Vy, Vz]          = V();
-        auto const& [Exnew, Eynew, Eznew] = Enew();
+        auto& [Bx, By, Bz] = B();
+        auto& [Jx, Jy, Jz] = J();
+        auto& [Vx, Vy, Vz] = V();
+        // auto const& [Exnew, Eynew, Eznew] = Enew();
 
         if constexpr (dim == 1)
         {

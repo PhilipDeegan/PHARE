@@ -14,7 +14,6 @@
 #include "core/utilities/span.hpp"
 #include "core/utilities/types.hpp"
 
-
 namespace PHARE::core
 {
 template<typename T = float>
@@ -28,12 +27,39 @@ struct ParticleDeltaDistribution
     std::uniform_real_distribution<T> dist{0, 1. - std::numeric_limits<T>::epsilon()};
 };
 
+template<typename Box_t, typename RValue = std::size_t>
+struct CellFlattener
+{
+    template<typename Icell>
+    NO_DISCARD RValue operator()(Icell const& icell) const _PHARE_ALL_FN_
+    {
+        if constexpr (Box_t::dimension == 2)
+            return icell[1] + icell[0] * shape[1] * shape[0];
+        if constexpr (Box_t::dimension == 3)
+            return icell[2] + icell[1] * shape[2] + icell[0] * shape[1] * shape[2];
+        return icell[0];
+    }
+
+    Box_t const box;
+    std::array<int, Box_t::dimension> shape = box.shape().toArray();
+};
+
+template<typename T, std::size_t dim>
+NO_DISCARD auto cellAsPoint(std::array<T, dim> const& iCell) _PHARE_ALL_FN_
+{
+    return Point<int, dim>{iCell};
+}
+
 
 template<typename Particle>
-NO_DISCARD auto cellAsPoint(Particle const& particle)
+NO_DISCARD auto cellAsPoint(Particle const& particle) _PHARE_ALL_FN_
 {
-    return Point<int, Particle::dimension>{particle.iCell};
+    return cellAsPoint(particle.iCell());
 }
+
+
+template<std::size_t dim, bool _const_ = false>
+struct ParticleRef;
 
 
 template<size_t dim>
@@ -42,113 +68,133 @@ struct Particle
     static_assert(dim > 0 and dim < 4, "Only dimensions 1,2,3 are supported.");
     static const size_t dimension = dim;
 
-    Particle(double a_weight, double a_charge, std::array<int, dim> cell,
-             std::array<double, dim> a_delta, std::array<double, 3> a_v)
-        : weight{a_weight}
-        , charge{a_charge}
-        , iCell{cell}
-        , delta{a_delta}
-        , v{a_v}
+    Particle(double const& a_weight, double const& a_charge, std::array<int, dim> const& cell,
+             std::array<double, dim> const& a_delta,
+             std::array<double, 3> const& a_v) _PHARE_ALL_FN_ //
+        : weight_{a_weight},
+          charge_{a_charge},
+          iCell_{cell},
+          delta_{a_delta},
+          v_{a_v}
     {
     }
 
-    Particle() = default;
+    Particle() _PHARE_ALL_FN_ {}
 
-    double weight = 0;
-    double charge = 0;
-
-    std::array<int, dim> iCell    = ConstArray<int, dim>();
-    std::array<double, dim> delta = ConstArray<double, dim>();
-    std::array<double, 3> v       = ConstArray<double, 3>();
+    // Particle(Particle const&)            = default;
+    // Particle(Particle&&)                 = default;
+    // Particle& operator=(Particle const&) = default;
+    // Particle& operator=(Particle&&)      = default;
+    //                                                             1d  2d  3d
+    double weight_                 = 0;                         // 8   8   8
+    double charge_                 = 0;                         // 16  16  16
+    std::array<int, dim> iCell_    = ConstArray<int, dim>();    // 20  24  28
+    std::array<double, dim> delta_ = ConstArray<double, dim>(); // 28  40  52
+    std::array<double, 3> v_       = ConstArray<double, 3>();   // 52  64  76
 
     NO_DISCARD bool operator==(Particle<dim> const& that) const
     {
-        return (this->weight == that.weight) && //
-               (this->charge == that.charge) && //
-               (this->iCell == that.iCell) &&   //
-               (this->delta == that.delta) &&   //
-               (this->v == that.v);
+        return (this->weight_ == that.weight_) && //
+               (this->charge_ == that.charge_) && //
+               (this->iCell_ == that.iCell_) &&   //
+               (this->delta_ == that.delta_) &&   //
+               (this->v_ == that.v_);
     }
+
+    auto& weight() _PHARE_ALL_FN_ { return weight_; }
+    auto& weight() const _PHARE_ALL_FN_ { return weight_; }
+
+    auto& charge() _PHARE_ALL_FN_ { return charge_; }
+    auto& charge() const _PHARE_ALL_FN_ { return charge_; }
+
+    auto& iCell() _PHARE_ALL_FN_ { return iCell_; }
+    auto& iCell() const _PHARE_ALL_FN_ { return iCell_; }
+
+    auto& delta() _PHARE_ALL_FN_ { return delta_; }
+    auto& delta() const _PHARE_ALL_FN_ { return delta_; }
+
+    auto& v() _PHARE_ALL_FN_ { return v_; }
+    auto& v() const _PHARE_ALL_FN_ { return v_; }
 
     template<std::size_t dimension>
     friend std::ostream& operator<<(std::ostream& out, Particle<dimension> const& particle);
+
+    auto copy() const { return *this; }
 };
+
+
+template<size_t dim>
+struct CountedParticle : public Particle<dim>
+{
+    CountedParticle(double const& a_weight, double const& a_charge,
+                    std::array<int, dim> const& cell, std::array<double, dim> const& a_delta,
+                    std::array<double, 3> const& a_v, std::size_t const& id_ = 0) _PHARE_ALL_FN_
+        : Particle<dim>{a_weight, a_charge, cell, a_delta, a_v},
+          id{id_}
+    {
+    }
+
+    std::size_t id = 0;
+
+    auto copy() const { return *this; }
+    auto& super() const { return *this; }
+
+    template<std::size_t dimension>
+    friend std::ostream& operator<<(std::ostream& out, CountedParticle<dimension> const& particle);
+};
+
+
+template<template<std::size_t> typename Particle_t, std::size_t dim, typename Stream>
+Stream& write_to_stream(Particle_t<dim> const& particle, Stream& out, bool const new_line = true)
+{
+    out << "iCell(";
+    for (auto c : particle.iCell())
+        out << c << ",";
+    out << "), delta(";
+    for (auto d : particle.delta())
+        out << d << ",";
+    out << "), v(";
+    for (auto v : particle.v())
+        out << v << ",";
+    out << "), charge : " << particle.charge() << ", weight : " << particle.weight();
+
+    if constexpr (std::is_same_v<Particle_t<dim>, CountedParticle<dim>>)
+        out << ", id : " << particle.id;
+
+    if (new_line)
+        out << '\n';
+
+    return out;
+}
 
 template<std::size_t dim>
 std::ostream& operator<<(std::ostream& out, Particle<dim> const& particle)
 {
-    out << "iCell(";
-    for (auto c : particle.iCell)
-    {
-        out << c << ",";
-    }
-    out << "), delta(";
-    for (auto d : particle.delta)
-    {
-        out << d << ",";
-    }
-    out << "), v(";
-    for (auto v : particle.v)
-    {
-        out << v << ",";
-    }
-    out << "), charge : " << particle.charge << ", weight : " << particle.weight;
+    return write_to_stream(particle, out);
+}
+
+template<std::size_t dim>
+std::ostream& operator<<(std::ostream& out, CountedParticle<dim> const& particle)
+{
+    write_to_stream(particle, out, /*new_line =*/false);
     out << '\n';
     return out;
 }
 
 
-template<std::size_t dim>
-struct ParticleView
-{
-    static_assert(dim > 0 and dim < 4, "Only dimensions 1,2,3 are supported.");
-    static constexpr std::size_t dimension = dim;
-
-    double& weight;
-    double& charge;
-    std::array<int, dim>& iCell;
-    std::array<double, dim>& delta;
-    std::array<double, 3>& v;
-};
-
-
-
-
-template<std::size_t dim, typename T>
-inline constexpr auto is_phare_particle_type
-    = std::is_same_v<Particle<dim>, T> or std::is_same_v<ParticleView<dim>, T>;
-
-
-template<std::size_t dim, template<std::size_t> typename ParticleA,
-         template<std::size_t> typename ParticleB>
-NO_DISCARD typename std::enable_if_t<
-    is_phare_particle_type<dim, ParticleA<dim>> and is_phare_particle_type<dim, ParticleB<dim>>,
-    bool>
-operator==(ParticleA<dim> const& particleA, ParticleB<dim> const& particleB)
-{
-    return particleA.weight == particleB.weight and //
-           particleA.charge == particleB.charge and //
-           particleA.iCell == particleB.iCell and   //
-           particleA.delta == particleB.delta and   //
-           particleA.v == particleB.v;
-}
-
 } // namespace PHARE::core
 
 
-namespace std
+template<std::size_t dim>
+void swap(PHARE::core::Particle<dim>& a, PHARE::core::Particle<dim>& b)
 {
-
-template<size_t dim, template<std::size_t> typename Particle_t>
-NO_DISCARD typename std::enable_if_t<PHARE::core::is_phare_particle_type<dim, Particle_t<dim>>,
-                                     PHARE::core::Particle<dim>>
-copy(Particle_t<dim> const& from)
-{
-    return {from.weight, from.charge, from.iCell, from.delta, from.v};
+    // if (a == Particle<dim>{})
+    //     std::abort();
+    PHARE_LOG_LINE_STR(a);
+    // PHARE_LOG_LINE_STR(b);
+    if (&a != &b)
+        std::swap(a, b);
 }
-
-
-} // namespace std
 
 
 #endif
