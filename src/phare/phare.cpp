@@ -1,5 +1,3 @@
-
-
 #include "phare/phare.hpp"
 #include "simulator/simulator.hpp"
 #include "amr/wrappers/hierarchy.hpp"
@@ -11,6 +9,22 @@
 #include <csignal>
 #include <atomic>
 
+namespace PHARE
+{
+std::unique_ptr<PHARE::ISimulator> getSimulator(std::shared_ptr<PHARE::amr::Hierarchy>& hierarchy)
+{
+    PHARE::initializer::PHAREDict const& theDict
+        = PHARE::initializer::PHAREDictHandler::INSTANCE().dict();
+    auto dim           = theDict["simulation"]["dimension"].template to<int>();
+    auto interpOrder   = theDict["simulation"]["interp_order"].template to<int>();
+    auto nbRefinedPart = theDict["simulation"]["refined_particle_nbr"].template to<int>();
+
+    return core::makeAtRuntime<SimulatorMaker>(dim, interpOrder, nbRefinedPart,
+                                               SimulatorMaker{hierarchy});
+}
+} /* namespace PHARE */
+
+
 namespace
 {
 std::atomic<int> gSignalStatus = 0;
@@ -21,34 +35,16 @@ void signal_handler(int signal)
     gSignalStatus = signal;
 }
 
-std::unique_ptr<PHARE::initializer::DataProvider> fromCommandLine(int argc, char** argv)
-{
-    using dataProvider [[maybe_unused]] = std::unique_ptr<PHARE::initializer::DataProvider>;
 
-    switch (argc)
-    {
-        case 1: return nullptr;
-        case 2:
-            std::string arg = argv[1];
-            auto moduleName = arg.substr(0, arg.find_last_of("."));
-            if (arg.substr(arg.find_last_of(".") + 1) == "py")
-            {
-                std::replace(moduleName.begin(), moduleName.end(), '/', '.');
-                std::cout << "python input detected, building with python provider...\n";
-                return std::make_unique<PHARE::initializer::PythonDataProvider>(moduleName);
-            }
-
-            break;
-    }
-    return nullptr;
-}
 
 int main(int argc, char** argv)
 {
-    if (std::signal(SIGINT, signal_handler) == SIG_ERR) {
+    if (std::signal(SIGINT, signal_handler) == SIG_ERR)
+    {
         throw std::runtime_error("PHARE Error: Failed to register SIGINT signal handler");
     }
-    if (std::signal(SIGABRT, signal_handler) == SIG_ERR) {
+    if (std::signal(SIGABRT, signal_handler) == SIG_ERR)
+    {
         throw std::runtime_error("PHARE Error: Failed to register SIGABRT signal handler");
     }
 
@@ -66,7 +62,7 @@ int main(int argc, char** argv)
     PHARE::SamraiLifeCycle slc{argc, argv};
 
     std::cerr << "creating python data provider\n";
-    auto provider = fromCommandLine(argc, argv);
+    auto provider = PHARE::fromCommandLine(argc, argv);
 
     std::cerr << "reading user inputs...";
     provider->read();

@@ -15,25 +15,50 @@ namespace PHARE::core
 A UsableTensorField is an extension of the TensorField view that owns memory for components and sets
 the view pointers. It is useful for tests to easily declare usable (== set views) tensors
 */
-template<std::size_t dim, std::size_t rank_ = 2>
-class UsableTensorField : public TensorField<Field_t<dim>, HybridQuantity, rank_>
+template<std::size_t dim, std::size_t rank = 2, auto alloc_mode = AllocatorMode::CPU>
+class UsableTensorField : public TensorField<Field_t<dim, alloc_mode>, HybridQuantity, rank>
 {
-    auto constexpr static N_elements = detail::tensor_field_dim_from_rank<rank_>();
+    static_assert(std::is_same_v<decltype(alloc_mode), AllocatorMode>);
+
+    auto constexpr static N_elements = detail::tensor_field_dim_from_rank<rank>();
+
+    using NdArrayVector_t = NdArrayVector<dim, double, /*c_ordering =*/true, alloc_mode>;
+    using Grid_t          = Grid<NdArrayVector_t, HybridQuantity::Scalar>;
 
 public:
     auto static constexpr dimension = dim;
-    using Super                     = TensorField<Field_t<dim>, HybridQuantity, rank_>;
-    using Grid_t                    = Grid<NdArrayVector<dim>, HybridQuantity::Scalar>;
-    using tensor_t                  = typename Super::tensor_t;
+    using Super                     = TensorField<Field_t<dim, alloc_mode>, HybridQuantity, rank>;
 
-    template<typename GridLayout>
-    UsableTensorField(std::string const& name, GridLayout const& layout, tensor_t qty)
-        : Super{name, qty}
-        , xyz{make_grids(Super::componentNames(), layout, qty)}
+protected:
+    using tensor_t = typename Super::tensor_t;
+
+    void _set()
     {
         for (std::size_t i = 0; i < N_elements; ++i)
             super()[i].setBuffer(&xyz[i]);
     }
+
+
+public:
+    template<typename GridLayout>
+    UsableTensorField(std::string const& name, GridLayout const& layout, tensor_t qty, double v = 0)
+        : Super{name, qty}
+        , xyz{make_grids(Super::componentNames(), layout, qty)}
+    {
+        if (v != 0)
+            for (auto& grid : xyz)
+                std::fill_n(grid.data(), grid.size(), v);
+        _set();
+    }
+
+
+    UsableTensorField(UsableTensorField&& that)
+        : Super{std::forward<Super>(that)}
+        , xyz{std::move(that.xyz)}
+    {
+        _set();
+    }
+
 
     void set_on(Super& tensorfield)
     {
@@ -42,8 +67,33 @@ public:
             tensorfield[i].setBuffer(&xyz[i]);
     }
 
+
     Super& super() { return *this; }
     Super& super() const { return *this; }
+
+    Super& view() { return *this; }
+    Super const& view() const { *this; }
+
+    auto& operator*() { return view(); }
+    auto& operator*() const { return view(); }
+
+    auto& grids() const { return xyz; }
+
+    template<auto AM>
+    bool isclose(UsableTensorField<dim, rank, AM> const& that, double diff = 1e-15) const
+    {
+        if constexpr (alloc_mode == AllocatorMode::GPU_UNIFIED || AM == AllocatorMode::GPU_UNIFIED)
+            diff *= 1e3; // atomics no order guaranteed
+        return core::for_N_all<N_elements>(
+            [&](auto i) { return (*this)[i].isclose(that[i], diff); });
+    }
+
+    template<auto AM>
+    bool operator==(UsableTensorField<dim, rank, AM> const& that) const
+    {
+        return core::for_N_all<N_elements>([&](auto i) { return (*this)[i] == that[i]; });
+    }
+
 
 protected:
     template<typename ComponentNames, typename GridLayout>

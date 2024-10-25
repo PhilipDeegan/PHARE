@@ -45,7 +45,7 @@ namespace amr
         FieldCoarsenOperator(FieldCoarsenOperator const&)            = delete;
         FieldCoarsenOperator(FieldCoarsenOperator&&)                 = delete;
         FieldCoarsenOperator& operator=(FieldCoarsenOperator const&) = delete;
-        FieldCoarsenOperator&& operator=(FieldCoarsenOperator&&)     = delete;
+        FieldCoarsenOperator& operator=(FieldCoarsenOperator&&)      = delete;
 
 
         virtual ~FieldCoarsenOperator() = default;

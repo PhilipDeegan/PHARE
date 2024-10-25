@@ -7,6 +7,7 @@
 #include <SAMRAI/hier/Box.h>
 #include <SAMRAI/hier/BoxOverlap.h>
 #include <SAMRAI/hier/IntVector.h>
+#include <SAMRAI/hier/HierarchyNeighbors.h>
 #include <SAMRAI/hier/Patch.h>
 #include <SAMRAI/hier/PatchData.h>
 
@@ -132,7 +133,9 @@ namespace amr
 
 
     template<typename GridLayoutT>
-    NO_DISCARD GridLayoutT layoutFromPatch(SAMRAI::hier::Patch const& patch)
+    NO_DISCARD GridLayoutT
+    layoutFromPatch(SAMRAI::hier::Patch const& patch,
+                    std::shared_ptr<SAMRAI::hier::PatchHierarchy> const& hierarchy = nullptr)
     {
         int constexpr dimension = GridLayoutT::dimension;
 
@@ -182,8 +185,20 @@ namespace amr
             nbrCell[iDim] = static_cast<std::uint32_t>(domain.numberCells(iDim));
         }
 
-        auto lvlNbr = patch.getPatchLevelNumber();
-        return GridLayoutT{dl, nbrCell, origin, amr::Box<int, dimension>{domain}, lvlNbr};
+        std::vector<core::Box<int, dimension>> neighbors;
+        if (hierarchy)
+        {
+            SAMRAI::hier::HierarchyNeighbors hier_nbrs{*hierarchy, patch.getPatchLevelNumber(),
+                                                       patch.getPatchLevelNumber()};
+
+            for (auto const& neighbour_box :
+                 hier_nbrs.getSameLevelNeighbors(domain, patch.getPatchLevelNumber()))
+                neighbors.emplace_back(phare_box_from<dimension>(neighbour_box));
+        }
+
+        auto const lvlNbr = patch.getPatchLevelNumber();
+        return GridLayoutT{dl,     nbrCell,  origin, amr::Box<int, dimension>{domain},
+                           lvlNbr, neighbors};
     }
 
     inline auto to_string(SAMRAI::hier::GlobalId const& id)

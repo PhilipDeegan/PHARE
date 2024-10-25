@@ -85,8 +85,8 @@ class AdvanceTest(AdvanceTestBase):
             (
                 {
                     "L0": {"B0": Box2D(5, 20)},
-                    "L1": {"B0": Box2D(12, 38)},
-                    "L2": {"B0": Box2D(30, 52)},
+                    "L1": {"B0": Box2D(12, 39)},
+                    "L2": {"B0": Box2D(35, 49)},
                 }
             )
         ),

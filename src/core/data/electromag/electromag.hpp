@@ -4,10 +4,12 @@
 #include <string>
 #include <tuple>
 
+#include "core/def.hpp"
 #include "core/hybrid/hybrid_quantities.hpp"
 #include "core/data/vecfield/vecfield_initializer.hpp"
 #include "initializer/data_provider.hpp"
 #include "core/def.hpp"
+
 
 
 namespace PHARE
@@ -73,6 +75,10 @@ namespace core
             E.copyData(source.E);
             B.copyData(source.B);
         }
+
+
+        auto operator()() { return std::forward_as_tuple(E, B); }
+        auto operator()() const { return std::forward_as_tuple(E, B); }
 
         VecFieldT E;
         VecFieldT B;
