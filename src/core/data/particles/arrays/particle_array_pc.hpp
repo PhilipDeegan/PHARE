@@ -255,6 +255,7 @@ public:
 
     auto& box() const { return box_; }
     auto& ghost_box() const { return ghost_box_; }
+    auto& safe_box() const { return safe_box_; } // allocating box
 
 
     auto& operator()() const { return particles_; }

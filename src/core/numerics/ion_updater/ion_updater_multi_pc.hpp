@@ -109,7 +109,7 @@ void IonUpdaterMultiPC<Ions, Electromag, GridLayout>::updateAndDepositDomain_(Mo
 
     // add new domain particles
     in.streamer.host_group_mutex(group_size, [&](auto const i) {
-        auto is_domain_particles = in.particle_type[i] == 0;
+        auto is_domain_particles = in.particle_type[i] == DOMAIN_ID;
         if (is_domain_particles || in.particles[i]->size() == 0)
             return;
 
@@ -117,7 +117,7 @@ void IonUpdaterMultiPC<Ions, Electromag, GridLayout>::updateAndDepositDomain_(Mo
             ParticleArrayService::copy_ghost_into_domain(*in.particles[i], *in.particles[j]);
         };
 
-        if (in.particle_type[i - 1] == 0)
+        if (in.particle_type[i - 1] == DOMAIN_ID)
             copy_in(i - 1);
         else
             return;
@@ -134,11 +134,11 @@ void IonUpdaterMultiPC<Ions, Electromag, GridLayout>::updateAndDepositDomain_(Mo
     // finished adding new domain particles
     in.streamer.group_barrier(group_size);
 
-    in.streamer.async_dev_idx(N_ARRAYS, 0, [=](auto const i) { // 0 = domain
+    in.streamer.async_dev_idx(N_ARRAYS, DOMAIN_ID, [=](auto const i) { // 0 = domain
         Interpolating_t::box_kernel(pps[i], layouts[i], fluxes[i], rhos[i]);
     });
     // no patch ghost as they're injected into domain
-    in.streamer.async_dev_idx(N_ARRAYS, 2, [=](auto const i) { // 2 = level ghosts
+    in.streamer.async_dev_idx(N_ARRAYS, LEVEL_GHOST_ID, [=](auto const i) { // 2 = level ghosts
         Interpolating_t::box_kernel(pps[i], layouts[i], fluxes[i], rhos[i]);
     });
 
@@ -146,7 +146,7 @@ void IonUpdaterMultiPC<Ions, Electromag, GridLayout>::updateAndDepositDomain_(Mo
     in.streamer.sync();
 
 #else
-    // throw std::runtime_error("No available implementation")
+        // throw std::runtime_error("No available implementation")
 #endif
     //
 }
@@ -157,6 +157,8 @@ template<typename ModelViews>
 void IonUpdaterMultiPC<Ions, Electromag, GridLayout>::updateAndDepositAll_(ModelViews& views)
 {
     PHARE_LOG_SCOPE(1, "IonUpdaterMultiPC::updateAndDepositAll_");
+
+    constexpr static std::uint8_t DOMAIN_ID = 0;
 
     if (views.size() == 0)
         return;
@@ -172,7 +174,7 @@ void IonUpdaterMultiPC<Ions, Electromag, GridLayout>::updateAndDepositAll_(Model
 
     // add new domain particles
     in.streamer.host_group_mutex(group_size, [&](auto const i) {
-        auto is_domain_particles = in.particle_type[i] == 0;
+        auto is_domain_particles = in.particle_type[i] == DOMAIN_ID;
         if (is_domain_particles || in.particles[i]->size() == 0)
             return;
 
@@ -180,9 +182,9 @@ void IonUpdaterMultiPC<Ions, Electromag, GridLayout>::updateAndDepositAll_(Model
             ParticleArrayService::copy_ghost_into_domain(*in.particles[i], *in.particles[j]);
         };
 
-        if (in.particle_type[i - 1] == 0)
+        if (in.particle_type[i - 1] == DOMAIN_ID)
             copy_in(i - 1);
-        else if (in.particle_type[i - 2] == 0)
+        else if (in.particle_type[i - 2] == DOMAIN_ID)
             copy_in(i - 2);
 
         // means there is no particle to mesh for ghosts
@@ -208,7 +210,7 @@ void IonUpdaterMultiPC<Ions, Electromag, GridLayout>::updateAndDepositAll_(Model
     in.streamer.print_times();
 
 #else
-    // throw std::runtime_error("No available implementation")
+        // throw std::runtime_error("No available implementation")
 #endif
     //
 }

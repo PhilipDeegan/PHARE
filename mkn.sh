@@ -8,8 +8,9 @@ set -e
 
 export KLOG=${KLOG:-0}
 export PHARE_SCOPE_TIMING=1
-export PHARE_CELLS=${PHARE_CELLS:-5}
-export PHARE_PPC=${PHARE_PPC:-10}
+export PHARE_CELLS=${PHARE_CELLS:-10}
+export PHARE_PPC=${PHARE_PPC:-5}
+export PHARE_PATCHES=${PHARE_PATCHES:-1}
 
 TEST="-M tests/core/numerics/ion_updater/test_updater_pp_main.cpp"
 TEST="-M tests/core/numerics/ion_updater/test_multi_updater.cpp"
@@ -24,9 +25,9 @@ set -x
       mkn clean build -Oqp test_core -d google.test,+ -a "-fPIC"
       mkn clean build -tOqp core -a "-fPIC" -x res/mkn/mpi # -DPHARE_SKIP_MPI_IN_CORE
   )
-  # mkn run -p test_core ${ARGS} $@ # -- --gtest_filter=IonUpdaterPPTest/14.updater
-  mkn clean build run -p test_core ${ARGS} $@ # -- --gtest_filter=IonUpdaterPPTest/14.updater
-) # 1> >(tee $CWD/.mkn.sh.out ) 2> >(tee $CWD/.mkn.sh.err >&2 )
+  mkn run -p test_core ${ARGS} $@ # -- --gtest_filter=IonUpdaterPPTest/14.updater
+  # mkn clean build run -p test_core ${ARGS} $@ # -- --gtest_filter=IonUpdaterPPTest/14.updater
+)  1> >(tee $CWD/.mkn.sh.out ) 2> >(tee $CWD/.mkn.sh.err >&2 )
 exit 0 # comment out to do soak test
 
 (

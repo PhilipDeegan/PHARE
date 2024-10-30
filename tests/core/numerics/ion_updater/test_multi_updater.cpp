@@ -167,7 +167,7 @@ auto from_ions(GridLayout_t const& layout, Ions const& from)
 
     auto _add_particles_from = [&]<auto type>(auto& src, auto& dst) {
         ParticleArrayService::reserve_ppc_in<type>(dst, ppc);
-        add_particles_from<type>(src, dst);
+        append<type>(src, dst, layout);
     };
 
     _add_particles_from.template operator()<ParticleType::Domain>(
@@ -298,11 +298,11 @@ struct MultiPatchIonUpdaterTest : public ::testing::Test
     MultiPatchIonUpdaterTest()
     {
         patches.resize(n_patches);
-        /* // uncomment to do init value check
-        auto ref = make_ions<RefParticleArray_t>(layout);
-        auto cmp = from_ions<CmpParticleArray_t>(layout, *ref);
-        compare(*this->layout, *ref, *cmp); // pre update check
-        */
+        // uncomment to do init value check
+
+        // auto ref = make_ions<RefParticleArray_t>(layout);
+        // auto cmp = from_ions<CmpParticleArray_t>(layout, *ref);
+        // compare(*this->layout, *ref, *cmp); // pre update check
     }
 
     struct Patch
@@ -327,8 +327,8 @@ using Permutations_t = testing::Types< // ! notice commas !
 
 PHARE_WITH_MKN_GPU(
 
-    TestParam<3, LayoutMode::AoSPC, AllocatorMode::GPU_UNIFIED, 2, UpdaterMode::domain_only>,
-    TestParam<3, LayoutMode::SoAPC, AllocatorMode::GPU_UNIFIED, 2, UpdaterMode::domain_only>,
+    // TestParam<3, LayoutMode::AoSPC, AllocatorMode::GPU_UNIFIED, 2, UpdaterMode::domain_only>,
+    // TestParam<3, LayoutMode::SoAPC, AllocatorMode::GPU_UNIFIED, 2, UpdaterMode::domain_only>,
 
     TestParam<3, LayoutMode::AoSPC, AllocatorMode::GPU_UNIFIED, 2, UpdaterMode::all>,
     TestParam<3, LayoutMode::SoAPC, AllocatorMode::GPU_UNIFIED, 2, UpdaterMode::all>

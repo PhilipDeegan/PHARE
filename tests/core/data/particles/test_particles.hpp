@@ -1,9 +1,11 @@
 #ifndef PHARE_CORE_DATA_TEST_PARTICLES_HPP
 #define PHARE_CORE_DATA_TEST_PARTICLES_HPP
 
-
 #include "phare_core.hpp"
 #include "core/utilities/types.hpp"
+
+#include "tests/core/data/particles/test_particles_appender.hpp"
+#include "tests/core/data/particles/test_particles_converter.hpp"
 
 #include <fstream>
 
@@ -113,7 +115,7 @@ template<auto type, typename Src, typename Dst>
 void add_particles_from(Src const& src, Dst& dst)
 {
     static_assert(std::is_same_v<decltype(type), ParticleType>);
-
+    // SLOW!
     for (auto const& p : src)
         dst.push_back(p);
 
