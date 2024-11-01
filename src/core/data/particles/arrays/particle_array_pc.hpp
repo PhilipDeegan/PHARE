@@ -1,6 +1,7 @@
 #ifndef PHARE_CORE_DATA_PARTICLES_PARTICLE_ARRAY_PerCell_HPP
 #define PHARE_CORE_DATA_PARTICLES_PARTICLE_ARRAY_PerCell_HPP
 
+#include "core/data/particles/particle.hpp"
 #include "core/operators.hpp"
 #include "core/utilities/span.hpp"
 #include "core/data/ndarray/ndarray_vector.hpp"
@@ -26,6 +27,7 @@ public:
     auto static constexpr impl_v     = impl_;
     using This                       = PerCellSpan<Particles, impl_v>;
     using lobox_t                    = Box<std::uint32_t, dim>;
+    using per_cell_particles         = Particles;
 
 private:
     using locell_t = std::array<std::uint32_t, dim>;
@@ -123,6 +125,11 @@ public:
         size_ = 0;
     }
 
+    void reset_p2c(std::array<std::uint32_t, dim>* cells, std::size_t size)
+    {
+        p2c_ = Span<std::array<std::uint32_t, dim>>{cells, size};
+    }
+
 
 protected:
     NdArrayView<dim, Particles> particles_;
@@ -160,6 +167,7 @@ public:
     using Particle_t                   = Particle<dim>;
     using value_type                   = Particle_t;
     using PSpan_t                      = typename Particles::Span_t;
+    using per_cell_particles           = Particles;
 
     template<typename T>
     using vec_helper = PHARE::Vector<T, alloc_mode, 1>;
@@ -357,6 +365,12 @@ public:
 
         else
             v.reserve(s);
+    }
+
+    template<typename View_t>
+    void reset_p2c(View_t& view)
+    {
+        view.reset_p2c(p2c_.data(), p2c_.size());
     }
 
 protected:
@@ -668,18 +682,22 @@ template<typename Particles, std::uint8_t impl>
 void PerCellVector<Particles, impl>::reset_index_wrapper_map()
 {
     resize(p2c_, total_size);
+
+
     std::size_t offset = 0;
     for (auto const& bix : local_box())
     {
         auto const& cs = cell_size_(bix);
+        if (cs == 0)
+            continue;
+
         resize(gaps_(bix), cs);
         off_sets_(bix) = offset;
-        if (cs)
-            std::fill(p2c_.begin() + offset, p2c_.begin() + offset + cs, *bix);
 
-        // thrust::fill(thrust::device, p2c_.begin() + offset, p2c_.begin() + offset +
-        // cs, *bix); thrust::fill(v.begin(), v.end(),
-        // std::numeric_limits<float>::max());
+        if constexpr (alloc_mode == AllocatorMode::GPU_UNIFIED)
+            thrust::fill(thrust::device, p2c_.begin() + offset, p2c_.begin() + offset + cs, *bix);
+        else
+            std::fill(p2c_.begin() + offset, p2c_.begin() + offset + cs, *bix);
 
         offset += cs;
         cap_(bix) = particles_(bix).capacity();
@@ -752,19 +770,20 @@ void PerCellVector<Particles, impl>::sync()
 template<typename Super_>
 struct PerCellParticles : public Super_
 {
-    using Super      = Super_;
-    using This       = PerCellParticles<Super>;
-    using Particle_t = typename Super::Particle_t;
+    using Super              = Super_;
+    using This               = PerCellParticles<Super>;
+    using Particle_t         = typename Super::Particle_t;
+    using per_cell_particles = typename Super::per_cell_particles;
 
-    auto static constexpr impl_v       = Super::impl_v;
-    auto static constexpr alloc_mode   = Super::alloc_mode;
-    auto static constexpr dimension    = Super::dimension;
-    auto static constexpr layout_mode  = LayoutMode::AoS;
+    auto static constexpr impl_v     = Super::impl_v;
+    auto static constexpr alloc_mode = Super::alloc_mode;
+    auto static constexpr dimension  = Super::dimension;
+    // auto static constexpr layout_mode  = Super::layout_mode;
     auto static constexpr storage_mode = Super::storage_mode;
     auto static constexpr size_of_particle() { return sizeof(Particle_t); }
 
-    template<std::size_t size>
-    using array_type = AoSParticles<AoSArray<dimension, size>>;
+    // template<std::size_t size>
+    // using array_type = AoSParticles<AoSArray<dimension, size>>;
 
     using Super::local_box;
     using Super::particles_;
@@ -863,10 +882,11 @@ struct PerCellParticles : public Super_
 
     template<typename T>
     struct index_wrapper;
-    auto operator[](std::size_t const& s) _PHARE_ALL_FN_ { return index_wrapper<This&>{*this, s}; }
+
+    auto operator[](std::size_t const& s) _PHARE_ALL_FN_ { return index_wrapper<This>{this, s}; }
     auto operator[](std::size_t const& s) const _PHARE_ALL_FN_
     {
-        return index_wrapper<This const&>{*this, s};
+        return index_wrapper<This const>{this, s};
     }
 
     void print() const {}
@@ -981,66 +1001,106 @@ struct PerCellParticles<OuterSuper>::iterator_impl
     std::size_t l = 0, i = 0;
 };
 
+template<auto layout_mode, typename Particles>
+struct index_wrapper_storage;
 
+template<typename Particles>
+struct index_wrapper_storage<LayoutMode::SoA, Particles>
+{
+    bool static constexpr is_const = std::is_const_v<std::remove_reference_t<Particles>>;
+    using per_cell_particles       = typename std::decay_t<Particles>::per_cell_particles;
+    using Particle_t               = detail::SoAZipParticle<per_cell_particles>;
 
-template<typename Super_>
+    index_wrapper_storage(per_cell_particles* p, std::size_t const i) _PHARE_ALL_FN_
+        : particles{p},
+          particle{*p, i}
+    {
+    }
+
+    auto& deref() _PHARE_ALL_FN_ { return particle; }
+    // auto& reset(std::size_t const i) { return particle = detail::SoAZipParticle(*particles, i); }
+
+    per_cell_particles* particles;
+    Particle_t particle;
+};
+
+template<typename Particles>
+struct index_wrapper_storage<LayoutMode::AoS, Particles>
+{
+    bool static constexpr is_const = std::is_const_v<std::remove_reference_t<Particles>>;
+    using per_cell_particles       = typename std::decay_t<Particles>::per_cell_particles;
+    using Particle_t               = typename Particles::Particle_t;
+    using Particle_p = std::conditional_t<is_const, Particle_t const* const, Particle_t*>;
+
+    index_wrapper_storage(per_cell_particles* p, std::size_t const i) _PHARE_ALL_FN_
+        : particles{p},
+          particle{&p->data()[i]}
+    {
+    }
+
+    auto& deref() _PHARE_ALL_FN_ { return *particle; }
+    // auto& reset(std::size_t const i) { return particle = p.data()[i]; }
+
+    per_cell_particles* particles;
+    Particle_p particle;
+};
+
+template<auto layout_mode, typename Particles>
+struct index_wrapper_storage
+{
+    // unused
+}; // default;
+
 template<typename T>
-struct PerCellParticles<Super_>::index_wrapper
+struct index_wrapper_super
+{
+    using per_cell_particles = typename std::decay_t<T>::per_cell_particles;
+    using value_type         = index_wrapper_storage<per_cell_particles::layout_mode, T>;
+};
+
+template<typename ParticlesSuper>
+template<typename T>
+struct PerCellParticles<ParticlesSuper>::index_wrapper : public index_wrapper_super<T>::value_type
 {
     using outer_t = std::decay_t<T>;
+    using Super   = typename index_wrapper_super<T>::value_type;
+    using Super::deref;
 
-    auto static constexpr dimension = Super_::dimension;
+    auto static constexpr dimension = ParticlesSuper::dimension;
     bool static constexpr is_const  = std::is_const_v<std::remove_reference_t<T>>;
     using Particle_t                = typename outer_t::Particle_t;
     using Particle_p = std::conditional_t<is_const, Particle_t const* const, Particle_t*>;
 
 
-    index_wrapper(T particles_, std::size_t idx_) _PHARE_ALL_FN_ : array_{particles_},
-                                                                   idx{idx_},
-                                                                   p_{&pi(*this)}
+    index_wrapper(T* pc_particles, std::size_t idx_) _PHARE_ALL_FN_
+        : Super{&pc_particles->particles_(cell(pc_particles, idx_)), index(pc_particles, idx_)},
+          pc_particles_ptr{pc_particles},
+          idx{idx_}
     {
-        PHARE_ASSERT(p_);
-        PHARE_ASSERT(p_->iCell()[0] > -10 and p_->iCell()[0] < 1000); // bad memory
+        PHARE_ASSERT(deref().iCell()[0] > -10 and deref().iCell()[0] < 1000); // bad memory
         if constexpr (dimension > 1)
-        {
-            PHARE_ASSERT(p_->iCell()[1] > -10 and p_->iCell()[1] < 1000); // bad memory
-        }
+            PHARE_ASSERT(deref().iCell()[1] > -10 and deref().iCell()[1] < 1000); // bad memory
+        if constexpr (dimension > 2)
+            PHARE_ASSERT(deref().iCell()[2] > -10 and deref().iCell()[2] < 1000); // bad memory
     }
 
-    auto& c() const _PHARE_ALL_FN_ { return array_.p2c_[idx]; }
-    auto i() const _PHARE_ALL_FN_ { return idx - array_.off_sets_(c()); }
-
-    template<typename This>
-    static auto& pi(This& self) _PHARE_ALL_FN_
+    auto& c() const _PHARE_ALL_FN_ { return cell(pc_particles_ptr, idx); }
+    static auto& cell(T* arr, std::size_t const idx) _PHARE_ALL_FN_ { return arr->p2c_[idx]; }
+    auto i() const _PHARE_ALL_FN_ { return index(pc_particles_ptr, idx); }
+    static auto index(T* arr, std::size_t const idx) _PHARE_ALL_FN_
     {
-        return self.array_.particles_(self.c())[self.i()];
+        return idx - arr->off_sets_(cell(arr, idx));
     }
 
-    auto& charge() _PHARE_ALL_FN_ { return p_->charge(); }
-    auto& delta() _PHARE_ALL_FN_ { return p_->delta(); }
-    auto& iCell() _PHARE_ALL_FN_ { return p_->iCell(); }
-    auto& weight() _PHARE_ALL_FN_ { return p_->weight(); }
-    auto& v() _PHARE_ALL_FN_ { return p_->v(); }
-
-    auto& charge() const _PHARE_ALL_FN_ { return p_->charge(); }
-    auto& delta() const _PHARE_ALL_FN_ { return p_->delta(); }
-    auto& iCell() const _PHARE_ALL_FN_ { return p_->iCell(); }
-    auto& weight() const _PHARE_ALL_FN_ { return p_->weight(); }
-    auto& v() const _PHARE_ALL_FN_ { return p_->v(); }
-
-    auto& operator*() { return *p_; }
-    auto& operator*() const { return *p_; }
 
     auto icell_changer(std::array<int, dimension> const& newcell) _PHARE_ALL_FN_
     {
-        array_.icell_changer(*p_, c(), i(), newcell);
+        pc_particles_ptr->icell_changer(deref(), c(), i(), newcell);
     }
 
-    auto copy() const { return *p_; }
 
-    T array_;
+    T* pc_particles_ptr;
     std::size_t idx = 0;
-    Particle_p p_   = nullptr;
 };
 
 

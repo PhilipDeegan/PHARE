@@ -120,8 +120,7 @@ struct SoAZipParticle
         std::declval<SoAParticles_t&>()))>;
 
     SoAZipParticle(SoAParticles_t& ps, std::size_t const& i) _PHARE_ALL_FN_
-        : it{SoAIteratorAdaptor::make(ps, i)},
-          ref{weight(), charge(), iCell(), delta(), v()}
+        : it{SoAIteratorAdaptor::make(ps, i)} // , ref{weight(), charge(), iCell(), delta(), v()}
     {
     }
 
@@ -140,11 +139,11 @@ struct SoAZipParticle
     auto& v() _PHARE_ALL_FN_ { return SoAIteratorAdaptor::v(*it); }
     auto& v() const _PHARE_ALL_FN_ { return SoAIteratorAdaptor::v(*it); }
 
-    auto& operator*() _PHARE_ALL_FN_ { return ref; }
-    auto& operator*() const _PHARE_ALL_FN_ { return ref; }
+    // auto& operator*() _PHARE_ALL_FN_ { return ref; }
+    // auto& operator*() const _PHARE_ALL_FN_ { return ref; }
 
     Iterator it;
-    SoAParticle_rt<dim> ref;
+    // SoAParticle_rt<dim> ref;
 };
 
 

@@ -1,5 +1,5 @@
-#ifndef PHARE_CORE_PUSHER_MULTI_BORIS_2_HPP
-#define PHARE_CORE_PUSHER_MULTI_BORIS_2_HPP
+#ifndef PHARE_CORE_PUSHER_MULTI_BORIS_HPP
+#define PHARE_CORE_PUSHER_MULTI_BORIS_HPP
 
 #include <array>
 #include <cmath>
@@ -27,13 +27,6 @@
 #endif // PHARE_HAVE_MKN_GPU
 
 #include "core/data/particles/arrays/particle_array_soa.hpp"
-
-
-namespace PHARE::core::detail
-{
-auto static const multi_boris_threads = get_env_as("PHARE_ASYNC_THREADS", std::size_t{5});
-
-} // namespace PHARE::core::detail
 
 namespace PHARE::core
 {
@@ -124,7 +117,7 @@ struct MultiBoris
     gpu::Vec_t<std::array<double, dim>> halfdt;
     gpu::Vec_t<double> dto2ms;
 
-    StreamLauncher streamer{particles, boxes, detail::multi_boris_threads};
+    StreamLauncher streamer{particles, boxes, 5};
 
     auto static mesh(std::array<double, dim> const& ms, double const& ts)
     {
@@ -212,47 +205,14 @@ public:
             }
         };
 
-        auto per_ghost_particle = [=] _PHARE_DEV_FN_(auto const& i) mutable {
-            auto const& dto2m      = dto2mspp[i];
-            auto const& layout     = layoutps[i];
-            auto& view             = pps[i];
-            auto particle_iterator = view[mkn::gpu::idx()];
-            auto& particle         = particle_iterator.deref();
-            auto const og_iCell    = particle.iCell();
-
-            particle.iCell() = advancePosition_<alloc_mode>(particle, halfDtOverDl[i]);
-            {
-                Interpolator interp;
-                boris_accelerate(particle, interp.m2p(particle, emps[i], layout), dto2m);
-            }
-            particle.iCell() = advancePosition_<alloc_mode>(particle, halfDtOverDl[i]);
-
-            if (!array_equals(particle.iCell(), og_iCell))
-                view.icell_changer(particle, particle_iterator.c(), particle_iterator.i(),
-                                   particle.iCell());
-        };
 
 
         auto& streamer = in.streamer;
         auto ip        = &in; // used in lambdas, copy address! NO REF!
 
-        // if constexpr (any_in(ParticleArray_v::layout_mode, LayoutMode::AoSPC, LayoutMode::SoAPC))
-        streamer.host([ip = ip](auto const i) mutable {
-            if (ip->particles[i]->size() == 0 || ip->particle_type[i] == 0)
-                return;
-            ip->particles[i]->reset_index_wrapper_map();
-            ip->particles[i]->reset_p2c(ip->pviews[i]);
-        });
-
-        streamer.async_dev_idx(3, 0, [=] _PHARE_DEV_FN_(auto const i) mutable { per_particle(i); });
-        streamer.template async_dev_not_idx<2>(
-            3, 0, [=] _PHARE_DEV_FN_(auto const i) mutable { per_ghost_particle(i); });
-
+        streamer.async_dev([=] _PHARE_DEV_FN_(auto const i) mutable { per_particle(i); });
         streamer.host([ip = ip](auto const i) mutable {
             constexpr static std::uint32_t PHASE = 1;
-
-            if (ip->particles[i]->size() == 0)
-                return;
 
             if (ip->particle_type[i] == 0) //  :(
                 This::template sync<PHASE, ParticleType::Domain>(ip, i);
@@ -281,4 +241,4 @@ public:
 
 
 
-#endif /* PHARE_CORE_PUSHER_MULTI_BORIS_2_HPP */
+#endif /* PHARE_CORE_PUSHER_MULTI_BORIS_HPP */
