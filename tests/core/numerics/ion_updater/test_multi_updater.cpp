@@ -5,7 +5,8 @@
 //  - cxxflags: -DPHARE_LOG_LEVEL=1
 //  - env:      PHARE_SCOPE_TIMING=1
 
-// #define PHARE_HAVE_MKN_GPU
+// USE HIP_VISIBLE_DEVICES OR CUDA_VISIBLE_DEVICES env vars
+
 #include "core/numerics/ion_updater/ion_updater_def.hpp"
 #define PHARE_UNDEF_ASSERT
 #define PHARE_SKIP_MPI_IN_CORE
@@ -35,17 +36,18 @@ void PrintTo(ParticleArray<dim, internals> const& arr, std::ostream* os)
 }
 
 auto static const bytes     = get_env_as("PHARE_GPU_BYTES", std::uint64_t{500000000});
-auto static const cells     = get_env_as("PHARE_CELLS", std::uint32_t{15});
-auto static const ppc       = get_env_as("PHARE_PPC", std::size_t{100});
+auto static const cells     = get_env_as("PHARE_CELLS", std::uint32_t{5});
+auto static const ppc       = get_env_as("PHARE_PPC", std::size_t{5});
 auto static const seed      = get_env_as("PHARE_SEED", std::size_t{1039});
-auto static const n_patches = get_env_as("PHARE_PATCHES", std::size_t{5});
+auto static const n_patches = get_env_as("PHARE_PATCHES", std::size_t{1});
 auto static const dt        = get_env_as("PHARE_TIMESTEP", double{.001});
 auto static const shufle    = get_env_as("PHARE_UNSORTED", std::size_t{0});
 auto static const do_cmp    = get_env_as("PHARE_COMPARE", std::size_t{1});
+auto static const device_id = get_env_as("PHARE_GPU_DEVICE", std::size_t{0});
 
 bool static const premain = []() {
     PHARE_WITH_MKN_GPU({
-        // cudaSetDevice(0);
+        mkn::gpu::setDevice(device_id);
         mkn::gpu::setLimitMallocHeapSize(bytes);
     })
     PHARE_WITH_PHLOP(                                     //

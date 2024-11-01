@@ -1,8 +1,7 @@
 #!/usr/bin/env bash
 
 set -ex
-SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )" && cd $SCRIPT_DIR/.. && CWD=$PWD
-THREADS=${THREADS:="11"}
+CWD="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )" && cd $CWD/.. && CWD=$PWD
 
 #time (
   date

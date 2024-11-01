@@ -7,8 +7,29 @@
 #include "core/data/particles/particle_array.hpp"
 #include "core/numerics/interpolator/interpolating.hpp"
 
+#if PHARE_HAVE_MKN_GPU
+#include "mkn/kul/os.hpp"
+#endif // PHARE_HAVE_MKN_GPU
+
+
+namespace PHARE::core::detail
+{
+auto static const timings_dir_str
+    = get_env_as("PHARE_ASYNC_TIMES", std::string{".phare/async/multi_updater"});
+
+static bool ion_updater_pc_setup = []() {
+    mkn::kul::Dir timings{timings_dir_str};
+    timings.mk();
+    return true;
+}();
+
+} // namespace PHARE::core::detail
+
+
 namespace PHARE::core
 {
+
+
 template<typename Ions, typename Electromag, typename GridLayout>
 class IonUpdaterMultiPC
 {
@@ -144,9 +165,10 @@ void IonUpdaterMultiPC<Ions, Electromag, GridLayout>::updateAndDepositDomain_(Mo
 
     in.streamer();
     in.streamer.sync();
+    in.streamer.dump_times(detail::timings_dir_str + "/updateAndDepositDomain_.txt");
 
 #else
-        // throw std::runtime_error("No available implementation")
+    // throw std::runtime_error("No available implementation")
 #endif
     //
 }
@@ -207,10 +229,11 @@ void IonUpdaterMultiPC<Ions, Electromag, GridLayout>::updateAndDepositAll_(Model
 
     in.streamer();
     in.streamer.sync();
-    in.streamer.print_times();
+    in.streamer.dump_times(detail::timings_dir_str + "/updateAndDepositAll_"
+                           + std::string{Particles::type_id} + ".txt");
 
 #else
-        // throw std::runtime_error("No available implementation")
+    // throw std::runtime_error("No available implementation")
 #endif
     //
 }
