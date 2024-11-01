@@ -866,12 +866,13 @@ struct PerCellParticles : public Super_
         {
             using Op = Operators<typename Super::SIZE_T, true>;
 
-            auto const nc = Super::local_cell(newcell);
-
             // printf("L:%d i %llu ic %u,%u change \n", __LINE__, idx, cell[0], cell[1]);
-
-            Op{Super::add_into_(nc)}.increment_return_old();
-            Super::gaps_(cell)[Op{Super::gap_idx_(cell)}.increment_return_old()] = idx;
+            if (isIn(newcell, Super::ghost_box()))
+            {
+                auto const nc = Super::local_cell(newcell);
+                Op{Super::add_into_(nc)}.increment_return_old();
+                Super::gaps_(cell)[Op{Super::gap_idx_(cell)}.increment_return_old()] = idx;
+            }
         }
         else
             throw std::runtime_error("no");
