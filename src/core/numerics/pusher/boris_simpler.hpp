@@ -276,13 +276,14 @@ public:
             auto per_particle = [=] _PHARE_ALL_FN_<bool accelerate = false>() mutable
             {
                 Interpolator interp;
-                auto particle = view[mkn::gpu::idx()];
+                auto it        = view[mkn::gpu::idx()];
+                auto& particle = *it;
                 if constexpr (accelerate)
                     boris_accelerate(particle, interp.m2p(particle, em, layout), dto2m_);
                 auto const& newCell = advancePosition_<alloc_mode>(particle, halfDtOverDl);
                 if (!array_equals(newCell, particle.iCell()))
                 {
-                    particle.icell_changer(newCell);
+                    it.icell_changer(newCell);
                     particle.iCell() = newCell;
                 }
             };

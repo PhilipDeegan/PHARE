@@ -16,7 +16,7 @@
 namespace PHARE::core
 {
 
-auto static const bytes   = get_env_as("PHARE_GPU_BYTES", std::uint64_t{8000000000});
+auto static const bytes   = get_env_as("PHARE_GPU_BYTES", std::uint64_t{500000000});
 auto static const cells   = get_env_as("PHARE_CELLS", std::uint32_t{3});
 auto static const ppc     = get_env_as("PHARE_PPC", std::size_t{1});
 bool static const premain = []() {
@@ -30,7 +30,6 @@ bool static const premain = []() {
     PHARE_WITH_PHLOP(                           //
         PHARE_LOG_LINE_STR("cells: " << cells); //
         PHARE_LOG_LINE_STR("ppc  : " << ppc);   //
-        PHARE_LOG_LINE_STR("seed : " << seed);
 
         using namespace PHARE; //
         using namespace std::literals;

@@ -49,8 +49,8 @@ public:
                 static_assert(atomic_ops, "GPU must be atomic");
                 PHARE_WITH_MKN_GPU(
                     mkn::gpu::GDLauncher{particles.size()}([=] _PHARE_ALL_FN_() mutable {
-                        Interpolator_t{}.particleToMesh(particles[mkn::gpu::idx()], density, flux,
-                                                        layout, coef);
+                        auto it = particles[mkn::gpu::idx()];
+                        Interpolator_t{}.particleToMesh(*it, density, flux, layout, coef);
                     }); //
                 )
             }

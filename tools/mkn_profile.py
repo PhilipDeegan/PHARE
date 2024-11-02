@@ -6,14 +6,10 @@ import numpy as np
 from pathlib import Path
 import shutil
 
-PATCHES = [1, 2, 3, 4, 5, 10]
-CELLS = [5, 6, 7, 8, 9, 10, 12, 15, 20]
-PPC = [10, 20, 50, 100]
 
-PATCHES = [10]
-CELLS = [5]
-PPC = [5, 10]
-
+PATCHES = [1]
+CELLS = [10]
+PPC = [50]
 
 permutables = [
     ("patches", PATCHES),
@@ -32,6 +28,15 @@ fn_strings = {
     5: "Domain_insert",
     6: "Group_barrier",
     7: "Deposit",
+}
+
+fn_strings = {
+    0: "Boris::move_domain",
+    1: "sync",
+    2: "Group_barrier",
+    3: "Domain_insert",
+    4: "Group_barrier",
+    5: "Deposit",
 }
 
 
@@ -77,10 +82,7 @@ def plot_fn(times, fn):
     import matplotlib.pyplot as plt
 
     x_axis = [0.1, 0.2, 0.3]
-
     fig, ax = plt.subplots(figsize=(8.0, 8.0))
-
-    fn_0_times = []
 
     for times_dir, times_per_type_tuple in times.items():
         times_per_type, patches, cells, ppc = times_per_type_tuple
@@ -110,13 +112,11 @@ def plot_fn(times, fn):
         shadow=True,
     )
     ax.set_title(fn_strings[fn])
-
-    plt.ylabel("nanoseconds")
-
     ax.set_xticks(x_axis)
     ax.set_xticklabels(
         ["domain", "patchghost", "levelghost"], rotation="vertical", fontsize=18
     )
+    plt.ylabel("nanoseconds")
     fig.savefig(f"profile_plot.{fn}.png")
 
 

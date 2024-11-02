@@ -9,7 +9,7 @@
 
 #include "core/numerics/ion_updater/ion_updater_def.hpp"
 
-#define PHARE_UNDEF_ASSERT
+// #define PHARE_UNDEF_ASSERT
 #define PHARE_SKIP_MPI_IN_CORE
 
 #include <cstddef>

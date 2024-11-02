@@ -156,32 +156,24 @@ struct SoAZipConstParticle
         std::declval<SoAParticles_t&>()))>;
 
     SoAZipConstParticle(SoAParticles_t& ps, std::size_t const& i) _PHARE_ALL_FN_
-        : it{SoAIteratorAdaptor::make(ps, i)},
-          ref{weight(), charge(), iCell(), delta(), v()}
+        : it{SoAIteratorAdaptor::make(ps, i)} /*,
+           ref{weight(), charge(), iCell(), delta(), v()}*/
     {
     }
 
-    auto& charge() _PHARE_ALL_FN_ { return SoAIteratorAdaptor::charge(*it); }
+
     auto& charge() const _PHARE_ALL_FN_ { return SoAIteratorAdaptor::charge(*it); }
-    auto& weight() _PHARE_ALL_FN_ { return SoAIteratorAdaptor::weight(*it); }
     auto& weight() const _PHARE_ALL_FN_ { return SoAIteratorAdaptor::weight(*it); }
-
-    auto& iCell() _PHARE_ALL_FN_ { return SoAIteratorAdaptor::iCell(*it); }
     auto& iCell() const _PHARE_ALL_FN_ { return SoAIteratorAdaptor::iCell(*it); }
-    auto& delta() _PHARE_ALL_FN_ { return SoAIteratorAdaptor::delta(*it); }
     auto& delta() const _PHARE_ALL_FN_ { return SoAIteratorAdaptor::delta(*it); }
-
-
-    auto& v() _PHARE_ALL_FN_ { return SoAIteratorAdaptor::v(*it); }
     auto& v() const _PHARE_ALL_FN_ { return SoAIteratorAdaptor::v(*it); }
 
-    auto& operator*() _PHARE_ALL_FN_ { return ref; }
-    auto& operator*() const _PHARE_ALL_FN_ { return ref; }
+    // auto& operator*() _PHARE_ALL_FN_ { return ref; }
+    // auto& operator*() const _PHARE_ALL_FN_ { return ref; }
 
     Iterator it;
-    SoAParticle_crt<dim> ref;
+    // SoAParticle_crt<dim> ref;
 };
-
 
 
 } // namespace PHARE::core::detail
@@ -189,6 +181,22 @@ struct SoAZipConstParticle
 
 namespace PHARE::core
 {
+
+template<typename SoAParticles_t, bool _is_const = false>
+struct SoAZipParticle_t
+{
+    bool static constexpr is_const
+        = _is_const || std::is_const_v<std::remove_reference_t<SoAParticles_t>>;
+
+    using value_type = std::conditional_t<is_const, detail::SoAZipConstParticle<SoAParticles_t>,
+                                          detail::SoAZipParticle<SoAParticles_t>>;
+};
+
+template<typename Particles>
+auto particle_zip_iterator(Particles& ps, std::size_t const i)
+{
+    return typename SoAZipParticle_t<Particles>::value_type{ps, i};
+}
 
 template<typename T, std::size_t dim>
 auto partitionner(detail::SoAIteratorAdaptor& begin, detail::SoAIteratorAdaptor& end,

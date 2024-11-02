@@ -8,8 +8,11 @@ cls
 set -e
 
 TEST="-M tests/core/numerics/ion_updater/test_multi_updater.cpp"
-ARGS="${TEST} -P mkn.base=gpu_ -x "
-[ -d /opt/rocm/bin ] && ARGS+="res/mkn/hip" || ARGS+="res/mkn/clang_cuda "
+XFILE="${XFILE:-res/mkn/clang_cuda}"
+[ -d /opt/rocm/bin ] && XFILE="res/mkn/hip"
+
+ARGS="${TEST} -P mkn.base=gpu_"
+[ -n "XFILE" ] && ARGS+=" -x ${XFILE}"
 
 set -x
 
@@ -22,6 +25,3 @@ set -x
   mkn clean build -p test_core ${ARGS} $@
 
 ) #1> >(tee $CWD/.mkn.sh.out ) 2> >(tee $CWD/.mkn.sh.err >&2 )
-
-exit 0 # comment out to do soak test
-

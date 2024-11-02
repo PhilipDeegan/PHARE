@@ -29,6 +29,7 @@
 #include "core/data/particles/arrays/particle_array_soa.hpp"
 
 
+
 namespace PHARE::core::detail
 {
 auto static const multi_boris_threads = get_env_as("PHARE_ASYNC_THREADS", std::size_t{5});
@@ -54,11 +55,9 @@ struct MultiBoris
     using ParticleArray_v     = typename ParticleArray_t::view_t;
     using Box_t               = Box<std::uint32_t, dim>;
     using Boxes_t             = std::vector<Box_t>;
-    // = decltype(*(*views[0].ions).getRunTimeResourcesViewList()[0].domainParticles());
-    using Particles_ptrs = std::vector<ParticleArray_t*>;
-    // using StreamLauncher = gpu::BoxStreamLauncher<Boxes_t, Particles_ptrs>;
-    using StreamLauncher = gpu::ThreadedBoxStreamLauncher<Boxes_t, Particles_ptrs>;
-    // using StreamLauncher = mkn::gpu::StreamLauncher<>;
+    using Particles_ptrs      = std::vector<ParticleArray_t*>;
+    using StreamLauncher      = gpu::ThreadedBoxStreamLauncher<Boxes_t, Particles_ptrs>;
+
 
     static auto _particles(ModelViews& views)
     {
@@ -212,42 +211,11 @@ public:
             }
         };
 
-        auto per_ghost_particle = [=] _PHARE_DEV_FN_(auto const& i) mutable {
-            auto const& dto2m      = dto2mspp[i];
-            auto const& layout     = layoutps[i];
-            auto& view             = pps[i];
-            auto particle_iterator = view[mkn::gpu::idx()];
-            auto& particle         = particle_iterator.deref();
-            auto const og_iCell    = particle.iCell();
-
-            particle.iCell() = advancePosition_<alloc_mode>(particle, halfDtOverDl[i]);
-            {
-                Interpolator interp;
-                boris_accelerate(particle, interp.m2p(particle, emps[i], layout), dto2m);
-            }
-            particle.iCell() = advancePosition_<alloc_mode>(particle, halfDtOverDl[i]);
-
-            if (!array_equals(particle.iCell(), og_iCell))
-                view.icell_changer(particle, particle_iterator.c(), particle_iterator.i(),
-                                   particle.iCell());
-        };
-
 
         auto& streamer = in.streamer;
         auto ip        = &in; // used in lambdas, copy address! NO REF!
 
-        // if constexpr (any_in(ParticleArray_v::layout_mode, LayoutMode::AoSPC, LayoutMode::SoAPC))
-        streamer.host([ip = ip](auto const i) mutable {
-            if (ip->particles[i]->size() == 0 || ip->particle_type[i] == 0)
-                return;
-            ip->particles[i]->reset_index_wrapper_map();
-            ip->particles[i]->reset_p2c(ip->pviews[i]);
-        });
-
-        streamer.async_dev_idx(3, 0, [=] _PHARE_DEV_FN_(auto const i) mutable { per_particle(i); });
-        streamer.template async_dev_not_idx<2>(
-            3, 0, [=] _PHARE_DEV_FN_(auto const i) mutable { per_ghost_particle(i); });
-
+        streamer.async_dev([=] _PHARE_DEV_FN_(auto const i) mutable { per_particle(i); });
         streamer.host([ip = ip](auto const i) mutable {
             constexpr static std::uint32_t PHASE = 1;
 
@@ -277,8 +245,6 @@ public:
 };
 
 } // namespace PHARE::core
-
-
 
 
 #endif /* PHARE_CORE_PUSHER_MULTI_BORIS_2_HPP */

@@ -518,11 +518,11 @@ public:
 
     auto operator[](std::size_t const& s) const _PHARE_ALL_FN_
     {
-#if __has_include(<thrust/iterator/zip_iterator.h>)
-        return detail::SoAZipConstParticle(*this, s);
-#else
+        // #if __has_include(<thrust/iterator/zip_iterator.h>)
+        //         return detail::SoAZipConstParticle(*this, s);
+        // #else
         return copy(s);
-#endif // __has_include(<thrust/iterator/zip_iterator.h>)
+        // #endif // __has_include(<thrust/iterator/zip_iterator.h>)
     }
 };
 

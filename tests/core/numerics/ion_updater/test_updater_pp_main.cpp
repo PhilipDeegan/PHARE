@@ -28,7 +28,7 @@ void PrintTo(ParticleArray<dim, internals> const& arr, std::ostream* os)
     // assert(arr.size());
     *os << arr;
 }
-auto static const bytes  = 1024ull * 1024ull * 1024ull * 10; // == 10GB
+auto static const bytes  = get_env_as("PHARE_GPU_BYTES", std::uint64_t{500000000});
 auto static const cells  = get_env_as("PHARE_CELLS", std::uint32_t{3});
 auto static const ppc    = get_env_as("PHARE_PPC", std::size_t{3});
 auto static const seed   = get_env_as("PHARE_SEED", std::size_t{1012});
@@ -46,7 +46,7 @@ bool static const premain = []() {
         using namespace PHARE; //
         using namespace std::literals;
         if (auto e = core::get_env("PHARE_SCOPE_TIMING", "false"); e == "1" || e == "true")
-            phlop::ScopeTimerMan::INSTANCE()
+            phlop::threaded::ScopeTimerMan::INSTANCE()
                 .file_name(".phare_times.0.txt")
                 // .force_strings()
                 // .headers("fn"s, "dim"s, "layout"s, "alloc"s, "storage"s, "time"s)
@@ -143,8 +143,7 @@ auto from_ions(GridLayout_t const& layout, Ions const& from)
     auto& ions  = *ions_p;
     EXPECT_EQ(ions.populations[0].particles.domain_particles.size(), 0);
 
-    auto _add_particles_from = [&]<auto type>(auto& src, auto& dst)
-    {
+    auto _add_particles_from = [&]<auto type>(auto& src, auto& dst) {
         ParticleArrayService::reserve_ppc_in<type>(dst, ppc);
         add_particles_from<type>(src, dst);
     };
@@ -275,35 +274,35 @@ struct IonUpdaterPPTest : public ::testing::Test
 
 // clang-format off
 using Permutations_t = testing::Types< // ! notice commas !
-    //  TestParam<1, LayoutMode::AoS>                               // 0
-    // ,TestParam<1, LayoutMode::AoSPC>                             // 1
+     TestParam<1, LayoutMode::AoS>                               // 0
+    ,TestParam<1, LayoutMode::AoSPC>                             // 1
 PHARE_WITH_MKN_GPU(
-    // ,TestParam<1, LayoutMode::SoA>                               // 2
-    // ,TestParam<1, LayoutMode::AoS, AllocatorMode::GPU_UNIFIED>   // 3
-    // ,TestParam<1, LayoutMode::AoSPC, AllocatorMode::GPU_UNIFIED> // 4
-    // ,TestParam<1, LayoutMode::AoSPC, AllocatorMode::GPU_UNIFIED, /*impl=*/1> // 5
-    // ,TestParam<1, LayoutMode::AoSPC, AllocatorMode::GPU_UNIFIED, /*impl=*/2>
-    // ,TestParam<1, LayoutMode::SoA, AllocatorMode::GPU_UNIFIED>
+    ,TestParam<1, LayoutMode::SoA>                               // 2
+    ,TestParam<1, LayoutMode::AoS, AllocatorMode::GPU_UNIFIED>   // 3
+    ,TestParam<1, LayoutMode::AoSPC, AllocatorMode::GPU_UNIFIED> // 4
+    ,TestParam<1, LayoutMode::AoSPC, AllocatorMode::GPU_UNIFIED,  /*impl=*/1> // 5
+    ,TestParam<1, LayoutMode::AoSPC, AllocatorMode::GPU_UNIFIED,  /*impl=*/2>
+    ,TestParam<1, LayoutMode::SoA, AllocatorMode::GPU_UNIFIED>
 )
-    // ,TestParam<2, LayoutMode::AoS>
-    // ,TestParam<2, LayoutMode::AoSPC>
+    ,TestParam<2, LayoutMode::AoS>
+    ,TestParam<2, LayoutMode::AoSPC>
 PHARE_WITH_MKN_GPU(
-    // ,TestParam<2, LayoutMode::SoA>
-    // ,TestParam<2, LayoutMode::AoS, AllocatorMode::GPU_UNIFIED>
-    // ,TestParam<2, LayoutMode::AoSPC, AllocatorMode::GPU_UNIFIED>
-    // ,TestParam<2, LayoutMode::AoSPC, AllocatorMode::GPU_UNIFIED, /*impl=*/1> // 13
-    // ,TestParam<2, LayoutMode::AoSPC, AllocatorMode::GPU_UNIFIED, /*impl=*/2> // 14
-    // ,TestParam<2, LayoutMode::SoA, AllocatorMode::GPU_UNIFIED>
+    ,TestParam<2, LayoutMode::SoA>
+    ,TestParam<2, LayoutMode::AoS, AllocatorMode::GPU_UNIFIED>
+    ,TestParam<2, LayoutMode::AoSPC, AllocatorMode::GPU_UNIFIED>
+    ,TestParam<2, LayoutMode::AoSPC, AllocatorMode::GPU_UNIFIED, /*impl=*/1> // 13
+    ,TestParam<2, LayoutMode::AoSPC, AllocatorMode::GPU_UNIFIED, /*impl=*/2> // 14
+    ,TestParam<2, LayoutMode::SoA, AllocatorMode::GPU_UNIFIED>
 )
-    // ,TestParam<3, LayoutMode::AoS>
-    // ,TestParam<3, LayoutMode::AoSPC>
+    ,TestParam<3, LayoutMode::AoS>
+    ,TestParam<3, LayoutMode::AoSPC>
 PHARE_WITH_MKN_GPU(
-    // ,TestParam<3, LayoutMode::SoA>
-    // ,TestParam<3, LayoutMode::AoS, AllocatorMode::GPU_UNIFIED>
-    // ,TestParam<3, LayoutMode::AoSPC, AllocatorMode::GPU_UNIFIED>
-    // ,TestParam<3, LayoutMode::AoSPC, AllocatorMode::GPU_UNIFIED, /*impl=*/1> //
-    /*,*/TestParam<3, LayoutMode::AoSPC, AllocatorMode::GPU_UNIFIED, /*impl=*/2> // 22
-    // ,TestParam<3, LayoutMode::SoA, AllocatorMode::GPU_UNIFIED>
+    ,TestParam<3, LayoutMode::SoA>
+    ,TestParam<3, LayoutMode::AoS, AllocatorMode::GPU_UNIFIED>
+    ,TestParam<3, LayoutMode::AoSPC, AllocatorMode::GPU_UNIFIED>
+    ,TestParam<3, LayoutMode::AoSPC, AllocatorMode::GPU_UNIFIED, /*impl=*/1> //
+    ,TestParam<3, LayoutMode::AoSPC, AllocatorMode::GPU_UNIFIED, /*impl=*/2> // 22
+    ,TestParam<3, LayoutMode::SoA, AllocatorMode::GPU_UNIFIED>
 )
 >;
 // clang-format on
@@ -324,9 +323,8 @@ TYPED_TEST(IonUpdaterPPTest, updater)
 
 int main(int argc, char** argv)
 {
-    // assert(phlop::ScopeTimerMan::INSTANCE().active);
     ::testing::InitGoogleTest(&argc, argv);
     auto r = RUN_ALL_TESTS();
-    PHARE_WITH_PHLOP(phlop::ScopeTimerMan::reset());
+    PHARE_WITH_PHLOP(phlop::threaded::ScopeTimerMan::reset());
     return r;
 }
