@@ -104,8 +104,8 @@ profile:
 - name: test
   parent: base
   self: init simulator
-  dep: lang.pybind11 google.test
-  mod: lang.python3
+  dep: lang.pybind11#master google.test#master
+  mod: lang.python3#master
   inc: .
   link: -pthread
 

@@ -1,11 +1,11 @@
 property:
   cxx_flags: -std=c++17 -fsanitize=address -fno-omit-frame-pointer
-local:
-  repo: /mkn/r
-  mod-repo: /mkn/m
-remote:
-  repo: git@github.com:mkn/
-  mod-repo: git@github.com:mkn-mod/
+#local:
+#  repo: /mkn/r
+#  mod-repo: /mkn/m
+#remote:
+#  repo: git@github.com:mkn/
+#  mod-repo: git@github.com:mkn-mod/
 path: |
   /usr/lib/llvm-14/lib/clang/14.0.6/lib/linux
 env: | # replace with $(clang++ -print-file-name=libclang_rt.asan-x86_64.so)
