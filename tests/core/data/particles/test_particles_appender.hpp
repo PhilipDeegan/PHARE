@@ -140,7 +140,7 @@ template<>
 template<auto type, typename Src, typename Dst, typename GridLayout>
 void PAppender<LayoutMode::AoSMapped, AllocatorMode::CPU, LayoutMode::AoSPC,
                AllocatorMode::GPU_UNIFIED>::operator()(Src const& src, Dst& dst,
-                                                       GridLayout const& layout)
+                                                       GridLayout const& /*layout*/)
 {
     // hax
     auto const ppc = [&]() { // assume constant for the moment
