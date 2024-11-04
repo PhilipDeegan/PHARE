@@ -94,7 +94,7 @@ def plot_fn(times, fn):
             pid = 0
             for bits in bits_list:
                 if bits[1] == f"{fn}":
-                    fn_0_times[pid % 3].append(int(bits[2]))
+                    fn_0_times[pid % 3].append(float(bits[2]))
                     pid += 1
 
             fn_0_times = [np.asarray(ts).mean() for ts in fn_0_times]
