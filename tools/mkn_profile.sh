@@ -8,7 +8,7 @@ set -e
 
 export PHARE_GPU_BYTES=5000000000 # 5gb
 export PHARE_SCOPE_TIMING=1
-export PHARE_ASYNC_THREADS=15
+export PHARE_ASYNC_THREADS=3
 
 TEST="-M tests/core/numerics/ion_updater/test_multi_updater.cpp"
 ARGS="${TEST} -P mkn.base=gpu_ -x "
