@@ -55,7 +55,7 @@ class ChunkLauncher : public mkn::gpu::DLauncher<sync>
     static constexpr std::size_t warp = 64;
 
 public:
-    ChunkLauncher(std::size_t const& _n, size_t const& dev = 0)
+    ChunkLauncher(std::size_t const& _n, std::size_t const& ds = 0, size_t const& dev = 0)
         : Super{dev}
         , n{_n}
     {
@@ -65,6 +65,7 @@ public:
         this->b.y = n;
         this->b.z = n;
         this->g.x = 1;
+        this->ds  = ds;
     }
 
     // static std::uint32_t thread_idx() _PHARE_DEV_FN_ { return threadIdx.x; }
@@ -122,10 +123,11 @@ struct ChunkFunction : mkn::gpu::StreamFunction<Strat>
     using Super::strat;
 
 
-    ChunkFunction(Strat& strat, Fn&& fn_, std::size_t const n_)
+    ChunkFunction(Strat& strat, Fn&& fn_, std::size_t const n_, std::size_t const ds_)
         : Super{strat, mkn::gpu::StreamFunctionMode::DEVICE_WAIT}
         , fn{fn_}
         , n{n_}
+        , ds{ds_}
     {
     }
 
@@ -134,14 +136,14 @@ struct ChunkFunction : mkn::gpu::StreamFunction<Strat>
         if constexpr (impl == 0)
         {
             using Launcher = ChunkLauncher<false>;
-            Launcher{n}.stream(strat.streams[i], [=, fn = fn] __device__() mutable { fn(i); });
+            Launcher{n, ds}.stream(strat.streams[i], [=, fn = fn] __device__() mutable { fn(i); });
         }
         else
             throw std::runtime_error("No impl");
     }
 
     Fn fn;
-    std::size_t n;
+    std::size_t n, ds;
 };
 
 
@@ -223,12 +225,12 @@ struct ThreadedBoxStreamLauncher : public mkn::gpu::ThreadedStreamLauncher<Vecto
 
 
     template<std::uint16_t impl = 0, typename Fn>
-    auto& async_dev_chunk(Fn&& fn, std::size_t const n)
+    auto& async_dev_chunk(Fn&& fn, std::size_t const n, std::size_t const ds = 0)
     {
         if constexpr (impl == 0)
         {
             using DevFn = ChunkFunction<Super, Fn, impl>;
-            Super::fns.emplace_back(std::make_shared<DevFn>(**this, std::forward<Fn>(fn), n));
+            Super::fns.emplace_back(std::make_shared<DevFn>(**this, std::forward<Fn>(fn), n, ds));
         }
         else
         {

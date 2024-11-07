@@ -204,7 +204,7 @@ protected:
         std::copy(that.data(), that.data() + size(), data());
     }
 
-    void setBuffer(pointer_type ptr) { ptr_ = ptr; }
+    void setBuffer(pointer_type ptr) _PHARE_ALL_FN_ { ptr_ = ptr; }
     void setShape(std::array<std::uint32_t, dim> const nCells)
     {
         nCells_ = nCells;
@@ -219,13 +219,14 @@ private:
 
 
 template<bool c_ordering = true, typename DataType, std::size_t dim>
-auto make_array_view(DataType* data, std::array<std::uint32_t, dim> const shape)
+auto make_array_view(DataType* data, std::array<std::uint32_t, dim> const shape) _PHARE_ALL_FN_
 {
     return NdArrayView<dim, DataType, c_ordering>{data, shape};
 }
 
 template<bool c_ordering = true, typename DataType, std::size_t dim>
-auto make_array_view(DataType const* const data, std::array<std::uint32_t, dim> const shape)
+auto make_array_view(DataType const* const data,
+                     std::array<std::uint32_t, dim> const shape) _PHARE_ALL_FN_
 {
     return NdArrayView<dim, DataType const, c_ordering>{data, shape};
 }

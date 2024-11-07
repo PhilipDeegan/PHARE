@@ -180,8 +180,8 @@ public:
     NO_DISCARD auto& operator()() _PHARE_ALL_FN_ { return components(); }
 
 
-    NO_DISCARD auto& operator[](std::size_t i) { return components_[i]; }
-    NO_DISCARD auto& operator[](std::size_t i) const { return components_[i]; }
+    NO_DISCARD auto& operator[](std::size_t i) _PHARE_ALL_FN_ { return components_[i]; }
+    NO_DISCARD auto& operator[](std::size_t i) const _PHARE_ALL_FN_ { return components_[i]; }
 
 
     void copyData(TensorField const& source)

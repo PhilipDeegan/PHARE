@@ -73,9 +73,11 @@ public:
         Super::setBuffer(data);
     }
 
+    void setBuffer(Data_t* const data) _PHARE_ALL_FN_ { Super::setBuffer(data); }
+
     bool isUsable() const { return Super::data() != nullptr; }
     bool isSettable() const { return !isUsable(); }
-    
+
 
     template<typename... Args>
     NO_DISCARD auto& operator()(Args&&... args) _PHARE_ALL_FN_

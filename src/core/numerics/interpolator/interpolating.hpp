@@ -6,7 +6,6 @@
 #include "interpolator.hpp"
 
 
-
 namespace PHARE::core
 {
 
@@ -115,6 +114,74 @@ public:
                     interp();
             }
         }
+#endif // PHARE_HAVE_MKN_GPU
+    }
+
+    template<typename Particles, typename GridLayout, typename VecField, typename Field>
+    static void chunk_kernel(Particles& particles, GridLayout& layout, VecField& flux,
+                             Field& density, double coef = 1.) _PHARE_ALL_FN_
+    {
+#if PHARE_HAVE_MKN_GPU
+        auto constexpr static nghosts = GridLayout::nbrGhosts();
+        extern __shared__ double data[];
+        auto const& lobox = particles.local_box();
+        auto const ziz    = 9 * 9 * 9;
+
+        auto const t_x = threadIdx.x;
+        auto const t_y = threadIdx.y;
+        auto const t_z = threadIdx.z;
+
+        core::Point<std::uint32_t, 3> const tcell{t_x, t_y, t_z};
+        core::Point<std::uint32_t, 3> locell = tcell + nghosts;
+
+        auto rho = make_array_view(&data[ziz * 0], density.shape());
+        auto fx  = make_array_view(&data[ziz * 1], flux[0].shape());
+        auto fy  = make_array_view(&data[ziz * 2], flux[1].shape());
+        auto fz  = make_array_view(&data[ziz * 3], flux[2].shape());
+
+        // global mem pointer backps
+        auto const r0 = density.data();
+        auto const f0 = flux[0].data();
+        auto const f1 = flux[1].data();
+        auto const f2 = flux[2].data();
+
+        density.setBuffer(rho.data());
+        flux[0].setBuffer(fx.data());
+        flux[1].setBuffer(fy.data());
+        flux[2].setBuffer(fz.data());
+
+        for (std::size_t i = 0; i < 9 * 9 * 9; ++i)
+        {
+            auto const cell = *(lobox.begin() + i);
+            density(cell)   = 0;
+            flux[0](cell)   = 0;
+            flux[1](cell)   = 0;
+            flux[2](cell)   = 0;
+        }
+
+        __syncthreads();
+
+        Interpolator_t interp;
+        auto& parts = particles(locell);
+        for (std::size_t i = 0; i < parts.size(); ++i)
+            interp.particleToMesh(parts[i], density, flux, layout, coef);
+
+        __syncthreads();
+
+        density.setBuffer(r0);
+        flux[0].setBuffer(f0);
+        flux[1].setBuffer(f1);
+        flux[2].setBuffer(f2);
+
+        for (std::size_t i = 0; i < 9 * 9 * 9; ++i)
+        {
+            auto const cell = *(lobox.begin() + i);
+            density(cell)   = rho(cell);
+            flux[0](cell)   = fx(cell);
+            flux[1](cell)   = fy(cell);
+            flux[2](cell)   = fz(cell);
+        }
+
 #endif // PHARE_HAVE_MKN_GPU
     }
 

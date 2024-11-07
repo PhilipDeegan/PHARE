@@ -198,6 +198,8 @@ void IonUpdaterMultiPC<Ions, Electromag, GridLayout>::updateAndDepositAll_(Model
 
     // add new domain particles
     in.streamer.host_group_mutex(group_size, [&](auto const i) {
+        // hipStreamSynchronize(in.streamer.streams[i]);
+
         auto is_domain_particles = in.particle_type[i] == DOMAIN_ID;
         if (is_domain_particles || in.particles[i]->size() == 0)
             return;
@@ -225,9 +227,19 @@ void IonUpdaterMultiPC<Ions, Electromag, GridLayout>::updateAndDepositAll_(Model
     // finished adding new domain particles
     in.streamer.group_barrier(group_size);
 
-    in.streamer.async_dev([=](auto const i) { //
-        Interpolating_t::box_kernel(pps[i], layouts[i], fluxes[i], rhos[i]);
-    });
+    // in.streamer.async_dev([=](auto const i) { //
+    //     Interpolating_t::box_kernel(pps[i], layouts[i], fluxes[i], rhos[i]);
+    // });
+
+
+    assert(GridLayout::nbrGhosts() == 2);
+    static_assert(GridLayout::nbrGhosts() == 2);
+
+    in.streamer.async_dev_chunk(
+        [=] _PHARE_DEV_FN_(auto const i) mutable {
+            Interpolating_t::chunk_kernel(pps[i], layouts[i], fluxes[i], rhos[i]);
+        },
+        4, 9 * 9 * 9 * 4 * 8);
 
     in.streamer();
     in.streamer.sync();
