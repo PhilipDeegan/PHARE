@@ -48,6 +48,32 @@ private:
     std::size_t n_per_cell = 0;
 };
 
+template<bool sync = false>
+class ChunkLauncher : public mkn::gpu::DLauncher<sync>
+{
+    using Super                       = mkn::gpu::DLauncher<sync>;
+    static constexpr std::size_t warp = 64;
+
+public:
+    ChunkLauncher(std::size_t const& _n, size_t const& dev = 0)
+        : Super{dev}
+        , n{_n}
+    {
+        this->b   = dim3{};
+        this->g   = dim3{};
+        this->b.x = n;
+        this->b.y = n;
+        this->b.z = n;
+        this->g.x = 1;
+    }
+
+    // static std::uint32_t thread_idx() _PHARE_DEV_FN_ { return threadIdx.x; }
+
+private:
+    std::size_t n = 0;
+};
+
+
 template<typename Box_t, typename Strat, typename Fn, std::uint16_t impl = 0>
 struct BoxStreamDeviceFunction : mkn::gpu::StreamFunction<Strat>
 {
@@ -86,6 +112,39 @@ struct BoxStreamDeviceFunction : mkn::gpu::StreamFunction<Strat>
     Fn fn;
     std::vector<Box_t> const& boxes;
 };
+
+
+
+template<typename Strat, typename Fn, std::uint16_t impl = 0>
+struct ChunkFunction : mkn::gpu::StreamFunction<Strat>
+{
+    using Super = mkn::gpu::StreamFunction<Strat>;
+    using Super::strat;
+
+
+    ChunkFunction(Strat& strat, Fn&& fn_, std::size_t const n_)
+        : Super{strat, mkn::gpu::StreamFunctionMode::DEVICE_WAIT}
+        , fn{fn_}
+        , n{n_}
+    {
+    }
+
+    void run(std::uint32_t const i) override
+    {
+        if constexpr (impl == 0)
+        {
+            using Launcher = ChunkLauncher<false>;
+            Launcher{n}.stream(strat.streams[i], [=, fn = fn] __device__() mutable { fn(i); });
+        }
+        else
+            throw std::runtime_error("No impl");
+    }
+
+    Fn fn;
+    std::size_t n;
+};
+
+
 
 
 template<typename Box_t, typename Strat, typename Fn, std::uint16_t impl = 0, bool is = true>
@@ -161,11 +220,35 @@ struct ThreadedBoxStreamLauncher : public mkn::gpu::ThreadedStreamLauncher<Vecto
     {
     }
 
+
+
+    template<std::uint16_t impl = 0, typename Fn>
+    auto& async_dev_chunk(Fn&& fn, std::size_t const n)
+    {
+        if constexpr (impl == 0)
+        {
+            using DevFn = ChunkFunction<Super, Fn, impl>;
+            Super::fns.emplace_back(std::make_shared<DevFn>(**this, std::forward<Fn>(fn), n));
+        }
+        else
+        {
+            throw std::runtime_error("no impl");
+        }
+        return *this;
+    };
+
     template<std::uint16_t impl = 0, typename Fn>
     auto& async_dev(Fn&& fn)
     {
-        using DevFn = BoxStreamDeviceFunction<Box_t, Super, Fn, impl>;
-        Super::fns.emplace_back(std::make_shared<DevFn>(**this, std::forward<Fn>(fn), boxes));
+        if constexpr (impl == 0)
+        {
+            using DevFn = BoxStreamDeviceFunction<Box_t, Super, Fn, impl>;
+            Super::fns.emplace_back(std::make_shared<DevFn>(**this, std::forward<Fn>(fn), boxes));
+        }
+        else
+        {
+            throw std::runtime_error("no impl");
+        }
         return *this;
     };
 

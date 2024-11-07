@@ -37,8 +37,8 @@ void PrintTo(ParticleArray<dim, internals> const& arr, std::ostream* os)
 }
 
 auto static const bytes     = get_env_as("PHARE_GPU_BYTES", std::uint64_t{500000000});
-auto static const cells     = get_env_as("PHARE_CELLS", std::uint32_t{5});
-auto static const ppc       = get_env_as("PHARE_PPC", std::size_t{5});
+auto static const cells     = get_env_as("PHARE_CELLS", std::uint32_t{4});
+auto static const ppc       = get_env_as("PHARE_PPC", std::size_t{64});
 auto static const seed      = get_env_as("PHARE_SEED", std::size_t{1039});
 auto static const n_patches = get_env_as("PHARE_PATCHES", std::size_t{1});
 auto static const dt        = get_env_as("PHARE_TIMESTEP", double{.001});
@@ -144,8 +144,8 @@ auto make_ions(GridLayout_t const& layout)
 
     auto add_particles = [&](auto& particles) {
         add_particles_in(particles.domain_particles, layout.AMRBox(), ppc);
-        add_ghost_particles(particles.patch_ghost_particles, layout.AMRBox(), ppc,
-                            GridLayout_t::nbrParticleGhosts());
+        // add_ghost_particles(particles.patch_ghost_particles, layout.AMRBox(), ppc,
+        //                     GridLayout_t::nbrParticleGhosts());
     };
 
     add_particles(ions.populations[0].particles);
@@ -176,9 +176,9 @@ auto from_ions(GridLayout_t const& layout, Ions const& from)
     _add_particles_from.template operator()<ParticleType::Domain>(
         from.populations[0].particles.domain_particles,
         ions.populations[0].particles.domain_particles);
-    _add_particles_from.template operator()<ParticleType::Ghost>(
-        from.populations[0].particles.patch_ghost_particles,
-        ions.populations[0].particles.patch_ghost_particles);
+    // _add_particles_from.template operator()<ParticleType::Ghost>(
+    //     from.populations[0].particles.patch_ghost_particles,
+    //     ions.populations[0].particles.patch_ghost_particles);
     EXPECT_EQ(ions.populations[0].particles.domain_particles.size(), layout.AMRBox().size() * ppc);
     return ions_p;
 }

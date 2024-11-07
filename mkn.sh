@@ -22,6 +22,6 @@ set -x
       mkn clean build -tOqp core -a "-fPIC" -x res/mkn/mpi
   )
 
-  mkn clean build -p test_core ${ARGS} $@
+  mkn -p test_core ${ARGS} $@
 
 ) #1> >(tee $CWD/.mkn.sh.out ) 2> >(tee $CWD/.mkn.sh.err >&2 )

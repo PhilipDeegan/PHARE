@@ -63,8 +63,8 @@ struct MultiBoris
     {
         std::vector<ParticleArray_t*> ptrs;
         auto add = [&](auto& ps) {
-            // if (ps.size())
-            ptrs.emplace_back(&ps);
+            if (ps.size())
+                ptrs.emplace_back(&ps);
         };
         auto all = [&](auto&... ps) { (add(ps), ...); };
 
@@ -82,8 +82,8 @@ struct MultiBoris
         for (auto& view : views)
         {
             auto each = [&](auto const& type, auto& ps, auto& pop) mutable {
-                // if (!ps.size())
-                // return;
+                if (!ps.size())
+                    return;
                 particle_type.emplace_back(type);
                 auto& domainview = pviews.emplace_back(*ps);
                 boxes.emplace_back(domainview.local_box());
@@ -211,12 +211,79 @@ public:
             }
         };
 
+        std::size_t const ppc = pps[0]({2, 2, 2}).size();
+        // assert(ppc == 64);
+
+        PHARE_LOG_LINE_STR(*(pps[0].local_box().begin() + 2));
+        PHARE_LOG_LINE_STR((pps[0].box()));
+        PHARE_LOG_LINE_STR((pps[0].local_box()));
+
+        auto per_chunk = [=] _PHARE_DEV_FN_(auto const& i) mutable {
+            // auto const tidx = mkn::gpu::idx();
+            // assert(tidx < 65);
+
+            // auto const blockidx
+            //     = (8 * 8 * ((tidx / 16) + 2)) + 16 + (((tidx % 16) / 4) * 8) + 2 + (tidx % 4);
+            auto const t_x = threadIdx.x + 2;
+            auto const t_y = threadIdx.y + 2;
+            auto const t_z = threadIdx.z + 2;
+
+            auto const& dto2m  = dto2mspp[i];
+            auto const& layout = layoutps[i];
+            auto& view         = pps[i];
+            // auto const& lobox  = view.local_box();
+            // auto const& locell = *(lobox.begin() + blockidx);
+            std::array<std::uint32_t, 3> locell{t_x, t_y, t_z};
+            auto& parts = view(locell);
+
+            for (std::size_t pidx = 0; pidx < ppc; ++pidx)
+            {
+                if constexpr (any_in(ParticleArray_v::layout_mode, LayoutMode::SoA,
+                                     LayoutMode::SoAPC))
+                {
+                    detail::SoAZipParticle particle{parts, pidx};
+                    auto const og_iCell = particle.iCell();
+
+                    particle.iCell() = advancePosition_<alloc_mode>(particle, halfDtOverDl[i]);
+                    {
+                        Interpolator interp;
+                        boris_accelerate(particle, interp.m2p(particle, emps[i], layout), dto2m);
+                    }
+
+                    particle.iCell() = advancePosition_<alloc_mode>(particle, halfDtOverDl[i]);
+
+                    if (!array_equals(particle.iCell(), og_iCell))
+                        view.icell_changer(particle, locell, pidx, particle.iCell());
+                }
+                else
+                {
+                    auto& particle      = parts[pidx];
+                    auto const og_iCell = particle.iCell();
+
+                    particle.iCell() = advancePosition_<alloc_mode>(particle, halfDtOverDl[i]);
+                    {
+                        Interpolator interp;
+                        boris_accelerate(particle, interp.m2p(particle, emps[i], layout), dto2m);
+                    }
+
+                    particle.iCell() = advancePosition_<alloc_mode>(particle, halfDtOverDl[i]);
+
+                    if (!array_equals(particle.iCell(), og_iCell))
+                        view.icell_changer(particle, locell, pidx, particle.iCell());
+                }
+            }
+        };
+
 
         auto& streamer = in.streamer;
         auto ip        = &in; // used in lambdas, copy address! NO REF!
 
-        streamer.async_dev([=] _PHARE_DEV_FN_(auto const i) mutable { per_particle(i); });
+        // streamer.async_dev([=] _PHARE_DEV_FN_(auto const i) mutable { per_particle(i); });
+        streamer.async_dev_chunk([=] _PHARE_DEV_FN_(auto const i) mutable { per_chunk(i); }, 4);
+
         streamer.host([ip = ip](auto const i) mutable {
+            PHARE_LOG_LINE_STR("");
+
             constexpr static std::uint32_t PHASE = 1;
 
             if (ip->particles[i]->size() == 0)
@@ -224,10 +291,10 @@ public:
 
             if (ip->particle_type[i] == 0) //  :(
                 This::template sync<PHASE, ParticleType::Domain>(ip, i);
-            else if (any_in(ip->particle_type[i], 1, 2))
-                This::template sync<PHASE, ParticleType::Ghost>(ip, i);
-            else
-                throw std::runtime_error("No impl");
+            // else if (any_in(ip->particle_type[i], 1, 2))
+            //     This::template sync<PHASE, ParticleType::Ghost>(ip, i);
+            // else
+            //     throw std::runtime_error("No impl");
         });
 
 #endif

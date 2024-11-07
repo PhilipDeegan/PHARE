@@ -7,9 +7,9 @@ from pathlib import Path
 import shutil
 
 
-PATCHES = [1]
-CELLS = [10]
-PPC = [50]
+PATCHES = [5]
+CELLS = [4]
+PPC = [100]
 
 permutables = [
     ("patches", PATCHES),
@@ -52,9 +52,9 @@ def run_permutation(patches, cells, ppc):
     env.update(env_update)
     print({k: v for k, v in env.items() if k.startswith("PHARE_")})
 
-    subprocess.run(
-        ["mkn", "run", "-p", "test_core"] + sys.argv[1:], check=True, env=env
-    )
+    # subprocess.run(
+    #     ["mkn", "run", "-p", "test_core"] + sys.argv[1:], check=True, env=env
+    # )
 
     shutil.copy(".phare_times.0.txt", f"{times_dir}/scope_times.txt")
     return times_dir
@@ -81,7 +81,9 @@ def parse_times(times_dir, patches, cells, ppc):
 def plot_fn(times, fn):
     import matplotlib.pyplot as plt
 
-    x_axis = [0.1, 0.2, 0.3]
+    n_arrays = 1
+    names = ["domain"]  # , "patchghost", "levelghost"]
+    x_axis = [0.1]  # , 0.2, 0.3]
     fig, ax = plt.subplots(figsize=(8.0, 8.0))
 
     for times_dir, times_per_type_tuple in times.items():
@@ -89,16 +91,18 @@ def plot_fn(times, fn):
         for type_id, bits_list in times_per_type.items():
             type_str = type_id.split(",")[1]
             type_str = f"{type_str}/{patches}/{cells}/{ppc}"
-            fn_0_times = [[], [], []]
+            fn_0_times = [[]]  # , [], []]
 
             pid = 0
             for bits in bits_list:
                 if bits[1] == f"{fn}":
-                    fn_0_times[pid % 3].append(float(bits[2]))
-                    pid += 1
+                    fn_times = fn_0_times[pid]  # % n_arrays
+                    fn_times.append(float(bits[2]))
+                    # pid += 1
 
+            print("fn_0_times", fn_0_times)
             fn_0_times = [np.asarray(ts).mean() for ts in fn_0_times]
-            ax.plot(x_axis, fn_0_times, ":", label=f"{type_str}")
+            ax.plot(x_axis, fn_0_times, "-", label=f"{type_str}")
 
     box = ax.get_position()
     ax.set_position(
@@ -113,11 +117,9 @@ def plot_fn(times, fn):
     )
     ax.set_title(fn_strings[fn])
     ax.set_xticks(x_axis)
-    ax.set_xticklabels(
-        ["domain", "patchghost", "levelghost"], rotation="vertical", fontsize=18
-    )
+    ax.set_xticklabels(names, rotation="vertical", fontsize=18)
     plt.ylabel("nanoseconds")
-    fig.savefig(f"profile_plot.{fn}.png")
+    fig.savefig(f"profile_plot.{fn}.png", dpi=100)
 
 
 def plot(times):

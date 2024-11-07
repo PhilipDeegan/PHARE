@@ -113,7 +113,7 @@ void IonUpdaterMultiPC<Ions, Electromag, GridLayout>::updateAndDepositDomain_(Mo
 {
     PHARE_LOG_SCOPE(1, "IonUpdaterMultiPC::updateAndDepositDomain_");
 
-    constexpr static std::uint8_t N_ARRAYS       = 3;
+    constexpr static std::uint8_t N_ARRAYS       = 1;
     constexpr static std::uint8_t DOMAIN_ID      = 0;
     constexpr static std::uint8_t LEVEL_GHOST_ID = 2;
 
@@ -168,7 +168,7 @@ void IonUpdaterMultiPC<Ions, Electromag, GridLayout>::updateAndDepositDomain_(Mo
     in.streamer.dump_times(detail::timings_dir_str + "/updateAndDepositDomain_.txt");
 
 #else
-    // throw std::runtime_error("No available implementation")
+        // throw std::runtime_error("No available implementation")
 #endif
     //
 }
@@ -180,7 +180,9 @@ void IonUpdaterMultiPC<Ions, Electromag, GridLayout>::updateAndDepositAll_(Model
 {
     PHARE_LOG_SCOPE(1, "IonUpdaterMultiPC::updateAndDepositAll_");
 
-    constexpr static std::uint8_t DOMAIN_ID = 0;
+    constexpr static std::uint8_t N_ARRAYS       = 1;
+    constexpr static std::uint8_t DOMAIN_ID      = 0;
+    constexpr static std::uint8_t LEVEL_GHOST_ID = 2;
 
     if (views.size() == 0)
         return;
@@ -189,7 +191,7 @@ void IonUpdaterMultiPC<Ions, Electromag, GridLayout>::updateAndDepositAll_(Model
     MultiBoris<ModelViews> in{dt_, views};
     Pusher_t::move(in);
 
-    std::uint16_t const group_size = 3 * views[0].ions->size();
+    std::uint16_t const group_size = N_ARRAYS * views[0].ions->size();
 
     // finished moving particles on patch
     in.streamer.group_barrier(group_size);
@@ -233,7 +235,7 @@ void IonUpdaterMultiPC<Ions, Electromag, GridLayout>::updateAndDepositAll_(Model
                            + std::string{Particles::type_id} + ".txt");
 
 #else
-    // throw std::runtime_error("No available implementation")
+        // throw std::runtime_error("No available implementation")
 #endif
     //
 }
