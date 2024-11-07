@@ -1,9 +1,9 @@
 #!/usr/bin/env bash
 CWD="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )" && cd $CWD
 set -o pipefail
-shopt -s expand_aliases
-alias cls="clear; printf '\033[3J'"
-cls
+# shopt -s expand_aliases
+# alias cls="clear; printf '\033[3J'"
+# cls
 
 set -e
 
