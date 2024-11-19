@@ -7,6 +7,7 @@
 #include "core/utilities/meta/meta_utilities.hpp"
 #include "core/def.hpp"
 
+#include <vector>
 #include <cstddef>
 #include <algorithm>
 #include <optional>
@@ -265,6 +266,13 @@ NO_DISCARD bool isIn(Point<Type, SIZE> const& point, Box<Type, SIZE> const& box)
 
     return false;
 }
+
+template<typename Particle, typename Type>
+NO_DISCARD bool isIn(Particle const& particle, Box<Type, Particle::dimension> const& box)
+{
+    return isIn(particle.iCell, box);
+}
+
 
 
 

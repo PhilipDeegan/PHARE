@@ -65,6 +65,7 @@ private:
     IonUpdater_t ionUpdater_;
 
 
+
 public:
     using patch_t     = AMR_Types::patch_t;
     using level_t     = AMR_Types::level_t;
