@@ -11,6 +11,8 @@
 #include "core/def.hpp"
 #include "core/utilities/span.hpp"
 
+#include "cppdict/include/dict/exp/serializer.hpp"
+
 namespace PHARE
 {
 namespace initializer
@@ -52,6 +54,25 @@ namespace initializer
                                     std::size_t, std::optional<std::size_t>, std::string,
                                     InitFunction<1>, InitFunction<2>, InitFunction<3>>;
 
+    void inline dump_phare_dict(PHAREDict const& dict, std::string const& filename)
+    {
+        using Serializer
+            = cppdict::DictSerializer<bool, int, std::vector<int>, double, std::vector<double>,
+                                      std::size_t, std::optional<std::size_t>, std::string,
+                                      InitFunction<1>, InitFunction<2>, InitFunction<3>>;
+
+        Serializer{filename}(dict);
+    }
+
+    auto inline load_phare_dict(std::string const& filename)
+    {
+        using Deserializer
+            = cppdict::DictDeSerializer<bool, int, std::vector<int>, double, std::vector<double>,
+                                        std::size_t, std::optional<std::size_t>, std::string,
+                                        InitFunction<1>, InitFunction<2>, InitFunction<3>>;
+        return Deserializer{filename}();
+    }
+
 
     class PHAREDictHandler
     {
@@ -67,6 +88,13 @@ namespace initializer
             if (!phareDict)
                 init();
             return *phareDict;
+        }
+
+        void dump(std::string const& filename) const { dump_phare_dict(*phareDict, filename); }
+
+        static auto& load(std::string const& filename)
+        {
+            return (INSTANCE().dict() = load_phare_dict(filename));
         }
 
     private:

@@ -5,7 +5,6 @@
 #define PHARE_CPP_MOD_NAME cpp
 #endif
 
-namespace py = pybind11;
 
 namespace PHARE::pydata
 {

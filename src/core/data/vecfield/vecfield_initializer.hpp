@@ -1,12 +1,11 @@
 #ifndef VECFIELD_INITIALIZER_HPP
 #define VECFIELD_INITIALIZER_HPP
 
-#include "core/data/grid/gridlayoutdefs.hpp"
-#include "core/data/vecfield/vecfield_component.hpp"
+
 #include "initializer/data_provider.hpp"
+#include "core/data/vecfield/vecfield_component.hpp"
 #include "core/data/field/initializers/field_user_initializer.hpp"
 
-#include <array>
 
 namespace PHARE
 {
@@ -19,10 +18,13 @@ namespace core
         VecFieldInitializer() = default;
 
         VecFieldInitializer(initializer::PHAREDict const& dict)
-            : x_{dict["x_component"].template to<initializer::InitFunction<dimension>>()}
-            , y_{dict["y_component"].template to<initializer::InitFunction<dimension>>()}
-            , z_{dict["z_component"].template to<initializer::InitFunction<dimension>>()}
         {
+            if (dict.contains("x_component") and dict["x_component"].isValue()) // assume restarts?
+            {
+                x_ = dict["x_component"].template to<initializer::InitFunction<dimension>>();
+                y_ = dict["y_component"].template to<initializer::InitFunction<dimension>>();
+                z_ = dict["z_component"].template to<initializer::InitFunction<dimension>>();
+            }
         }
 
 

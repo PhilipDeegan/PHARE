@@ -58,4 +58,11 @@ PYBIND11_MODULE(dictator, m)
     m.def("add_array_as_vector", add_array_as_vector<double>, "add_array_as_vector");
 
     m.def("stop", []() { PHARE::initializer::PHAREDictHandler::INSTANCE().stop(); });
+
+    m.def("dump_dict", [](std::string const& filename) {
+        PHARE::initializer::PHAREDictHandler::INSTANCE().dump(filename);
+    });
+    m.def("load_dict", [](std::string const& filename) {
+        PHARE::initializer::PHAREDictHandler::load(filename);
+    });
 }

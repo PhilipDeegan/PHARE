@@ -169,7 +169,7 @@ void declare_all(py::module& m, std::tuple<Dimension, InterpOrder, NbRefinedPart
     });
 }
 
-void declare_essential(py::module& m)
+void inline declare_essential(py::module& m)
 {
     py::class_<SamraiLifeCycle, std::shared_ptr<SamraiLifeCycle>>(m, "SamraiLifeCycle")
         .def(py::init<>())
