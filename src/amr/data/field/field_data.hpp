@@ -86,6 +86,7 @@ namespace amr
         {
             Super::getFromRestart(restart_db);
 
+
             assert(field.vector().size() > 0);
             restart_db->getDoubleArray("field_" + field.name(), field.vector().data(),
                                        field.vector().size()); // do not reallocate!
@@ -95,7 +96,16 @@ namespace amr
         {
             Super::putToRestart(restart_db);
 
-            restart_db->putVector("field_" + field.name(), field.vector());
+            // if constexpr (std::decay_t<decltype(field)>::is_host_mem)
+
+            restart_db->putDoubleArray("field_" + field.name(), field.vector().data(),
+                                       field.vector().size());
+
+            // restart_db->putVector("field_" + field.name(), field.vector());
+            // else
+            // {
+            //     std::abort();
+            // }
         };
 
 
