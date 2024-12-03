@@ -181,8 +181,6 @@ public:
     {
         for (auto& tile : particles_)
             tile().clear();
-        // for (auto const& bix : local_box())
-        //     particles_(bix).clear();
         size_ = 0;
     }
 
@@ -375,8 +373,10 @@ public:
 
     void clear()
     {
-        // for (auto const& bix : local_box())
-        //     particles_(bix).clear();
+        for (auto& tile : particles_)
+            tile().clear();
+        for (auto& tile : particles_views_)
+            tile().clear();
         total_size = 0;
     }
 

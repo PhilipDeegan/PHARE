@@ -27,7 +27,7 @@ class BoxCellNLauncher : public mkn::gpu::GDLauncher<sync>
     using Super                       = mkn::gpu::GDLauncher<sync>;
     static constexpr std::size_t warp = 32; // 32 for nvidia. todo?
 public:
-    BoxCellNLauncher(Box_t const& box, std::size_t const& _n, size_t const& dev = 0)
+    BoxCellNLauncher(Box_t const& box, std::size_t const _n, size_t const& dev = 0)
         : Super{1, dev}
         , n{_n}
     {
@@ -54,7 +54,7 @@ class ChunkLauncher : public mkn::gpu::DLauncher<sync>
     static constexpr std::size_t warp = 64;
 
 public:
-    ChunkLauncher(std::size_t const& _n, std::size_t const& ds = 0, size_t const& dev = 0)
+    ChunkLauncher(std::size_t const _n, std::size_t const ds = 0, size_t const& dev = 0)
         : Super{dev}
         , n{_n}
     {
@@ -115,7 +115,7 @@ struct BoxStreamDeviceFunction : mkn::gpu::StreamFunction<Strat>
 
 
 template<typename Strat, typename Fn, std::uint16_t impl = 0>
-struct ChunkFunction : mkn::gpu::StreamFunction<Strat>
+struct ChunkFunction : public mkn::gpu::StreamFunction<Strat>
 {
     using Super = mkn::gpu::StreamFunction<Strat>;
     using Super::strat;
@@ -144,7 +144,35 @@ struct ChunkFunction : mkn::gpu::StreamFunction<Strat>
     std::size_t n, ds;
 };
 
+template<typename Strat, typename Fn, std::uint16_t impl = 0, bool is = true>
+struct ChunkIndexFunction : public ChunkFunction<Strat, Fn, impl>
+{
+    using Super = ChunkFunction<Strat, Fn, impl>;
+    using Super::strat;
 
+
+    ChunkIndexFunction(std::size_t const gs_, std::size_t const gid_, Strat& strat, Fn&& fn,
+                       std::size_t const n, std::size_t const ds)
+        : Super{strat, std::forward<Fn>(fn), n, ds}
+        , gs{gs_}
+        , gid{gid_}
+    {
+    }
+
+    void run(std::uint32_t const i) override
+    {
+        if constexpr (is)
+        {
+            if (i % gs == gid)
+                Super::run(i);
+        }
+        else if (i % gs != gid)
+            Super::run(i);
+    }
+
+    std::size_t const gs;
+    std::size_t const gid;
+};
 
 
 template<typename Box_t, typename Strat, typename Fn, std::uint16_t impl = 0, bool is = true>
@@ -154,7 +182,7 @@ struct BoxStreamDeviceGroupIndexFunction : BoxStreamDeviceFunction<Box_t, Strat,
     using Super::strat;
 
 
-    BoxStreamDeviceGroupIndexFunction(std::size_t const& gs_, std::size_t const& gid_, Strat& strat,
+    BoxStreamDeviceGroupIndexFunction(std::size_t const gs_, std::size_t const gid_, Strat& strat,
                                       Fn&& fn, std::vector<Box_t> const& boxes)
         : Super{strat, std::forward<Fn>(fn), boxes}
         , gs{gs_}
@@ -214,7 +242,7 @@ struct ThreadedBoxStreamLauncher : public mkn::gpu::ThreadedStreamLauncher<Vecto
     using Super = mkn::gpu::ThreadedStreamLauncher<Vectors>;
     using Box_t = Boxes::value_type;
 
-    ThreadedBoxStreamLauncher(Vectors& vectors, Boxes const& bxes, std::size_t const& nthreads = 1)
+    ThreadedBoxStreamLauncher(Vectors& vectors, Boxes const& bxes, std::size_t const nthreads = 1)
         : Super{vectors, nthreads}
         , boxes{bxes}
     {
@@ -229,6 +257,23 @@ struct ThreadedBoxStreamLauncher : public mkn::gpu::ThreadedStreamLauncher<Vecto
         {
             using DevFn = ChunkFunction<Super, Fn, impl>;
             Super::fns.emplace_back(std::make_shared<DevFn>(**this, std::forward<Fn>(fn), n, ds));
+        }
+        else
+        {
+            throw std::runtime_error("no impl");
+        }
+        return *this;
+    };
+
+    template<std::uint16_t impl = 0, typename Fn>
+    auto& async_dev_chunk_idx(std::size_t const gs, std::size_t const gid, Fn&& fn,
+                              std::size_t const n, std::size_t const ds = 0)
+    {
+        if constexpr (impl == 0)
+        {
+            using DevFn = ChunkIndexFunction<Super, Fn, impl>;
+            Super::fns.emplace_back(
+                std::make_shared<DevFn>(gs, gid, **this, std::forward<Fn>(fn), n, ds));
         }
         else
         {
@@ -253,7 +298,7 @@ struct ThreadedBoxStreamLauncher : public mkn::gpu::ThreadedStreamLauncher<Vecto
     };
 
     template<std::uint16_t impl = 0, typename Fn>
-    auto& async_dev_idx(std::size_t const& gs, std::size_t const& gid, Fn&& fn)
+    auto& async_dev_idx(std::size_t const gs, std::size_t const gid, Fn&& fn)
     {
         using DevFn = BoxStreamDeviceGroupIndexFunction<Box_t, Super, Fn, impl>;
         Super::fns.emplace_back(
@@ -262,7 +307,7 @@ struct ThreadedBoxStreamLauncher : public mkn::gpu::ThreadedStreamLauncher<Vecto
     };
 
     template<std::uint16_t impl = 0, typename Fn>
-    auto& async_dev_not_idx(std::size_t const& gs, std::size_t const& gid, Fn&& fn)
+    auto& async_dev_not_idx(std::size_t const gs, std::size_t const gid, Fn&& fn)
     {
         if constexpr (impl < 2)
         {

@@ -581,6 +581,33 @@ public:
             coef);
     }
 
+    template<typename Particle_t, typename GridLayout>
+    void p2m_setup(Particle_t const& particle, GridLayout const& layout) _PHARE_ALL_FN_
+    {
+        indexAndWeights_<QtyCentering::primal>(layout, particle.iCell(), particle.delta());
+    }
+    template<std::uint8_t IDX, typename Particle_t, typename Field>
+    void p2m_per_component(Particle_t const& particle, Field& feeld,
+                           double coef = 1.) _PHARE_ALL_FN_
+    {
+        static_assert(IDX < 4); // noooooo
+        auto const& startIndex_ = primal_startIndex_;
+        auto const& weights_    = primal_weights_;
+        if constexpr (IDX == 0)
+        {
+            particleToMesh_(
+                feeld, particle, [](auto const& /*part*/) { return 1.; }, startIndex_, weights_,
+                coef);
+        }
+        else
+        {
+            particleToMesh_(
+                feeld, particle, [](auto const& part) { return part.v()[IDX - 1]; }, startIndex_,
+                weights_, coef);
+        }
+    }
+
+
 
     template<typename Particles, typename VecField, typename GridLayout, typename Field>
     inline void operator()(Particles const& particles, Field& density, VecField& flux,

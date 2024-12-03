@@ -47,7 +47,7 @@ struct SoAZipParticle;
 }
 
 
-#if __has_include(<thrust/iterator/zip_iterator.h>)
+#if PHARE_HAVE_THRUST
 
 #include <thrust/partition.h>
 #include <thrust/execution_policy.h>
@@ -349,7 +349,7 @@ auto partitionner(detail::SoAIteratorAdaptor& begin, detail::SoAIteratorAdaptor&
 } // namespace PHARE::core
 
 
-#endif // __has_include(<thrust/iterator/zip_iterator.h>)
+#endif // PHARE_HAVE_THRUST
 
 
 #endif /* PHARE_CORE_DATA_PARTICLES_PARTICLE_ARRAY_SOA_THRUST_HPP */

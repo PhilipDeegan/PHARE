@@ -344,7 +344,7 @@ struct MultiPatchIonUpdaterTest : public ::testing::Test
         std::shared_ptr<CmpIons_t> ions = from_ions<CmpParticleArray_t>(layout, *DefIons::I().init);
         UsableElectromag_t em{layout};
 
-        Patch() { PHARE_WITH_MKN_GPU(mkn::gpu::print_gpu_mem_used()); }
+        Patch() { /*PHARE_WITH_MKN_GPU(mkn::gpu::print_gpu_mem_used());*/ }
     };
 
     std::vector<Patch> patches{};

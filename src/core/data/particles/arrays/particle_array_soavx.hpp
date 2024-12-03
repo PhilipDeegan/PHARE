@@ -638,7 +638,10 @@ struct SoAVXParticles<OuterSuper>::iterator_impl
 
     auto& set()
     {
+#if PHARE_HAVE_THRUST
         particle = particle_zip_iterator(particles, curr_pos);
+#else
+#endif
         return *this;
     }
 
@@ -707,7 +710,9 @@ struct SoAVXParticles<OuterSuper>::iterator_impl
     // auto& charge() _PHARE_ALL_FN_ { return deref(particles).charge_[curr_pos]; }
     // auto& charge() const _PHARE_ALL_FN_ { return deref(particles).charge_[curr_pos]; }
     // auto& iCell() _PHARE_ALL_FN_ { return deref(particles).iCell_[curr_pos]; }
+#if PHARE_HAVE_THRUST
     auto iCell() const _PHARE_ALL_FN_ { return particle.iCell(); }
+#endif // PHARE_HAVE_THRUST
     // auto& delta() _PHARE_ALL_FN_ { return deref(particles).delta_[curr_pos]; }
     // auto& delta() const _PHARE_ALL_FN_ { return deref(particles).delta_[curr_pos]; }
     // auto& v() _PHARE_ALL_FN_ { return deref(particles).v_[curr_pos]; }
@@ -720,7 +725,11 @@ struct SoAVXParticles<OuterSuper>::iterator_impl
 
     T particles;
     std::size_t curr_pos = 0;
-    typename SoAVXZipParticle_t<T>::value_type particle;
+
+#if PHARE_HAVE_THRUST
+    using Particle_avxt = typename SoAVXZipParticle_t<T>::value_type;
+    Particle_avxt particle;
+#endif // PHARE_HAVE_THRUST
 };
 
 

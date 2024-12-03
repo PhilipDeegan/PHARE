@@ -234,11 +234,16 @@ void IonUpdaterMultiTS<Ions, Electromag, GridLayout>::updateAndDepositAll_(Model
     static_assert(GridLayout::nbrGhosts() == 2);
 
     if constexpr (any_in(Particles::alloc_mode, AllocatorMode::GPU_UNIFIED))
-        in.streamer.async_dev_chunk(
-            [=] _PHARE_DEV_FN_(auto const i) mutable {
-                Interpolating_t::chunk_kernel_ts(pps[i], layouts[i], fluxes[i], rhos[i]);
-            },
-            4, 9 * 9 * 9 * 4 * 8);
+    {
+        auto const interper = [=] _PHARE_DEV_FN_(auto const i) mutable {
+            Interpolating_t::chunk_kernel_ts(pps[i], layouts[i], fluxes[i], rhos[i]);
+        };
+        // int const maxbytes   = 65536; // 64 KB
+        // auto static func_    = &mkn::gpu::global_d_kernel<decltype(interper), std::uint32_t
+        // const>; void* const gpu_func = *reinterpret_cast<void**>(&func_);
+        // hipFuncSetAttribute(gpu_func, hipFuncAttributeMaxDynamicSharedMemorySize, maxbytes);
+        in.streamer.async_dev_chunk_idx(N_ARRAYS, DOMAIN_ID, interper, 4, 9 * 9 * 9 * 1 * 8);
+    }
     else
     {
         in.streamer.host([&](auto const i) {
@@ -248,8 +253,7 @@ void IonUpdaterMultiTS<Ions, Electromag, GridLayout>::updateAndDepositAll_(Model
         });
     }
 
-    in.streamer();
-    in.streamer.sync();
+    in.streamer().sync();
     in.streamer.dump_times(detail::timings_dir_str + "/updateAndDepositAll_"
                            + std::string{Particles::type_id} + ".txt");
 
