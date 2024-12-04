@@ -1,5 +1,7 @@
 property:
   cxx_flags: --std=c++20 -fsized-deallocation -DPHARE_HAVE_MKN_GPU -fPIC -fsanitize=address -fno-omit-frame-pointer
+  asan_lib: libclang_rt.asan-x86_64.so
+  asan_dir: /opt/rocm/lib/llvm/lib/clang/18/lib/linux
 local:
   repo: /mkn/r
   mod-repo: /mkn/m
@@ -9,10 +11,10 @@ remote:
 env: |
   PATH=/opt/mpi/rocm/bin:/opt/rocm/bin:${PATH}
   OMPI_CXX=hipcc
-  LD_PRELOAD=/opt/rocm-6.1.0/lib/llvm/lib/clang/17/lib/linux/libclang_rt.asan-x86_64.so
+  LD_PRELOAD=${asan_dir}/${asan_lib}
   ASAN_OPTIONS=detect_leaks=0
 path: |
-  /opt/rocm/lib/llvm/lib/clang/17/lib/linux
+  ${asan_dir}
 compiler:
   mask:
     g++:

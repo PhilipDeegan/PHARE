@@ -20,8 +20,8 @@ set -x
 
 (
   [ ! -f "bin/core/libphare_core.so" ] && (
-      mkn clean build -Oqp test_core -d google.test,+ -a "-fPIC"
-      mkn clean build -tOqp core -a "-fPIC" -x res/mkn/mpi
+      mkn clean build -Oqgp test_core -d google.test,+ -a "-fPIC"
+      mkn clean build -tOqgp core -a "-fPIC" -x res/mkn/mpi
   )
 
   mkn -p test_core ${ARGS} $@

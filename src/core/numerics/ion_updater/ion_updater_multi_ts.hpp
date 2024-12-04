@@ -233,7 +233,10 @@ void IonUpdaterMultiTS<Ions, Electromag, GridLayout>::updateAndDepositAll_(Model
     assert(GridLayout::nbrGhosts() == 2);
     static_assert(GridLayout::nbrGhosts() == 2);
 
-    if constexpr (any_in(Particles::alloc_mode, AllocatorMode::GPU_UNIFIED))
+    std::uint8_t constexpr static INTERP_GPU_IMPL = 1;
+
+    if constexpr (any_in(Particles::alloc_mode, AllocatorMode::GPU_UNIFIED)
+                  and INTERP_GPU_IMPL == 0)
     {
         auto const interper = [=] _PHARE_DEV_FN_(auto const i) mutable {
             Interpolating_t::chunk_kernel_ts(pps[i], layouts[i], fluxes[i], rhos[i]);
@@ -243,6 +246,13 @@ void IonUpdaterMultiTS<Ions, Electromag, GridLayout>::updateAndDepositAll_(Model
         // const>; void* const gpu_func = *reinterpret_cast<void**>(&func_);
         // hipFuncSetAttribute(gpu_func, hipFuncAttributeMaxDynamicSharedMemorySize, maxbytes);
         in.streamer.async_dev_chunk_idx(N_ARRAYS, DOMAIN_ID, interper, 4, 9 * 9 * 9 * 1 * 8);
+    }
+    else if constexpr (any_in(Particles::alloc_mode, AllocatorMode::GPU_UNIFIED))
+    {
+        auto const interper = [=] _PHARE_DEV_FN_(auto const i) mutable {
+            Interpolating_t::chunk_kernel_ts_all(pps[i], layouts[i], fluxes[i], rhos[i]);
+        };
+        in.streamer.async_dev_chunk_idx(N_ARRAYS, DOMAIN_ID, interper, 4, 9 * 9 * 9 * 4 * 8);
     }
     else
     {

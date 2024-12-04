@@ -118,8 +118,13 @@ public:
                     for (std::size_t pidx = 0; pidx < nparts; ++pidx)
                         per_any_particle(tile(), particles_ts, locell, pidx, i);
                 }
+            });
 
+            // separation for profiling the same as gpu
+            streamer.host([=](auto const i) mutable {
                 constexpr static std::uint32_t PHASE = 1;
+
+                auto& particles_ts = *ip->particles[i];
                 if (ip->particle_type[i] == 0)
                     ParticleArrayService::sync<PHASE, ParticleType::Domain>(particles_ts);
                 else if (any_in(ip->particle_type[i], 1, 2))

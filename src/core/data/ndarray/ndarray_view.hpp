@@ -160,8 +160,8 @@ public:
     NO_DISCARD auto end() _PHARE_ALL_FN_ { return ptr_ + size_; }
 
 
-    void zero() { fill(0); }
-    auto& fill(DataType const& v)
+    void zero() _PHARE_ALL_FN_ { fill(0); }
+    auto& fill(DataType const& v) _PHARE_ALL_FN_
     {
         std::fill(begin(), end(), v);
         return *this;

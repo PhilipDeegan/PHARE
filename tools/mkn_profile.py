@@ -7,7 +7,7 @@ from pathlib import Path
 import shutil
 
 
-PATCHES = [5]
+PATCHES = [10]
 CELLS = [4]
 PPC = [100]
 
@@ -52,9 +52,9 @@ def run_permutation(patches, cells, ppc):
     env.update(env_update)
     print({k: v for k, v in env.items() if k.startswith("PHARE_")})
 
-    # subprocess.run(
-    #     ["mkn", "run", "-p", "test_core"] + sys.argv[1:], check=True, env=env
-    # )
+    subprocess.run(
+        ["mkn", "run", "-p", "test_core"] + sys.argv[1:], check=True, env=env
+    )
 
     shutil.copy(".phare_times.0.txt", f"{times_dir}/scope_times.txt")
     return times_dir
@@ -81,32 +81,34 @@ def parse_times(times_dir, patches, cells, ppc):
 def plot_fn(times, fn):
     import matplotlib.pyplot as plt
 
-    n_arrays = 1
-    names = ["domain"]  # , "patchghost", "levelghost"]
-    x_axis = [0.1]  # , 0.2, 0.3]
+    n_arrays = 2
+    names = ["domain", "patchghost"]  # , "levelghost"]
+    x_axis = [0.1, 0.2]  # , 0.2, 0.3]
     fig, ax = plt.subplots(figsize=(8.0, 8.0))
 
     for times_dir, times_per_type_tuple in times.items():
         times_per_type, patches, cells, ppc = times_per_type_tuple
         for type_id, bits_list in times_per_type.items():
-            type_str = type_id.split(",")[1]
-            type_str = f"{type_str}/{patches}/{cells}/{ppc}"
-            fn_0_times = [[]]  # , [], []]
+            type_id_csv = type_id.split(",")
+            type_str = type_id_csv[1]
+            alloc_mode = type_id_csv[2][:3]
+            type_str = f"{type_str}/{alloc_mode}/{patches}/{cells}/{ppc}"
+            fn_0_times = [[], []]  # , []]
 
             pid = 0
             for bits in bits_list:
                 if bits[1] == f"{fn}":
-                    fn_times = fn_0_times[pid]  # % n_arrays
-                    fn_times.append(float(bits[2]))
-                    # pid += 1
+                    fn_times = fn_0_times[pid % n_arrays]
+                    fn_times.append(int(bits[2]))
+                    pid += 1
 
-            print("fn_0_times", fn_0_times)
+            print("\nfn_0_times", fn, type_id, fn_0_times)
             fn_0_times = [np.asarray(ts).mean() for ts in fn_0_times]
             ax.plot(x_axis, fn_0_times, "-", label=f"{type_str}")
 
     box = ax.get_position()
     ax.set_position(
-        [box.x0, box.y0 + box.height * 0.2, box.width * 0.8, box.height * 0.8]
+        [box.x0, box.y0 + box.height * 0.2, box.width * 0.7, box.height * 0.8]
     )
 
     ax.legend(

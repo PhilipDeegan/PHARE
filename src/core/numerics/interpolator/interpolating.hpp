@@ -144,15 +144,16 @@ public:
         auto const each   = parts.size() / 8;
         auto const tile_p = rcell % 2;
         auto const pidx   = tile_p[2] + tile_p[1] * 2 + tile_p[0] * 2 * 2;
+        auto const ji     = [&](auto const i) { return i * 8 + pidx; };
         auto doX          = [&]<std::uint8_t IDX = 0>(auto& feeld) {
             auto v = make_array_view(&data[0], feeld.shape());
             if (mkn::gpu::idx() == 0)
                 for (auto& e : v)
                     e = 0;
             Interpolator_t interp;
-            std::size_t i = 0, j = i * 8 + pidx;
+            std::size_t i = 0, j = ji(i);
             __syncthreads();
-            for (; i < each; ++i, j = i * 8 + pidx)
+            for (; i < each; ++i, j = ji(i))
                 interp.p2m_setup(parts[j], layout),
                     interp.template p2m_per_component<IDX>(parts[j], v);
             if (pidx < parts.size() - (8 * each))
@@ -173,11 +174,82 @@ public:
 #endif // PHARE_HAVE_MKN_GPU
     }
 
+
+
+    template<typename Particles, typename GridLayout, typename VecField, typename Field>
+    static void chunk_kernel_ts_all(Particles& particles, GridLayout& layout, VecField& flux,
+                                    Field& density, double coef = 1.) _PHARE_ALL_FN_
+    {
+#if PHARE_HAVE_MKN_GPU
+
+        Point<std::uint32_t, 3> const rcell{threadIdx.z, threadIdx.y, threadIdx.x};
+        extern __shared__ double data[];
+        auto const ziz    = 9 * 9 * 9;
+        auto& tile        = *particles().at(rcell + 2);
+        auto& parts       = tile();
+        auto const each   = parts.size() / 8;
+        auto const tile_p = rcell % 2;
+        auto const pidx   = tile_p[2] + tile_p[1] * 2 + tile_p[0] * 2 * 2;
+        auto const ji     = [&](auto const i) { return i * 8 + pidx; };
+        auto doX          = [](auto const& v, auto& feeld) {
+            if (mkn::gpu::idx() == 0)
+                for (std::size_t i = 0; i < v.size(); ++i)
+                    feeld.data()[i] = v.data()[i];
+        };
+
+        auto const r0 = density.data();
+        auto const f0 = flux[0].data();
+        auto const f1 = flux[1].data();
+        auto const f2 = flux[2].data();
+
+        auto rho = make_array_view(&data[ziz * 0], density.shape());
+        auto fx  = make_array_view(&data[ziz * 1], flux[0].shape());
+        auto fy  = make_array_view(&data[ziz * 2], flux[1].shape());
+        auto fz  = make_array_view(&data[ziz * 3], flux[2].shape());
+
+        density.setData(rho.data());
+        flux[0].setData(fx.data());
+        flux[1].setData(fy.data());
+        flux[2].setData(fz.data());
+
+        auto const z0 = [](auto& arr) {
+            for (auto& e : arr)
+                e = 0;
+        };
+        if (mkn::gpu::idx() == 0)
+            [&](auto&... arr) { (z0(arr), ...); }(rho, fx, fy, fz);
+
+        Interpolator_t interp;
+        std::size_t i = 0, j = ji(i);
+
+        __syncthreads();
+        for (; i < each; ++i, j = ji(i))
+            interp.particleToMesh(parts[j], density, flux, layout, coef);
+        if (pidx < parts.size() - (8 * each))
+            interp.particleToMesh(parts[j], density, flux, layout, coef);
+        __syncthreads();
+
+        density.setData(r0);
+        flux[0].setData(f0);
+        flux[1].setData(f1);
+        flux[2].setData(f2);
+
+
+        doX(rho, density);
+        doX(fx, flux[0]);
+        doX(fy, flux[1]);
+        doX(fz, flux[2]);
+
+
+#endif // PHARE_HAVE_MKN_GPU
+    }
+
+
     template<typename Particles, typename GridLayout, typename VecField, typename Field>
     static void chunk_kernel(Particles& particles, GridLayout& layout, VecField& flux,
                              Field& density, double coef = 1.) _PHARE_ALL_FN_
     {
-#if PHARE_HAVE_MKN_GPU
+#if PHARE_HAVE_MKN_GPUdd
         auto constexpr static nghosts = GridLayout::nbrGhosts();
         extern __shared__ double data[];
         auto const& lobox = particles.local_box();

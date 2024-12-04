@@ -7,19 +7,19 @@ remote:
   repo: git@github.com:mkn/
   mod-repo: git@github.com:mkn-mod/
 path: |
-  /usr/lib/llvm-19/lib/clang/19/lib/linux
+  /usr/lib/clang/18/lib/x86_64-redhat-linux-gnu
 
 #/usr/lib/clang/18/lib/x86_64-redhat-linux-gnu
 env: | # replace with $(clang++ -print-file-name=libclang_rt.asan-x86_64.so)
-  MKN_LD_PRELOAD=/usr/lib/llvm-19/lib/clang/19/lib/linux/libclang_rt.asan-x86_64.so
+  MKN_LD_PRELOAD=/usr/lib/clang/18/lib/x86_64-redhat-linux-gnu/libclang_rt.asan.so
   ASAN_OPTIONS=detect_leaks=0
 
-compiler:
-  mask:
-    clang++:
-      clang++-19
+# compiler:
+#   mask:
+#     clang++:
+#       clang++-
 file:
   - type: cpp:cxx:cc:c:S
     archiver: ar -cr
-    compiler: ccache clang++-19 ${cxx_flags}
-    linker: clang++-19 -Bmold -lclang_rt.asan-x86_64
+    compiler: ccache clang++ ${cxx_flags}
+    linker: clang++ -Bmold -lclang_rt.asan-x86_64
