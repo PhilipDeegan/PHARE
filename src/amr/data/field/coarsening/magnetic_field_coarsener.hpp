@@ -38,7 +38,7 @@ public:
     MagneticFieldCoarsener(std::array<core::QtyCentering, dimension> const centering,
                            SAMRAI::hier::Box const& sourceBox,
                            SAMRAI::hier::Box const& destinationBox,
-                           SAMRAI::hier::IntVector const& ratio)
+                           SAMRAI::hier::IntVector const& /*ratio*/)
         : centering_{centering}
         , sourceBox_{sourceBox}
         , destinationBox_{destinationBox}

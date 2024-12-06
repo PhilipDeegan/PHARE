@@ -14,6 +14,7 @@
 #include "amr/solvers/solver_ppc_model_view.hpp"
 
 #include "core/numerics/ion_updater/ion_updater.hpp"
+// #include "core/numerics/ion_updater/ion_updater_per_particle.hpp"
 #include "core/numerics/ampere/ampere.hpp"
 #include "core/numerics/faraday/faraday.hpp"
 #include "core/numerics/ohm/ohm.hpp"
@@ -22,8 +23,7 @@
 #include "core/data/grid/gridlayout_utils.hpp"
 
 
-#include <iomanip>
-#include <sstream>
+#include "core/vector.hpp"
 
 namespace PHARE::solver
 {
@@ -58,8 +58,11 @@ private:
     Ampere_t ampere_;
     Ohm_t ohm_;
 
-    PHARE::core::IonUpdater<Ions, Electromag, GridLayout> ionUpdater_;
-
+    using IonUpdater_t = core::IonUpdater<Ions, Electromag, GridLayout>;
+    // using IonUpdater_t = std::conditional_t<ParticleArray::is_mapped,
+    //                                         core::IonUpdater<Ions, Electromag, GridLayout>,
+    //                                         core::IonUpdaterPP<Ions, Electromag, GridLayout>>;
+    core::IonUpdater<Ions, Electromag, GridLayout> ionUpdater_;
 
 public:
     using patch_t     = typename AMR_Types::patch_t;
@@ -126,12 +129,13 @@ private:
                   double const newTime);
 
 
+
     void moveIons_(level_t& level, ModelViews_t& views, Messenger& fromCoarser,
                    double const currentTime, double const newTime, core::UpdaterMode mode);
 
 
-    void saveState_(level_t& level, ModelViews_t& views);
-    void restoreState_(level_t& level, ModelViews_t& views);
+    void saveState_(ModelViews_t& views);
+    void restoreState_(ModelViews_t& views);
 
 
     struct TimeSetter
@@ -149,6 +153,10 @@ private:
 
 
     // extend lifespan
+    // GPU -> GPU alloc/copy is bugging inside std vector
+
+    // using PHARE_Types    = core::CPU_Types<dimension>;
+    // using LocalParticles = typename PHARE_Types::ParticleArray_t;
     std::unordered_map<std::string, ParticleArray> tmpDomain;
     std::unordered_map<std::string, ParticleArray> patchGhost;
 
@@ -214,7 +222,7 @@ void SolverPPC<HybridModel, AMR_Types>::fillMessengerInfo(
 
 
 template<typename HybridModel, typename AMR_Types>
-void SolverPPC<HybridModel, AMR_Types>::saveState_(level_t& level, ModelViews_t& views)
+void SolverPPC<HybridModel, AMR_Types>::saveState_(ModelViews_t& views)
 {
     PHARE_LOG_SCOPE(1, "SolverPPC::saveState_");
 
@@ -232,7 +240,7 @@ void SolverPPC<HybridModel, AMR_Types>::saveState_(level_t& level, ModelViews_t&
 }
 
 template<typename HybridModel, typename AMR_Types>
-void SolverPPC<HybridModel, AMR_Types>::restoreState_(level_t& level, ModelViews_t& views)
+void SolverPPC<HybridModel, AMR_Types>::restoreState_(ModelViews_t& views)
 {
     PHARE_LOG_SCOPE(1, "SolverPPC::restoreState_");
 
@@ -243,8 +251,11 @@ void SolverPPC<HybridModel, AMR_Types>::restoreState_(level_t& level, ModelViews
 
         for (auto& pop : state.ions)
         {
-            pop.domainParticles()     = std::move(tmpDomain.at(ss.str() + "_" + pop.name()));
-            pop.patchGhostParticles() = std::move(patchGhost.at(ss.str() + "_" + pop.name()));
+            auto key = ss.str() + "_" + pop.name();
+            tmpDomain.at(key).check();
+            pop.domainParticles() = std::move(tmpDomain.at(key));
+            pop.domainParticles().check();
+            pop.patchGhostParticles() = std::move(patchGhost.at(key));
         }
     }
 }
@@ -266,7 +277,7 @@ void SolverPPC<HybridModel, AMR_Types>::advanceLevel(hierarchy_t const& hierarch
 
     average_(*level, modelView, fromCoarser, newTime);
 
-    saveState_(*level, modelView);
+    saveState_(modelView);
 
     moveIons_(*level, modelView, fromCoarser, currentTime, newTime, core::UpdaterMode::domain_only);
 
@@ -275,7 +286,7 @@ void SolverPPC<HybridModel, AMR_Types>::advanceLevel(hierarchy_t const& hierarch
 
     average_(*level, modelView, fromCoarser, newTime);
 
-    restoreState_(*level, modelView);
+    restoreState_(modelView);
 
     moveIons_(*level, modelView, fromCoarser, currentTime, newTime, core::UpdaterMode::all);
 
@@ -468,7 +479,7 @@ void SolverPPC<HybridModel, AMR_Types>::moveIons_(level_t& level, ModelViews_t& 
     fromCoarser.fillIonPopMomentGhosts(views.model().state.ions, level, newTime);
 
     for (auto& state : views)
-        ionUpdater_.updateIons(state.ions);
+        IonUpdater_t::updateIons(state.ions);
     // no need to update time, since it has been done before
 
     // now Ni and Vi are calculated we can fill pure ghost nodes
