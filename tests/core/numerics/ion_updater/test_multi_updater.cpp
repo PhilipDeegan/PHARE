@@ -28,7 +28,8 @@
 namespace PHARE::core
 {
 // COMPILE TIME SWITCHES
-auto constexpr INCLUDE_PATCH_GHOST = 1;
+bool constexpr INCLUDE_PATCH_GHOST  = 1;
+bool constexpr COMPARE_TO_ONE_PATCH = 0;
 
 // RUNTIME ENV VAR OVERRIDES
 auto static const bytes     = get_env_as("PHARE_GPU_BYTES", std::uint64_t{500000000});
@@ -40,6 +41,8 @@ auto static const dt        = get_env_as("PHARE_TIMESTEP", double{.001});
 auto static const shufle    = get_env_as("PHARE_UNSORTED", std::size_t{0});
 auto static const do_cmp    = get_env_as("PHARE_COMPARE", std::size_t{1});
 auto static const device_id = get_env_as("PHARE_GPU_DEVICE", std::size_t{0});
+
+auto static seeder = seed; // increments over ref patches if COMPARE_TO_ONE_PATCH == 0
 
 bool static const premain = []() {
     PHARE_WITH_MKN_GPU({
@@ -98,19 +101,21 @@ namespace detail::strings
     constexpr static std::string_view cma     = ",";
 } // namespace detail::strings
 
-template<typename Ions, typename EM, typename GridLayout_t>
-void update(UpdaterMode mode, Ions& ions, EM const& em, GridLayout_t const& layout)
+
+template<typename Patches>
+void ref_update(UpdaterMode mode, Patches& patches)
 {
-    using Particles = typename Ions::particle_array_type;
+    using Particles = Patches::value_type::ParticleArray_t;
     auto constexpr function_id
         = join_string_views_v<detail::strings::update, Particles::type_id, detail::strings::cma>;
     PHARE_LOG_LINE_STR(function_id);
     PHARE_LOG_SCOPE(1, function_id);
-    get_updater_for(ions, em, layout).updatePopulations(ions, em, layout, dt, mode);
+    for (auto& [layout, ions, em] : patches)
+        get_updater_for(*ions, *em, layout).updatePopulations(*ions, *em, layout, dt, mode);
 }
 
 template<typename Patches>
-void update(UpdaterMode mode, Patches& patches)
+void cmp_update(UpdaterMode mode, Patches& patches)
 {
     using Particles = Patches::value_type::ParticleArray_t;
     auto constexpr function_id
@@ -132,13 +137,20 @@ auto make_ions(GridLayout_t const& layout)
 
     EXPECT_EQ(ions.populations[0].particles.domain_particles.size(), 0ull);
 
-    auto disperse = [](auto& particles) {
-        delta_disperse(particles.domain_particles, seed);
-        delta_disperse(particles.patch_ghost_particles, seed);
+    auto seeding = [&]() {
+        if constexpr (COMPARE_TO_ONE_PATCH)
+            return seed;
+        else
+            return seeder++;
+    }();
+
+    auto disperse = [&](auto& particles) {
+        delta_disperse(particles.domain_particles, seeding);
+        delta_disperse(particles.patch_ghost_particles, seeding);
         if (shufle > 0)
         {
-            shuffle(particles.domain_particles, seed);
-            shuffle(particles.patch_ghost_particles, seed);
+            shuffle(particles.domain_particles, seeding);
+            shuffle(particles.patch_ghost_particles, seeding);
         }
     };
 
@@ -184,26 +196,6 @@ auto from_ions(GridLayout_t const& layout, Ions const& from)
     return ions_p;
 }
 
-template<auto updater_mode, typename Patches>
-auto& evolve(Patches& patches)
-{
-    update(updater_mode, patches);
-    return patches;
-}
-
-template<auto updater_mode, typename Ions, typename GridLayout_t>
-auto& evolve(Ions& ions, GridLayout_t const& layout)
-{
-    using Particles_t                = typename Ions::particle_array_type;
-    auto constexpr static alloc_mode = Particles_t::alloc_mode;
-    auto constexpr static dim        = GridLayout_t::dimension;
-
-    UsableElectromag<dim, alloc_mode> em{layout};
-    update(updater_mode, *ions, *em, layout);
-    assert(ions.populations[0].particles.domain_particles.size() > 0);
-    return ions;
-}
-
 
 template<typename GridLayout_t, typename P0, typename P1>
 void compare_particles(GridLayout_t const& layout, P0& ref, P1& cmp_, std::size_t ghosts = 0)
@@ -231,6 +223,7 @@ void compare_particles(GridLayout_t const& layout, P0& ref, P1& cmp_, std::size_
         PHARE_LOG_LINE_STR("Comparing Particle Arrays FAIL: " << P0::id() << " vs " << P1::id());
         PHARE_LOG_LINE_STR("results: " << report.why());
     }
+    PHARE_LOG_LINE_STR("sample 0 index particle: " << ref[0]);
 
     EXPECT_EQ(ref, cmp);
 }
@@ -278,23 +271,7 @@ struct TestParam
     auto constexpr static updater_mode = _updater_mode;
 };
 
-template<typename Ions, std::size_t dim, std::size_t interp, auto updater_mode>
-struct DefaultIons
-{
-    using GridLayout_t = TestGridLayout<typename PHARE_Types<dim, interp>::GridLayout_t>;
 
-    GridLayout_t const layout{cells};
-    std::shared_ptr<Ions> init = make_ions<typename Ions::particle_array_type>(layout);
-    std::shared_ptr<Ions> ions = make_ions<typename Ions::particle_array_type>(layout);
-
-    DefaultIons() { evolve<updater_mode>(*ions, *layout); }
-
-    static auto& I()
-    {
-        static DefaultIons self;
-        return self;
-    }
-};
 
 template<typename Param>
 struct MultiPatchIonUpdaterTest : public ::testing::Test
@@ -312,15 +289,39 @@ struct MultiPatchIonUpdaterTest : public ::testing::Test
     using CmpParticleArray_t = ParticleArray<
         dim, ParticleArrayInternals<dim, layout_mode, StorageMode::VECTOR, alloc_mode, impl>>;
 
-    using RefIons_t = UsableIons_t<RefParticleArray_t, interp>;
-    using CmpIons_t = UsableIons_t<CmpParticleArray_t, interp>;
-    using DefIons   = DefaultIons<RefIons_t, dim, interp, Param::updater_mode>;
+    using UsableElectromag_t = UsableElectromag<dim, alloc_mode>;
+    using RefIons_t          = UsableIons_t<RefParticleArray_t, interp>;
+    using CmpIons_t          = UsableIons_t<CmpParticleArray_t, interp>;
 
-    GridLayout_t const& layout           = DefIons::I().layout;
-    std::shared_ptr<RefIons_t>& ref_ions = DefIons::I().ions;
+    GridLayout_t const layout{cells};
 
 
-    MultiPatchIonUpdaterTest() = default;
+    MultiPatchIonUpdaterTest() {}
+
+    void setup()
+    {
+        if constexpr (COMPARE_TO_ONE_PATCH)
+            init_one();
+        else
+            init_n();
+
+        ref_update(updater_mode, ref_patches);
+    }
+
+    void init_one()
+    {
+        auto& ref = ref_patches.emplace_back(layout, make_ions<RefParticleArray_t>(layout));
+        for (std::size_t i = 0; i < n_patches; i++)
+            cmp_patches.emplace_back(layout, from_ions<CmpParticleArray_t>(layout, *ref.ions));
+    }
+    void init_n()
+    {
+        for (std::size_t i = 0; i < n_patches; i++)
+        {
+            auto& ref = ref_patches.emplace_back(layout, make_ions<RefParticleArray_t>(layout));
+            cmp_patches.emplace_back(layout, from_ions<CmpParticleArray_t>(layout, *ref.ions));
+        }
+    }
 
     void init_check() const
     {
@@ -333,21 +334,34 @@ struct MultiPatchIonUpdaterTest : public ::testing::Test
         }
     }
 
+    void do_compare() const
+    {
+        if constexpr (COMPARE_TO_ONE_PATCH)
+            for (auto const& cmp : cmp_patches)
+                compare(*layout, *ref_patches[0].ions, *cmp.ions);
+        else
+            for (std::size_t i = 0; i < n_patches; i++)
+                compare(*layout, *ref_patches[i].ions, *cmp_patches[i].ions);
+    }
+
+
+    template<typename Ions_t, typename ParticleArray_t_ = typename Ions_t::particle_array_type>
     struct Patch
     {
-        using ParticleArray_t    = CmpParticleArray_t;
-        using UsableElectromag_t = UsableElectromag<dim, alloc_mode>;
-        using Electromag_t       = UsableElectromag_t::Super;
-        using GridLayout_t       = MultiPatchIonUpdaterTest<Param>::GridLayout_t;
+        using ParticleArray_t = ParticleArray_t_;
+        using GridLayout_t    = MultiPatchIonUpdaterTest<Param>::GridLayout_t;
+        using Electromag_t    = UsableElectromag_t::Super;
 
-        GridLayout_t layout             = DefIons::I().layout;
-        std::shared_ptr<CmpIons_t> ions = from_ions<CmpParticleArray_t>(layout, *DefIons::I().init);
+        GridLayout_t layout;
+        std::shared_ptr<Ions_t> ions;
         UsableElectromag_t em{layout};
-
-        Patch() { /*PHARE_WITH_MKN_GPU(mkn::gpu::print_gpu_mem_used());*/ }
     };
 
-    std::vector<Patch> patches{};
+    using RefPatch = Patch<RefIons_t>;
+    using CmpPatch = Patch<CmpIons_t>;
+
+    std::vector<aggregate_adapter<RefPatch>> ref_patches{};
+    std::vector<aggregate_adapter<CmpPatch>> cmp_patches{};
 };
 
 // clang-format off
@@ -382,14 +396,18 @@ auto run(MultiPatchIonUpdaterTest_t& self)
         = join_string_views_v<detail::strings::test, Particles::type_id, detail::strings::cma>;
     PHARE_LOG_SCOPE(1, function_id);
 
-    self.patches.resize(n_patches);
-    self.init_check();
+    // self.patches.resize(n_patches);
+    // self.init_check();
 
-    evolve<MultiPatchIonUpdaterTest_t::updater_mode>(self.patches);
+    self.setup();
+
+    cmp_update(MultiPatchIonUpdaterTest_t::updater_mode, self.cmp_patches);
+
     if (do_cmp)
-        for (auto const& patch : self.patches)
-            compare(*self.layout, *self.ref_ions, *patch.ions);
+        self.do_compare();
 }
+
+
 
 
 TYPED_TEST(MultiPatchIonUpdaterTest, updater_domain_only)

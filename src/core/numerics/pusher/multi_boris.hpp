@@ -4,7 +4,6 @@
 
 #include "core/utilities/types.hpp"
 #include "core/utilities/kernels.hpp"
-// #include "core/data/grid/gridlayoutdefs.hpp"
 
 #include "core/numerics/pusher/boris/move.hpp"
 #include "core/numerics/pusher/boris/basics.hpp"
@@ -70,7 +69,7 @@ public:
                 per_particle(particles[pidx], args...);
         };
 
-        auto per_tile = [=] _PHARE_DEV_FN_(auto const& i) mutable {
+        auto per_tile_chunk = [=] _PHARE_DEV_FN_(auto const& i) mutable {
             Point<std::uint32_t, 3> const rcell{threadIdx.z, threadIdx.y, threadIdx.x};
             auto& view        = pps[i];
             auto& tile        = *view().at(rcell + 2);
@@ -82,13 +81,31 @@ public:
                 per_any_particle(parts, view, view.local_cell(tile.lower), pid * 8 + tidx, i);
         };
 
+        auto per_tile = [=] _PHARE_DEV_FN_(auto const& i) mutable {
+            // Point<std::uint32_t, 3> const rcell{threadIdx.z, threadIdx.y, threadIdx.x};
+            auto& view      = pps[i];
+            auto& tile      = view()[blockIdx.x];
+            auto& parts     = tile();
+            auto const tidx = threadIdx.x;
+            auto const ws   = kernel::warp_size();
+            auto const each = parts.size() / ws;
+            std::size_t pid = 0;
+            for (; pid < each; ++pid)
+                per_any_particle(parts, view, view.local_cell(tile.lower), pid * ws + tidx, i);
+            // if (tidx < parts.size() - (ws * each))
+            //     per_any_particle(parts, view, view.local_cell(tile.lower), pid * ws + tidx, i);
+        };
+
 
         auto& streamer = in.streamer;
         auto ip        = &in; // used in lambdas, copy address! NO REF!
 
         if constexpr (Particles::alloc_mode == AllocatorMode::GPU_UNIFIED)
         {
-            streamer.async_dev_chunk([=] _PHARE_DEV_FN_(auto const i) mutable { per_tile(i); }, 4);
+            // streamer.async_dev_chunk([=] _PHARE_DEV_FN_(auto const i) mutable { per_tile(i); },
+            // 4);
+            streamer.async_dev_tiles([=] _PHARE_DEV_FN_(auto const i) mutable { per_tile(i); });
+
             streamer.host([ip = ip](auto const i) mutable {
                 if (ip->particles[i]->size() == 0)
                     return;

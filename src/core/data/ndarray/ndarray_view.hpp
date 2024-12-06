@@ -2,21 +2,14 @@
 #define PHARE_CORE_DATA_NDARRAY_NDARRAY_VIEW_HPP
 
 
+#include "core/def.hpp"
+#include "core/utilities/types.hpp"
+
 #include <array>
 #include <tuple>
 #include <vector>
 #include <cstdint>
-#include <numeric>
-#include <iostream>
 #include <stdexcept>
-
-
-#include "core/def.hpp"
-#include "core/vector.hpp"
-#include "core/utilities/types.hpp"
-#include "core/utilities/point/point.hpp"
-
-
 
 namespace PHARE::core
 {

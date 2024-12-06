@@ -5,6 +5,8 @@
 
 #if PHARE_HAVE_MKN_GPU
 
+#include "core/utilities/kernels.hpp"
+
 #include "mkn/gpu.hpp"
 #include "mkn/gpu/multi_launch.hpp"
 
@@ -236,6 +238,39 @@ struct BoxStreamLauncher : public mkn::gpu::StreamLauncher<Vectors>
     Boxes const& boxes;
 };
 
+
+template<typename Strat, typename Fn, std::uint16_t impl = 0>
+struct TileBlockFunction : public mkn::gpu::StreamFunction<Strat>
+{
+    using Super = mkn::gpu::StreamFunction<Strat>;
+    using Super::strat;
+
+
+    TileBlockFunction(Strat& strat, Fn&& fn_, std::size_t const ds_)
+        : Super{strat, mkn::gpu::StreamFunctionMode::DEVICE_WAIT}
+        , fn{fn_}
+        , ds{ds_}
+    {
+    }
+
+    void run(std::uint32_t const i) override
+    {
+        if constexpr (impl == 0)
+        {
+            using Launcher = ChunkLauncher<false>;
+            Launcher launcher{1, ds};
+            launcher.b.x = kernel::warp_size();
+            launcher.g.x = strat.datas[i]->size();
+            launcher.stream(strat.streams[i], [=, fn = fn] __device__() mutable { fn(i); });
+        }
+        else
+            throw std::runtime_error("No impl");
+    }
+
+    Fn fn;
+    std::size_t ds;
+};
+
 template<typename Boxes, typename Vectors>
 struct ThreadedBoxStreamLauncher : public mkn::gpu::ThreadedStreamLauncher<Vectors>
 {
@@ -249,6 +284,21 @@ struct ThreadedBoxStreamLauncher : public mkn::gpu::ThreadedStreamLauncher<Vecto
     }
 
 
+
+    template<std::uint16_t impl = 0, typename Fn>
+    auto& async_dev_tiles(Fn&& fn, std::size_t const ds = 0)
+    {
+        if constexpr (impl == 0)
+        {
+            using DevFn = TileBlockFunction<Super, Fn, impl>;
+            Super::fns.emplace_back(std::make_shared<DevFn>(**this, std::forward<Fn>(fn), ds));
+        }
+        else
+        {
+            throw std::runtime_error("no impl");
+        }
+        return *this;
+    };
 
     template<std::uint16_t impl = 0, typename Fn>
     auto& async_dev_chunk(Fn&& fn, std::size_t const n, std::size_t const ds = 0)
@@ -350,4 +400,4 @@ public:
 
 #endif // PHARE_HAVE_MKN_GPU
 
-#endif /* PHARE_CORE_DEF_DETAIL_MKN_GPU_HPP */
+#endif /* PHARE_CORE_UTILITIES_KERNELS_DETAIL_MKN_LAUNCHERS_HPP */

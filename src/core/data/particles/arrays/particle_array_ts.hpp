@@ -2,13 +2,11 @@
 #define PHARE_CORE_DATA_PARTICLES_PARTICLE_ARRAY_TILE_SET_HPP
 
 
-#include "core/data/grid/gridlayout.hpp"
 #include "core/operators.hpp"
 #include "core/data/tiles/tile_set.hpp"
 #include "core/data/tiles/tile_set_traversal.hpp"
 
 #include "core/utilities/span.hpp"
-#include "core/utilities/memory.hpp"
 #include "core/data/particles/particle.hpp"
 #include "core/data/ndarray/ndarray_vector.hpp"
 #include "core/data/particles/particle_array_def.hpp"
@@ -22,23 +20,52 @@
 namespace PHARE::core
 {
 
-template<typename Particles>
+template<typename Particles, typename NdArray_t>
 class ParticlesTile : public Box<std::int32_t, Particles::dimension>
 {
     auto constexpr static dim = Particles::dimension;
     using Super               = Box<std::int32_t, dim>;
 
+    template<typename P, typename N>
+    friend class ParticlesTile;
+
+    auto constexpr static ndarray_builder = [](auto const& box) {
+        auto const cells = *(box.shape().as_unsigned() - 1);
+        if constexpr (Particles::storage_mode == StorageMode::VECTOR)
+            return NdArray_t{cells}; // allocating
+        else
+            return NdArray_t{0, cells}; // span with nullptr, updated later
+    };
 
 public:
-    template<typename... Args>
-    ParticlesTile(Super const& box, Args&&... args)
+    ParticlesTile(Super const& box)
         : Super{box}
         , particles{[&]() {
-            if constexpr (std::is_constructible_v<Particles, Super, Args...>)
-                return Particles{box, args...};
+            if constexpr (std::is_constructible_v<Particles, Super>)
+                return Particles{box};
             else
-                return Particles{args...};
+                return Particles{};
         }()}
+        , field_ghost_box{grow(box, 2)} // assume interp 1 for now
+        , rho{ndarray_builder(field_ghost_box)}
+        , fx{ndarray_builder(field_ghost_box)}
+        , fy{ndarray_builder(field_ghost_box)}
+        , fz{ndarray_builder(field_ghost_box)}
+    {
+    }
+
+
+    ParticlesTile(ParticlesTile<Particles, NdArray_t>&) = default;
+
+    template<typename Ps, typename Nd>
+    ParticlesTile(ParticlesTile<Ps, Nd>& tile) // span constructor
+        : Super{tile}
+        , particles{tile(), tile().size()}
+        , field_ghost_box{tile.field_ghost_box}
+        , rho{*tile.rho}
+        , fx{*tile.fx}
+        , fy{*tile.fy}
+        , fz{*tile.fz}
     {
     }
 
@@ -59,6 +86,8 @@ public:
 
 private:
     Particles particles;
+    Super field_ghost_box; // tilebox + field ghosts
+    NdArray_t rho, fx, fy, fz;
 
     std::array<ParticlesTile*, 7> _links = ConstArray<ParticlesTile*, 7>(nullptr);
 };
@@ -195,7 +224,7 @@ public:
     }
 
 protected:
-    TileSetView<ParticlesTile<Particles>> particles_;
+    TileSetView<ParticlesTile<Particles, NdArrayView<dim, double>>> particles_;
     NdArrayView<dim, Span<std::size_t>> gaps_;
     NdArrayView<dim, SIZE_T> off_sets_, gap_idx_, add_into_, cap_, left_;
     Span<std::array<std::uint32_t, dim>> p2c_;
@@ -240,6 +269,9 @@ public:
 
     using size_t_vector = typename vec_helper<std::size_t>::vector_t;
 
+    using VecTile = ParticlesTile<Particles, nd_array_t<double>>;
+    using SpnTile = ParticlesTile<PSpan_t, NdArrayView<dim, double>>;
+
 
     TileSetVector(box_t const& box /*= {}*/, std::size_t ghost_cells = 0)
         : ghost_cells_{ghost_cells}
@@ -254,8 +286,8 @@ public:
         cap_.zero();
 
         reset_views();
-        TileSet<ParticlesTile<Particles>, alloc_mode>::build_links(particles_);
-        TileSet<ParticlesTile<PSpan_t>, alloc_mode>::build_links(particles_views_);
+        TileSet<VecTile, alloc_mode>::build_links(particles_);
+        TileSet<SpnTile, alloc_mode>::build_links(particles_views_);
     }
 
     TileSetVector(TileSetVector const& from)            = default;
@@ -330,9 +362,7 @@ public:
     }
     auto reset_particle_views_fn()
     {
-        return [&](std::size_t const i) {
-            return ParticlesTile<PSpan_t>{*particles_[i], particles_[i](), particles_[i]().size()};
-        };
+        return [&](std::size_t const i) { return SpnTile{particles_[i]}; };
     }
 
     void reset_tile_set_iterator_map();
@@ -468,10 +498,10 @@ protected:
     nd_array_t<SIZE_T> cap_{local_box().shape()};
     nd_array_t<std::size_t> cell_size_{local_box().shape()};
 
-    TileSet<ParticlesTile<Particles>, alloc_mode> particles_{safe_box_, 4};
+    TileSet<VecTile, alloc_mode> particles_{safe_box_, 4};
 
     // only used for GPU
-    TileSet<ParticlesTile<PSpan_t>, alloc_mode> particles_views_{
+    TileSet<SpnTile, alloc_mode> particles_views_{
         generate_from<alloc_mode>(reset_particle_views_fn(), particles_)};
 
 
@@ -572,7 +602,7 @@ auto& TileSetVector<Particles, impl>::reserve_ppc(std::size_t const& ppc)
 {
     static_assert(std::is_same_v<decltype(type), ParticleType>);
 
-    std::size_t const additional = ppc < 50 ? 10 : ppc * .1; // 20% overallocate
+    std::size_t const additional = ppc < 50 ? 10 : ppc * .2; // 20% overallocate
     std::size_t const buffered   = ppc + additional;
 
     if constexpr (type == ParticleType::Domain)
