@@ -410,6 +410,43 @@ namespace core
 
 
 
+        NO_DISCARD auto static constexpr fullPrimalToFullDual()
+        {
+            auto constexpr iShift = primalToDual();
+
+            // P1 is always on top of Ex so no shift
+
+            if constexpr (dimension == 1)
+            {
+                constexpr WeightPoint<dimension> P1{Point<int, dimension>{0}, 0.5};
+                constexpr WeightPoint<dimension> P2{Point<int, dimension>{iShift}, 0.5};
+                return std::array<WeightPoint<dimension>, 2>{P1, P2};
+            }
+            else if constexpr (dimension == 2)
+            {
+                constexpr WeightPoint<dimension> P1{Point<int, dimension>{0, 0}, 0.25};
+                constexpr WeightPoint<dimension> P2{Point<int, dimension>{0, iShift}, 0.25};
+                constexpr WeightPoint<dimension> P3{Point<int, dimension>{iShift, 0}, 0.25};
+                constexpr WeightPoint<dimension> P4{Point<int, dimension>{iShift, iShift}, 0.25};
+                return std::array<WeightPoint<dimension>, 4>{P1, P2, P3, P4};
+            }
+            else if constexpr (dimension == 3)
+            {
+                constexpr WeightPoint<dimension> P1{Point<int, dimension>{iShift, iShift, iShift}, 0.125};
+                constexpr WeightPoint<dimension> P2{Point<int, dimension>{iShift, iShift, iShift}, 0.125};
+                constexpr WeightPoint<dimension> P3{Point<int, dimension>{iShift, iShift, iShift}, 0.125};
+                constexpr WeightPoint<dimension> P4{Point<int, dimension>{iShift, iShift, iShift}, 0.125};
+                constexpr WeightPoint<dimension> P5{Point<int, dimension>{iShift, iShift, iShift}, 0.125};
+                constexpr WeightPoint<dimension> P6{Point<int, dimension>{iShift, iShift, iShift}, 0.125};
+                constexpr WeightPoint<dimension> P7{Point<int, dimension>{iShift, iShift, iShift}, 0.125};
+                constexpr WeightPoint<dimension> P8{Point<int, dimension>{iShift, iShift, iShift}, 0.125};
+                return std::array<WeightPoint<dimension>, 8>{P1, P2, P3, P4, P5, P6, P7, P8};
+            }
+        }
+
+
+
+
         NO_DISCARD auto static constexpr momentsToEx()
         {
             // Ex is dual primal primal

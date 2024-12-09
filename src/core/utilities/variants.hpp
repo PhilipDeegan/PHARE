@@ -1,9 +1,9 @@
 #ifndef PHARE_CORE_UTILITIES_RESOURCES_VARIANTS_HPP
 #define PHARE_CORE_UTILITIES_RESOURCES_VARIANTS_HPP
 
+#include <core/logger.hpp>
 #include "core/utilities/types.hpp"
 
-#include <core/logger.hpp>
 #include <tuple>
 #include <variant>
 #include <stdexcept>
@@ -124,7 +124,6 @@ auto get_from_variants(auto& variants, Args&... args)
 {
     return std::forward_as_tuple(get_from_variants(variants, args)...);
 }
-
 
 
 
