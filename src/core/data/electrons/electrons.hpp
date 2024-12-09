@@ -4,14 +4,12 @@
 #include "core/def.hpp"
 #include "core/utilities/variants.hpp"
 #include "core/hybrid/hybrid_quantities.hpp"
+#include "core/data/grid/gridlayoutdefs.hpp"
 #include "core/data/grid/gridlayout_utils.hpp"
-#include "core/data/grid/gridlayoutdefs.hpp" // TODO : needed ?
 #include "core/data/vecfield/vecfield_component.hpp"
 #include "core/data/field/initializers/field_user_initializer.hpp"
 
 #include "initializer/data_provider.hpp"
-
-#include "core/utilities/index/index.hpp"
 
 
 
@@ -66,7 +64,7 @@ public:
             throw std::runtime_error("Error, cannot return density because "
                                      "StandardHybridElectronFluxComputer is not usable");
 
-        return ions_.density();
+        return ions_.chargeDensity();
     }
 
     NO_DISCARD Field& density()
@@ -75,7 +73,7 @@ public:
             throw std::runtime_error("Error, cannot return density because "
                                      "StandardHybridElectronFluxComputer is not usable");
 
-        return ions_.density();
+        return ions_.chargeDensity();
     }
 
     NO_DISCARD VecField& velocity()
@@ -97,23 +95,23 @@ public:
         auto const& Vix = ions_.velocity()(Component::X);
         auto const& Viy = ions_.velocity()(Component::Y);
         auto const& Viz = ions_.velocity()(Component::Z);
-        auto const& Ni  = ions_.density(); // gives the particle density, hence the electron density
+        auto const& Ne  = ions_.chargeDensity();
 
         auto& Vex = Ve_(Component::X);
         auto& Vey = Ve_(Component::Y);
         auto& Vez = Ve_(Component::Z);
 
         // from Ni because all components are defined on primal
-        layout.evalOnBox(Ni, [&](auto const&... args) {
+        layout.evalOnBox(Ne, [&](auto const&... args) {
             auto arr = std::array{args...};
 
             auto const JxOnVx = GridLayout::project(Jx, arr, GridLayout::JxToMoments());
             auto const JyOnVy = GridLayout::project(Jy, arr, GridLayout::JyToMoments());
             auto const JzOnVz = GridLayout::project(Jz, arr, GridLayout::JzToMoments());
 
-            Vex(arr) = Vix(arr) - JxOnVx / Ni(arr);
-            Vey(arr) = Viy(arr) - JyOnVy / Ni(arr);
-            Vez(arr) = Viz(arr) - JzOnVz / Ni(arr);
+            Vex(arr) = Vix(arr) - JxOnVx / Ne(arr);
+            Vey(arr) = Viy(arr) - JyOnVy / Ne(arr);
+            Vez(arr) = Viz(arr) - JzOnVz / Ne(arr);
         });
     }
 
@@ -245,7 +243,7 @@ public:
         if (!this->Pe_.isUsable())
             throw std::runtime_error("Error - isothermal closure is not usable");
 
-        auto const& Ne_ = this->flux_.density();
+        auto const& Ne_ = this->flux_.chargeDensity();
         std::transform(std::begin(Ne_), std::end(Ne_), std::begin(this->Pe_),
                        [this](auto n) { return n * T0_; });
     }
@@ -281,7 +279,6 @@ public:
         , gamma_{dict["pressure_closure"]["Gamma"].template to<double>()}
         , Pe_init_{dict["pressure_closure"]["Pe"].template to<initializer::InitFunction<dim>>()}
     {
-        Field Te_{"Te", HybridQuantity::Scalar::P};
         resources.emplace_back(Te_);
     }
 
@@ -300,14 +297,14 @@ public:
         auto const& N_ = this->flux_.density();
         auto const& V_ = this->flux_.velocity();
 
-        Field Te_ = get_as_ref_or_throw<Field>(resources);
+        auto& Te = get_from_variants(resources, Te_);
 
-        std::transform(this->Pe_.begin(), this->Pe_.end(), N_.begin(), Te_.begin(),
+        std::transform(this->Pe_.begin(), this->Pe_.end(), N_.begin(), Te.begin(),
                        [](auto p, auto n) { return p / n; });
 
         this->dt_ = dt;
 
-        layout.evalOnBox(Te_, [&](auto&... ijk) mutable { P_Eq_(layout, V_, Te_, ijk...); });
+        layout.evalOnBox(Te, [&](auto&... ijk) mutable { P_Eq_(layout, V_, Te, ijk...); });
 
 
         // std::transform(std::begin(Ne_), std::end(Ne_), std::begin(this->Pe_),
@@ -319,6 +316,7 @@ private:
     double const gamma_ = 5. / 3.;
     double dt_;
     initializer::InitFunction<dim> Pe_init_;
+    Field Te_{"Te", HybridQuantity::Scalar::P};
 
 
     template<typename Field, typename VecField>
