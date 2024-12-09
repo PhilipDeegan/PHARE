@@ -143,8 +143,18 @@ private:
 
 
 
+
+
+
 template<typename Ions>
-class IsothermalElectronPressureClosure
+class ElectronPressureClosure
+{
+};
+
+
+
+template<typename Ions>
+class IsothermalElectronPressureClosure : public ElectronPressureClosure<Ions>
 {
     using GridLayout = typename Ions::gridlayout_type;
     using VecField   = typename Ions::vecfield_type;
@@ -221,6 +231,28 @@ private:
     double const Te_ = 0;
     Field Pe_;
 };
+
+
+
+
+
+
+template<typename Ions>
+std::unique_ptr<ElectronPressureClosure<Ions>> ElectronPressureClosureFactory()
+{
+    return std::make_unique<IsothermalElectronPressureClosure<Ions>>();
+}
+
+
+
+
+
+
+
+
+
+
+
 
 
 
