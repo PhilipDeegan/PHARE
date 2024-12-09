@@ -82,18 +82,18 @@ public:
         };
 
         auto per_tile = [=] _PHARE_DEV_FN_(auto const& i) mutable {
-            // Point<std::uint32_t, 3> const rcell{threadIdx.z, threadIdx.y, threadIdx.x};
             auto& view      = pps[i];
             auto& tile      = view()[blockIdx.x];
             auto& parts     = tile();
             auto const tidx = threadIdx.x;
             auto const ws   = kernel::warp_size();
             auto const each = parts.size() / ws;
+
             std::size_t pid = 0;
             for (; pid < each; ++pid)
                 per_any_particle(parts, view, view.local_cell(tile.lower), pid * ws + tidx, i);
-            // if (tidx < parts.size() - (ws * each))
-            //     per_any_particle(parts, view, view.local_cell(tile.lower), pid * ws + tidx, i);
+            if (tidx < parts.size() - (ws * each))
+                per_any_particle(parts, view, view.local_cell(tile.lower), pid * ws + tidx, i);
         };
 
 

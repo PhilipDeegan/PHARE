@@ -29,7 +29,7 @@ namespace PHARE::core
 {
 // COMPILE TIME SWITCHES
 bool constexpr INCLUDE_PATCH_GHOST  = 1;
-bool constexpr COMPARE_TO_ONE_PATCH = 0;
+bool constexpr COMPARE_TO_ONE_PATCH = 1;
 
 // RUNTIME ENV VAR OVERRIDES
 auto static const bytes     = get_env_as("PHARE_GPU_BYTES", std::uint64_t{500000000});
@@ -223,7 +223,7 @@ void compare_particles(GridLayout_t const& layout, P0& ref, P1& cmp_, std::size_
         PHARE_LOG_LINE_STR("Comparing Particle Arrays FAIL: " << P0::id() << " vs " << P1::id());
         PHARE_LOG_LINE_STR("results: " << report.why());
     }
-    PHARE_LOG_LINE_STR("sample 0 index particle: " << ref[0]);
+    PHARE_LOG_LINE_STR("eg: " << ref[0]);
 
     EXPECT_EQ(ref, cmp);
 }

@@ -821,8 +821,10 @@ namespace core
          * @brief AMRToLocal returns the local index associated with the given AMR one.
          * This method only deals with **cell** indexes.
          */
+
         template<typename T>
-        NO_DISCARD auto AMRToLocal(Point<T, dimension> const& AMRPoint) const _PHARE_ALL_FN_
+        NO_DISCARD auto AMRToLocal(Box<int, dimension> const& AMRBox,
+                                   Point<T, dimension> const& AMRPoint) const _PHARE_ALL_FN_
         {
             static_assert(std::is_integral_v<T>, "Error, must be MeshIndex (integral Point)");
             Point<std::uint32_t, dimension> localPoint;
@@ -833,11 +835,18 @@ namespace core
             //
             for (auto i = 0u; i < dimension; ++i)
             {
-                int local = AMRPoint[i] - (AMRBox_.lower[i] - localStart);
-                // assert(local >= 0);
+                int local = AMRPoint[i] - (AMRBox.lower[i] - localStart);
+                assert(local >= 0);
                 localPoint[i] = local;
             }
             return localPoint;
+        }
+
+
+        template<typename T>
+        NO_DISCARD auto AMRToLocal(Point<T, dimension> const& AMRPoint) const _PHARE_ALL_FN_
+        {
+            return AMRToLocal(AMRBox_, AMRPoint);
         }
 
 

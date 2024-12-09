@@ -28,9 +28,9 @@ template<std::size_t dim, typename PhysicalQuantity, typename Data_t = double,
 class Field : public NdArrayView<dim, Data_t>
 {
     static_assert(std::is_same_v<decltype(alloc_mode_), AllocatorMode>);
-    using Super = NdArrayView<dim, Data_t>;
 
 public:
+    using Super                      = NdArrayView<dim, Data_t>;
     auto constexpr static dimension  = dim;
     auto constexpr static alloc_mode = alloc_mode_;
     using value_type                 = Data_t;
@@ -62,7 +62,8 @@ public:
 
     void copyData(Field const& source) { Super::fill_from(source); }
 
-    void setBuffer(Field* const field)
+    template<typename FieldLike>
+    void setBuffer(FieldLike* const field) _PHARE_ALL_FN_
     {
         auto data = field ? field->data() : nullptr;
         if (data)

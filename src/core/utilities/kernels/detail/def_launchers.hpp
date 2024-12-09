@@ -21,7 +21,7 @@ auto inline warp_size() _PHARE_ALL_FN_ // make runtime interrogation?
 #if !defined(MKN_GPU_CUDA) || !defined(MKN_GPU_ROCM)
     throw std::runtime_error("warpsize is not available for cpu");
 #elif defined(MKN_GPU_ROCM)
-    return 64ull;
+    return 32ull;
 #elif defined(MKN_GPU_CUDA)
     return 32ull;
 #endif

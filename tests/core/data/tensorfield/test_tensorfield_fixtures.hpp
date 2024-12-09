@@ -86,8 +86,11 @@ public:
     template<auto AM>
     bool isclose(UsableTensorField<dim, rank, AM> const& that, double diff = 1e-15) const
     {
-        return core::for_N_all<N_elements>(
-            [&](auto i) { return (*this)[i].isclose(that[i], diff); });
+        return core::for_N_all<N_elements>([&](auto i) {
+            bool const b = (*this)[i].isclose(that[i], diff);
+            // PHARE_LOG_LINE_SS(b);
+            return b;
+        });
     }
 
     template<auto AM>

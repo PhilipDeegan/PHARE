@@ -181,9 +181,15 @@ public:
         return true;
     }
 
-protected:
+    template<typename View>
+    void reset(View& view) _PHARE_ALL_FN_
+    {
+        this->ptr_    = view.data();
+        this->size_   = view.size();
+        this->nCells_ = view.nCells_;
+    }
     template<typename Vec>
-    void reset(Vec& vec, std::array<std::uint32_t, dim> const& nCells)
+    void reset(Vec& vec, std::array<std::uint32_t, dim> const& nCells) _PHARE_ALL_FN_
     {
         this->ptr_    = vec.data();
         this->size_   = vec.size();
@@ -198,7 +204,7 @@ protected:
     }
 
     void setBuffer(pointer_type ptr) _PHARE_ALL_FN_ { ptr_ = ptr; }
-    void setShape(std::array<std::uint32_t, dim> const nCells)
+    void setShape(std::array<std::uint32_t, dim> const nCells) _PHARE_ALL_FN_
     {
         nCells_ = nCells;
         size_   = core::product(nCells);

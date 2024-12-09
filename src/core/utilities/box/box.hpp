@@ -91,6 +91,18 @@ struct Box
         return std::optional<Box>{intersection};
     }
 
+    NO_DISCARD auto unsafe_intersection(Box const& other) const _PHARE_ALL_FN_ // no optional on gpu
+    {
+        Box intersection{other};
+        for (auto idim = 0u; idim < dim; ++idim)
+        {
+            intersection.lower[idim] = std::max(lower[idim], other.lower[idim]);
+            intersection.upper[idim] = std::min(upper[idim], other.upper[idim]);
+            assert(intersection.lower[idim] < intersection.upper[idim]);
+        }
+        return intersection;
+    }
+
     NO_DISCARD auto operator-(Box const& that) const
     {
         return Box{lower - that.lower, upper - that.upper};

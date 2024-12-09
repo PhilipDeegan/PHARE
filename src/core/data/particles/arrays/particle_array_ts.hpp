@@ -13,12 +13,14 @@
 #include "core/data/particles/particle_array_partitioner.hpp"
 
 
+#include <tuple>
 #include <iterator>
 #include <stdexcept>
 
 
 namespace PHARE::core
 {
+
 
 template<typename Particles, typename NdArray_t>
 class ParticlesTile : public Box<std::int32_t, Particles::dimension>
@@ -30,33 +32,24 @@ class ParticlesTile : public Box<std::int32_t, Particles::dimension>
     friend class ParticlesTile;
 
     auto constexpr static ndarray_builder = [](auto const& box) {
-        auto const cells = *(box.shape().as_unsigned() - 1);
+        auto const cells = *(box.shape().as_unsigned()); // no -1 for primal
         if constexpr (Particles::storage_mode == StorageMode::VECTOR)
             return NdArray_t{cells}; // allocating
         else
             return NdArray_t{0, cells}; // span with nullptr, updated later
     };
 
-public:
-    ParticlesTile(Super const& box)
-        : Super{box}
-        , particles{[&]() {
-            if constexpr (std::is_constructible_v<Particles, Super>)
-                return Particles{box};
-            else
-                return Particles{};
-        }()}
-        , field_ghost_box{grow(box, 2)} // assume interp 1 for now
-        , rho{ndarray_builder(field_ghost_box)}
-        , fx{ndarray_builder(field_ghost_box)}
-        , fy{ndarray_builder(field_ghost_box)}
-        , fz{ndarray_builder(field_ghost_box)}
+    template<typename... Args>
+    auto constexpr static bounded_ghost_box(Args&&... args)
     {
+        auto const& [tilebox, particle_array] = std::forward_as_tuple(args...);
+        auto tgbox                            = grow(tilebox, 2); // assume interp 1 for now
+        auto bounded_tgbox                    = tgbox * particle_array.safe_box();
+        assert(bounded_tgbox);
+        return *bounded_tgbox;
     }
 
-
-    ParticlesTile(ParticlesTile<Particles, NdArray_t>&) = default;
-
+public:
     template<typename Ps, typename Nd>
     ParticlesTile(ParticlesTile<Ps, Nd>& tile) // span constructor
         : Super{tile}
@@ -68,6 +61,27 @@ public:
         , fz{*tile.fz}
     {
     }
+
+    template<typename... Args>
+    ParticlesTile(Super const& box, Args&&... args)
+        : Super{box}
+        , particles{[&]() {
+            if constexpr (std::is_constructible_v<Particles, Super>)
+                return Particles{box};
+            else
+                return Particles{};
+        }()}
+        , field_ghost_box{bounded_ghost_box(box, args...)}
+        , rho{ndarray_builder(field_ghost_box)}
+        , fx{ndarray_builder(field_ghost_box)}
+        , fy{ndarray_builder(field_ghost_box)}
+        , fz{ndarray_builder(field_ghost_box)}
+    {
+    }
+
+
+    ParticlesTile(ParticlesTile<Particles, NdArray_t>&) = default;
+
 
     ParticlesTile(ParticlesTile&&)                 = default;
     ParticlesTile(ParticlesTile const&)            = default;
@@ -83,6 +97,10 @@ public:
     auto& link(std::size_t const idx) { return _links[idx]; }
     auto& links() { return _links; }
     auto& links() const { return _links; }
+
+    auto fields() _PHARE_ALL_FN_ { return std::forward_as_tuple(rho, fx, fy, fz); }
+    auto fields() const _PHARE_ALL_FN_ { return std::forward_as_tuple(rho, fx, fy, fz); }
+    auto& field_box() const _PHARE_ALL_FN_ { return field_ghost_box; }
 
 private:
     Particles particles;
@@ -173,6 +191,7 @@ public:
 
     auto& box() const _PHARE_ALL_FN_ { return box_; }
     auto& ghost_box() const _PHARE_ALL_FN_ { return ghost_box_; }
+    auto& safe_box() const { return safe_box_; }
     auto local_cell(std::array<int, dim> const& icell) const _PHARE_ALL_FN_
     {
         return as_local_cell(safe_box_, icell);
@@ -498,11 +517,11 @@ protected:
     nd_array_t<SIZE_T> cap_{local_box().shape()};
     nd_array_t<std::size_t> cell_size_{local_box().shape()};
 
-    TileSet<VecTile, alloc_mode> particles_{safe_box_, 4};
+    TileSet<VecTile, alloc_mode> particles_{safe_box_, 4, *this};
 
     // only used for GPU
     TileSet<SpnTile, alloc_mode> particles_views_{
-        generate_from<alloc_mode>(reset_particle_views_fn(), particles_)};
+        generate_from<alloc_mode>(reset_particle_views_fn(), particles_, *this)};
 
 
     std::size_t total_size = 0;
@@ -666,7 +685,7 @@ template<typename Particles, std::uint8_t impl>
 template<auto type>
 void TileSetVector<Particles, impl>::sync_cpu_gaps_and_tmp()
 {
-    PHARE_LOG_LINE_STR("sync_cpu_gaps_and_tmp " << magic_enum::enum_name(type));
+    // PHARE_LOG_LINE_STR("sync_cpu_gaps_and_tmp " << magic_enum::enum_name(type));
 
     for (auto& tile : particles_)
     {
@@ -820,9 +839,8 @@ void TileSetVector<Particles, impl>::sync()
     static_assert(type != ParticleType::All);
 
     PHARE_LOG_SCOPE(1, "TileSetVector::sync");
-    PHARE_LOG_LINE_STR("sync " << static_cast<std::uint32_t>(PHASE) << " "
-                               << magic_enum::enum_name(type));
-
+    // PHARE_LOG_LINE_STR("sync " << static_cast<std::uint32_t>(PHASE) << " "
+    //                            << magic_enum::enum_name(type));
     // auto const lbox = local_box();
 
     if constexpr (PHASE < 2 and alloc_mode == AllocatorMode::CPU)

@@ -774,7 +774,16 @@ auto constexpr any_in(auto const a, auto&&... ts) _PHARE_ALL_FN_
 }
 
 
+template<typename T, std::uint8_t size>
+struct SimplerTensorField
+{
+    auto& operator[](std::size_t const i) _PHARE_ALL_FN_ { return fields[i]; }
+    auto& operator[](std::size_t const i) const _PHARE_ALL_FN_ { return fields[i]; }
+    auto& operator()() _PHARE_ALL_FN_ { return fields; }
+    auto& operator()() const _PHARE_ALL_FN_ { return fields; }
 
+    std::array<T, size> fields;
+};
 
 } // namespace PHARE::core
 

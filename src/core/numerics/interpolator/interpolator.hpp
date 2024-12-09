@@ -428,8 +428,8 @@ protected:
     // in 'startIndex' and 'weights'. For dual fields, the normalizedPosition
     // is offseted compared to primal ones.
     template<auto centering, typename GridLayout, typename ICell, typename Delta>
-    auto indexAndWeights_(GridLayout const& layout, ICell const& iCell_,
-                          Delta const& delta) _PHARE_ALL_FN_
+    auto indexAndWeights_(GridLayout const& layout, ICell const& iCell_, Delta const& delta,
+                          Box<int, dim> const& amrbox) _PHARE_ALL_FN_
     {
         // dual weights require -.5 to take the correct position weight
         auto constexpr dual_offset = .5;
@@ -441,7 +441,7 @@ protected:
                 return std::forward_as_tuple(primal_startIndex_, primal_weights_);
         }();
 
-        auto iCell = layout.AMRToLocal(Point{iCell_});
+        auto iCell = layout.AMRToLocal(amrbox, Point{iCell_});
 
         for (auto iDim = 0u; iDim < dimension; ++iDim)
         {
@@ -456,6 +456,12 @@ protected:
         }
     }
 
+    template<auto centering, typename GridLayout, typename ICell, typename Delta>
+    auto indexAndWeights_(GridLayout const& layout, ICell const& iCell_,
+                          Delta const& delta) _PHARE_ALL_FN_
+    {
+        indexAndWeights_<centering>(layout, iCell_, delta, layout.AMRBox());
+    }
 
 public:
     using Operator = core::Operators<double, atomic_ops>;
@@ -561,12 +567,13 @@ public:
      */
     template<typename Particle_t, typename VecField, typename GridLayout, typename Field>
     void particleToMesh(Particle_t const& particle, Field& density, VecField& flux,
-                        GridLayout const& layout, double coef = 1.) _PHARE_ALL_FN_
+                        GridLayout const& layout, Box<int, dim> const amrBox,
+                        double coef = 1.) _PHARE_ALL_FN_
     {
         auto& startIndex_           = primal_startIndex_;
         auto& weights_              = primal_weights_;
         auto& [xFlux, yFlux, zFlux] = flux();
-        indexAndWeights_<QtyCentering::primal>(layout, particle.iCell(), particle.delta());
+        indexAndWeights_<QtyCentering::primal>(layout, particle.iCell(), particle.delta(), amrBox);
         particleToMesh_(
             density, particle, [](auto const& /*part*/) { return 1.; }, startIndex_, weights_,
             coef);
@@ -579,6 +586,12 @@ public:
         particleToMesh_(
             zFlux, particle, [](auto const& part) { return part.v()[2]; }, startIndex_, weights_,
             coef);
+    }
+    template<typename Particle_t, typename VecField, typename GridLayout, typename Field>
+    void particleToMesh(Particle_t const& particle, Field& density, VecField& flux,
+                        GridLayout const& layout, double coef = 1.) _PHARE_ALL_FN_
+    {
+        particleToMesh(particle, density, flux, layout, layout.AMRBox(), coef);
     }
 
     template<typename Particle_t, typename GridLayout>

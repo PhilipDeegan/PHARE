@@ -147,7 +147,8 @@ public:
     using Box_t                     = Box<int, Tile::dimension>;
     static auto constexpr dimension = Tile::dimension;
 
-    TileSet(Box_t const& box, std::array<std::size_t, dimension> const& tile_size)
+    template<typename... Args>
+    TileSet(Box_t const& box, std::array<std::size_t, dimension> const& tile_size, Args&&... args)
         : box_{box}
         , tile_size_{tile_size}
         , shape_{[&]() {
@@ -161,13 +162,14 @@ public:
     {
         tiles_.reserve(product(shape_));
         consistent_tile_size_();
-        make_tiles_();
+        make_tiles_(args...);
         tag_cells_();
     }
 
 
-    TileSet(Box_t const& box, std::size_t const& tile_size)
-        : TileSet{box, ConstArray<std::size_t, dimension>(tile_size)}
+    template<typename... Args>
+    TileSet(Box_t const& box, std::size_t const& tile_size, Args&&... args)
+        : TileSet{box, ConstArray<std::size_t, dimension>(tile_size), args...}
     {
     }
 
@@ -472,7 +474,8 @@ private:
         }
     }
 
-    void make_tiles_()
+    template<typename... Args>
+    void make_tiles_(Args&&... args)
     {
         auto const size_me = [&](auto dim, auto idx) {
             if (idx == shape_[dim] - 1)
@@ -492,7 +495,7 @@ private:
                 // -1 because upper is included
                 tile.lower[0] = box_.lower[0] + ix * tile_size_[0];
                 tile.upper[0] = tile.lower[0] + size_me(0, ix) - 1;
-                tiles_.emplace_back(tile);
+                tiles_.emplace_back(tile, args...);
             }
             else
             {
@@ -505,7 +508,7 @@ private:
                         tile.upper[0] = tile.lower[0] + size_me(0, ix) - 1;
                         tile.lower[1] = box_.lower[1] + iy * tile_size_[1];
                         tile.upper[1] = tile.lower[1] + size_me(1, iy) - 1;
-                        tiles_.emplace_back(tile);
+                        tiles_.emplace_back(tile, args...);
                     }
                     else
                     {
@@ -518,7 +521,7 @@ private:
                             tile.upper[1] = tile.lower[1] + size_me(1, iy) - 1;
                             tile.lower[2] = box_.lower[2] + iz * tile_size_[2];
                             tile.upper[2] = tile.lower[2] + size_me(2, iz) - 1;
-                            tiles_.emplace_back(tile);
+                            tiles_.emplace_back(tile, args...);
                         }
                     }
                 }
@@ -558,21 +561,23 @@ auto& update_from(F f, TileSet<Tile, alloc_mode>& in)
     return in;
 }
 
-template<auto alloc_mode = AllocatorMode::CPU, typename F, typename Tile, auto alloc_mode1>
-auto generate_from(F f, TileSet<Tile, alloc_mode1>& in)
+template<auto alloc_mode = AllocatorMode::CPU, typename F, typename Tile, auto am1,
+         typename... Args>
+auto generate_from(F f, TileSet<Tile, am1>& in, Args&&... args)
 {
     using value_type = std::decay_t<std::invoke_result_t<F&, std::size_t const&>>;
-    TileSet<value_type, alloc_mode> ret{in.box(), in.tile_size()};
+    TileSet<value_type, alloc_mode> ret{in.box(), in.tile_size(), args...};
     for (std::size_t i = 0; i < in.size(); ++i)
         ret.data()[i] = f(i);
     return ret;
 }
 
-template<auto alloc_mode = AllocatorMode::CPU, typename F, typename Tile, auto alloc_mode1>
-auto generate_from(F f, TileSet<Tile, alloc_mode1> const& in)
+template<auto alloc_mode = AllocatorMode::CPU, typename F, typename Tile, auto am1,
+         typename... Args>
+auto generate_from(F f, TileSet<Tile, am1> const& in, Args&&... args)
 {
     using value_type = std::decay_t<std::invoke_result_t<F&, std::size_t const&>>;
-    TileSet<value_type, alloc_mode> ret{in.box(), in.tile_size()};
+    TileSet<value_type, alloc_mode> ret{in.box(), in.tile_size(), args...};
     for (std::size_t i = 0; i < in.size(); ++i)
         ret.data()[i] = f(i);
     return ret;

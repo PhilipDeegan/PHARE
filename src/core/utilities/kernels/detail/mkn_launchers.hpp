@@ -255,12 +255,14 @@ struct TileBlockFunction : public mkn::gpu::StreamFunction<Strat>
 
     void run(std::uint32_t const i) override
     {
+        if (strat.datas[i]->size() == 0)
+            return;
         if constexpr (impl == 0)
         {
             using Launcher = ChunkLauncher<false>;
             Launcher launcher{1, ds};
             launcher.b.x = kernel::warp_size();
-            launcher.g.x = strat.datas[i]->size();
+            launcher.g.x = (*strat.datas[i])().size();
             launcher.stream(strat.streams[i], [=, fn = fn] __device__() mutable { fn(i); });
         }
         else

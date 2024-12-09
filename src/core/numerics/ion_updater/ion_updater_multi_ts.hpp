@@ -122,55 +122,55 @@ void IonUpdaterMultiTS<Ions, Electromag, GridLayout>::updateAndDepositDomain_(Mo
 
 #if PHARE_HAVE_MKN_GPU
 
-        // std::uint16_t const group_size = N_ARRAYS * views[0].ions->size();
-        // MultiBoris<ModelViews> in{dt_, views};
-        // Pusher_t::move(in);
+    // std::uint16_t const group_size = N_ARRAYS * views[0].ions->size();
+    // MultiBoris<ModelViews> in{dt_, views};
+    // Pusher_t::move(in);
 
-        // // finished moving particles on patch
-        // in.streamer.group_barrier(group_size);
+    // // finished moving particles on patch
+    // in.streamer.group_barrier(group_size);
 
-        // // add new domain particles
-        // in.streamer.host_group_mutex(group_size, [&](auto const i) {
-        //     auto is_domain_particles = in.particle_type[i] == DOMAIN_ID;
-        //     if (is_domain_particles || in.particles[i]->size() == 0)
-        //         return;
+    // // add new domain particles
+    // in.streamer.host_group_mutex(group_size, [&](auto const i) {
+    //     auto is_domain_particles = in.particle_type[i] == DOMAIN_ID;
+    //     if (is_domain_particles || in.particles[i]->size() == 0)
+    //         return;
 
-        //     auto copy_in = [&](auto const j) {
-        //         ParticleArrayService::copy_ghost_into_domain(*in.particles[i], *in.particles[j]);
-        //     };
+    //     auto copy_in = [&](auto const j) {
+    //         ParticleArrayService::copy_ghost_into_domain(*in.particles[i], *in.particles[j]);
+    //     };
 
-        //     if (in.particle_type[i - 1] == DOMAIN_ID)
-        //         copy_in(i - 1);
-        //     else
-        //         return;
-        //     in.particles[i]->clear();
-        //     in.pviews[i].clear();
-        // });
+    //     if (in.particle_type[i - 1] == DOMAIN_ID)
+    //         copy_in(i - 1);
+    //     else
+    //         return;
+    //     in.particles[i]->clear();
+    //     in.pviews[i].clear();
+    // });
 
 
-        // auto pps     = in.pviews.data();
-        // auto rhos    = in.rhos.data();
-        // auto fluxes  = in.fluxes.data();
-        // auto layouts = in.layouts.data();
+    // auto pps     = in.pviews.data();
+    // auto rhos    = in.rhos.data();
+    // auto fluxes  = in.fluxes.data();
+    // auto layouts = in.layouts.data();
 
-        // // finished adding new domain particles
-        // in.streamer.group_barrier(group_size);
+    // // finished adding new domain particles
+    // in.streamer.group_barrier(group_size);
 
-        // in.streamer.async_dev_idx(N_ARRAYS, DOMAIN_ID, [=](auto const i) { // 0 = domain
-        //     Interpolating_t::box_kernel(pps[i], layouts[i], fluxes[i], rhos[i]);
-        // });
-        // // no patch ghost as they're injected into domain
-        // in.streamer.async_dev_idx(N_ARRAYS, LEVEL_GHOST_ID, [=](auto const i) { // 2 = level
-        // ghosts
-        //     Interpolating_t::box_kernel(pps[i], layouts[i], fluxes[i], rhos[i]);
-        // });
+    // in.streamer.async_dev_idx(N_ARRAYS, DOMAIN_ID, [=](auto const i) { // 0 = domain
+    //     Interpolating_t::box_kernel(pps[i], layouts[i], fluxes[i], rhos[i]);
+    // });
+    // // no patch ghost as they're injected into domain
+    // in.streamer.async_dev_idx(N_ARRAYS, LEVEL_GHOST_ID, [=](auto const i) { // 2 = level
+    // ghosts
+    //     Interpolating_t::box_kernel(pps[i], layouts[i], fluxes[i], rhos[i]);
+    // });
 
-        // in.streamer();
-        // in.streamer.sync();
-        // in.streamer.dump_times(detail::timings_dir_str + "/updateAndDepositDomain_.txt");
+    // in.streamer();
+    // in.streamer.sync();
+    // in.streamer.dump_times(detail::timings_dir_str + "/updateAndDepositDomain_.txt");
 
 #else
-        // throw std::runtime_error("No available implementation")
+    // throw std::runtime_error("No available implementation")
 #endif
     //
 }
@@ -233,7 +233,7 @@ void IonUpdaterMultiTS<Ions, Electromag, GridLayout>::updateAndDepositAll_(Model
     assert(GridLayout::nbrGhosts() == 2);
     static_assert(GridLayout::nbrGhosts() == 2);
 
-    std::uint8_t constexpr static INTERP_GPU_IMPL = 1;
+    std::uint8_t constexpr static INTERP_GPU_IMPL = 2;
 
     if constexpr (any_in(Particles::alloc_mode, AllocatorMode::GPU_UNIFIED)
                   and INTERP_GPU_IMPL == 0)
@@ -247,12 +247,27 @@ void IonUpdaterMultiTS<Ions, Electromag, GridLayout>::updateAndDepositAll_(Model
         // hipFuncSetAttribute(gpu_func, hipFuncAttributeMaxDynamicSharedMemorySize, maxbytes);
         in.streamer.async_dev_chunk_idx(N_ARRAYS, DOMAIN_ID, interper, 4, 9 * 9 * 9 * 1 * 8);
     }
-    else if constexpr (any_in(Particles::alloc_mode, AllocatorMode::GPU_UNIFIED))
+    else if constexpr (any_in(Particles::alloc_mode, AllocatorMode::GPU_UNIFIED)
+                       and INTERP_GPU_IMPL == 1)
     {
         auto const interper = [=] _PHARE_DEV_FN_(auto const i) mutable {
             Interpolating_t::chunk_kernel_ts_all(pps[i], layouts[i], fluxes[i], rhos[i]);
         };
         in.streamer.async_dev_chunk_idx(N_ARRAYS, DOMAIN_ID, interper, 4, 9 * 9 * 9 * 4 * 8);
+    }
+    else if constexpr (any_in(Particles::alloc_mode, AllocatorMode::GPU_UNIFIED)
+                       and INTERP_GPU_IMPL == 2)
+    {
+        in.streamer.async_dev_tiles(
+            [=] _PHARE_DEV_FN_(auto const i) mutable {
+                Interpolating_t::on_tiles(pps[i], layouts[i], fluxes[i], rhos[i]);
+            },
+            9 * 9 * 9 * 4 * 8);
+
+        in.streamer.host([&](auto const i) {
+            if (pps[i].size())
+                Interpolating_t::ts_reducer(pps[i], layouts[i], fluxes[i], rhos[i]);
+        });
     }
     else
     {
@@ -267,8 +282,9 @@ void IonUpdaterMultiTS<Ions, Electromag, GridLayout>::updateAndDepositAll_(Model
     in.streamer.dump_times(detail::timings_dir_str + "/updateAndDepositAll_"
                            + std::string{Particles::type_id} + ".txt");
 
+
 #else
-        // throw std::runtime_error("No available implementation")
+    // throw std::runtime_error("No available implementation")
 #endif
     //
 }

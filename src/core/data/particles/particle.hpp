@@ -170,23 +170,20 @@ struct CountedParticle : public Particle<dim>
 template<template<std::size_t> typename Particle_t, std::size_t dim, typename Stream>
 Stream& write_to_stream(Particle_t<dim> const& particle, Stream& out, bool const new_line = true)
 {
-    out << "iCell(";
-    for (auto c : particle.iCell())
-        out << c << ",";
-    out << "), delta(";
-    for (auto d : particle.delta())
-        out << d << ",";
-    out << "), v(";
-    for (auto v : particle.v())
-        out << v << ",";
-    out << "), charge : " << particle.charge() << ", weight : " << particle.weight();
-
+    auto const append = [&](std::string const name, auto const& value) {
+        out << name << "(" << value[0];
+        for (std::size_t i = 1; i < dim; ++i)
+            out << "," << value[i];
+        out << "), ";
+    };
+    append("iCell", particle.iCell());
+    append("delta", particle.delta());
+    append("v", particle.v());
+    out << "), charge: " << particle.charge() << ", weight: " << particle.weight();
     if constexpr (std::is_same_v<Particle_t<dim>, CountedParticle<dim>>)
         out << ", id : " << particle.id;
-
     if (new_line)
         out << '\n';
-
     return out;
 }
 
