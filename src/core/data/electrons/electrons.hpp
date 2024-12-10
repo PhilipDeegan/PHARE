@@ -149,27 +149,16 @@ private:
 template<typename Ions>
 class ElectronPressureClosure
 {
-};
-
-
-
-template<typename Ions>
-class IsothermalElectronPressureClosure : public ElectronPressureClosure<Ions>
-{
     using GridLayout = typename Ions::gridlayout_type;
-    using VecField   = typename Ions::vecfield_type;
     using Field      = typename Ions::field_type;
 
 public:
-    using field_type = Field;
 
-    IsothermalElectronPressureClosure(PHARE::initializer::PHAREDict const& dict, Ions const& ions)
+    ElectronPressureClosure(PHARE::initializer::PHAREDict const& dict, Ions const& ions)
         : ions_{ions}
-        , Te_{dict["Te"].template to<double>()}
         , Pe_{"Pe", HybridQuantity::Scalar::P}
     {
     }
-
 
     //-------------------------------------------------------------------------
     //                  start the ResourcesUser interface
@@ -199,8 +188,6 @@ public:
     //                  ends the ResourcesUser interface
     //-------------------------------------------------------------------------
 
-
-
     NO_DISCARD Field& pressure()
     {
         if (!Pe_.isUsable())
@@ -214,22 +201,48 @@ public:
         return Pe_;
     }
 
-    void computePressure(GridLayout const& /*layout*/)
+    void virtual computePressure(GridLayout const& /*layout*/) = 0;
+
+
+protected:
+    Ions ions_;
+    Field Pe_;
+};
+
+
+
+template<typename Ions>
+class IsothermalElectronPressureClosure : public ElectronPressureClosure<Ions>
+{
+    using GridLayout = typename Ions::gridlayout_type;
+    using VecField   = typename Ions::vecfield_type;
+    using Field      = typename Ions::field_type;
+
+    using Super = ElectronPressureClosure<Ions>;
+
+public:
+    using field_type = Field;
+
+    IsothermalElectronPressureClosure(PHARE::initializer::PHAREDict const& dict, Ions const& ions)
+        : Super{dict, ions},
+        Te_{dict["Te"].template to<double>()}
+    {
+    }
+
+    void computePressure(GridLayout const& /*layout*/) override
     {
         static_assert(Field::is_contiguous, "Error - assumes Field date is contiguous");
 
-        if (!Pe_.isUsable())
+        if (!this->Pe_.isUsable())
             throw std::runtime_error("Error - isothermal closure pressure not usable");
 
-        auto const& Ne_ = ions_.density();
-        std::transform(std::begin(Ne_), std::end(Ne_), std::begin(Pe_),
+        auto const& Ne_ = this->ions_.density();
+        std::transform(std::begin(Ne_), std::end(Ne_), std::begin(this->Pe_),
                        [this](auto n) { return n * Te_; });
     }
 
 private:
-    Ions ions_;
     double const Te_ = 0;
-    Field Pe_;
 };
 
 
