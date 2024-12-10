@@ -52,8 +52,8 @@ private:
 template<bool sync = false>
 class ChunkLauncher : public mkn::gpu::DLauncher<sync>
 {
-    using Super                       = mkn::gpu::DLauncher<sync>;
-    static constexpr std::size_t warp = 64;
+    using Super = mkn::gpu::DLauncher<sync>;
+    // static constexpr std::size_t warp = 64;
 
 public:
     ChunkLauncher(std::size_t const _n, std::size_t const ds = 0, size_t const& dev = 0)

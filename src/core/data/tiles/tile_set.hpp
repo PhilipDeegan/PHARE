@@ -109,7 +109,7 @@ public:
     template<typename Tile_t>
     void reset(std::size_t i, Tile_t& tile)
     {
-        tiles_[i]().reset(tile());
+        tiles_[i].reset(tile);
     }
 
     template<typename TileSet_t>

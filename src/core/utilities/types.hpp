@@ -504,9 +504,12 @@ auto inline float_equals(double const& a, double const& b, double diff = 1e-12)
     auto pred = ret < diff;
     if (!pred)
     {
-        PHARE_LOG_LINE_STR(to_string_with_precision(a, 22));
-        PHARE_LOG_LINE_STR(to_string_with_precision(b, 22));
-        PHARE_LOG_LINE_STR(to_string_with_precision(ret, 22));
+        PHARE_LOG_LINE_SS(to_string_with_precision(a, 22) << ":" << //
+                          to_string_with_precision(b, 22) << ":" << //
+                          to_string_with_precision(ret, 22));
+        // PHARE_LOG_LINE_STR(to_string_with_precision(a, 22));
+        // PHARE_LOG_LINE_STR(to_string_with_precision(b, 22));
+        // PHARE_LOG_LINE_STR(to_string_with_precision(ret, 22));
     }
     return pred;
 #else

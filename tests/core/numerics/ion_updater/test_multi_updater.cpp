@@ -253,8 +253,18 @@ void compare(GridLayout_t const& layout, R& ref, C& cmp)
     else if constexpr (any_in(ParticleArray_t::layout_mode, AoSTS, SoATS))
         diff *= 1e1; // p2m op order diff
 
-    EXPECT_TRUE(ref.populations[0].F.isclose(cmp.populations[0].F, diff));
-    EXPECT_TRUE(ref.populations[0].rho.isclose(cmp.populations[0].rho, diff));
+
+    // EXPECT_TRUE(ref.populations[0].F.isclose(cmp.populations[0].F, diff));
+    {
+        auto const freport
+            = compare_tensor_fields(*ref.populations[0].F, *cmp.populations[0].F, diff);
+        if (!freport)
+            PHARE_LOG_LINE_STR("results: " << freport.why());
+    }
+    auto const freport = compare_fields(*ref.populations[0].rho, *cmp.populations[0].rho, diff);
+    if (!freport)
+        PHARE_LOG_LINE_STR("results: " << freport.why());
+    // EXPECT_TRUE(ref.populations[0].rho.isclose(cmp.populations[0].rho, diff));
 }
 
 

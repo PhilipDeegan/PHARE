@@ -822,15 +822,15 @@ namespace core
          * This method only deals with **cell** indexes.
          */
 
-        template<typename T>
+        template<template<typename, std::size_t> typename Point_t, typename T>
         NO_DISCARD auto AMRToLocal(Box<int, dimension> const& AMRBox,
-                                   Point<T, dimension> const& AMRPoint) const _PHARE_ALL_FN_
+                                   Point_t<T, dimension> const& AMRPoint) const _PHARE_ALL_FN_
         {
             static_assert(std::is_integral_v<T>, "Error, must be MeshIndex (integral Point)");
-            Point<std::uint32_t, dimension> localPoint;
+            Point_t<std::uint32_t, dimension> localPoint;
 
             // any direction, it's the same because we want cells
-            auto localStart = physicalStartIndex(QtyCentering::dual, Direction::X);
+            auto const localStart = physicalStartIndex(QtyCentering::dual, Direction::X);
 
             //
             for (auto i = 0u; i < dimension; ++i)
@@ -843,8 +843,8 @@ namespace core
         }
 
 
-        template<typename T>
-        NO_DISCARD auto AMRToLocal(Point<T, dimension> const& AMRPoint) const _PHARE_ALL_FN_
+        template<template<typename, std::size_t> typename Point_t, typename T>
+        NO_DISCARD auto AMRToLocal(Point_t<T, dimension> const& AMRPoint) const _PHARE_ALL_FN_
         {
             return AMRToLocal(AMRBox_, AMRPoint);
         }

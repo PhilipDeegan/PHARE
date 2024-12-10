@@ -264,10 +264,10 @@ void IonUpdaterMultiTS<Ions, Electromag, GridLayout>::updateAndDepositAll_(Model
             },
             9 * 9 * 9 * 4 * 8);
 
-        in.streamer.host([&](auto const i) {
-            if (pps[i].size())
-                Interpolating_t::ts_reducer(pps[i], layouts[i], fluxes[i], rhos[i]);
-        });
+        // in.streamer.host([&](auto const i) {
+        //     if (pps[i].size())
+        //         Interpolating_t::ts_reducer(pps[i], layouts[i], fluxes[i], rhos[i]);
+        // });
     }
     else
     {
@@ -281,6 +281,13 @@ void IonUpdaterMultiTS<Ions, Electromag, GridLayout>::updateAndDepositAll_(Model
     in.streamer().sync();
     in.streamer.dump_times(detail::timings_dir_str + "/updateAndDepositAll_"
                            + std::string{Particles::type_id} + ".txt");
+
+    if constexpr (any_in(Particles::alloc_mode, AllocatorMode::GPU_UNIFIED)
+                  and INTERP_GPU_IMPL == 2)
+        [&](auto const i) {
+            if (pps[i].size())
+                Interpolating_t::ts_reducer(pps[i], layouts[i], fluxes[i], rhos[i]);
+        }(0);
 
 
 #else

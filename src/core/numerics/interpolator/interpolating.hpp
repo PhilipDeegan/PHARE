@@ -181,16 +181,17 @@ public:
 #if PHARE_HAVE_MKN_GPU == 0
         throw std::runtime_error("nah");
 #else
+        static_assert(atomic_ops, "GPU must be atomic");
         using TensorField_t = SimplerTensorField<typename Field::Super, 3>;
         extern __shared__ double data[];
         // printf("L:%d i %llu \n", __LINE__, blockIdx.x);
-        auto const ziz  = 9 * 9 * 9;
-        auto& tile      = particles()[blockIdx.x];
-        auto& parts     = tile();
-        auto const tbox = tile.field_box().unsafe_intersection(particles.box());
-        auto const tidx = threadIdx.x;
-        auto const ws   = kernel::warp_size();
-        auto const each = parts.size() / ws;
+        auto const ziz                             = 9 * 9 * 9;
+        auto& tile                                 = particles()[blockIdx.x];
+        auto& parts                                = tile();
+        auto const tbox                            = (*tile).unsafe_intersection(particles.box());
+        auto const tidx                            = threadIdx.x;
+        auto const ws                              = kernel::warp_size();
+        auto const each                            = parts.size() / ws;
         auto const& [density, flux0, flux1, flux2] = tile.fields();
         auto const r0                              = density;
 
@@ -215,9 +216,9 @@ public:
 
         __syncthreads();
         for (; pid < each; ++pid)
-            interp.particleToMesh(parts[pid * ws + tidx], density, flux, layout, tbox, coef);
+            interp.particleToMesh(parts[(pid * ws) + tidx], density, flux, layout, tbox, coef);
         if (tidx < parts.size() - (ws * each))
-            interp.particleToMesh(parts[pid * ws + tidx], density, flux, layout, tbox, coef);
+            interp.particleToMesh(parts[(pid * ws) + tidx], density, flux, layout, tbox, coef);
         __syncthreads();
 
         density.reset(r0);
@@ -415,24 +416,30 @@ public:
     }
 
     template<typename Particles, typename GridLayout, typename VecField, typename Field>
-    static void ts_reducer(Particles& particles, GridLayout& layout, VecField& flux,
+    static void ts_reducer(Particles& particles, GridLayout const& layout, VecField& flux,
                            Field& density) _PHARE_ALL_FN_
     {
-        auto const& safe_box = particles.safe_box();
+        auto const safe_box = particles.safe_box();
 
         for (auto& tile : particles())
         {
             auto const& tile_box         = tile.field_box();
             auto const& [r0, f0, f1, f2] = tile.fields();
+            PHARE_LOG_LINE_SS(tile_box << " " << safe_box << " " << Point{r0.shape()});
             for (auto const& bix : tile_box)
             {
-                auto const plix = *(bix - safe_box.lower()).as_unsigned();
-                auto const tlix = *(bix - tile_box.lower()).as_unsigned();
+                auto const plix = (bix - safe_box.lower()).as_unsigned();
+                auto const tlix = (bix - tile_box.lower()).as_unsigned();
 
-                density(plix) += r0[tlix];
-                flux[0][plix] += f0[tlix];
-                flux[1][plix] += f1[tlix];
-                flux[2][plix] += f2[tlix];
+                // auto const plix = layout.AMRToLocal(bix);
+                // auto const tlix = layout.AMRToLocal(tile_box, bix);
+                PHARE_LOG_LINE_SS(bix << " " << plix << " " << tlix);
+
+
+                density(plix) += r0(tlix);
+                flux[0](plix) += f0(tlix);
+                flux[1](plix) += f1(tlix);
+                flux[2](plix) += f2(tlix);
             }
         }
     }

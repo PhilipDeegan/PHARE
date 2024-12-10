@@ -139,7 +139,13 @@ namespace core
             return p;
         }
 
-
+        auto& operator+=(Type const& value) _PHARE_ALL_FN_
+        {
+            auto& self = *this;
+            for (auto iDim = 0u; iDim < dim; ++iDim)
+                self[iDim] += value;
+            return self;
+        }
 
         auto operator+(Type const& value) const _PHARE_ALL_FN_
         {

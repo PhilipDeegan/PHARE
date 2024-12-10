@@ -2,15 +2,18 @@
 #define PHARE_TEST_CORE_DATA_TEST_TENSORFIELD_FIXTURES_HPP
 
 #include "core/data/grid/grid.hpp"
-#include "core/data/field/field.hpp"
-#include "core/data/grid/gridlayoutdefs.hpp"
-#include "core/data/particles/particle_array_def.hpp"
+// #include "core/data/field/field.hpp"
+// #include "core/data/grid/gridlayoutdefs.hpp"
+// #include "core/data/particles/particle_array_def.hpp"
 #include "core/def/phare_config.hpp"
 #include "core/hybrid/hybrid_quantities.hpp"
 #include "core/data/tensorfield/tensorfield.hpp"
 
-#include "core/vector.hpp"
+// #include "core/vector.hpp"
+#include "core/utilities/equality.hpp"
+
 #include "tests/core/data/field/test_field_fixtures.hpp"
+#include <cstdint>
 
 namespace PHARE::core
 {
@@ -111,6 +114,73 @@ protected:
 
     std::array<Grid_t, N_elements> xyz;
 };
+
+
+template<bool binary_eq = false, typename F0, typename F1, typename PhysicalQuantity,
+         std::size_t rank>
+EqualityReport compare_tensor_fields(TensorField<F0, PhysicalQuantity, rank> const& ref,
+                                     TensorField<F1, PhysicalQuantity, rank> const& cmp,
+                                     [[maybe_unused]] double const diff)
+{
+    auto constexpr static N_elements = detail::tensor_field_dim_from_rank<rank>();
+
+    auto const same_sizes = [&]() {
+        return core::for_N_all<N_elements>([&](auto i) { return ref[i].size() == cmp[i].size(); });
+    }();
+
+    if (!same_sizes)
+        return EqualityReport{false, "Tensorfield shape/size mismatch"};
+
+    auto const float_eq = [&](auto const a, auto const b) {
+        if constexpr (binary_eq)
+            return a == b;
+        else
+            return float_equals(a, b, diff);
+    };
+
+    std::stringstream log;
+
+    for (std::size_t ci = 0; ci < N_elements; ++ci)
+    {
+        auto const& ref_dat = ref[ci].data();
+        auto const& cmp_dat = cmp[ci].data();
+        std::size_t eqvals = 0, eqnot0 = 0;
+        for (std::size_t i = 0; i < ref[ci].size(); ++i)
+            if (float_eq(ref_dat[i], cmp_dat[i]))
+            {
+                ++eqvals;
+                if (ref_dat[i] != 0 and cmp_dat[i] != 0)
+                    ++eqnot0;
+            }
+        if (eqvals != ref[ci].size())
+        {
+            auto const bad = ref[ci].size() - eqvals;
+            log << "Tensorfield value mismatch: \n";
+            log << " component: " << ci << " - ";
+            log << "ok(" << eqvals << ") - ";
+            log << "ok!=0(" << eqnot0 << ") - ";
+            log << "bad(" << bad << ")\n";
+            return EqualityReport{false, log.str()};
+        }
+    }
+
+
+
+    return EqualityReport{true};
+}
+
+
+template<bool binary_equal = false, typename Field_t, typename PhysicalQuantity, std::size_t rank>
+EqualityReport compare_tensor_fields_strict(TensorField<Field_t, PhysicalQuantity, rank> const& ref,
+                                            TensorField<Field_t, PhysicalQuantity, rank> const& cmp,
+                                            double const diff)
+{
+    if (ref.componentNames() != cmp.componentNames())
+        return EqualityReport{false, "Tensorfield component mismatch"};
+
+    // else check rest
+    return compare_tensor_fields(ref, cmp, diff);
+}
 
 
 } // namespace PHARE::core

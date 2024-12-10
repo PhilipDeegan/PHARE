@@ -132,7 +132,7 @@ struct Box
         return *this;
     }
 
-    auto& shrink(Type const& size)
+    auto& shrink(Type const& size) _PHARE_ALL_FN_
     {
         assert(size >= 0);
         for (auto& c : lower)
@@ -155,7 +155,7 @@ struct Box
     }
 
     template<typename Size>
-    auto& shrink(std::array<Size, dim> const& by)
+    auto& shrink(std::array<Size, dim> const& by) _PHARE_ALL_FN_
     {
         for (auto iDim = 0u; iDim < dim; ++iDim)
         {
@@ -387,7 +387,7 @@ Box<Type, dim> grow(Box<Type, dim> const& box, std::array<Type, dim> const& by)
 
 
 template<typename Type, std::size_t dim, typename T2>
-NO_DISCARD Box<Type, dim> shrink(Box<Type, dim> const& box, T2 const& size)
+NO_DISCARD Box<Type, dim> shrink(Box<Type, dim> const& box, T2 const& size) _PHARE_ALL_FN_
 {
     auto copy{box};
     copy.shrink(size);

@@ -32,7 +32,8 @@ class ParticlesTile : public Box<std::int32_t, Particles::dimension>
     friend class ParticlesTile;
 
     auto constexpr static ndarray_builder = [](auto const& box) {
-        auto const cells = *(box.shape().as_unsigned()); // no -1 for primal
+        auto const cells = *(box.shape().as_unsigned());
+        PHARE_LOG_LINE_SS(box.shape().as_unsigned());
         if constexpr (Particles::storage_mode == StorageMode::VECTOR)
             return NdArray_t{cells}; // allocating
         else
@@ -46,6 +47,8 @@ class ParticlesTile : public Box<std::int32_t, Particles::dimension>
         auto tgbox                            = grow(tilebox, 2); // assume interp 1 for now
         auto bounded_tgbox                    = tgbox * particle_array.safe_box();
         assert(bounded_tgbox);
+        (*bounded_tgbox).upper += 1; // +1 for primal
+        PHARE_LOG_LINE_SS(*bounded_tgbox);
         return *bounded_tgbox;
     }
 
@@ -101,6 +104,13 @@ public:
     auto fields() _PHARE_ALL_FN_ { return std::forward_as_tuple(rho, fx, fy, fz); }
     auto fields() const _PHARE_ALL_FN_ { return std::forward_as_tuple(rho, fx, fy, fz); }
     auto& field_box() const _PHARE_ALL_FN_ { return field_ghost_box; }
+
+    template<typename P, typename N>
+    void reset(ParticlesTile<P, N>& tile)
+    {
+        (*this)().reset(tile());
+        // fx.reset(tile.fx);
+    }
 
 private:
     Particles particles;
