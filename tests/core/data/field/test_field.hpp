@@ -86,9 +86,8 @@ namespace PHARE::core
 template<std::size_t dim>
 struct FieldMock
 {
-    static auto constexpr dimension   = dim;
-    static auto constexpr is_host_mem = true;
-    double data;
+    static auto constexpr dimension  = dim;
+    auto constexpr static alloc_mode = AllocatorMode::CPU;
 
     FieldMock() = default;
 
@@ -105,6 +104,7 @@ struct FieldMock
     auto physicalQuantity() const { return qty; }
     std::string name() const { return "FieldMock"; }
 
+    double data;
     PHARE::core::HybridQuantity::Scalar qty = PHARE::core::HybridQuantity::Scalar::Ex;
 };
 
@@ -179,6 +179,7 @@ template<typename GridLayout, typename Field, typename T, typename FF = PHARE::F
 void test(GridLayout const& layout, Field const& field0, std::vector<T> const& fieldV,
           FF const ff = FF{})
 {
+    // <<<<<<< HEAD
     EXPECT_EQ(field0.size(), fieldV.size());
     core::NdArrayView<GridLayout::dimension, T const> const field1{fieldV.data(), field0.shape()};
     test_fields(layout, field0, field1, ff);
@@ -194,6 +195,46 @@ void test(GridLayout const& layout, Field0 const& field0, Field1 const& field1, 
 }
 
 
+// =======
+//     test_fields(layout, field0, field1, ff);
+// }
+
+
+// template<typename GridLayout, typename NdArrayImpl, std::size_t dim, typename T,
+//          typename FF = PHARE::FieldNullFilter>
+// void test(GridLayout const& layout,
+//           PHARE::core::FieldView<NdArrayImpl, PHARE::core::HybridQuantity::Scalar> const& field0,
+//           PHARE::core::NdArrayView<dim, T> const& field1, FF const ff = FF{})
+// {
+//     static_assert(NdArrayImpl::dimension == dim);
+//     test_fields(layout, field0, field1, ff);
+// }
+
+
+// template<typename GridLayout, typename NdArrayImpl, typename T,
+//          typename FF = PHARE::FieldNullFilter>
+// void test(GridLayout const& layout,
+//           PHARE::core::FieldView<NdArrayImpl, PHARE::core::HybridQuantity::Scalar> const& field0,
+//           std::vector<T> const& fieldV, FF const ff = FF{})
+// {
+//     EXPECT_EQ(field0.size(), fieldV.size());
+
+//     auto field1 = core::make_array_view(fieldV, field0.shape());
+//     test_fields(layout, field0, field1, ff);
+// }
+
+// template<typename GridLayout, typename NdArrayImpl, typename Qty, typename T,
+//          typename FF = PHARE::FieldNullFilter>
+// void test(GridLayout const& layout, PHARE::core::Field<NdArrayImpl, Qty> field0,
+//           std::vector<T>&& fieldV, FF const ff = FF{})
+// {
+//     EXPECT_EQ(field0.size(), fieldV.size());
+
+//     auto field1 = core::make_array_view(fieldV, field0.shape());
+//     test_fields(layout, field0, field1, ff);
+// }
+
+// >>>>>>> 6c74a67e (...)
 } // namespace PHARE::core
 
 

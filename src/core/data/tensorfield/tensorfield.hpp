@@ -21,6 +21,7 @@ constexpr static std::size_t tensor_field_dim_from_rank()
         return 3;
     else if constexpr (rank == 2) // symmetric 3x3 tensor field
         return 6;
+    return 0; // nvcc complains about no return
 }
 
 template<std::size_t rank, typename R = std::array<std::string, tensor_field_dim_from_rank<rank>()>>
@@ -56,9 +57,11 @@ public:
     static constexpr std::size_t dimension = Field_t::dimension;
     static constexpr std::size_t rank      = rank_;
 
-    using field_type = Field_t;
-    using value_type = typename Field_t::type;
-    using tensor_t   = typename PhysicalQuantity::template TensorType<rank>;
+    using field_type   = Field_t;
+    using raw_array_t  = field_type (&)[N];
+    using raw_array_ct = field_type const (&)[N];
+    using value_type   = typename Field_t::type;
+    using tensor_t     = typename PhysicalQuantity::template TensorType<rank>;
 
 
     TensorField()                                     = delete;
@@ -75,6 +78,7 @@ public:
         , nameToIndex_{makeMap_(std::make_index_sequence<N>{})}
     {
     }
+
 
     //-------------------------------------------------------------------------
     //                  start the ResourcesUser interface
@@ -132,15 +136,15 @@ public:
             throw std::runtime_error("Error - TensorField not usable");
     }
 
-    NO_DISCARD field_type& getComponent(Component component)
+    NO_DISCARD field_type& getComponent(Component component) _PHARE_ALL_FN_
     {
-        _check();
+        // _check();
         return components_[_get_index_for(component)];
     }
 
-    NO_DISCARD field_type const& getComponent(Component component) const
+    NO_DISCARD field_type const& getComponent(Component component) const _PHARE_ALL_FN_
     {
-        _check();
+        // _check();
         return components_[_get_index_for(component)];
     }
 
@@ -151,32 +155,33 @@ public:
     }
 
 
-    template<std::size_t... Index>
-    NO_DISCARD auto components(std::index_sequence<Index...>) const
-    {
-        return std::forward_as_tuple((*this)[Index]...);
+
+    NO_DISCARD auto& components() const _PHARE_ALL_FN_
+    {                       // std::array can't work on gpu?
+        return components_; // reinterpret_cast<raw_array_ct>(components_);
     }
-    NO_DISCARD auto components() const { return components(std::make_index_sequence<N>{}); }
-
-
-    template<std::size_t... Index>
-    NO_DISCARD auto components(std::index_sequence<Index...>)
+    NO_DISCARD auto& components() _PHARE_ALL_FN_
     {
-        return std::forward_as_tuple((*this)[Index]...);
+        return components_; // reinterpret_cast<raw_array_t>(components_);
     }
-    NO_DISCARD auto components() { return components(std::make_index_sequence<N>{}); }
 
 
-    NO_DISCARD auto& operator()(Component component) const { return getComponent(component); }
-    NO_DISCARD auto& operator()(Component component) { return getComponent(component); }
+    NO_DISCARD auto& operator()(Component component) const _PHARE_ALL_FN_
+    {
+        return getComponent(component);
+    }
+    NO_DISCARD auto& operator()(Component component) _PHARE_ALL_FN_
+    {
+        return getComponent(component);
+    }
 
 
-    NO_DISCARD auto operator()() const { return components(); }
-    NO_DISCARD auto operator()() { return components(); }
+    NO_DISCARD auto& operator()() const _PHARE_ALL_FN_ { return components(); }
+    NO_DISCARD auto& operator()() _PHARE_ALL_FN_ { return components(); }
 
 
-    NO_DISCARD auto& operator[](std::size_t i) { return components_[i]; }
-    NO_DISCARD auto& operator[](std::size_t i) const { return components_[i]; }
+    NO_DISCARD auto& operator[](std::size_t i) _PHARE_ALL_FN_ { return components_[i]; }
+    NO_DISCARD auto& operator[](std::size_t i) const _PHARE_ALL_FN_ { return components_[i]; }
 
 
     void copyData(TensorField const& source)
@@ -203,7 +208,7 @@ public:
     NO_DISCARD auto& componentNames() const { return componentNames_; }
 
 private:
-    auto static _get_index_for(Component component)
+    auto static _get_index_for(Component component) _PHARE_ALL_FN_
     {
         auto val = static_cast<std::underlying_type_t<Component>>(component);
         if constexpr (rank == 1)
