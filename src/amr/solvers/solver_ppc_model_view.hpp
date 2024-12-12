@@ -19,6 +19,7 @@ void assert_equal_sizes([[maybe_unused]] Vectors const&... vectors)
     )
 }
 
+
 /*Faraday, Ampere, Ohm Transformers are abstraction that, from the solver viewpoint, act as Faraday,
  * Ampere and Ohm algorithms, but take all patch views and hide the way these are processed, for
  * instance to implement a parallelization decomposition*/
