@@ -258,7 +258,7 @@ public:
     ElectronMomentModel(PHARE::initializer::PHAREDict const& dict, Ions& ions, VecField& J)
         : fluxComput_{ions, J}
 //      , pressureClosure_{dict["pressure_closure"], fluxComput_.getIons()}
-        , pressureClosure_{ElectronPressureClosureFactory<Ions>(dict, ions)}
+        , pressureClosure_{dict,ions}//ElectronPressureClosureFactory<Ions>(dict, ions)}
     {
     }
 
@@ -272,8 +272,8 @@ public:
 
     NO_DISCARD bool isUsable() const
     {
-//      return fluxComput_.isUsable() and pressureClosure_.isUsable();
-        return fluxComput_.isUsable() and pressureClosure_->isUsable();
+      return fluxComput_.isUsable() and pressureClosure_.isUsable();
+        //return fluxComput_.isUsable() and pressureClosure_->isUsable();
     }
 
     NO_DISCARD bool isSettable() const { return fluxComput_.isSettable(); }
@@ -281,13 +281,13 @@ public:
     NO_DISCARD auto getCompileTimeResourcesViewList() const
     {
 //      return std::forward_as_tuple(fluxComput_, pressureClosure_);
-        return std::forward_as_tuple(fluxComput_, *pressureClosure_);
+        return std::forward_as_tuple(fluxComput_, pressureClosure_);
     }
 
     NO_DISCARD auto getCompileTimeResourcesViewList()
     {
 //      return std::forward_as_tuple(fluxComput_, pressureClosure_);
-        return std::forward_as_tuple(fluxComput_, *pressureClosure_);
+        return std::forward_as_tuple(fluxComput_, pressureClosure_);
     }
 
     //-------------------------------------------------------------------------
@@ -297,23 +297,24 @@ public:
 
     NO_DISCARD Field const& density() const { return fluxComput_.density(); }
     NO_DISCARD VecField const& velocity() const { return fluxComput_.velocity(); }
-//  NO_DISCARD Field const& pressure() const { return pressureClosure_.pressure(); }
-    NO_DISCARD Field const& pressure() const { return pressureClosure_->pressure(); }
+  NO_DISCARD Field const& pressure() const { return pressureClosure_.pressure(); }
+    /*NO_DISCARD Field const& pressure() const { return pressureClosure_->pressure(); }*/
 
     NO_DISCARD Field& density() { return fluxComput_.density(); }
     NO_DISCARD VecField& velocity() { return fluxComput_.velocity(); }
-//  NO_DISCARD Field& pressure() { return pressureClosure_.pressure(); }
-    NO_DISCARD Field& pressure() { return pressureClosure_->pressure(); }
+  NO_DISCARD Field& pressure() { return pressureClosure_.pressure(); }
+//    NO_DISCARD Field& pressure() { return pressureClosure_->pressure(); }
 
     void computeDensity() { fluxComput_.computeDensity(); }
     void computeBulkVelocity(GridLayout const& layout) { fluxComput_.computeBulkVelocity(layout); }
-//  void computePressure(GridLayout const& layout) { pressureClosure_.computePressure(layout); }
-    void computePressure(GridLayout const& layout) { pressureClosure_->computePressure(layout); }
+  void computePressure(GridLayout const& layout) { pressureClosure_.computePressure(layout); }
+//    void computePressure(GridLayout const& layout) { pressureClosure_->computePressure(layout); }
 
 private:
     FluxComputer fluxComput_;
 //  IsothermalElectronPressureClosure<Ions> pressureClosure_;
-    std::shared_ptr<ElectronPressureClosure<Ions>> pressureClosure_;
+    //std::shared_ptr<ElectronPressureClosure<Ions>> pressureClosure_;
+    IsothermalElectronPressureClosure<Ions> pressureClosure_;
 };
 
 
