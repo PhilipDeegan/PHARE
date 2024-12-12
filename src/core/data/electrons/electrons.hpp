@@ -36,7 +36,6 @@ public:
     //                  start the ResourcesUser interface
     //-------------------------------------------------------------------------
 
-
     NO_DISCARD bool isUsable() const { return ions_.isUsable() && J_.isUsable() && Ve_.isUsable(); }
 
     NO_DISCARD bool isSettable() const
@@ -57,8 +56,6 @@ public:
     //-------------------------------------------------------------------------
     //                  ends the ResourcesUser interface
     //-------------------------------------------------------------------------
-
-
 
 
     NO_DISCARD Field const& density() const
@@ -87,7 +84,6 @@ public:
         }
     }
 
-
     NO_DISCARD VecField& velocity()
     {
         if (isUsable())
@@ -100,7 +96,6 @@ public:
                                      "StandardHybridElectronFluxComputer is not usable");
         }
     }
-
 
     void computeDensity() {}
 
@@ -132,7 +127,6 @@ public:
         });
     }
 
-
     auto& getIons() const { return ions_; }
 
 private:
@@ -140,9 +134,6 @@ private:
     VecField J_;
     VecField Ve_;
 };
-
-
-
 
 
 
@@ -163,7 +154,6 @@ public:
     //-------------------------------------------------------------------------
     //                  start the ResourcesUser interface
     //-------------------------------------------------------------------------
-
 
     NO_DISCARD bool isUsable() const { return Pe_.isUsable() and ions_.isUsable(); }
 
@@ -188,21 +178,22 @@ public:
     //                  ends the ResourcesUser interface
     //-------------------------------------------------------------------------
 
+
     NO_DISCARD Field& pressure()
     {
         if (!Pe_.isUsable())
-            throw std::runtime_error("Error - isothermal closure pressure not usable");
+            throw std::runtime_error("Error - ! isothermal closure pressure not usable");
         return Pe_;
     }
+
     NO_DISCARD Field const& pressure() const
     {
         if (!Pe_.isUsable())
-            throw std::runtime_error("Error - isothermal closure pressure not usable");
+            throw std::runtime_error("Error - !! isothermal closure pressure not usable");
         return Pe_;
     }
 
     void virtual computePressure(GridLayout const& /*layout*/) = 0;
-
 
 protected:
     Ions ions_;
@@ -225,7 +216,7 @@ public:
 
     IsothermalElectronPressureClosure(PHARE::initializer::PHAREDict const& dict, Ions const& ions)
         : Super{dict, ions},
-        Te_{dict["Te"].template to<double>()}
+        Te_{dict["pressure_closure"]["Te"].template to<double>()}
     {
     }
 
@@ -234,7 +225,7 @@ public:
         static_assert(Field::is_contiguous, "Error - assumes Field date is contiguous");
 
         if (!this->Pe_.isUsable())
-            throw std::runtime_error("Error - isothermal closure pressure not usable");
+            throw std::runtime_error("Error - !!! isothermal closure pressure not usable");
 
         auto const& Ne_ = this->ions_.density();
         std::transform(std::begin(Ne_), std::end(Ne_), std::begin(this->Pe_),
@@ -247,26 +238,11 @@ private:
 
 
 
-
-
-
 template<typename Ions>
-std::unique_ptr<ElectronPressureClosure<Ions>> ElectronPressureClosureFactory()
+std::shared_ptr<ElectronPressureClosure<Ions>> ElectronPressureClosureFactory(PHARE::initializer::PHAREDict const& dict, Ions& ions)
 {
-    return std::make_unique<IsothermalElectronPressureClosure<Ions>>();
+    return std::make_shared<IsothermalElectronPressureClosure<Ions>>(dict, ions);
 }
-
-
-
-
-
-
-
-
-
-
-
-
 
 
 
@@ -281,9 +257,14 @@ class ElectronMomentModel
 public:
     ElectronMomentModel(PHARE::initializer::PHAREDict const& dict, Ions& ions, VecField& J)
         : fluxComput_{ions, J}
-        , pressureClosure_{dict["pressure_closure"], fluxComput_.getIons()}
+//      , pressureClosure_{dict["pressure_closure"], fluxComput_.getIons()}
+        , pressureClosure_{ElectronPressureClosureFactory<Ions>(dict, ions)}
     {
     }
+
+//    ElectronMomentModel(const ElectronMomentModel&) = delete;
+//    ElectronMomentModel& operator=(const ElectronMomentModel&) = delete;
+//   ~ElectronMomentModel() = default;
 
     //-------------------------------------------------------------------------
     //                  start the ResourcesUser interface
@@ -291,19 +272,22 @@ public:
 
     NO_DISCARD bool isUsable() const
     {
-        return fluxComput_.isUsable() and pressureClosure_.isUsable();
+//      return fluxComput_.isUsable() and pressureClosure_.isUsable();
+        return fluxComput_.isUsable() and pressureClosure_->isUsable();
     }
 
     NO_DISCARD bool isSettable() const { return fluxComput_.isSettable(); }
 
     NO_DISCARD auto getCompileTimeResourcesViewList() const
     {
-        return std::forward_as_tuple(fluxComput_, pressureClosure_);
+//      return std::forward_as_tuple(fluxComput_, pressureClosure_);
+        return std::forward_as_tuple(fluxComput_, *pressureClosure_);
     }
 
     NO_DISCARD auto getCompileTimeResourcesViewList()
     {
-        return std::forward_as_tuple(fluxComput_, pressureClosure_);
+//      return std::forward_as_tuple(fluxComput_, pressureClosure_);
+        return std::forward_as_tuple(fluxComput_, *pressureClosure_);
     }
 
     //-------------------------------------------------------------------------
@@ -312,27 +296,24 @@ public:
 
 
     NO_DISCARD Field const& density() const { return fluxComput_.density(); }
+    NO_DISCARD VecField const& velocity() const { return fluxComput_.velocity(); }
+//  NO_DISCARD Field const& pressure() const { return pressureClosure_.pressure(); }
+    NO_DISCARD Field const& pressure() const { return pressureClosure_->pressure(); }
 
     NO_DISCARD Field& density() { return fluxComput_.density(); }
-
-
-    NO_DISCARD VecField const& velocity() const { return fluxComput_.velocity(); }
-
     NO_DISCARD VecField& velocity() { return fluxComput_.velocity(); }
-
-
-    NO_DISCARD Field const& pressure() const { return pressureClosure_.pressure(); }
-    NO_DISCARD Field& pressure() { return pressureClosure_.pressure(); }
-
-
+//  NO_DISCARD Field& pressure() { return pressureClosure_.pressure(); }
+    NO_DISCARD Field& pressure() { return pressureClosure_->pressure(); }
 
     void computeDensity() { fluxComput_.computeDensity(); }
     void computeBulkVelocity(GridLayout const& layout) { fluxComput_.computeBulkVelocity(layout); }
-    void computePressure(GridLayout const& layout) { pressureClosure_.computePressure(layout); }
+//  void computePressure(GridLayout const& layout) { pressureClosure_.computePressure(layout); }
+    void computePressure(GridLayout const& layout) { pressureClosure_->computePressure(layout); }
 
 private:
     FluxComputer fluxComput_;
-    IsothermalElectronPressureClosure<Ions> pressureClosure_;
+//  IsothermalElectronPressureClosure<Ions> pressureClosure_;
+    std::shared_ptr<ElectronPressureClosure<Ions>> pressureClosure_;
 };
 
 
@@ -350,7 +331,6 @@ public:
     {
     }
 
-
     void update(GridLayout const& layout)
     {
         if (isUsable())
@@ -362,7 +342,6 @@ public:
         else
             throw std::runtime_error("Error - Electron  is not usable");
     }
-
 
     //-------------------------------------------------------------------------
     //                  start the ResourcesUser interface
@@ -382,26 +361,21 @@ public:
         return std::forward_as_tuple(momentModel_);
     }
 
-
-
     //-------------------------------------------------------------------------
     //                  ends the ResourcesUser interface
     //-------------------------------------------------------------------------
-
-
 
 
     NO_DISCARD Field const& density() const { return momentModel_.density(); }
     NO_DISCARD VecField const& velocity() const { return momentModel_.velocity(); }
     NO_DISCARD Field const& pressure() const { return momentModel_.pressure(); }
 
-
     NO_DISCARD Field& density() { return momentModel_.density(); }
     NO_DISCARD VecField& velocity() { return momentModel_.velocity(); }
     NO_DISCARD Field& pressure() { return momentModel_.pressure(); }
 
 private:
-    ElectronMomentModel<Ions> momentModel_;
+    ElectronMomentModel<Ions> momentModel_; // TODO doit etre un pointeur pour preserver le polymorphisme ?
 };
 
 } // namespace PHARE::core
