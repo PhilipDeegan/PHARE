@@ -43,7 +43,7 @@ public:
         return Ve_.isSettable() && ions_.isSettable() && J_.isSettable();
     }
 
-NO_DISCARD auto getCompileTimeResourcesViewList() const
+    NO_DISCARD auto getCompileTimeResourcesViewList() const
     {
         return std::forward_as_tuple(Ve_, ions_, J_);
     }
@@ -155,7 +155,8 @@ public:
     //                  start the ResourcesUser interface
     //-------------------------------------------------------------------------
 
-    NO_DISCARD bool isUsable() const { return Pe_.isUsable() and ions_.isUsable(); }
+    NO_DISCARD bool isUsable() const {
+        return Pe_.isUsable() and ions_.isUsable(); }
 
     NO_DISCARD bool isSettable() const { return Pe_.isSettable(); }
 
@@ -211,6 +212,8 @@ class IsothermalElectronPressureClosure : public ElectronPressureClosure<Ions>
 
     using Super = ElectronPressureClosure<Ions>;
     using Super::getCompileTimeResourcesViewList;
+    using Super::isSettable;
+    using Super::isUsable;
 
 public:
     using field_type = Field;
@@ -264,9 +267,9 @@ public:
     {
     }
 
-//    ElectronMomentModel(const ElectronMomentModel&) = delete;
-//    ElectronMomentModel& operator=(const ElectronMomentModel&) = delete;
-//   ~ElectronMomentModel() = default;
+   // ElectronMomentModel(ElectronMomentModel const&) = default;
+   // ElectronMomentModel& operator=(ElectronMomentModel const&) = default;
+  // ~ElectronMomentModel() = default;
 
     //-------------------------------------------------------------------------
     //                  start the ResourcesUser interface
@@ -312,6 +315,16 @@ public:
 //  void computePressure(GridLayout const& layout) { pressureClosure_.computePressure(layout); }
     void computePressure(GridLayout const& layout) { pressureClosure_->computePressure(layout); }
 
+    auto static deep_copy(ElectronMomentModel & self, initializer::PHAREDict const& dict)  {
+      assert(self.isUsable());
+      auto const& [Ve, ions, J] = self.fluxComput_.getCompileTimeResourcesViewList( );
+      ElectronMomentModel<Ions> cpy {dict, ions, J}; // new shared ptr memory
+      std::get<0>(cpy.getCompileTimeResourcesViewList()) = self.fluxComput_;
+      std::get<1>(cpy.getCompileTimeResourcesViewList()) = *self.pressureClosure_;
+      assert(cpy.isUsable());
+      return cpy;
+    }
+
 private:
     FluxComputer fluxComput_;
     std::shared_ptr<ElectronPressureClosure<Ions>> pressureClosure_;
@@ -327,10 +340,23 @@ class Electrons : public LayoutHolder<typename Ions::gridlayout_type>
     using Field      = typename Ions::field_type;
     using GridLayout = typename Ions::gridlayout_type;
 
+    auto static copy_or_init_model(Electrons & that){
+
+      if(that.isUsable()) return ElectronMomentModel<Ions>::deep_copy(that.momentModel_, that.dict_);
+      // else
+      auto const& [fluxComput, pressureClosure] = that.momentModel_.getCompileTimeResourcesViewList();
+      auto const& [Ve, ions, J] = fluxComput.getCompileTimeResourcesViewList( );
+      return ElectronMomentModel<Ions>{that.dict_, ions, J};
+    }
+
 public:
-    Electrons(PHARE::initializer::PHAREDict const& dict, Ions& ions, VecField& J)
-        : momentModel_{dict, ions, J}
+    Electrons(initializer::PHAREDict const& dict, Ions& ions, VecField& J)
+        : dict_{dict},
+          momentModel_{dict, ions, J}
     {
+    }
+
+    Electrons(Electrons const& that) : dict_{that.dict_}, momentModel_{copy_or_init_model(const_cast<Electrons&>(that))}{
     }
 
     void update(GridLayout const& layout)
@@ -349,7 +375,8 @@ public:
     //                  start the ResourcesUser interface
     //-------------------------------------------------------------------------
 
-    NO_DISCARD bool isUsable() const { return momentModel_.isUsable(); }
+    NO_DISCARD bool isUsable() const {
+      return momentModel_.isUsable(); }
 
     NO_DISCARD bool isSettable() const { return momentModel_.isSettable(); }
 
@@ -377,6 +404,7 @@ public:
     NO_DISCARD Field& pressure() { return momentModel_.pressure(); }
 
 private:
+    initializer::PHAREDict dict_;
     ElectronMomentModel<Ions> momentModel_; // TODO doit etre un pointeur pour preserver le polymorphisme ?
 };
 
