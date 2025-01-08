@@ -15,6 +15,7 @@
 namespace PHARE::core
 {
 
+
 /* Grid is the structure owning the field type memory via its inheritance from NdArrayImpl
 Grid exists to decouple the usage of memory by computing routines from the allocation of
 memory. Components needing to own/allocate memory will use a Grid.
@@ -28,17 +29,26 @@ class Grid : public NdArrayImpl
     using Super = NdArrayImpl;
 
 public:
+    auto constexpr static dimension  = NdArrayImpl::dimension;
+    auto constexpr static alloc_mode = NdArrayImpl::allocator_mode;
+    // using NdArrayImpl::dimension;
     using value_type             = typename NdArrayImpl::type;
     using physical_quantity_type = PhysicalQuantity;
-    using NdArrayImpl::dimension;
-    using field_type = Field<dimension, PhysicalQuantity, value_type>;
+    using field_type             = Field<dimension, PhysicalQuantity, value_type, alloc_mode>;
 
 
     Grid()                              = delete;
     Grid(Grid const& source)            = delete;
-    Grid(Grid&& source)                 = default;
     Grid& operator=(Grid&& source)      = delete;
     Grid& operator=(Grid const& source) = delete;
+
+    Grid(Grid&& that)
+        : Super{std::forward<Super>(that)}
+        , name_{that.name_}
+        , qty_{that.qty_}
+        , field_{that.name_, that.qty_, Super::data(), Super::shape()}
+    {
+    }
 
     template<typename... Dims>
     Grid(std::string const& name, PhysicalQuantity qty, Dims... dims)
@@ -59,14 +69,19 @@ public:
     {
     }
 
+
     template<typename GridLayout_t>
-    Grid(std::string const& name, GridLayout_t const& layout, PhysicalQuantity qty)
+    Grid(std::string const& name, GridLayout_t const& layout, PhysicalQuantity qty,
+         value_type const v = 0)
         : Super{layout.allocSize(qty)}
         , name_{name}
         , qty_{qty}
         , field_{name, qty, Super::data(), Super::shape()}
     {
+        if (v)
+            Super::fill(v);
     }
+
 
     NO_DISCARD std::string name() const { return name_; }
 
@@ -83,6 +98,10 @@ public:
     // returns view when getting address of this object, could be misleading, but convenient
     NO_DISCARD auto operator&() { return &field_; }
     NO_DISCARD auto operator&() const { return &field_; }
+
+    NO_DISCARD operator field_type&() { return field_; }
+    NO_DISCARD auto& operator*() { return field_; }
+    NO_DISCARD auto& operator*() const { return field_; }
 
 private:
     std::string name_{"No Name"};

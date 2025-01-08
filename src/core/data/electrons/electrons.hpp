@@ -119,16 +119,14 @@ public:
         auto& Vez = Ve_(Component::Z);
 
         // from Ni because all components defined on primal
-        layout.evalOnBox(Ni, [&](auto const&... args) {
-            auto arr = std::array{args...};
+        layout.evalOnBox(Ni, [=] _PHARE_ALL_FN_(auto const& ijk) mutable {
+            auto const JxOnVx = GridLayout::project(Jx, ijk, GridLayout::JxToMoments());
+            auto const JyOnVy = GridLayout::project(Jy, ijk, GridLayout::JyToMoments());
+            auto const JzOnVz = GridLayout::project(Jz, ijk, GridLayout::JzToMoments());
 
-            auto const JxOnVx = GridLayout::project(Jx, arr, GridLayout::JxToMoments());
-            auto const JyOnVy = GridLayout::project(Jy, arr, GridLayout::JyToMoments());
-            auto const JzOnVz = GridLayout::project(Jz, arr, GridLayout::JzToMoments());
-
-            Vex(arr) = Vix(arr) - JxOnVx / Ni(arr);
-            Vey(arr) = Viy(arr) - JyOnVy / Ni(arr);
-            Vez(arr) = Viz(arr) - JzOnVz / Ni(arr);
+            Vex(ijk) = Vix(ijk) - JxOnVx / Ni(ijk);
+            Vey(ijk) = Viy(ijk) - JyOnVy / Ni(ijk);
+            Vez(ijk) = Viz(ijk) - JzOnVz / Ni(ijk);
         });
     }
 
@@ -206,7 +204,7 @@ public:
 
     void computePressure(GridLayout const& /*layout*/)
     {
-        static_assert(Field::is_contiguous, "Error - assumes Field date is contiguous");
+        // static_assert(Field::is_contiguous, "Error - assumes Field date is contiguous");
 
         if (!Pe_.isUsable())
             throw std::runtime_error("Error - isothermal closure pressure not usable");

@@ -11,7 +11,7 @@ import unittest
 import h5py
 import numpy as np
 import pyphare.pharein as ph
-from ddt import data, ddt
+from ddt import ddt, data, unpack
 from pyphare.pharein.simulation import supported_dimensions
 from pyphare.pharesee.hierarchy.fromh5 import h5_filename_from, h5_time_grp_key
 from pyphare.pharesee.hierarchy import hierarchy_from
@@ -120,12 +120,21 @@ def dup(dic):
     return dic
 
 
+interp_orders = [1, 2, 3]
+
+
+def per_dim_per_interp(dic):
+    return [
+        (dim, interp, dic) for interp in interp_orders for dim in supported_dimensions()
+    ]
+
+
 @ddt
 class DiagnosticsTest(unittest.TestCase):
     _test_cases = (
-        dup({"smallest_patch_size": 10, "largest_patch_size": 20}),
-        dup({"smallest_patch_size": 20, "largest_patch_size": 20}),
-        dup({"smallest_patch_size": 20, "largest_patch_size": 40}),
+        *per_dim_per_interp(dup({"smallest_patch_size": 10, "largest_patch_size": 20})),
+        *per_dim_per_interp(dup({"smallest_patch_size": 20, "largest_patch_size": 20})),
+        *per_dim_per_interp(dup({"smallest_patch_size": 20, "largest_patch_size": 40})),
     )
 
     def __init__(self, *args, **kwargs):
@@ -146,18 +155,16 @@ class DiagnosticsTest(unittest.TestCase):
         return self._testMethodName.split("_")[-1]
 
     @data(*_test_cases)
-    def test_dump_diags(self, simInput):
-        for ndim in supported_dimensions():
-            self._test_dump_diags(ndim, **simInput)
-
-    def _test_dump_diags(self, dim, **simInput):
+    @unpack
+    def test_dump_diags(self, dim, interp, simInput_original):
         test_id = self.ddt_test_id()
+        simInput = simInput_original.copy()  # save backup as we modify it below
 
         # configure simulation dim sized values
         for key in ["cells", "dl", "boundary_types"]:
-            simInput[key] = [simInput[key] for d in range(dim)]
+            simInput[key] = [simInput[key]] * dim
 
-        b0 = [[10 for i in range(dim)], [19 for i in range(dim)]]
+        b0 = [[10] * dim, [19] * dim]
         simInput["refinement_boxes"] = {"L0": {"B0": b0}}
 
         py_attrs = [f"{dep}_version" for dep in ["samrai", "highfive", "pybind"]]
@@ -171,6 +178,8 @@ class DiagnosticsTest(unittest.TestCase):
             )
             simInput["diag_options"]["options"]["dir"] = local_out
 
+            print("test cells", simInput["cells"])
+            print("test dl", simInput["dl"])
             simulation = ph.Simulation(**simInput)
             self.assertTrue(len(simulation.cells) == dim)
 

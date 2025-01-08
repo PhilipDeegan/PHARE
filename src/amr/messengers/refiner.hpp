@@ -159,7 +159,7 @@ public:
     }
 
     template<typename VecFieldT>
-    void fill(VecFieldT& vec, int const levelNumber, double const fillTime)
+    void fill(VecFieldT& /*vec*/, int const levelNumber, double const fillTime)
     {
         for (auto const& algo : this->algos)
             this->findSchedule(algo, levelNumber)->fillData(fillTime);

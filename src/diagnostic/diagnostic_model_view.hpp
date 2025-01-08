@@ -32,8 +32,8 @@ class ModelView : public IModelView
     using ResMan                    = typename Model::resources_manager_type;
     static constexpr auto dimension = Model::dimension;
 
-
 public:
+    using Model_t    = Model;
     using GridLayout = typename Model::gridlayout_type;
     using PatchProperties
         = cppdict::Dict<float, double, std::size_t, std::vector<int>, std::vector<std::uint32_t>,
@@ -75,7 +75,7 @@ public:
     }
 
 
-    NO_DISCARD auto getPatchProperties(std::string patchID, GridLayout const& grid) const
+    NO_DISCARD auto getPatchProperties(std::string /*patchID*/, GridLayout const& grid) const
     {
         PatchProperties dict;
         dict["origin"]   = grid.origin().toVector();

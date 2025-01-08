@@ -2,6 +2,7 @@
 #define PHARE_ION_UPDATER_HPP
 
 
+#include "ion_updater_def.hpp" // = UpdaterMode
 #include "core/utilities/box/box.hpp"
 #include "core/utilities/range/range.hpp"
 #include "core/numerics/interpolator/interpolator.hpp"
@@ -15,13 +16,12 @@
 
 #include "core/logger.hpp"
 
-#include <cstddef>
 #include <memory>
+#include <cstddef>
 
 
 namespace PHARE::core
 {
-enum class UpdaterMode { domain_only = 1, all = 2 };
 
 template<typename Ions, typename Electromag, typename GridLayout>
 class IonUpdater
@@ -32,12 +32,10 @@ public:
 
     using Box               = PHARE::core::Box<int, dimension>;
     using Interpolator      = PHARE::core::Interpolator<dimension, interp_order>;
-    using VecField          = typename Ions::vecfield_type;
-    using ParticleArray     = typename Ions::particle_array_type;
-    using Particle_t        = typename ParticleArray::Particle_t;
-    using PartIterator      = typename ParticleArray::iterator;
-    using ParticleRange     = IndexRange<ParticleArray>;
+    using ParticleArray_t   = typename Ions::particle_array_type;
+    using ParticleRange     = IndexRange<ParticleArray_t>;
     using BoundaryCondition = PHARE::core::BoundaryCondition<dimension, interp_order>;
+
     using Pusher = PHARE::core::Pusher<dimension, ParticleRange, Electromag, Interpolator,
                                        BoundaryCondition, GridLayout>;
 
@@ -59,13 +57,13 @@ public:
                            UpdaterMode = UpdaterMode::all);
 
 
-    void updateIons(Ions& ions);
+    static void updateIons(Ions& ions);
 
 
     void reset()
     {
         // clear memory
-        tmp_particles_ = std::move(ParticleArray{Box{}});
+        tmp_particles_ = std::move(ParticleArray_t{});
     }
 
 
@@ -76,7 +74,7 @@ private:
 
 
     // dealloced on regridding/load balancing coarsest
-    ParticleArray tmp_particles_{Box{}}; //{std::make_unique<ParticleArray>(Box{})};
+    ParticleArray_t tmp_particles_{}; //{std::make_unique<ParticleArray>(Box{})};
 };
 
 
@@ -144,7 +142,7 @@ void IonUpdater<Ions, Electromag, GridLayout>::updateAndDepositDomain_(Ions& ion
 
     for (auto& pop : ions)
     {
-        ParticleArray& domain = pop.domainParticles();
+        auto& domain = pop.domainParticles();
 
         // first push all domain particles
         // push them while still inDomainBox
