@@ -9,8 +9,8 @@ namespace PHARE::core
 
 
 
-template<auto type, typename Src, typename Dst, typename GridLayout>
-void append_particles(Src const& src, Dst& dst, GridLayout const& layout)
+template<auto type, typename Src, typename Dst>
+void append_particles(Src const& src, Dst& dst)
 {
     using Appending
         = ParticlesAppender<Src::layout_mode, Src::alloc_mode, Dst::layout_mode, Dst::alloc_mode>;
@@ -21,7 +21,7 @@ void append_particles(Src const& src, Dst& dst, GridLayout const& layout)
     auto constexpr function_id              = join_string_views_v<FN_ID, Dst::type_id>;
     PHARE_LOG_SCOPE(1, function_id);
 
-    Appending{0, src.size()}.template operator()<type>(src, dst, layout);
+    Appending{0, src.size()}.template operator()<type>(src, dst);
 
     PHARE_DEBUG_DO(assert(dst.size() == old_size + src.size());)
 }

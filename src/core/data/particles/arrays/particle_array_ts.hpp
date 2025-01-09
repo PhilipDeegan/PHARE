@@ -347,7 +347,7 @@ public:
     {
         // auto& np = get_vec(particles_(local_cell(p.iCell()))).emplace_back(p);
         auto const locell = local_cell(p.iCell());
-        /*auto& np = */ particles_(locell).emplace_back(p);
+        /*auto& np = */ (*particles_.at(local_cell(p.iCell())))().emplace_back(p);
         if constexpr (inc_)
             _inc(locell);
         // return np;
@@ -404,6 +404,9 @@ public:
     // auto& operator()(std::uint32_t const& cell) { return particles_.data() + cell; }
     auto& operator()(locell_t const& cell) const { return (*particles_.at(cell))(); }
     // auto& operator()(std::uint32_t const& cell) const { return particles_.data() + cell; }
+
+    auto& views() { return particles_views_; }
+    auto& view(locell_t const& cell) { return (*particles_views_.at(cell))(); }
 
     auto local_cell(std::array<int, dim> const& icell) const
     {

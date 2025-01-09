@@ -14,7 +14,8 @@ using enum AllocatorMode;
 
 template<>
 template<auto type, typename Dst, typename Src, typename GridLayout>
-Dst ParticlesConverter<SoATS, CPU, AoS, CPU>::operator()(Src const& src, GridLayout const& layout)
+Dst ParticlesConverter<SoATS, CPU, AoS, CPU>::operator()( //
+    Src const& src, GridLayout const& layout)
 {
     static constexpr std::uint8_t N = 128;
 
@@ -56,8 +57,8 @@ Dst ParticlesConverter<SoATS, CPU, AoS, CPU>::operator()(Src const& src, GridLay
 
 template<>
 template<auto type, typename Dst, typename Src, typename GridLayout>
-Dst ParticlesConverter<SoATS, GPU_UNIFIED, AoS, CPU>::operator()(Src const& src,
-                                                                 GridLayout const& layout)
+Dst ParticlesConverter<SoATS, GPU_UNIFIED, AoS, CPU>::operator()( //
+    Src const& src, GridLayout const& layout)
 {
     static constexpr std::uint8_t N = 128;
 

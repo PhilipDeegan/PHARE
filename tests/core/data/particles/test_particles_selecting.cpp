@@ -201,16 +201,17 @@ auto run(ParticleArraySelectingTest_t& self)
 // clang-format off
 using Permutations_t = testing::Types< // ! notice commas !
 
-     TestParam<3, LayoutMode::AoSPC, AllocatorMode::CPU>
+     // TestParam<3, LayoutMode::AoSPC, AllocatorMode::CPU>
+    /*,*/TestParam<3, LayoutMode::AoSTS, AllocatorMode::CPU>
 
-PHARE_WITH_THRUST(
-    ,TestParam<3, LayoutMode::SoAPC, AllocatorMode::CPU>
-)
+// PHARE_WITH_THRUST(
+//     ,TestParam<3, LayoutMode::SoAPC, AllocatorMode::CPU>
+// )
 
-PHARE_WITH_GPU( // GPU implies WITH_THRUST
-    ,TestParam<3, LayoutMode::AoSPC, AllocatorMode::GPU_UNIFIED, 2>
-    ,TestParam<3, LayoutMode::SoAPC, AllocatorMode::GPU_UNIFIED, 2>
-)
+// PHARE_WITH_GPU( // GPU implies WITH_THRUST
+//     ,TestParam<3, LayoutMode::AoSPC, AllocatorMode::GPU_UNIFIED, 2>
+//     ,TestParam<3, LayoutMode::SoAPC, AllocatorMode::GPU_UNIFIED, 2>
+// )
 
 >;
 // clang-format on

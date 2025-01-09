@@ -14,40 +14,57 @@ namespace PHARE::core
 {
 
 using enum LayoutMode;
+using enum AllocatorMode;
 
-// CPU-AoSMapped to GPU_UNIFIED-SoAPC
+// AoSMapped-CPU to SoAPC-GPU_UNIFIED
 template<>
-template<auto type, typename Src, typename Dst, typename GridLayout>
-void ParticlesAppender<LayoutMode::AoSMapped, AllocatorMode::CPU, LayoutMode::SoAPC,
-                       AllocatorMode::GPU_UNIFIED>::operator()(Src const& src, Dst& dst,
-                                                               GridLayout const& layout)
+template<auto type, typename Src, typename Dst>
+void ParticlesAppender<AoSMapped, CPU, SoAPC, GPU_UNIFIED>::operator()( //
+    Src const& src, Dst& dst)
 {
+    static constexpr std::uint8_t N = 128;
+
     auto const overlap = src.box() * dst.ghost_box();
     if (!overlap)
         return;
 
-    using Tmp // make chunked
-        = ParticleArray<Dst::dimension,
-                        ParticleArrayInternals<Dst::dimension, LayoutMode::SoA, StorageMode::VECTOR,
-                                               src_alloc_mode, Dst::impl>>;
+    SoAVXArray<Src::dimension, N> tmp;
 
-    auto tmp = make_particles<Tmp>(layout);
-    tmp.resize(src.size());
-    ParticlePacker<Src>{src}.pack(tmp);
+    auto copy = [](auto&... args) {
+        auto const& [particles, tmp, i, S] = std::forward_as_tuple(args...);
+        auto dst_tuple                     = particles.as_tuple();
+        auto tmp_tuple                     = tmp.as_tuple();
+        for_N<std::tuple_size_v<decltype(tmp_tuple)>>([&](auto vi) {
+            auto& a = std::get<vi>(dst_tuple);
+            auto& b = std::get<vi>(tmp_tuple);
+            mem::copy<dst_alloc_mode>(a.data() + particles.size(), b.data(), S);
+        });
+        particles.resize(particles.size() + S);
+    };
+
+    std::int32_t src_start = 0;
+    auto do_copy = [&](auto&&... args) {
+        auto const& [particles, tmp, i, S] = std::forward_as_tuple(args...);
+        for (std::size_t pidx = 0; pidx < S; ++pidx)
+            tmp.assign(src[pidx + src_start], pidx);
+        copy(particles, tmp, i, S);
+        src_start += S;
+    };
+
 
     std::size_t tmp_start = 0;
     auto const tmp_tuple  = tmp.as_tuple();
     auto finish           = [&](auto const lix, auto const size) {
-        auto& dst_arr        = dst(lix);
-        auto const curr_size = dst_arr.size();
-        Dst::resize(dst_arr, curr_size + size);
-        auto dst_tuple = dst_arr.as_tuple();
-        for_N<std::tuple_size_v<decltype(dst_tuple)>>([&](auto vi) {
-            auto const& tmp_vec = std::get<vi>(tmp_tuple);
-            auto& vec           = std::get<vi>(dst_tuple);
-            gpu::copy(vec.data() + curr_size, tmp_vec.data() + tmp_start, size);
-        });
-        tmp_start += size;
+        auto& particles       = dst(lix);
+        particles.reserve(particles.size() + size);
+        auto const full_count = size / N;
+        std::size_t i         = 0;
+        for (; i < full_count; ++i)
+            do_copy(particles, tmp, i, N);
+        if (auto const remaining = size % N)
+            do_copy(particles, tmp, i, remaining);
+
+        particles.resize(particles.size() + size);
     };
 
     for (auto const bix : *overlap)
@@ -60,10 +77,9 @@ void ParticlesAppender<LayoutMode::AoSMapped, AllocatorMode::CPU, LayoutMode::So
 
 
 template<>
-template<auto type, typename Src, typename Dst, typename GridLayout>
-void ParticlesAppender<LayoutMode::AoSMapped, AllocatorMode::CPU, LayoutMode::SoATS,
-                       AllocatorMode::GPU_UNIFIED>::operator()(Src const& src, Dst& dst,
-                                                               GridLayout const& /*layout*/)
+template<auto type, typename Src, typename Dst>
+void ParticlesAppender<AoSMapped, CPU, SoATS, GPU_UNIFIED>::operator()( //
+    Src const& src, Dst& dst)
 {
     static constexpr std::uint8_t N = 128;
 
@@ -92,7 +108,7 @@ void ParticlesAppender<LayoutMode::AoSMapped, AllocatorMode::CPU, LayoutMode::So
         src_start += S;
     };
 
-    SoAArray<GridLayout::dimension, N> tmp;
+    SoAArray<Src::dimension, N> tmp;
 
     auto finish = [&](auto const lix, auto const size) {
         assert(dst().at(lix));
@@ -121,10 +137,9 @@ void ParticlesAppender<LayoutMode::AoSMapped, AllocatorMode::CPU, LayoutMode::So
 }
 
 template<>
-template<auto type, typename Src, typename Dst, typename GridLayout>
-void ParticlesAppender<LayoutMode::AoSMapped, AllocatorMode::CPU, LayoutMode::SoATS,
-                       AllocatorMode::CPU>::operator()(Src const& src, Dst& dst,
-                                                       GridLayout const& /*layout*/)
+template<auto type, typename Src, typename Dst>
+void ParticlesAppender<AoSMapped, CPU, SoATS, CPU>::operator()( //
+    Src const& src, Dst& dst)
 {
     auto const overlap = src.box() * dst.ghost_box();
     if (!overlap)
@@ -150,10 +165,9 @@ void ParticlesAppender<LayoutMode::AoSMapped, AllocatorMode::CPU, LayoutMode::So
 
 
 template<>
-template<auto type, typename Src, typename Dst, typename GridLayout>
-void ParticlesAppender<LayoutMode::AoSMapped, AllocatorMode::CPU, LayoutMode::SoAVXTS,
-                       AllocatorMode::CPU>::operator()(Src const& src, Dst& dst,
-                                                       GridLayout const& /*layout*/)
+template<auto type, typename Src, typename Dst>
+void ParticlesAppender<AoSMapped, CPU, SoAVXTS, CPU>::operator()( //
+    Src const& src, Dst& dst)
 {
     static constexpr std::uint8_t N = 128;
 
@@ -183,7 +197,7 @@ void ParticlesAppender<LayoutMode::AoSMapped, AllocatorMode::CPU, LayoutMode::So
         src_start += S;
     };
 
-    SoAVXArray<GridLayout::dimension, N> tmp;
+    SoAVXArray<Src::dimension, N> tmp;
 
     auto finish = [&](auto const lix, auto const size) {
         auto& particles       = dst(lix);

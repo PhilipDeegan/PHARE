@@ -21,8 +21,8 @@ struct ParticlesAppender
     auto constexpr static dst_layout_mode = dst_layout_mde;
     auto constexpr static dst_alloc_mode  = dst_alloc_mde;
 
-    template<auto type, typename Src, typename Dst, typename GridLayout>
-    void operator()(Src const& src, Dst& dst, GridLayout const& layout);
+    template<auto type, typename Src, typename Dst>
+    void operator()(Src const& src, Dst& dst);
 
     std::size_t const start;
     std::size_t const end;

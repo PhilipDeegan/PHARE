@@ -24,7 +24,7 @@ public:
     auto operator()(box_t const& box)
     {
         using enum LayoutMode;
-        if constexpr (ParticleArray::layout_mode == LayoutMode::SoA)
+        if constexpr (ParticleArray::layout_mode == SoA)
         {
             PHARE_WITH_THRUST_ELSE_THROW( //
                 auto it    = SoAIteratorAdaptor::make(array);

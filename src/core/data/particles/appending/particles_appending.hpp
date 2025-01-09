@@ -11,9 +11,9 @@ namespace PHARE::core
 
 // generic fallthrough
 template<auto src_layout_mde, auto src_alloc_mde, auto dst_layout_mde, auto dst_alloc_mde>
-template<auto type, typename Src, typename Dst, typename GridLayout>
+template<auto type, typename Src, typename Dst>
 void ParticlesAppender<src_layout_mde, src_alloc_mde, dst_layout_mde, dst_alloc_mde>::operator()(
-    Src const& src, Dst& dst, GridLayout const& /*layout*/)
+    Src const& src, Dst& dst)
 {
     using enum LayoutMode;
     static_assert(src_layout_mde == dst_layout_mde);

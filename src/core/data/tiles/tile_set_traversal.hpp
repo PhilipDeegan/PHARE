@@ -1,6 +1,7 @@
 #ifndef PHARE_CORE_DATA_TILES_TILE_SET_TRAVERSAL_HPP
 #define PHARE_CORE_DATA_TILES_TILE_SET_TRAVERSAL_HPP
 
+#include "core/data/tiles/tile_set.hpp"
 #include "core/utilities/box/box.hpp"
 
 #include <cassert>
@@ -9,6 +10,36 @@
 
 namespace PHARE::core
 {
+
+template<typename TileSet_t, typename Box_t, typename Fn>
+void traverse_tiles(TileSet_t& tileset, Box_t const& box, Fn fn)
+{
+    using Tile_t = typename TileSet_t::value_type;
+
+    std::function<void(Tile_t&)> const doX = [&](auto& tile) {
+        fn(tile);
+
+        if (auto nextX = tile.link(3); nextX and (box * (**nextX)))
+            doX(*nextX);
+    };
+    std::function<void(Tile_t&)> const doY = [&](auto& tile) {
+        doX(tile);
+
+        if constexpr (TileSet_t::dimension > 1)
+            if (auto nextY = tile.link(1); nextY and (box * (**nextY)))
+                doY(*nextY);
+    };
+    std::function<void(Tile_t&)> const doZ = [&](auto& tile) {
+        doY(tile);
+
+        if constexpr (TileSet_t::dimension == 3)
+            if (auto nextZ = tile.link(0); nextZ and (box * (**nextZ)))
+                doZ(*nextZ);
+    };
+
+    doZ(*tileset.at(box.lower));
+}
+
 
 template<typename TileSet_t, typename Fn>
 void traverse_ghost_boundary_tiles(TileSet_t& tileset, Fn fn)

@@ -10,13 +10,13 @@ namespace PHARE::core
 {
 
 using enum LayoutMode;
+using enum AllocatorMode;
 
 
 template<>
-template<auto type, typename Src, typename Dst, typename GridLayout>
-void ParticlesAppender<LayoutMode::AoSMapped, AllocatorMode::CPU, LayoutMode::AoSPC,
-                       AllocatorMode::GPU_UNIFIED>::operator()(Src const& src, Dst& dst,
-                                                               GridLayout const& /*layout*/)
+template<auto type, typename Src, typename Dst>
+void ParticlesAppender<AoSMapped, CPU, AoSPC, GPU_UNIFIED>::operator()( //
+    Src const& src, Dst& dst)
 {
     auto const overlap = src.box() * dst.ghost_box();
     if (!overlap)
@@ -40,10 +40,9 @@ void ParticlesAppender<LayoutMode::AoSMapped, AllocatorMode::CPU, LayoutMode::Ao
 
 
 template<>
-template<auto type, typename Src, typename Dst, typename GridLayout>
-void ParticlesAppender<LayoutMode::AoSMapped, AllocatorMode::CPU, LayoutMode::AoSTS,
-                       AllocatorMode::GPU_UNIFIED>::operator()(Src const& src, Dst& dst,
-                                                               GridLayout const& /*layout*/)
+template<auto type, typename Src, typename Dst>
+void ParticlesAppender<AoSMapped, CPU, AoSTS, GPU_UNIFIED>::operator()( //
+    Src const& src, Dst& dst)
 {
     auto const overlap = src.box() * dst.ghost_box();
     if (!overlap)
@@ -52,8 +51,7 @@ void ParticlesAppender<LayoutMode::AoSMapped, AllocatorMode::CPU, LayoutMode::Ao
     std::int32_t src_start = 0;
     auto finish            = [&](auto const lix, auto const size) {
         auto& particles = dst(lix);
-        mem::copy<AllocatorMode::GPU_UNIFIED>(particles.data() + particles.size(),
-                                                         src.data() + src_start, size);
+        mem::copy<GPU_UNIFIED>(particles.data() + particles.size(), src.data() + src_start, size);
         particles.resize(particles.size() + size);
         src_start += size;
     };
@@ -73,10 +71,9 @@ void ParticlesAppender<LayoutMode::AoSMapped, AllocatorMode::CPU, LayoutMode::Ao
 }
 
 template<>
-template<auto type, typename Src, typename Dst, typename GridLayout>
-void ParticlesAppender<LayoutMode::AoSMapped, AllocatorMode::CPU, LayoutMode::AoSTS,
-                       AllocatorMode::CPU>::operator()(Src const& src, Dst& dst,
-                                                       GridLayout const& /*layout*/)
+template<auto type, typename Src, typename Dst>
+void ParticlesAppender<AoSMapped, CPU, AoSTS, CPU>::operator()( //
+    Src const& src, Dst& dst)
 {
     auto const overlap = src.box() * dst.ghost_box();
     if (!overlap)

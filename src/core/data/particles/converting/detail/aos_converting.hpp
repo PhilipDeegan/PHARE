@@ -9,10 +9,11 @@ namespace PHARE::core
 {
 
 using enum LayoutMode;
+using enum AllocatorMode;
 
 template<>
 template<auto type, typename Dst, typename Src, typename GridLayout>
-Dst ParticlesConverter<AoSTS, AllocatorMode::CPU, AoS, AllocatorMode::CPU>::operator()(
+Dst ParticlesConverter<AoSTS, CPU, AoS, CPU>::operator()( //
     Src const& src, GridLayout const& layout)
 {
     auto out = make_particles<Dst>(layout);
@@ -27,7 +28,7 @@ Dst ParticlesConverter<AoSTS, AllocatorMode::CPU, AoS, AllocatorMode::CPU>::oper
 
 template<>
 template<auto type, typename Dst, typename Src, typename GridLayout>
-Dst ParticlesConverter<AoSTS, AllocatorMode::GPU_UNIFIED, AoS, AllocatorMode::CPU>::operator()(
+Dst ParticlesConverter<AoSTS, GPU_UNIFIED, AoS, CPU>::operator()( //
     Src const& src, GridLayout const& layout)
 {
     auto out = make_particles<Dst>(layout);

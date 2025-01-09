@@ -3,8 +3,11 @@
 #define PHARE_CORE_DATA_PARTICLES_SELECTING_DETAIL_AOS_SELECTING
 
 
-#include "core/utilities/memory.hpp"
+// #include "core/utilities/memory.hpp"
+#include "core/data/particles/particle_array_def.hpp"
+#include "core/data/particles/particle_array_partitioner.hpp"
 #include "core/data/particles/selecting/detail/def_selecting.hpp"
+#include "core/logger.hpp"
 
 namespace PHARE::core
 {
@@ -13,22 +16,124 @@ using enum LayoutMode;
 using enum AllocatorMode;
 
 
+//
+
 // AoS, CPU
 
 template<>
 template<typename SrcParticles, typename DstParticles, typename box_t>
-void ParticlesSelector<AoS, CPU>::select(SrcParticles const& src, DstParticles& dst,
-                                         box_t const& box)
+void ParticlesSelector<AoS, CPU>::select( //
+    SrcParticles const& src, DstParticles& dst, box_t const& box)
 {
     throw std::runtime_error("finish this");
 }
 
 template<>
 template<typename SrcParticles, typename DstParticles, typename box_t, typename Shift>
-void ParticlesSelector<AoS, CPU>::select(SrcParticles const& src, DstParticles& dst,
-                                         box_t const& box, Shift&& fn)
+void ParticlesSelector<AoS, CPU>::select( //
+    SrcParticles const& src, DstParticles& dst, box_t const& box, Shift&& fn)
 {
     throw std::runtime_error("finish this");
+}
+
+//
+
+// AoSTS, CPU
+
+template<>
+template<typename SrcParticles, typename DstParticles, typename box_t>
+void ParticlesSelector<AoSTS, CPU>::select( //
+    SrcParticles const& src, DstParticles& dst, box_t const& box)
+{
+    // using Partitioner = ParticleArrayPartitioner<typename SrcParticles::view_t>;
+
+    auto const per_tile = [&](auto const& src_tile) { //
+        PHARE_LOG_LINE_SS(src_tile);
+
+        auto& dst_tile      = *dst().at(dst.local_cell(src_tile.lower));
+        auto& dst_particles = dst_tile();
+        auto& src_particles = src_tile();
+
+        if (auto const overlap_opt = (*src_tile) * (*dst_tile))
+        {
+            auto const overlap = *overlap_opt;
+
+            if (overlap == src_tile) // complete
+            {
+                PHARE_LOG_LINE_SS("");
+
+                dst_particles.reserve(dst_particles.size() + src_particles.size());
+                mem::copy<CPU>(dst_particles.data() + dst_particles.size(), src_particles.data(),
+                               src_particles.size());
+                dst_particles.resize(dst_particles.size() + src_particles.size());
+            }
+            else
+            {
+                PHARE_LOG_LINE_SS("");
+
+                auto const in_dst = ParticleArrayPartitioner{src_particles}(dst_tile).size();
+
+                dst_particles.reserve(dst_particles.size() + in_dst);
+                mem::copy<CPU>(dst_particles.data() + dst_particles.size(), src_particles.data(),
+                               in_dst);
+                dst_particles.resize(dst_particles.size() + in_dst);
+            }
+        }
+    };
+
+    auto& mutable_src = const_cast<SrcParticles&>(src); // :(
+    traverse_tiles(mutable_src.views(), box, per_tile);
+}
+
+template<>
+template<typename SrcParticles, typename DstParticles, typename box_t, typename Shift>
+void ParticlesSelector<AoSTS, CPU>::select( //
+    SrcParticles const& src, DstParticles& dst, box_t const& box, Shift&& shift)
+{
+    using Partitioner = ParticleArrayPartitioner<typename SrcParticles::view_t>;
+
+    auto const lcl_dst_box = dst.local_box(box - shift);
+
+    auto const per_tile = [&](auto const& src_tile) { //
+        PHARE_LOG_LINE_SS(src_tile);
+
+        auto& dst_tile      = *dst().at(dst.local_cell(src_tile.lower - shift));
+        auto& dst_particles = dst_tile();
+        auto& src_particles = src_tile();
+
+        // auto const shifted_src_box = (*src_tile) - shift;
+        auto const shifted_dst_box = (*dst_tile) + shift;
+
+        if (auto const overlap_opt = (*src_tile) * shifted_dst_box)
+        {
+            auto const overlap      = *overlap_opt;
+            auto const old_dst_size = dst_particles.size();
+            if (overlap == src_tile) // complete
+            {
+                PHARE_LOG_LINE_SS("");
+
+                dst_particles.reserve(dst_particles.size() + src_particles.size());
+                mem::copy<CPU>(dst_particles.data() + dst_particles.size(), src_particles.data(),
+                               src_particles.size());
+                dst_particles.resize(dst_particles.size() + src_particles.size());
+            }
+            else
+            {
+                auto const in_dst = ParticleArrayPartitioner{src_particles}(shifted_dst_box).size();
+                PHARE_LOG_LINE_SS(in_dst);
+
+                dst_particles.reserve(dst_particles.size() + in_dst);
+                mem::copy<CPU>(dst_particles.data() + dst_particles.size(), src_particles.data(),
+                               in_dst);
+                dst_particles.resize(dst_particles.size() + in_dst);
+            }
+
+            // todo: exported particles need icell shifing
+        }
+    };
+
+    auto& mutable_src = const_cast<SrcParticles&>(src); // :(
+    traverse_tiles(mutable_src.views(), box, per_tile);
 }
 
 //
@@ -37,16 +142,16 @@ void ParticlesSelector<AoS, CPU>::select(SrcParticles const& src, DstParticles& 
 
 template<>
 template<typename SrcParticles, typename DstParticles, typename box_t>
-void ParticlesSelector<AoS, GPU_UNIFIED>::select(SrcParticles const& src, DstParticles& dst,
-                                                 box_t const& box)
+void ParticlesSelector<AoS, GPU_UNIFIED>::select( //
+    SrcParticles const& src, DstParticles& dst, box_t const& box)
 {
     throw std::runtime_error("finish this");
 }
 
 template<>
 template<typename SrcParticles, typename DstParticles, typename box_t, typename Shift>
-void ParticlesSelector<AoS, GPU_UNIFIED>::select(SrcParticles const& src, DstParticles& dst,
-                                                 box_t const& box, Shift&& fn)
+void ParticlesSelector<AoS, GPU_UNIFIED>::select( //
+    SrcParticles const& src, DstParticles& dst, box_t const& box, Shift&& fn)
 {
     throw std::runtime_error("finish this");
 }
@@ -57,8 +162,8 @@ void ParticlesSelector<AoS, GPU_UNIFIED>::select(SrcParticles const& src, DstPar
 
 template<>
 template<typename SrcParticles, typename DstParticles, typename box_t>
-void ParticlesSelector<AoSPC, CPU>::select(SrcParticles const& src, DstParticles& dst,
-                                           box_t const& box)
+void ParticlesSelector<AoSPC, CPU>::select( //
+    SrcParticles const& src, DstParticles& dst, box_t const& box)
 {
     auto const lcl_src_box = src.local_box(box);
     auto const lcl_dst_box = dst.local_box(box);
@@ -77,8 +182,8 @@ void ParticlesSelector<AoSPC, CPU>::select(SrcParticles const& src, DstParticles
 
 template<>
 template<typename SrcParticles, typename DstParticles, typename box_t, typename Shift>
-void ParticlesSelector<AoSPC, CPU>::select(SrcParticles const& src, DstParticles& dst,
-                                           box_t const& box, Shift&& fn)
+void ParticlesSelector<AoSPC, CPU>::select( //
+    SrcParticles const& src, DstParticles& dst, box_t const& box, Shift&& fn)
 {
     auto const lcl_src_box = src.local_box(box);
     auto const lcl_dst_box = dst.local_box(box - fn); // BEWARE
@@ -104,8 +209,8 @@ void ParticlesSelector<AoSPC, CPU>::select(SrcParticles const& src, DstParticles
 
 template<>
 template<typename SrcParticles, typename DstParticles, typename box_t>
-void ParticlesSelector<AoSPC, GPU_UNIFIED>::select(SrcParticles const& src, DstParticles& dst,
-                                                   box_t const& box)
+void ParticlesSelector<AoSPC, GPU_UNIFIED>::select( //
+    SrcParticles const& src, DstParticles& dst, box_t const& box)
 {
     auto const lcl_src_box = src.local_box(box);
     auto const lcl_dst_box = dst.local_box(box);
@@ -124,8 +229,8 @@ void ParticlesSelector<AoSPC, GPU_UNIFIED>::select(SrcParticles const& src, DstP
 
 template<>
 template<typename SrcParticles, typename DstParticles, typename box_t, typename Shift>
-void ParticlesSelector<AoSPC, GPU_UNIFIED>::select(SrcParticles const& src, DstParticles& dst,
-                                                   box_t const& box, Shift&& shift)
+void ParticlesSelector<AoSPC, GPU_UNIFIED>::select( //
+    SrcParticles const& src, DstParticles& dst, box_t const& box, Shift&& shift)
 { // unoptimized
     auto const lcl_src_box = src.local_box(box);
     auto const lcl_dst_box = dst.local_box(box - shift);

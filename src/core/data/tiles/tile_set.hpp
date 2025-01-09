@@ -96,12 +96,14 @@ public:
     template<typename... Index>
     NO_DISCARD auto at(Index... indexes) _PHARE_ALL_FN_
     {
+        PHARE_LOG_LINE_SS("");
         assert(cells_(indexes...));
         return cells_(indexes...);
     }
     template<typename... Index>
     NO_DISCARD auto at(Index... indexes) const _PHARE_ALL_FN_
     {
+        PHARE_LOG_LINE_SS("");
         assert(cells_(indexes...));
         return cells_(indexes...);
     }
@@ -295,14 +297,29 @@ public:
     NO_DISCARD auto box() const { return box_; }
     NO_DISCARD auto tile_size() const { return tile_size_; }
 
+
+    NO_DISCARD auto& at(Point<int, dimension> const& amr_point)
+    {
+        PHARE_LOG_LINE_SS("");
+        return cells_((amr_point - box_.lower).as_unsigned());
+    }
+    NO_DISCARD auto& at(Point<int, dimension> const& amr_point) const
+    {
+        PHARE_LOG_LINE_SS("");
+        return cells_((amr_point - box_.lower).as_unsigned());
+    }
+
+
     template<typename... Index>
     NO_DISCARD auto& at(Index... indexes)
     {
+        PHARE_LOG_LINE_SS("");
         return cells_(indexes...);
     }
     template<typename... Index>
     NO_DISCARD auto& at(Index... indexes) const
     {
+        PHARE_LOG_LINE_SS("");
         return cells_(indexes...);
     }
 
