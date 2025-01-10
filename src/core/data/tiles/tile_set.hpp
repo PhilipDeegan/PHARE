@@ -300,12 +300,10 @@ public:
 
     NO_DISCARD auto& at(Point<int, dimension> const& amr_point)
     {
-        PHARE_LOG_LINE_SS("");
         return cells_((amr_point - box_.lower).as_unsigned());
     }
     NO_DISCARD auto& at(Point<int, dimension> const& amr_point) const
     {
-        PHARE_LOG_LINE_SS("");
         return cells_((amr_point - box_.lower).as_unsigned());
     }
 
@@ -313,13 +311,11 @@ public:
     template<typename... Index>
     NO_DISCARD auto& at(Index... indexes)
     {
-        PHARE_LOG_LINE_SS("");
         return cells_(indexes...);
     }
     template<typename... Index>
     NO_DISCARD auto& at(Index... indexes) const
     {
-        PHARE_LOG_LINE_SS("");
         return cells_(indexes...);
     }
 

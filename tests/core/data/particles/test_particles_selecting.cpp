@@ -112,13 +112,16 @@ struct ParticleArraySelectingTest : public ::testing::Test
     auto& neighbours_for(std::size_t const pid)
     {
         neighbours.clear();
+
         auto const ghostbox = grow(patches[pid].layout.AMRBox(), 1);
-        for (std::size_t i = 0; i < pid; ++i)
-            if (auto const overlap = ghostbox * patches[i].layout.AMRBox())
-                neighbours.emplace_back(&patches[i], *overlap);
-        for (std::size_t i = pid + 1; i < patches.size(); ++i)
-            if (auto const overlap = ghostbox * patches[i].layout.AMRBox())
-                neighbours.emplace_back(&patches[i], *overlap);
+        auto const emplace = [&](auto from, auto to) {
+            for (std::size_t i = from; i < to; ++i)
+                if (auto const overlap = ghostbox * patches[i].layout.AMRBox())
+                    neighbours.emplace_back(&patches[i], *overlap);
+        };
+
+        emplace(0, pid);
+        emplace(pid + 1, patches.size());
 
         return neighbours;
     }

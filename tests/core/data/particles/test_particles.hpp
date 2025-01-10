@@ -192,6 +192,18 @@ std::size_t ram_in_gbs(ParticleArray const& ps)
     return memory_for_particles(ps) / 1e9;
 }
 
+template<typename ParticleArray0, typename ParticleArray1>
+std::size_t count_equal(ParticleArray0 const& p0, ParticleArray1 const& p1)
+{
+    return 0;
+}
+
+template<typename ParticleArray0, typename ParticleArray1, typename Shift>
+std::size_t count_equal(ParticleArray0 const& p0, ParticleArray1 const& p1, Shift shift)
+{
+    return 0;
+}
+
 } // namespace PHARE::core
 
 #endif /* PHARE_CORE_DATA_TEST_PARTICLES_HPP */
