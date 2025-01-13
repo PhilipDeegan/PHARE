@@ -50,18 +50,28 @@ void traverse_tilesets_overlap(TileSet0& ts0, TileSet1& ts1, Box_t const& box, F
     using TileFn = std::function<void(Tile0&, Tile1&)>;
 
     TileFn const doX = [&](auto& t0, auto& t1) {
-        fn(t0, t1);
+        if (box * *t0 and box * *t1 and *t0 * *t1)
+            fn(t0, t1);
 
-        // if (auto nextX = t0.link(0); nextX and (box * (**nextX)))
-        //     doX(*nextX);
+        auto const nt0 = t0.link(0);
+        auto const nt1 = t1.link(0);
+
+        if (nt0) // do y and z same
+            doX(*nt0, t1);
+
+        if (nt0 and nt1)
+            doX(*nt0, *nt1);
     };
     TileFn const doY = [&](auto& t0, auto& t1) {
         doX(t0, t1);
 
         if constexpr (TileSet0::dimension > 1)
         {
-            // if (auto nextY = t0.link(1); nextY and (box * (**nextY)))
-            //     doY(*nextY);
+            auto const nt0 = t0.link(1);
+            auto const nt1 = t1.link(1);
+
+            if (nt0 and nt1 and box * *nt0 and box * *nt1)
+                doY(*nt0, *nt1);
         }
     };
     TileFn const doZ = [&](auto& t0, auto& t1) {
@@ -69,11 +79,11 @@ void traverse_tilesets_overlap(TileSet0& ts0, TileSet1& ts1, Box_t const& box, F
 
         if constexpr (TileSet0::dimension == 3)
         {
-            auto const nz0 = t0.link(3);
-            auto const nz1 = t1.link(3);
+            auto const nt0 = t0.link(3);
+            auto const nt1 = t1.link(3);
 
-            // if (auto nextZ = t0.link(3); nextZ and (box * (**nextZ)))
-            //     doZ(*nextZ);
+            if (nt0 and nt1 and box * *nt0 and box * *nt1)
+                doZ(*nt0, *nt1);
         }
     };
 
@@ -89,19 +99,25 @@ void traverse_tilesets_overlap(TileSet0& ts0, TileSet1& ts1, Box_t const& box, F
     using Tile1  = decltype(*ts1().at(box.lower));
     using TileFn = std::function<void(Tile0&, Tile1&)>;
 
+    auto const ts1_box = box - shift; // untransformed box in ts1 space
+
     TileFn const doX = [&](auto& t0, auto& t1) {
         fn(t0, t1);
 
-        // if (auto nextX = t0.link(0); nextX and (box * (**nextX)))
-        //     doX(*nextX);
+        auto const nt0 = t0.link(0);
+        auto const nt1 = t1.link(0);
+        if (nt0 and nt1 and box * *nt0 and ts1_box * *nt1)
+            doX(*nt0, *nt1);
     };
     TileFn const doY = [&](auto& t0, auto& t1) {
         doX(t0, t1);
 
         if constexpr (TileSet0::dimension > 1)
         {
-            // if (auto nextY = t0.link(1); nextY and (box * (**nextY)))
-            //     doY(*nextY);
+            auto const nt0 = t0.link(1);
+            auto const nt1 = t1.link(1);
+            if (nt0 and nt1 and box * *nt0 and ts1_box * *nt1)
+                doY(*nt0, *nt1);
         }
     };
     TileFn const doZ = [&](auto& t0, auto& t1) {
@@ -109,11 +125,10 @@ void traverse_tilesets_overlap(TileSet0& ts0, TileSet1& ts1, Box_t const& box, F
 
         if constexpr (TileSet0::dimension == 3)
         {
-            auto const nz0 = t0.link(3);
-            auto const nz1 = t1.link(3);
-
-            // if (auto nextZ = t0.link(3); nextZ and (box * (**nextZ)))
-            //     doZ(*nextZ);
+            auto const nt0 = t0.link(3);
+            auto const nt1 = t1.link(3);
+            if (nt0 and nt1 and box * *nt0 and ts1_box * *nt1)
+                doZ(*nt0, *nt1);
         }
     };
 
@@ -125,8 +140,6 @@ void traverse_tilesets_overlap(TileSet0& ts0, TileSet1& ts1, Box_t const& box, F
 
     auto const ts0lower = (box.lower - ts0.box().lower).as_unsigned();
     // auto const ts1lower = (box.lower - ts1.box().lower).as_unsigned();
-
-
     doZ(*ts0.views().at(ts0lower), *ts1().at(box.lower - shift));
 }
 

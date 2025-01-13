@@ -132,7 +132,7 @@ public:
     auto static constexpr impl_v     = impl_;
     using This                       = TileSetSpan<Particles, impl_v>;
     using lobox_t                    = Box<std::uint32_t, dim>;
-    using per_cell_particles         = Particles;
+    using per_tile_particles         = Particles;
 
 private:
     using locell_t = std::array<std::uint32_t, dim>;
@@ -286,7 +286,7 @@ public:
     using Particle_t                   = typename ParticleDefaults<dim>::Particle_t;
     using value_type                   = Particle_t;
     using PSpan_t                      = typename Particles::view_t;
-    using per_cell_particles           = Particles;
+    using per_tile_particles           = Particles;
 
     template<typename T>
     using vec_helper = PHARE::Vector<T, alloc_mode, 1>;
@@ -378,7 +378,7 @@ public:
 
     void reset_views()
     {
-        update_from(reset_particle_views_fn(), particles_views_);
+        // update_from(reset_particle_views_fn(), particles_views_);
         update_from(reset_gap_views_fn(), gap_views_);
         for (std::size_t i = 0; i < particles_.size(); ++i)
             particles_views_[i]().reset(particles_[i]());
@@ -392,7 +392,7 @@ public:
         return [&](std::size_t const i) { return SpnTile{particles_[i]}; };
     }
 
-    void reset_tile_set_iterator_map();
+    void reset_index_wrapper_map();
 
     auto& box() const { return box_; }
     auto& ghost_box() const { return ghost_box_; }
@@ -661,7 +661,8 @@ void TileSetVector<Particles, impl>::trim()
     static_assert(std::is_same_v<decltype(type), ParticleType>);
 
     // currently using views for gpu partition
-    update_from(reset_particle_views_fn(), particles_views_);
+    reset_views();
+    // update_from(reset_particle_views_fn(), particles_views_);
 
     if constexpr (type == ParticleType::Ghost)
     {
@@ -806,40 +807,41 @@ void TileSetVector<Particles, impl>::sync_gpu_gaps_and_tmp()
 }
 
 template<typename Particles, std::uint8_t impl>
-void TileSetVector<Particles, impl>::reset_tile_set_iterator_map()
+void TileSetVector<Particles, impl>::reset_index_wrapper_map()
 {
-    // resize(p2c_, total_size);
+    resize(p2c_, total_size);
 
-    // auto const fill = [](auto p, auto o, auto s, auto b) { std::fill(p + o, p + o + s, *b); };
+    auto const fill = [](auto p, auto o, auto s, auto b) { std::fill(p + o, p + o + s, b); };
 
-    // std::size_t offset = 0;
-    // for (auto const& bix : local_box())
-    // {
-    //     auto const& cs = cell_size_(bix);
-    //     resize(gaps_(bix), cs);
-    //     off_sets_(bix) = offset;
+    std::size_t offset = 0;
 
-    //     if (cs)
-    //     {
-    //         if constexpr (alloc_mode == AllocatorMode::GPU_UNIFIED)
-    //         {
-    //             PHARE_WITH_THRUST( //
-    //                 thrust::fill(thrust::device, p2c_.begin() + offset, p2c_.begin() + offset +
-    //                 cs,
-    //                              *bix));
-    //             PHARE_WITH_THRUST_ELSE(
-    //                 PHARE_LOG_LINE_SS("Thrust not found for TileSetVector<Particles, "
-    //                                   "impl>::reset_tile_set_iterator_map"); //
-    //                 fill(p2c_.begin(), offset, cs, bix);                 //
-    //             )
-    //         }
-    //         else
-    //             fill(p2c_.begin(), offset, cs, bix);
-    //     }
+    on_tiles([&](auto& tile) {
+        auto const bix = local_cell(tile.lower);
 
-    //     offset += cs;
-    //     cap_(bix) = particles_(bix).capacity();
-    // }
+        auto const& cs = cell_size_(bix);
+        resize(gaps_(bix), cs);
+        off_sets_(bix) = offset;
+
+        if (cs)
+        {
+            if constexpr (alloc_mode == AllocatorMode::GPU_UNIFIED)
+            {
+                PHARE_WITH_THRUST( //
+                    thrust::fill(thrust::device, p2c_.begin() + offset, p2c_.begin() + offset + cs,
+                                 *bix));
+                PHARE_WITH_THRUST_ELSE(
+                    PHARE_LOG_LINE_SS("Thrust not found for TileSetVector<Particles, "
+                                      "impl>::reset_index_wrapper_map"); //
+                    fill(p2c_.begin(), offset, cs, bix);                 //
+                )
+            }
+            else
+                fill(p2c_.begin(), offset, cs, bix);
+        }
+
+        offset += cs;
+        cap_(bix) = tile().capacity();
+    });
 }
 
 template<typename Particles, std::uint8_t impl>
@@ -876,7 +878,7 @@ void TileSetVector<Particles, impl>::sync()
         static_assert(impl < 3); // otherwise unhandled
         if constexpr (impl < 2)
         {
-            // reset_tile_set_iterator_map();
+            // reset_index_wrapper_map();
         }
         else // if (PHASE == 2)
         {
@@ -914,7 +916,7 @@ struct TileSetParticles : public Super_
     using Super              = Super_;
     using This               = TileSetParticles<Super>;
     using Particle_t         = typename Super::Particle_t;
-    using per_cell_particles = typename Super::per_cell_particles;
+    using per_tile_particles = typename Super::per_tile_particles;
 
     auto static constexpr impl_v       = Super::impl_v;
     auto static constexpr alloc_mode   = Super::alloc_mode;
@@ -1064,8 +1066,8 @@ struct tile_set_iterator_storage<LayoutMode::SoA, Particles>
 {
     bool static constexpr is_const = std::is_const_v<std::remove_reference_t<Particles>>;
     using Super                    = tile_set_iterator_base<Particles>;
-    using per_cell_particles       = typename std::decay_t<Particles>::per_cell_particles;
-    using Particle_t = typename SoAZipParticle_t<per_cell_particles, is_const>::value_type;
+    using per_tile_particles       = typename std::decay_t<Particles>::per_tile_particles;
+    using Particle_t = typename SoAZipParticle_t<per_tile_particles, is_const>::value_type;
     using Super::l, Super::i, Super::particles;
 
     tile_set_iterator_storage(Particles ps) _PHARE_ALL_FN_ : Super{ps} {}
@@ -1073,7 +1075,7 @@ struct tile_set_iterator_storage<LayoutMode::SoA, Particles>
     // auto& operator*() _PHARE_ALL_FN_ { return particle; }
     // auto& operator*() const _PHARE_ALL_FN_ { return particle; }
 
-    // per_cell_particles* particles;
+    // per_tile_particles* particles;
     void set() { particle = Particle_t{particles.data()[l], i}; }
 
     Particle_t particle;
@@ -1085,8 +1087,8 @@ struct tile_set_iterator_storage<LayoutMode::SoAVX, Particles>
 {
     bool static constexpr is_const = std::is_const_v<std::remove_reference_t<Particles>>;
     using Super                    = tile_set_iterator_base<Particles>;
-    using per_cell_particles       = typename std::decay_t<Particles>::per_cell_particles;
-    using Particle_t = typename SoAVXZipParticle_t<per_cell_particles, is_const>::value_type;
+    using per_tile_particles       = typename std::decay_t<Particles>::per_tile_particles;
+    using Particle_t = typename SoAVXZipParticle_t<per_tile_particles, is_const>::value_type;
     using Super::l, Super::i, Super::particles;
 
 
@@ -1116,7 +1118,7 @@ struct tile_set_iterator_storage<LayoutMode::AoS, Particles>
 {
     bool static constexpr is_const = std::is_const_v<std::remove_reference_t<Particles>>;
     using Super                    = tile_set_iterator_base<Particles>;
-    using per_cell_particles       = typename std::decay_t<Particles>::per_cell_particles;
+    using per_tile_particles       = typename std::decay_t<Particles>::per_tile_particles;
     using Particle_t               = typename Particles::Particle_t;
     using Particle_p = std::conditional_t<is_const, Particle_t const* const, Particle_t*>;
     using Super::l, Super::i, Super::particles;
@@ -1156,8 +1158,8 @@ struct tile_set_iterator_storage : public tile_set_iterator_base<Particles>
 template<typename T>
 struct tile_set_iterator_super
 {
-    using per_cell_particles = typename std::decay_t<T>::per_cell_particles;
-    using value_type         = tile_set_iterator_storage<per_cell_particles::layout_mode, T>;
+    using per_tile_particles = typename std::decay_t<T>::per_tile_particles;
+    using value_type         = tile_set_iterator_storage<per_tile_particles::layout_mode, T>;
 };
 template<typename T>
 using tile_set_iterator_super_v = typename tile_set_iterator_super<T>::value_type;
@@ -1256,12 +1258,77 @@ struct TileSetParticles<OuterSuper>::iterator_impl : public tile_set_iterator_su
 };
 
 
+template<auto layout_mode, typename Particles>
+struct tile_set_index_wrapper_storage;
+
+#if PHARE_HAVE_THRUST
+template<typename Particles>
+struct tile_set_index_wrapper_storage<LayoutMode::SoA, Particles>
+{
+    bool static constexpr is_const = std::is_const_v<std::remove_reference_t<Particles>>;
+    using per_tile_particles       = typename std::decay_t<Particles>::per_tile_particles;
+    using Particle_t = typename SoAZipParticle_t<per_tile_particles, is_const>::value_type;
+
+    template<typename PerTileParticles_t>
+    tile_set_index_wrapper_storage(PerTileParticles_t p, std::size_t const i) _PHARE_ALL_FN_
+        : /*particles{p},*/
+          particle{*p, i}
+    {
+    }
+
+    auto& operator*() _PHARE_ALL_FN_ { return particle; }
+    auto& operator*() const _PHARE_ALL_FN_ { return particle; }
+
+    per_tile_particles* particles;
+    Particle_t particle;
+};
+#else
+
+#endif // PHARE_HAVE_THRUST
+
+template<typename Particles>
+struct tile_set_index_wrapper_storage<LayoutMode::AoS, Particles>
+{
+    bool static constexpr is_const = std::is_const_v<std::remove_reference_t<Particles>>;
+    using per_tile_particles       = typename std::decay_t<Particles>::per_tile_particles;
+    using Particle_t               = typename Particles::Particle_t;
+    using Particle_p = std::conditional_t<is_const, Particle_t const* const, Particle_t*>;
+
+    template<typename PerTileParticles_t>
+    tile_set_index_wrapper_storage(PerTileParticles_t p, std::size_t const i) _PHARE_ALL_FN_
+        : /*particles{p},*/
+          particle{&p->data()[i]}
+    {
+    }
+
+    auto& operator*() _PHARE_ALL_FN_ { return *particle; }
+    auto& operator*() const _PHARE_ALL_FN_ { return *particle; }
+
+    // per_tile_particles* particles;
+    Particle_p particle;
+};
+
+template<auto layout_mode, typename Particles>
+struct tile_set_index_wrapper_storage
+{
+    // unused
+}; // default;
+
+template<typename T>
+struct tile_set_index_wrapper_super
+{
+    using per_tile_particles = typename std::decay_t<T>::per_tile_particles;
+    using value_type         = tile_set_index_wrapper_storage<per_tile_particles::layout_mode, T>;
+};
+
+
 template<typename ParticlesSuper>
 template<typename T>
-struct TileSetParticles<ParticlesSuper>::index_wrapper : public index_wrapper_super<T>::value_type
+struct TileSetParticles<ParticlesSuper>::index_wrapper
+    : public tile_set_index_wrapper_super<T>::value_type
 {
     using outer_t = std::decay_t<T>;
-    using Super   = typename tile_set_iterator_super<T>::value_type;
+    using Super   = typename tile_set_index_wrapper_super<T>::value_type;
 
     auto static constexpr dimension = ParticlesSuper::dimension;
     bool static constexpr is_const  = std::is_const_v<std::remove_reference_t<T>>;
@@ -1269,9 +1336,9 @@ struct TileSetParticles<ParticlesSuper>::index_wrapper : public index_wrapper_su
     using Particle_p = std::conditional_t<is_const, Particle_t const* const, Particle_t*>;
 
 
-    index_wrapper(T* pc_particles, std::size_t idx_) _PHARE_ALL_FN_
-        : Super{&pc_particles->particles_(cell(pc_particles, idx_)), index(pc_particles, idx_)},
-          ts_particles_ptr{pc_particles},
+    index_wrapper(T* ts_particles, std::size_t idx_) _PHARE_ALL_FN_
+        : Super{&(*ts_particles)(cell(ts_particles, idx_)), index(ts_particles, idx_)},
+          ts_particles_ptr{ts_particles},
           idx{idx_}
     {
         PHARE_ASSERT((**this).iCell()[0] > -10 and (**this).iCell()[0] < 1000); // bad memory
@@ -1301,6 +1368,12 @@ struct TileSetParticles<ParticlesSuper>::index_wrapper : public index_wrapper_su
 
     auto& operator*() _PHARE_ALL_FN_ { return *super(); }
     auto& operator*() const _PHARE_ALL_FN_ { return *super(); }
+
+    auto& charge() const _PHARE_ALL_FN_ { return (**this).charge(); }
+    auto& delta() const _PHARE_ALL_FN_ { return (**this).delta(); }
+    auto& iCell() const _PHARE_ALL_FN_ { return (**this).iCell(); }
+    auto& weight() const _PHARE_ALL_FN_ { return (**this).weight(); }
+    auto& v() const _PHARE_ALL_FN_ { return (**this).v(); }
 
     Particle<dimension> copy() const _PHARE_ALL_FN_
     {

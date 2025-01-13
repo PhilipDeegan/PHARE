@@ -23,8 +23,8 @@ Particle_t particle(std::array<int, dim> const& icell, [[maybe_unused]] std::siz
         /*.weight = */ .01,
         /*.charge = */ .01,
         /*.iCell  = */ icell,
-        /*.delta  = */ ConstArray<double, dim>(.5),
-        /*.v      = */ {{.5, .5, .5}} //
+        /*.delta  = */ ConstArray<double, dim>(.51),
+        /*.v      = */ {{.52, .53, .54}} //
     };
 
     if constexpr (std::is_same_v<Particle_t, CountedParticle<dim>>)
@@ -195,13 +195,54 @@ std::size_t ram_in_gbs(ParticleArray const& ps)
 template<typename ParticleArray0, typename ParticleArray1>
 std::size_t count_equal(ParticleArray0 const& p0, ParticleArray1 const& p1)
 {
-    return 0;
+    PHARE_LOG_LINE_SS("");
+    auto inc = [](auto&... is) { (++is, ...); };
+
+    std::size_t i0 = 0, i1 = 0, eq = 0;
+
+    while (i0 < p0.size() and i1 < p1.size())
+    {
+        PHARE_LOG_LINE_SS(i0 << " " << i1 << " " << eq);
+        PHARE_LOG_LINE_SS(Point{p0[i0].iCell()} << " " << Point{p1[i1].iCell()});
+
+        auto const eqr = particle_compare(p0[i0], p1[i1]);
+        PHARE_LOG_LINE_SS(eqr.why());
+
+        if (eqr)
+        {
+            PHARE_LOG_LINE_SS(i0 << " " << i1 << " " << eq);
+            inc(i0, i1, eq);
+        }
+        else
+        {
+            PHARE_LOG_LINE_SS(i0 << " " << i1 << " " << eq);
+            ++i1;
+        }
+    }
+
+    PHARE_LOG_LINE_SS(eq);
+
+    return eq;
 }
 
 template<typename ParticleArray0, typename ParticleArray1, typename Shift>
 std::size_t count_equal(ParticleArray0 const& p0, ParticleArray1 const& p1, Shift shift)
 {
-    return 0;
+    auto inc = [](auto&... is) { (++is, ...); };
+
+    std::size_t i0 = 0, i1 = 0, eq = 0;
+
+    while (i0 < p0.size() and i1 < p1.size())
+    {
+        auto const p = shift(p0[i0]);
+
+        if (particle_compare(p, p1[i1]))
+            inc(i0, i1, eq);
+        else
+            ++i0;
+    }
+
+    return eq;
 }
 
 } // namespace PHARE::core

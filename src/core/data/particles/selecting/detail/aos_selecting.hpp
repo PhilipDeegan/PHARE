@@ -45,15 +45,20 @@ template<typename SrcParticles, typename DstParticles, typename box_t>
 void ParticlesSelector<AoSTS, CPU>::select( //
     SrcParticles const& src, DstParticles& dst, box_t const& box)
 {
-    PHARE_LOG_LINE_SS("");
+    PHARE_LOG_LINE_SS(box);
 
-    auto const per_tile = [&](auto const& src_tile, auto& dst_tile) { //
+    auto const per_tile = [&](auto& src_tile, auto& dst_tile) { //
+        using SrcTileParticles           = std::decay_t<decltype(src_tile())>;
+        using ParticleArrayPartitioner_t = ParticleArrayPartitioner<SrcTileParticles>;
         // auto& dst_tile         = *dst().at(dst.local_cell(src_tile.lower));
         auto& dst_particles    = dst_tile();
         auto& src_particles    = src_tile();
         auto const src_overlap = *((*src_tile) * box); // never null
 
-        PHARE_LOG_LINE_SS(src_tile << " " << dst_tile << " " << box);
+        PHARE_LOG_LINE_SS(src_tile);
+        PHARE_LOG_LINE_SS(dst_tile);
+
+        auto const old_dst_size = dst_particles.size();
 
         if (auto const overlap_opt = src_overlap * (*dst_tile))
         {
@@ -61,21 +66,17 @@ void ParticlesSelector<AoSTS, CPU>::select( //
 
             if (overlap == src_tile) // complete
             {
-                dst_particles.reserve(dst_particles.size() + src_particles.size());
-                mem::copy<CPU>(dst_particles.data() + dst_particles.size(), src_particles.data(),
+                dst_particles.resize(old_dst_size + src_particles.size());
+                mem::copy<CPU>(dst_particles.data() + old_dst_size, src_particles.data(),
                                src_particles.size());
-                dst_particles.resize(dst_particles.size() + src_particles.size());
 
                 PHARE_LOG_LINE_SS("Found: " << src_particles.size());
             }
             else
             {
-                auto const in_dst = ParticleArrayPartitioner{src_particles}(overlap).size();
-
-                dst_particles.reserve(dst_particles.size() + in_dst);
-                mem::copy<CPU>(dst_particles.data() + dst_particles.size(), src_particles.data(),
-                               in_dst);
-                dst_particles.resize(dst_particles.size() + in_dst);
+                auto const in_dst = ParticleArrayPartitioner_t{src_particles}(overlap).size();
+                dst_particles.resize(old_dst_size + in_dst);
+                mem::copy<CPU>(dst_particles.data() + old_dst_size, src_particles.data(), in_dst);
 
                 PHARE_LOG_LINE_SS("Found: " << in_dst);
             }
@@ -93,17 +94,20 @@ void ParticlesSelector<AoSTS, CPU>::select( //
     SrcParticles const& src, DstParticles& dst, box_t const& box, Shift&& shift)
 {
     PHARE_LOG_LINE_SS("");
+    PHARE_LOG_LINE_SS(box);
+    PHARE_LOG_LINE_SS(shift);
+    PHARE_LOG_LINE_SS(box - shift);
 
     auto const lcl_dst_box = dst.local_box(box - shift);
 
-    auto const per_tile = [&](auto const& src_tile, auto& dst_tile) { //
+    auto const per_tile = [&](auto& src_tile, auto& dst_tile) { //
+        using SrcTileParticles           = std::decay_t<decltype(src_tile())>;
+        using ParticleArrayPartitioner_t = ParticleArrayPartitioner<SrcTileParticles>;
+
         // auto& dst_tile         = *dst().at(dst.local_cell(src_tile.lower - shift));
         auto& dst_particles = dst_tile();
         auto& src_particles = src_tile();
 
-        PHARE_LOG_LINE_SS(shift);
-        PHARE_LOG_LINE_SS(box);
-        PHARE_LOG_LINE_SS(box - shift);
         PHARE_LOG_LINE_SS(src_tile);
         PHARE_LOG_LINE_SS(dst_tile);
 
@@ -128,7 +132,7 @@ void ParticlesSelector<AoSTS, CPU>::select( //
             }
             else
             {
-                auto const in_dst = ParticleArrayPartitioner{src_particles}(overlap).size();
+                auto const in_dst = ParticleArrayPartitioner_t{src_particles}(overlap).size();
 
                 dst_particles.reserve(dst_particles.size() + in_dst);
                 mem::copy<CPU>(dst_particles.data() + dst_particles.size(), src_particles.data(),

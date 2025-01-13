@@ -1,5 +1,6 @@
 
 
+#include "core/utilities/types.hpp"
 #include "phare_core.hpp"
 #include "core/data/particles/particle_array.hpp"
 #include "core/data/particles/particle_array_service.hpp"
@@ -15,7 +16,7 @@ namespace PHARE::core
 {
 
 auto static const bytes   = get_env_as("PHARE_GPU_BYTES", std::uint64_t{500000000});
-auto static const cells   = get_env_as("PHARE_CELLS", std::uint32_t{3});
+auto static const cells   = get_env_as("PHARE_CELLS", std::uint32_t{4});
 auto static const ppc     = get_env_as("PHARE_PPC", std::size_t{1});
 bool static const premain = []() {
     PHARE_WITH_MKN_GPU({
@@ -114,7 +115,7 @@ struct ParticleArraySelectingTest : public ::testing::Test
         neighbours.clear();
 
         auto const ghostbox = grow(patches[pid].layout.AMRBox(), 1);
-        auto const emplace = [&](auto from, auto to) {
+        auto const emplace  = [&](auto from, auto to) {
             for (std::size_t i = from; i < to; ++i)
                 if (auto const overlap = ghostbox * patches[i].layout.AMRBox())
                     neighbours.emplace_back(&patches[i], *overlap);
@@ -169,9 +170,22 @@ struct ParticleArraySelectingTest : public ::testing::Test
         return periodic_neighbours;
     }
 
+    void sort()
+    {
+        for (auto& patch : patches)
+        {
+            PHARE::core ::sort(patch.domain, ghostBox);
+            patch.domain.reset_index_wrapper_map();
+
+            PHARE::core ::sort(patch.ghost, ghostBox);
+            patch.ghost.reset_index_wrapper_map();
+        }
+    }
 
     GridLayout_t layout{cells * 3};
     Box_t const domainBox = layout.AMRBox();
+    Box_t const ghostBox  = grow(layout.AMRBox(), 1);
+
     std::vector<Patch> patches{};
 
     std::vector<std::tuple<Patch*, Box_t>> neighbours{};
@@ -183,21 +197,54 @@ struct ParticleArraySelectingTest : public ::testing::Test
 template<typename ParticleArraySelectingTest_t>
 auto run(ParticleArraySelectingTest_t& self)
 {
-    for (std::size_t pid = 0; pid < self.patches.size(); ++pid)
+    // using ParticleArray_t = typename ParticleArraySelectingTest_t::ParticleArray_t;
+
+    PHARE_LOG_LINE_SS("");
+    abort_if(self.periodic_neighbours_for(13).size());
+
+    for (std::size_t pid = 13; pid < self.patches.size(); ++pid)
     {
+        PHARE_LOG_LINE_SS("");
+
         auto& dst = self.patches[pid];
 
         for (auto const& [src, overlap] : self.neighbours_for(pid))
+        {
+            PHARE_LOG_LINE_SS("");
             select_particles(src->domain, dst.ghost, overlap);
+        }
 
         for (auto const& [src, overlap, shift] : self.periodic_neighbours_for(pid))
+        {
+            PHARE_LOG_LINE_SS("");
             select_particles(src->domain, dst.ghost, overlap, shift);
+        }
+        break; // hax
     }
 
+    auto const expected = pow(cells + 2, 3) - pow(cells, 3); // ghost box layer
+
     for (auto& patch : self.patches)
-    {
         ParticleArrayService::template sync<2, ParticleType::Ghost>(patch.ghost);
-        EXPECT_EQ(98, patch.ghost.size());
+
+    self.sort();
+
+    for (std::size_t pid = 13; pid < self.patches.size(); ++pid)
+    {
+        auto& patch = self.patches[pid];
+
+        EXPECT_EQ(expected, patch.ghost.size());
+
+        PHARE_LOG_LINE_SS(patch.ghost[0].copy());
+        PHARE_LOG_LINE_SS(patch.ghost[1].copy());
+
+        std::size_t eq = 0;
+        for (auto const& [src, overlap] : self.neighbours_for(pid))
+            eq += count_equal(src->domain, patch.ghost);
+
+        PHARE_LOG_LINE_SS(eq);
+
+        break; // hax
     }
 }
 

@@ -160,6 +160,31 @@ void swap(ParticleArray<dim, internals>& array1, ParticleArray<dim, internals>& 
 }
 
 template<bool binary_equal = false, typename P0, typename P1>
+EqualityReport particle_compare(P0 const& p0, P1 const& p1, std::size_t const i = 0)
+{
+    std::string idx = std::to_string(i);
+    if (p0.iCell() != p1.iCell())
+        return EqualityReport{false, "icell mismatch at index: " + idx, i};
+    if constexpr (binary_equal)
+    {
+        if (p0.delta() != p1.delta())
+            return EqualityReport{false, "delta mismatch at index: " + idx, i};
+        if (p0.v() != p1.v())
+            return EqualityReport{false, "v mismatch at index: " + idx, i};
+    }
+    else
+    {
+        if (!float_equals(p0.delta(), p1.delta()))
+            return EqualityReport{false, "delta mismatch at index: " + idx, i};
+        if (!float_equals(p0.v(), p1.v()))
+            return EqualityReport{false, "v mismatch at index: " + idx, i};
+    }
+
+    return EqualityReport{true};
+}
+
+
+template<bool binary_equal = false, typename P0, typename P1>
 EqualityReport compare_particles(P0 const& ref, P1 const& cmp)
 {
     if (ref.size() != cmp.size())
@@ -169,28 +194,10 @@ EqualityReport compare_particles(P0 const& ref, P1 const& cmp)
     auto rit      = ref.begin();
     auto cit      = cmp.begin();
     std::size_t i = 0;
+
     for (; rit != ref.end(); ++rit, ++cit, ++i)
-    {
-        auto& p0        = *rit;
-        auto& p1        = *cit;
-        std::string idx = std::to_string(i);
-        if (p0.iCell() != p1.iCell())
-            return EqualityReport{false, "icell mismatch at index: " + idx, i};
-        if constexpr (binary_equal)
-        {
-            if (p0.delta() != p1.delta())
-                return EqualityReport{false, "delta mismatch at index: " + idx, i};
-            if (p0.v() != p1.v())
-                return EqualityReport{false, "v mismatch at index: " + idx, i};
-        }
-        else
-        {
-            if (!float_equals(p0.delta(), p1.delta()))
-                return EqualityReport{false, "delta mismatch at index: " + idx, i};
-            if (!float_equals(p0.v(), p1.v()))
-                return EqualityReport{false, "v mismatch at index: " + idx, i};
-        }
-    }
+        if (auto const eq = particle_compare<binary_equal>(*rit, *cit, i); !eq)
+            return eq;
 
     return EqualityReport{true};
 }
