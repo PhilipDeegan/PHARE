@@ -166,10 +166,10 @@ struct CountedParticle : public Particle<dim>
     friend std::ostream& operator<<(std::ostream& out, CountedParticle<dimension> const& particle);
 };
 
-
-template<template<std::size_t> typename Particle_t, std::size_t dim, typename Stream>
-Stream& write_to_stream(Particle_t<dim> const& particle, Stream& out, bool const new_line = true)
+template<size_t dim>
+auto to_string(Particle<dim> const& particle)
 {
+    std::stringstream out;
     auto const append = [&](std::string const name, auto const& value) {
         out << name << "(" << value[0];
         for (std::size_t i = 1; i < dim; ++i)
@@ -180,6 +180,13 @@ Stream& write_to_stream(Particle_t<dim> const& particle, Stream& out, bool const
     append("delta", particle.delta());
     append("v", particle.v());
     out << "), charge: " << particle.charge() << ", weight: " << particle.weight();
+    return out.str();
+}
+
+template<template<std::size_t> typename Particle_t, std::size_t dim, typename Stream>
+Stream& write_to_stream(Particle_t<dim> const& particle, Stream& out, bool const new_line = true)
+{
+    out << to_string(particle);
     if constexpr (std::is_same_v<Particle_t<dim>, CountedParticle<dim>>)
         out << ", id : " << particle.id;
     if (new_line)

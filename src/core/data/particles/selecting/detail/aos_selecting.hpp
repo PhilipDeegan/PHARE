@@ -45,46 +45,40 @@ template<typename SrcParticles, typename DstParticles, typename box_t>
 void ParticlesSelector<AoSTS, CPU>::select( //
     SrcParticles const& src, DstParticles& dst, box_t const& box)
 {
-    PHARE_LOG_LINE_SS(box);
+    auto on_overlap = [](auto& a, auto& b, auto f) {
+        if (auto const overlap = a * b)
+            f(*overlap);
+    };
 
     auto const per_tile = [&](auto& src_tile, auto& dst_tile) { //
         using SrcTileParticles           = std::decay_t<decltype(src_tile())>;
         using ParticleArrayPartitioner_t = ParticleArrayPartitioner<SrcTileParticles>;
-        // auto& dst_tile         = *dst().at(dst.local_cell(src_tile.lower));
-        auto& dst_particles    = dst_tile();
-        auto& src_particles    = src_tile();
-        auto const src_overlap = *((*src_tile) * box); // never null
 
-        PHARE_LOG_LINE_SS(src_tile);
-        PHARE_LOG_LINE_SS(dst_tile);
-
+        auto& dst_particles     = dst_tile();
+        auto& src_particles     = src_tile();
         auto const old_dst_size = dst_particles.size();
 
-        if (auto const overlap_opt = src_overlap * (*dst_tile))
-        {
-            auto const overlap = *overlap_opt;
+        on_overlap(box, *src_tile, [&](auto const& o0) {
+            on_overlap(o0, *dst_tile, [&](auto const& overlap) {
+                if (overlap == src_tile) // complete
+                {
+                    dst_particles.resize(old_dst_size + src_particles.size());
+                    mem::copy<CPU>(dst_particles.data() + old_dst_size, src_particles.data(),
+                                   src_particles.size());
+                }
+                else
+                {
+                    auto const in_dst = ParticleArrayPartitioner_t{src_particles}(overlap).size();
+                    dst_particles.resize(old_dst_size + in_dst);
+                    mem::copy<CPU>(dst_particles.data() + old_dst_size, src_particles.data(),
+                                   in_dst);
+                }
+            });
+        });
 
-            if (overlap == src_tile) // complete
-            {
-                dst_particles.resize(old_dst_size + src_particles.size());
-                mem::copy<CPU>(dst_particles.data() + old_dst_size, src_particles.data(),
-                               src_particles.size());
-
-                PHARE_LOG_LINE_SS("Found: " << src_particles.size());
-            }
-            else
-            {
-                auto const in_dst = ParticleArrayPartitioner_t{src_particles}(overlap).size();
-                dst_particles.resize(old_dst_size + in_dst);
-                mem::copy<CPU>(dst_particles.data() + old_dst_size, src_particles.data(), in_dst);
-
-                PHARE_LOG_LINE_SS("Found: " << in_dst);
-            }
-        }
     };
 
     auto& mutable_src = const_cast<SrcParticles&>(src); // :(
-    // traverse_tiles(mutable_src.views(), box, per_tile);
     traverse_tilesets_overlap(mutable_src /*.views()*/, dst /*()*/, box, per_tile);
 }
 
@@ -93,62 +87,41 @@ template<typename SrcParticles, typename DstParticles, typename box_t, typename 
 void ParticlesSelector<AoSTS, CPU>::select( //
     SrcParticles const& src, DstParticles& dst, box_t const& box, Shift&& shift)
 {
-    PHARE_LOG_LINE_SS("");
-    PHARE_LOG_LINE_SS(box);
-    PHARE_LOG_LINE_SS(shift);
-    PHARE_LOG_LINE_SS(box - shift);
-
-    auto const lcl_dst_box = dst.local_box(box - shift);
+    auto on_overlap = [](auto& a, auto& b, auto f) {
+        if (auto const overlap = a * b)
+            f(*overlap);
+    };
 
     auto const per_tile = [&](auto& src_tile, auto& dst_tile) { //
         using SrcTileParticles           = std::decay_t<decltype(src_tile())>;
         using ParticleArrayPartitioner_t = ParticleArrayPartitioner<SrcTileParticles>;
 
-        // auto& dst_tile         = *dst().at(dst.local_cell(src_tile.lower - shift));
-        auto& dst_particles = dst_tile();
-        auto& src_particles = src_tile();
-
-        PHARE_LOG_LINE_SS(src_tile);
-        PHARE_LOG_LINE_SS(dst_tile);
-
-        auto const shifted_box     = box - shift;
-        auto const shifted_src_box = src_tile - shift;
+        auto& dst_particles        = dst_tile();
+        auto& src_particles        = src_tile();
+        auto const old_dst_size    = dst_particles.size();
         auto const shifted_dst_box = dst_tile + shift;
-        // PHARE_LOG_LINE_SS(shifted_box << " " << shifted_src_box << " " << shifted_dst_box);
-        auto const src_overlap_opt = box * src_tile;
 
-        if (auto const overlap_opt = shifted_dst_box * src_tile)
-        {
-            auto const overlap      = *overlap_opt;
-            auto const old_dst_size = dst_particles.size();
-            if (overlap == src_tile) // complete
-            {
-                dst_particles.reserve(dst_particles.size() + src_particles.size());
-                mem::copy<CPU>(dst_particles.data() + dst_particles.size(), src_particles.data(),
-                               src_particles.size());
-                dst_particles.resize(dst_particles.size() + src_particles.size());
+        on_overlap(box, *src_tile, [&](auto const& o0) {
+            on_overlap(o0, shifted_dst_box, [&](auto const& overlap) {
+                if (box == src_tile) // complete
+                {
+                    dst_particles.resize(dst_particles.size() + src_particles.size());
+                    mem::copy<CPU>(dst_particles.data() + old_dst_size, src_particles.data(),
+                                   src_particles.size());
+                }
+                else
+                {
+                    auto const in_dst = ParticleArrayPartitioner_t{src_particles}(overlap).size();
 
-                PHARE_LOG_LINE_SS("Found: " << src_particles.size());
-            }
-            else
-            {
-                auto const in_dst = ParticleArrayPartitioner_t{src_particles}(overlap).size();
-
-                dst_particles.reserve(dst_particles.size() + in_dst);
-                mem::copy<CPU>(dst_particles.data() + dst_particles.size(), src_particles.data(),
-                               in_dst);
-                dst_particles.resize(dst_particles.size() + in_dst);
-
-                PHARE_LOG_LINE_SS("Found: " << in_dst);
-            }
-
-            // todo: exported particles need icell shifing
-        }
+                    dst_particles.resize(dst_particles.size() + in_dst);
+                    mem::copy<CPU>(dst_particles.data() + old_dst_size, src_particles.data(),
+                                   in_dst);
+                }
+            });
+        });
     };
 
     auto& mutable_src = const_cast<SrcParticles&>(src); // :(
-    // traverse_tiles(mutable_src.views(), box, per_tile);
-
     traverse_tilesets_overlap(mutable_src /*.views()*/, dst /*()*/, box, per_tile, shift);
 }
 

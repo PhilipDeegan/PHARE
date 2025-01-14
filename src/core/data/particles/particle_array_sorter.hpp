@@ -17,7 +17,7 @@ struct ParticleArraySorter
 
     bool constexpr static is_sortable()
     {
-        return !any_in(ParticleArray::layout_mode, AoSTS, SoATS);
+        return true; //! any_in(ParticleArray::layout_mode, AoSTS, SoATS);
     }
 
     bool constexpr static is_cell_sortable()

@@ -65,7 +65,14 @@ public:
         }
         else if constexpr (any_in(ParticleArray::layout_mode, AoSTS, SoATS, SoAVXTS))
         {
-            throw std::runtime_error("no sort for LayoutMode::AoSTS");
+            // fix soa - not finished
+            for (auto& tile : particles())
+            {
+                std::sort(tile().begin(), tile().end(),
+                          [cf = cell_flattener](auto const& a, auto const& b) {
+                              return cf(a.iCell()) < cf(b.iCell());
+                          });
+            }
         }
         else
         {
@@ -109,7 +116,7 @@ public:
         }
         else if constexpr (any_in(ParticleArray::layout_mode, AoSTS, SoATS, SoAVXTS))
         {
-            throw std::runtime_error("no sort for LayoutMode::AoSTS");
+            throw std::runtime_error("no sort for AoSTS/SoATS");
         }
         else
         {
@@ -131,7 +138,9 @@ public:
                 std::sort(particles(bix).begin(), particles(bix).end(), by_deltas());
         else if constexpr (any_in(ParticleArray::layout_mode, AoSTS, SoATS, SoAVXTS))
         {
-            throw std::runtime_error("no sort for AoSTS/SoATS");
+            // fix soa - not finished
+            for (auto& tile : particles())
+                std::sort(tile().begin(), tile().end(), by_deltas());
         }
         else
         {

@@ -197,29 +197,17 @@ struct ParticleArraySelectingTest : public ::testing::Test
 template<typename ParticleArraySelectingTest_t>
 auto run(ParticleArraySelectingTest_t& self)
 {
-    // using ParticleArray_t = typename ParticleArraySelectingTest_t::ParticleArray_t;
-
-    PHARE_LOG_LINE_SS("");
     abort_if(self.periodic_neighbours_for(13).size());
 
-    for (std::size_t pid = 13; pid < self.patches.size(); ++pid)
+    for (std::size_t pid = 0; pid < self.patches.size(); ++pid)
     {
-        PHARE_LOG_LINE_SS("");
-
         auto& dst = self.patches[pid];
 
         for (auto const& [src, overlap] : self.neighbours_for(pid))
-        {
-            PHARE_LOG_LINE_SS("");
             select_particles(src->domain, dst.ghost, overlap);
-        }
 
         for (auto const& [src, overlap, shift] : self.periodic_neighbours_for(pid))
-        {
-            PHARE_LOG_LINE_SS("");
             select_particles(src->domain, dst.ghost, overlap, shift);
-        }
-        break; // hax
     }
 
     auto const expected = pow(cells + 2, 3) - pow(cells, 3); // ghost box layer
@@ -227,24 +215,11 @@ auto run(ParticleArraySelectingTest_t& self)
     for (auto& patch : self.patches)
         ParticleArrayService::template sync<2, ParticleType::Ghost>(patch.ghost);
 
-    self.sort();
-
-    for (std::size_t pid = 13; pid < self.patches.size(); ++pid)
+    for (std::size_t pid = 0; pid < self.patches.size(); ++pid)
     {
-        auto& patch = self.patches[pid];
+        auto const& patch = self.patches[pid];
 
         EXPECT_EQ(expected, patch.ghost.size());
-
-        PHARE_LOG_LINE_SS(patch.ghost[0].copy());
-        PHARE_LOG_LINE_SS(patch.ghost[1].copy());
-
-        std::size_t eq = 0;
-        for (auto const& [src, overlap] : self.neighbours_for(pid))
-            eq += count_equal(src->domain, patch.ghost);
-
-        PHARE_LOG_LINE_SS(eq);
-
-        break; // hax
     }
 }
 

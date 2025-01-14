@@ -5,6 +5,7 @@
 #include "core/utilities/types.hpp"
 #include "core/data/particles/particle_array_def.hpp"
 
+#include "core/data/particles/particle_array_sorter.hpp"
 #include "core/data/particles/particle_array_appender.hpp"
 #include "core/data/particles/particle_array_converter.hpp"
 
@@ -192,6 +193,27 @@ std::size_t ram_in_gbs(ParticleArray const& ps)
     return memory_for_particles(ps) / 1e9;
 }
 
+template<typename P0>
+struct ParticleComparable
+{
+    template<typename P1>
+    bool operator<(P1 const& p1)
+    {
+        auto const ic0 = p0.iCell();
+        auto const ic1 = p1.iCell();
+
+        if (ic0 > ic1)
+            return false;
+
+        if (ic0 == ic1)
+            return as_tuple(p0.delta()) < as_tuple(p1.delta());
+
+        return true;
+    }
+
+    P0 const& p0;
+};
+
 template<typename ParticleArray0, typename ParticleArray1>
 std::size_t count_equal(ParticleArray0 const& p0, ParticleArray1 const& p1)
 {
@@ -216,7 +238,7 @@ std::size_t count_equal(ParticleArray0 const& p0, ParticleArray1 const& p1)
         else
         {
             PHARE_LOG_LINE_SS(i0 << " " << i1 << " " << eq);
-            ++i1;
+            inc(ParticleComparable{p0[i0]} < p1[i1] ? ++i0 : ++i1);
         }
     }
 
@@ -239,7 +261,7 @@ std::size_t count_equal(ParticleArray0 const& p0, ParticleArray1 const& p1, Shif
         if (particle_compare(p, p1[i1]))
             inc(i0, i1, eq);
         else
-            ++i0;
+            inc(ParticleComparable{p} < p1[i1] ? ++i0 : ++i1);
     }
 
     return eq;

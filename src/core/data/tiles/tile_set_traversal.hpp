@@ -102,10 +102,15 @@ void traverse_tilesets_overlap(TileSet0& ts0, TileSet1& ts1, Box_t const& box, F
     auto const ts1_box = box - shift; // untransformed box in ts1 space
 
     TileFn const doX = [&](auto& t0, auto& t1) {
-        fn(t0, t1);
+        if (box * *t0 and ts1_box * *t1)
+            fn(t0, t1);
 
         auto const nt0 = t0.link(0);
         auto const nt1 = t1.link(0);
+
+        if (nt0) // do y and z same
+            doX(*nt0, t1);
+
         if (nt0 and nt1 and box * *nt0 and ts1_box * *nt1)
             doX(*nt0, *nt1);
     };
@@ -132,15 +137,7 @@ void traverse_tilesets_overlap(TileSet0& ts0, TileSet1& ts1, Box_t const& box, F
         }
     };
 
-    PHARE_LOG_LINE_SS(shift);
-    PHARE_LOG_LINE_SS(box);
-    PHARE_LOG_LINE_SS(box - shift);
-    PHARE_LOG_LINE_SS(ts0.box());
-    PHARE_LOG_LINE_SS(ts1.box());
-
-    auto const ts0lower = (box.lower - ts0.box().lower).as_unsigned();
-    // auto const ts1lower = (box.lower - ts1.box().lower).as_unsigned();
-    doZ(*ts0.views().at(ts0lower), *ts1().at(box.lower - shift));
+    doZ(*ts0.views().at(box.lower), *ts1().at(box.lower - shift));
 }
 
 
