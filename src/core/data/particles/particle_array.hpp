@@ -111,40 +111,61 @@ std::ostream& operator<<(std::ostream& out, ParticleArray<dim, internals> const&
     return out;
 }
 
-template<typename Particles, typename T, std::size_t S, typename Particle_t = Particle<S>>
-auto make_particles(Box<T, S> const& box, std::size_t const s = 0, Particle_t const& particle = {})
-{
-    using enum LayoutMode;
-    if constexpr (Particles::is_mapped)
-        return Particles{box, s, particle};
-    if constexpr (any_in(Particles::layout_mode, AoSPC, SoAPC))
-        return Particles{box};
-    else
-        return make_particles<Particles>(s, particle);
-}
+// template<typename Particles, typename T, std::size_t S, typename Particle_t = Particle<S>>
+// auto make_particles(Box<T, S> const& box, std::size_t const s = 0, Particle_t const& particle =
+// {})
+// {
+//     using enum LayoutMode;
+//     if constexpr (Particles::is_mapped)
+//         return Particles{box, s, particle};
+//     if constexpr (any_in(Particles::layout_mode, AoSPC, SoAPC))
+//         return Particles{box};
+//     else
+//         return make_particles<Particles>(s, particle);
+// }
 
-template<typename Particles, typename Particle_t = Particle<Particles::dimension>>
-auto make_particles(std::size_t const s = 0, Particle_t const& particle = {})
-{
-    return Particles{s, particle};
-}
+// template<typename Particles, typename Particle_t = Particle<Particles::dimension>>
+// auto make_particles(std::size_t const s = 0, Particle_t const& particle = {})
+// {
+//     return Particles{s, particle};
+// }
 
 
-template<typename Particles, typename GridLayout_t>
-auto make_particles(GridLayout_t const& layout)
+// template<typename Particles, typename GridLayout_t>
+// auto make_particles(GridLayout_t const& layout)
+// {
+//     auto constexpr static ghost_cells = GridLayout_t::nbrParticleGhosts();
+
+//     using enum LayoutMode;
+//     if constexpr (any_in(Particles::layout_mode, AoSPC, SoAPC))
+//         return Particles{layout.AMRBox(), ghost_cells};
+//     else if constexpr (any_in(Particles::layout_mode, AoSTS, SoATS, SoAVXTS))
+//         return Particles{layout.AMRBox(), TileSetParticleArrayDetails{ghost_cells}};
+//     else if constexpr (Particles::is_mapped)
+//         return Particles{grow(layout.AMRBox(), ghost_cells + 1)};
+
+//     else
+//         return Particles{};
+// }
+
+
+template<typename Particles_t, typename GridLayout_t>
+auto make_particles(GridLayout_t const& layout, PHARE::initializer::PHAREDict const& dict = {})
 {
     auto constexpr static ghost_cells = GridLayout_t::nbrParticleGhosts();
 
     using enum LayoutMode;
-    if constexpr (any_in(Particles::layout_mode, AoSPC, SoAPC, AoSTS, SoATS, SoAVXTS))
-        return Particles{layout.AMRBox(), ghost_cells};
-
-    else if constexpr (Particles::is_mapped)
-        return Particles{grow(layout.AMRBox(), ghost_cells + 1)};
+    if constexpr (any_in(Particles_t::layout_mode, AoSPC, SoAPC))
+        return Particles_t{layout.AMRBox(), ghost_cells};
+    else if constexpr (any_in(Particles_t::layout_mode, AoSTS, SoATS, SoAVXTS))
+        return Particles_t{layout.AMRBox(), TileSetParticleArrayDetails::FROM(layout, dict)};
+    else if constexpr (Particles_t::is_mapped)
+        return Particles_t{grow(layout.AMRBox(), ghost_cells + 1)};
 
     else
-        return Particles{};
+        return Particles_t{};
 }
+
 
 template<std::size_t dim, typename internals>
 void empty(ParticleArray<dim, internals>& array)

@@ -1,13 +1,13 @@
 
 
-#include "core/utilities/types.hpp"
 #include "phare_core.hpp"
+#include "core/utilities/types.hpp"
 #include "core/data/particles/particle_array.hpp"
 #include "core/data/particles/particle_array_service.hpp"
 #include "core/data/particles/particle_array_selector.hpp"
 
+#include "tests/core/data/particles/test_particles.hpp"
 #include "tests/core/data/gridlayout/test_gridlayout.hpp"
-#include "tests/core/data/particles/test_particles_fixtures.hpp"
 
 #include "gtest/gtest.h"
 
@@ -56,7 +56,7 @@ struct TestParam
 
 
 template<typename Param>
-struct ParticleArraySelectingTest : public ::testing::Test
+struct AParticleArraySelectingTest : public ::testing::Test
 {
     auto constexpr static dim         = Param::dim;
     auto constexpr static interp      = 1;
@@ -69,26 +69,11 @@ struct ParticleArraySelectingTest : public ::testing::Test
     using ParticleArray_t = ParticleArray<
         dim, ParticleArrayInternals<dim, layout_mode, StorageMode::VECTOR, alloc_mode, impl>>;
 
-
-
-    ParticleArraySelectingTest()
+    AParticleArraySelectingTest(GridLayout_t const& _layout)
+        : layout{_layout}
     {
-        // 27 patches of cells**3 in 3**3 config
-        patches.reserve(3 * 3 * 3);
-        int const off = cells - 1;
-        for (std::uint8_t i = 0; i < 3; ++i)
-            for (std::uint8_t j = 0; j < 3; ++j)
-                for (std::uint8_t k = 0; k < 3; ++k)
-                {
-                    int const cellx = i * cells;
-                    int const celly = j * cells;
-                    int const cellz = k * cells;
-                    patches.emplace_back(Box<int, dim>{
-                        Point{cellx, celly, cellz}, Point{cellx + off, celly + off, cellz + off}});
-                }
-
-        assert(!any_overlaps_in(patches, [](auto const& patch) { return patch.layout.AMRBox(); }));
     }
+
 
     struct Patch
     {
@@ -99,9 +84,18 @@ struct ParticleArraySelectingTest : public ::testing::Test
             abort_if_not(domain.size() == ppc * layout.AMRBox().size());
         }
 
+        auto static _dict()
+        {
+            initializer::PHAREDict dict;
+            dict["tile_size"]    = std::size_t{cells};
+            dict["interp_order"] = std::size_t{1};
+            return dict;
+        }
+
         GridLayout_t layout;
-        ParticleArray_t domain = make_particles<ParticleArray_t>(*layout);
-        ParticleArray_t ghost  = make_particles<ParticleArray_t>(*layout);
+        initializer::PHAREDict const dict = _dict();
+        ParticleArray_t domain            = make_particles<ParticleArray_t>(*layout, dict);
+        ParticleArray_t ghost             = make_particles<ParticleArray_t>(*layout, dict);
     };
 
     bool at_periodic_border(Box<int, dim> const& box) const
@@ -127,11 +121,6 @@ struct ParticleArraySelectingTest : public ::testing::Test
         return neighbours;
     }
 
-    struct Periodic
-    {
-        Point<int, 3> const shift;
-        Box_t const overlap; // shifted
-    };
 
     auto& periodic_neighbours_for(std::size_t const pid)
     {
@@ -170,28 +159,44 @@ struct ParticleArraySelectingTest : public ::testing::Test
         return periodic_neighbours;
     }
 
-    void sort()
-    {
-        for (auto& patch : patches)
-        {
-            PHARE::core ::sort(patch.domain, ghostBox);
-            patch.domain.reset_index_wrapper_map();
 
-            PHARE::core ::sort(patch.ghost, ghostBox);
-            patch.ghost.reset_index_wrapper_map();
-        }
-    }
-
-    GridLayout_t layout{cells * 3};
+    GridLayout_t layout; //{cells * 3};
     Box_t const domainBox = layout.AMRBox();
     Box_t const ghostBox  = grow(layout.AMRBox(), 1);
 
     std::vector<Patch> patches{};
-
     std::vector<std::tuple<Patch*, Box_t>> neighbours{};
     std::vector<std::tuple<Patch*, Box_t, Point<int, 3>>> periodic_neighbours{};
 };
 
+
+template<typename Param>
+struct ParticleArraySelectingTestSymmetric : public AParticleArraySelectingTest<Param>
+{
+    using Super        = AParticleArraySelectingTest<Param>;
+    using GridLayout_t = Super::GridLayout_t;
+    using Super::patches;
+
+    ParticleArraySelectingTestSymmetric()
+        : Super{GridLayout_t{cells * 3}}
+    {
+        // 27 patches of cells**3 in 3**3 config
+        patches.reserve(3 * 3 * 3);
+        int const off = cells - 1;
+        for (std::uint8_t i = 0; i < 3; ++i)
+            for (std::uint8_t j = 0; j < 3; ++j)
+                for (std::uint8_t k = 0; k < 3; ++k)
+                {
+                    int const cellx = i * cells;
+                    int const celly = j * cells;
+                    int const cellz = k * cells;
+                    patches.emplace_back(Box<int, Super::dim>{
+                        Point{cellx, celly, cellz}, Point{cellx + off, celly + off, cellz + off}});
+                }
+
+        assert(!any_overlaps_in(patches, [](auto const& patch) { return patch.layout.AMRBox(); }));
+    }
+};
 
 
 template<typename ParticleArraySelectingTest_t>
@@ -241,12 +246,14 @@ using Permutations_t = testing::Types< // ! notice commas !
 >;
 // clang-format on
 
-TYPED_TEST_SUITE(ParticleArraySelectingTest, Permutations_t, );
+TYPED_TEST_SUITE(ParticleArraySelectingTestSymmetric, Permutations_t, );
 
-TYPED_TEST(ParticleArraySelectingTest, updater_domain_only)
+TYPED_TEST(ParticleArraySelectingTestSymmetric, patch_ghost_copy)
 {
     run(*this);
 }
+
+
 
 } // namespace PHARE::core
 

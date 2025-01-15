@@ -1,8 +1,10 @@
 #ifndef PHARE_CORE_DATA_PARTICLES_SORTING_PARTICLES_SORTING_GPU_HPP
 #define PHARE_CORE_DATA_PARTICLES_SORTING_PARTICLES_SORTING_GPU_HPP
 
-#include "core/data/particles/particle_array_def.hpp"
+#if PHARE_HAVE_THRUST
+
 #include "core/utilities/box/box.hpp"
+#include "core/data/particles/particle_array_def.hpp"
 
 #include <thrust/sort.h>
 #include <thrust/gather.h>
@@ -157,5 +159,7 @@ public:
 
 } // namespace PHARE::core::detail
 
+
+#endif // PHARE_HAVE_THRUST
 
 #endif /*PHARE_CORE_DATA_PARTICLES_SORTING_PARTICLES_SORTING_GPU_HPP*/

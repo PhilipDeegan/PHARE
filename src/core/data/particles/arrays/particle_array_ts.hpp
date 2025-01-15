@@ -11,6 +11,7 @@
 #include "core/data/ndarray/ndarray_vector.hpp"
 #include "core/data/particles/particle_array_def.hpp"
 #include "core/data/particles/particle_array_partitioner.hpp"
+#include "initializer/data_provider.hpp"
 
 
 #include <tuple>
@@ -20,6 +21,27 @@
 
 namespace PHARE::core
 {
+
+struct TileSetParticleArrayDetails : public ParticleArrayDetails
+{
+    std::size_t const interp_order = 1; // for fields per tile
+    std::size_t const tile_size    = 4;
+
+    template<typename GridLayout_t>
+    TileSetParticleArrayDetails static FROM(GridLayout_t const& layout,
+                                            initializer::PHAREDict const& dict)
+    {
+        auto const super = ParticleArrayDetails::FROM(layout);
+        TileSetParticleArrayDetails const defaults{};
+        return {
+            {super},
+            cppdict::get_value(dict, "interp_order", defaults.interp_order),
+            cppdict::get_value(dict, "tile_size", defaults.tile_size),
+        };
+    }
+};
+
+
 
 
 template<typename Particles, typename NdArray_t>
@@ -300,11 +322,12 @@ public:
     using SpnTile = ParticlesTile<PSpan_t, NdArrayView<dim, double>>;
 
 
-    TileSetVector(box_t const& box /*= {}*/, std::size_t ghost_cells = 0)
-        : ghost_cells_{ghost_cells}
+    TileSetVector(box_t const& box /*= {}*/, TileSetParticleArrayDetails const& deets = {})
+        : details{deets}
+        , ghost_cells_{deets.ghost_cells}
         , box_{box}
-        , ghost_box_{grow(box, ghost_cells)}
-        , safe_box_{grow(box, ghost_cells + 1)}
+        , ghost_box_{grow(box, deets.ghost_cells)}
+        , safe_box_{grow(box, deets.ghost_cells + 1)}
     {
         cell_size_.zero();
         gap_idx_.zero();
@@ -512,6 +535,8 @@ public:
     }
 
 protected:
+    TileSetParticleArrayDetails const details;
+
     std::size_t ghost_cells_;
 
     Box<int, dim> box_, ghost_box_, safe_box_;
@@ -528,7 +553,7 @@ protected:
     nd_array_t<SIZE_T> cap_{local_box().shape()};
     nd_array_t<std::size_t> cell_size_{local_box().shape()};
 
-    TileSet<VecTile, alloc_mode> particles_{safe_box_, 4, *this};
+    TileSet<VecTile, alloc_mode> particles_{safe_box_, details.tile_size, *this};
 
     // only used for GPU
     TileSet<SpnTile, alloc_mode> particles_views_{

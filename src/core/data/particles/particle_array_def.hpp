@@ -6,6 +6,7 @@
 #include "core/utilities/box/box.hpp"
 #include "core/utilities/point/point.hpp"
 #include "core/data/particles/particle.hpp"
+#include "initializer/data_provider.hpp"
 
 #include <array>
 #include <cstdint>
@@ -34,6 +35,26 @@ template<std::size_t dim>
 struct ParticleDefaults
 {
     using Particle_t = Particle<dim>;
+};
+
+
+struct ParticleArrayDetails
+{
+    std::size_t const ghost_cells = 1;
+
+    ParticleArrayDetails static FROM(initializer::PHAREDict const& dict)
+    {
+        ParticleArrayDetails const defaults{};
+        return {
+            cppdict::get_value(dict, "ghost_cells", defaults.ghost_cells),
+        };
+    }
+
+    template<typename GridLayout_t>
+    ParticleArrayDetails static FROM(GridLayout_t const& layout)
+    {
+        return {GridLayout_t::nbrParticleGhosts()};
+    }
 };
 
 
