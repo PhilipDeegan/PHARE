@@ -168,7 +168,7 @@ void IonUpdaterMultiPC<Ions, Electromag, GridLayout>::updateAndDepositDomain_(Mo
     in.streamer.dump_times(detail::timings_dir_str + "/updateAndDepositDomain_.txt");
 
 #else
-        // throw std::runtime_error("No available implementation")
+    // throw std::runtime_error("No available implementation")
 #endif
     //
 }
@@ -243,7 +243,7 @@ void IonUpdaterMultiPC<Ions, Electromag, GridLayout>::updateAndDepositAll_(Model
                            + std::string{Particles::type_id} + ".txt");
 
 #else
-        // throw std::runtime_error("No available implementation")
+    // throw std::runtime_error("No available implementation")
 #endif
     //
 }

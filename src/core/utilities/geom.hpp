@@ -65,7 +65,7 @@ template<typename Box_t, typename Point_t>
 bool point_in_box_2(Box_t const& box, Point_t const& point)
 {
     for (auto iDim = 0u; iDim < point.size(); ++iDim)
-        if (!(point[iDim]<box.lower[iDim] | point[iDim]> box.upper[iDim]))
+        if (!(point[iDim] < box.lower[iDim] | point[iDim] > box.upper[iDim]))
             return true;
     return false;
 }

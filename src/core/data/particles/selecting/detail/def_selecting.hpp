@@ -19,7 +19,7 @@ struct ParticlesSelector
     template<typename SrcParticles, typename DstParticles, typename box_t>
     static void select(SrcParticles const&, DstParticles&, box_t const&);
 
-    template<typename SrcParticles,typename DstParticles, typename box_t, typename Shift>
+    template<typename SrcParticles, typename DstParticles, typename box_t, typename Shift>
     static void select(SrcParticles const&, DstParticles&, box_t const&, Shift&&);
 };
 

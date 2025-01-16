@@ -9,6 +9,7 @@
 #include "core/utilities/box/box.hpp"
 #include "core/data/ndarray/ndarray_vector.hpp"
 
+#include "tile_set_mapper.hpp"
 
 #include <array>
 #include <tuple>
@@ -297,6 +298,9 @@ public:
     NO_DISCARD auto box() const { return box_; }
     NO_DISCARD auto tile_size() const { return tile_size_; }
 
+    NO_DISCARD auto& operator()() { return tiles_; }
+    NO_DISCARD auto& operator()() const { return tiles_; }
+
 
     NO_DISCARD auto& at(Point<int, dimension> const& amr_point)
     {
@@ -490,56 +494,7 @@ private:
     template<typename... Args>
     void make_tiles_(Args&&... args)
     {
-        auto const size_me = [&](auto dim, auto idx) {
-            if (idx == shape_[dim] - 1)
-            {
-                auto const remain = box_.shape()[dim] % tile_size_[dim];
-                return (remain == 0) ? tile_size_[dim] : remain;
-            }
-            else
-                return tile_size_[dim];
-        };
-
-        for (auto ix = 0u; ix < shape_[0]; ++ix)
-        {
-            Box_t tile;
-            if constexpr (dimension == 1)
-            {
-                // -1 because upper is included
-                tile.lower[0] = box_.lower[0] + ix * tile_size_[0];
-                tile.upper[0] = tile.lower[0] + size_me(0, ix) - 1;
-                tiles_.emplace_back(tile, args...);
-            }
-            else
-            {
-                for (auto iy = 0u; iy < shape_[1]; ++iy)
-                {
-                    if constexpr (dimension == 2)
-                    {
-                        // auto const i  = ix * shape_[1] + iy;
-                        tile.lower[0] = box_.lower[0] + ix * tile_size_[0];
-                        tile.upper[0] = tile.lower[0] + size_me(0, ix) - 1;
-                        tile.lower[1] = box_.lower[1] + iy * tile_size_[1];
-                        tile.upper[1] = tile.lower[1] + size_me(1, iy) - 1;
-                        tiles_.emplace_back(tile, args...);
-                    }
-                    else
-                    {
-                        for (auto iz = 0u; iz < shape_[2]; ++iz)
-                        {
-                            // auto const i  = ix * shape_[1] * shape_[2] + shape_[2] * iy + iz;
-                            tile.lower[0] = box_.lower[0] + ix * tile_size_[0];
-                            tile.upper[0] = tile.lower[0] + size_me(0, ix) - 1;
-                            tile.lower[1] = box_.lower[1] + iy * tile_size_[1];
-                            tile.upper[1] = tile.lower[1] + size_me(1, iy) - 1;
-                            tile.lower[2] = box_.lower[2] + iz * tile_size_[2];
-                            tile.upper[2] = tile.lower[2] + size_me(2, iz) - 1;
-                            tiles_.emplace_back(tile, args...);
-                        }
-                    }
-                }
-            }
-        }
+        tile_set_make_tiles(*this, args...);
     }
 
 

@@ -43,7 +43,7 @@ void ParticlesAppender<AoSMapped, CPU, SoAPC, GPU_UNIFIED>::operator()( //
     };
 
     std::int32_t src_start = 0;
-    auto do_copy = [&](auto&&... args) {
+    auto do_copy           = [&](auto&&... args) {
         auto const& [particles, tmp, i, S] = std::forward_as_tuple(args...);
         for (std::size_t pidx = 0; pidx < S; ++pidx)
             tmp.assign(src[pidx + src_start], pidx);
@@ -55,7 +55,7 @@ void ParticlesAppender<AoSMapped, CPU, SoAPC, GPU_UNIFIED>::operator()( //
     std::size_t tmp_start = 0;
     auto const tmp_tuple  = tmp.as_tuple();
     auto finish           = [&](auto const lix, auto const size) {
-        auto& particles       = dst(lix);
+        auto& particles = dst(lix);
         particles.reserve(particles.size() + size);
         auto const full_count = size / N;
         std::size_t i         = 0;
