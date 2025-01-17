@@ -9,7 +9,8 @@ set -e
 
 # TEST="-M tests/core/numerics/ion_updater/test_multi_updater.cpp"
 # TEST="-M tests/core/data/tiles/test_tile.cpp"
-TEST="-M tests/core/data/particles/test_particles_selecting.cpp"
+# TEST="-M tests/core/data/particles/test_particles_selecting.cpp"
+TEST="-M tests/core/data/tiles/test_tile_set_mapper.cpp"
 
 XFILE="${XFILE:-res/mkn/clang_cuda}"
 [ -d /opt/rocm/bin ] && XFILE="res/mkn/hip"
