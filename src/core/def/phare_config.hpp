@@ -6,6 +6,7 @@
 #include "core/def/detail/umpire.hpp"
 #include "core/def/detail/raja.hpp" // checks for umpire to know if gpu
 #include "core/def/detail/mkn_gpu.hpp"
+#include "core/def/kokkos_tools.hpp"
 #include "core/def/detail/thrust.hpp"
 
 #include <cstdint>
@@ -41,6 +42,7 @@ struct CompileOptions
     static constexpr bool WithMknGpu = PHARE_HAVE_MKN_GPU;
     static constexpr bool WithRAJA   = PHARE_HAVE_RAJA;
     static constexpr bool WithThrust = PHARE_HAVE_THRUST;
+    static constexpr bool WithKokkos = PHARE_HAVE_KOKKOS;
     static constexpr bool WithGpu    = WithUmpire || WithMknGpu;
 };
 

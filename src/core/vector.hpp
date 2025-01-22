@@ -26,7 +26,8 @@ bool constexpr allocator_mode_supported()
     else if constexpr (/*allocator_mode == AllocatorMode::GPU
                        or */
                        allocator_mode == AllocatorMode::GPU_UNIFIED)
-        return CompileOptions::WithMknGpu or CompileOptions::WithUmpire;
+        return CompileOptions::WithMknGpu or CompileOptions::WithUmpire
+               or CompileOptions::WithKokkos;
     return false;
 }
 
@@ -62,13 +63,16 @@ auto constexpr allocator()
                     return Allocator<allocator_mode, mkn::gpu::NoConstructAllocator<Type>>{};
             });
         }
-        if constexpr (CompileOptions::WithUmpire)
+        else if constexpr (CompileOptions::WithUmpire)
         {
             PHARE_WITH_UMPIRE(return Allocator<allocator_mode, umpire::TypedAllocator<Type>>{
                 umpire::ResourceManager::getInstance().getAllocator("PHARE::data_allocator")});
         }
-
-        // or compile error
+        else if constexpr (CompileOptions::WithKokkos)
+        {
+            PHARE_WITH_KOKKOS(return Allocator<allocator_mode, KokkosAllocator<Type>>{});
+        }
+        // else compile error
     }
     throw std::runtime_error("NOOO");
 }

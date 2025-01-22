@@ -56,3 +56,6 @@ include("${PHARE_PROJECT_DIR}/res/cmake/dep/gtest.cmake")
 include("${PHARE_PROJECT_DIR}/res/cmake/dep/gbench.cmake")
 
 include("${PHARE_PROJECT_DIR}/res/cmake/dep/magicenum.cmake")
+
+# KokkosTools
+include("${PHARE_PROJECT_DIR}/res/cmake/dep/kokkos_tools.cmake")
