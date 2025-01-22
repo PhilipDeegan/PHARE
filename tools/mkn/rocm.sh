@@ -5,7 +5,7 @@ CWD="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )" && cd $CWD && cd ../.. &
 shopt -s expand_aliases
 alias cls="clear; printf '\033[3J'"
 
-MKN_ARGS="-P mkn.base=gpu_ -OW 9 -x res/mkn/hip_mpi "
+MKN_ARGS="-P mkn.base=gpu_ -OWx res/mkn/hip_mpi "
 
 run(){
     FILE="$1"
