@@ -11,7 +11,7 @@
 
 #include <cstdint>
 
-#if PHARE_HAVE_MKN_GPU or PHARE_HAVE_UMPIRE
+#if PHARE_HAVE_MKN_GPU or PHARE_HAVE_UMPIRE or PHARE_HAVE_KOKKOS
 #define PHARE_HAVE_GPU 1
 #define PHARE_WITH_GPU(...) __VA_ARGS__
 #else
@@ -19,19 +19,25 @@
 #define PHARE_WITH_GPU(...)
 #endif
 
-#if PHARE_HAVE_GPU
+#if !defined(PHARE_HAS_HOST_DEVICE_FUNCS) && PHARE_HAVE_KOKKOS
+#define PHARE_HAS_HOST_DEVICE_FUNCS 0
+#else
+#define PHARE_HAS_HOST_DEVICE_FUNCS 1
+#endif
+
+#if PHARE_HAVE_GPU && PHARE_HAS_HOST_DEVICE_FUNCS
 
 #define _PHARE_DEV_FN_ __device__
 #define _PHARE_HST_FN_ __host__
 #define _PHARE_ALL_FN_ _PHARE_HST_FN_ _PHARE_DEV_FN_
 
-#else // !PHARE_HAVE_GPU
+#else // !PHARE_HAVE_GPU && PHARE_HAS_HOST_DEVICE_FUNCS
 
 #define _PHARE_DEV_FN_
 #define _PHARE_HST_FN_
 #define _PHARE_ALL_FN_
 
-#endif // PHARE_HAVE_GPU
+#endif // PHARE_HAVE_GPU && PHARE_HAS_HOST_DEVICE_FUNCS
 
 
 namespace PHARE

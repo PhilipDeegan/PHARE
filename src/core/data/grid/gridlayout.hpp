@@ -30,6 +30,10 @@
 #include "core/data/grid/detail/mkn_gpu.hpp"
 #endif
 
+#if PHARE_HAVE_KOKKOS
+#include "core/data/grid/detail/kokkos.hpp"
+#endif
+
 
 namespace PHARE
 {
@@ -1223,6 +1227,9 @@ namespace core
                     grid_gpu_impl::GridLayout::evalOnBox(fn, box, args...); //
                 )
                 PHARE_WITH_MKN_GPU(                                   //
+                    mkn_gpu::GridLayout::evalOnBox(fn, box, args...); //
+                )
+                PHARE_WITH_KOKKOS(                                    //
                     mkn_gpu::GridLayout::evalOnBox(fn, box, args...); //
                 )
             }

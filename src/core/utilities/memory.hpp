@@ -97,7 +97,7 @@ public:
         if (n == 0)
             return nullptr;
 
-        void* ptr = Kokkos::kokkos_malloc(sizeof(T) * n);
+        void* ptr = Kokkos::kokkos_malloc<Kokkos::SYCLSharedUSMSpace>(sizeof(T) * n);
 
         if (!ptr)
             throw std::bad_alloc();

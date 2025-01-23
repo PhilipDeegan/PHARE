@@ -13,7 +13,8 @@ namespace PHARE
 
 auto constexpr default_allocator_mode()
 {
-    if constexpr (CompileOptions::WithUmpire or CompileOptions::WithMknGpu)
+    if constexpr (CompileOptions::WithUmpire or CompileOptions::WithMknGpu
+                  or CompileOptions::WithKokkos)
         return AllocatorMode::GPU_UNIFIED;
     return AllocatorMode::CPU;
 }

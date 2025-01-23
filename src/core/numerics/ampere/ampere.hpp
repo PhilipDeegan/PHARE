@@ -38,6 +38,21 @@ public:
     }
 };
 
+template<std::size_t dimension, typename... Args>
+void global_fn(Args... args)
+{
+    auto const& [ijk, Jx, B, layout] = std::forward_as_tuple(args...);
+    auto const& [_, By, Bz]          = B();
+
+    if constexpr (dimension == 2)
+        Jx(ijk) = layout.template deriv<Direction::Y>(Bz, ijk);
+
+    if constexpr (dimension == 3)
+        Jx(ijk) = layout.template deriv<Direction::Y>(Bz, ijk)
+                  - layout.template deriv<Direction::Z>(By, ijk);
+}
+
+
 template<typename GridLayout>
 class Ampere_ref
 {
@@ -58,9 +73,14 @@ public:
         auto& Jy = J(Component::Y);
         auto& Jz = J(Component::Z);
 
-        layout.evalOnBox(Jx, [] _PHARE_ALL_FN_(auto&&... args) { JxEq_(args...); }, Jx, B, layout);
-        layout.evalOnBox(Jy, [] _PHARE_ALL_FN_(auto&&... args) { JyEq_(args...); }, Jy, B, layout);
-        layout.evalOnBox(Jz, [] _PHARE_ALL_FN_(auto&&... args) { JzEq_(args...); }, Jz, B, layout);
+        layout.evalOnBox(
+            Jx, [=] _PHARE_ALL_FN_(auto&&... args) { global_fn<dimension>(args...); }, Jx, B,
+            layout);
+
+        // layout.evalOnBox(Jx, [] _PHARE_ALL_FN_(auto&&... args) { JxEq_(args...); }, Jx, B,
+        // layout); layout.evalOnBox(Jy, [] _PHARE_ALL_FN_(auto&&... args) { JyEq_(args...); }, Jy,
+        // B, layout); layout.evalOnBox(Jz, [] _PHARE_ALL_FN_(auto&&... args) { JzEq_(args...); },
+        // Jz, B, layout);
     }
 
 

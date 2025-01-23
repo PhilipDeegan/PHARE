@@ -8,12 +8,12 @@ cd $SCRIPT_DIR && cd .. && CWD=$PWD # move to project root
 
 THREADS=${THREADS:="14"}
 BUILD_DIR=${BUILD_DIR:="$CWD/build"}
-SAMRAI=${SAMRAI:="/mkn/r/llnl/samrai/regular"} # "" = as subproject /mkn/r/llnl/samrai/master
+SAMRAI=${SAMRAI:=""} # "" = as subproject /mkn/r/llnl/samrai/master
 FFF=("${BUILD_DIR}")
-CMAKE_CONFIG="-DdevMode=ON -Dasan=OFF -Dbench=OFF -DwithCaliper=OFF -DtestMPI=OFF -DtestDuringBuild=OFF -DwithKokkosTools=ON -DKokkos_ENABLE_SERIAL=ON"
-CMAKE_CONFIG="${CMAKE_CONFIG} -Dphare_configurator=ON " # -DHDF5_ROOT=/usr/local/HDF_Group/HDF5/1.15.0" #  " #-DHDF5_ROOT=/opt/mpi/rocm_hdf5"
-CMAKE_CONFIG="${CMAKE_CONFIG} -DwithPhlop=OFF " # -DPHARE_EXEC_LEVEL_MAX=99 "
-# CMAKE_CONFIG="${CMAKE_CONFIG} -DhighResourceTests=ON " # -DPHARE_EXEC_LEVEL_MAX=99 "
+# CMAKE_CONFIG="-DdevMode=ON -Dasan=OFF -Dbench=OFF -DwithCaliper=OFF -DtestMPI=OFF -DtestDuringBuild=OFF -DwithKokkosTools=ON -DKokkos_ENABLE_SERIAL=ON"
+CMAKE_CONFIG="-DCMAKE_POSITION_INDEPENDENT_CODE=ON -DENABLE_OPENMP=OFF "
+CMAKE_CONFIG="${CMAKE_CONFIG} -DwithKokkosTools=ON -DKokkos_ENABLE_SYCL=ON -DKokkos_ARCH_INTEL_PVC=ON -DMPI_C_COMPILER=mpicc -DMPI_CXX_COMPILER=mpicxx "
+CMAKE_CONFIG="${CMAKE_CONFIG} -DMPI_GUESS_LIBRARY_NAME=OPENMPI -DMPI_EXECUTABLE_SUFFIX=.openmpi -DMPI_CXX_SKIP_MPICXX=ON -DCMAKE_CXX_COMPILER=icpx "
 
 # CMAKE_CXX_FLAGS="-DNDEBUG -g0 -O3 -march=native -mtune=native"                # SUPER RELEASE
 # CMAKE_CXX_FLAGS="-g3 -O3 -march=native -mtune=native -fno-omit-frame-pointer" # OPTIMZ AND DEBUG
@@ -26,8 +26,6 @@ CMAKE_CONFIG="${CMAKE_CONFIG} -DCMAKE_BUILD_TYPE=Debug" # Or Debug RelWithDebInf
 exec 19>$CWD/.cmake.sh.cmd # set -x redirect
 export BASH_XTRACEFD=19  # set -x redirect
 
-CC=${CC:="gcc"}
-CXX=${CXX:="g++"}
 set -xe
 time (
   date
@@ -36,11 +34,10 @@ time (
   mkdir -p ${BUILD_DIR}
   [[ -n "${SAMRAI}" ]] && SAMRAI=-DSAMRAI_ROOT="${SAMRAI}"
   (
-    export CC CXX && cd ${BUILD_DIR}
+    cd ${BUILD_DIR}
     cmake $CWD ${SAMRAI} -G Ninja ${CMAKE_CONFIG} -DCMAKE_CXX_FLAGS="${CMAKE_CXX_FLAGS}"
-    mold --run ninja -C ${BUILD_DIR} -v -j${THREADS} $@ # cpp cpp_etc dictator
-    # ctest -j${THREADS}
-    # pythom3 -m
+    ninja -C ${BUILD_DIR} -v amper_gpu_kokkos
+    ctest -R amper_gpu_kokkos
   )
   date
 ) 1> >(tee $CWD/.cmake.sh.out ) 2> >(tee $CWD/.cmake.sh.err >&2 )
