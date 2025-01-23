@@ -37,7 +37,7 @@ time (
     cd ${BUILD_DIR}
     cmake $CWD ${SAMRAI} -G Ninja ${CMAKE_CONFIG} -DCMAKE_CXX_FLAGS="${CMAKE_CXX_FLAGS}"
     ninja -C ${BUILD_DIR} -v amper_gpu_kokkos
-    ctest -R amper_gpu_kokkos
+    ctest -R amper_gpu_kokkos -V
   )
   date
 ) 1> >(tee $CWD/.cmake.sh.out ) 2> >(tee $CWD/.cmake.sh.err >&2 )
