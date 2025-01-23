@@ -89,9 +89,9 @@ public:
     {
         if constexpr (alloc_mode == AllocatorMode::CPU)
         {
-            PHARE_DEBUG_DO(                                                                 //
-                if (!isUsable()) throw std::runtime_error("Field is not usable: " + name_); //
-            )
+            // PHARE_DEBUG_DO(                                                                 //
+            //     if (!isUsable()) throw std::runtime_error("Field is not usable: " + name_); //
+            // )
         }
 
         return super()(args...);

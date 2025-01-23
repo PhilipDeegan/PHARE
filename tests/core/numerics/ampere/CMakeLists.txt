@@ -28,7 +28,7 @@ if(withKokkosTools)
     add_no_mpi_phare_test(amper_gpu_kokkos ${CMAKE_CURRENT_BINARY_DIR})
     target_link_libraries(amper_gpu_kokkos PRIVATE
       phare_core
-      phare_simulator
+      # phare_simulator
       ${GTEST_LIBS})
     target_include_directories(amper_gpu_kokkos PRIVATE
       ${GTEST_INCLUDE_DIRS}
