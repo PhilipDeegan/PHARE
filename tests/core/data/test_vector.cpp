@@ -71,9 +71,17 @@ TYPED_TEST(VectorTest, is_copyable)
 // }
 
 
+struct K
+{
+    K(int argc, char** argv) { Kokkos::initialize(argc, argv); }
+    ~K() { Kokkos::finalize(); }
+};
+
+
 int main(int argc, char** argv)
 {
-    ::testing::InitGoogleTest(&argc, argv);
+    K k{argc, argv};
 
+    ::testing::InitGoogleTest(&argc, argv);
     return RUN_ALL_TESTS();
 }

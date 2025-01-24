@@ -13,7 +13,7 @@ class ParticleSorter;
 
 #include "particles_sorting_cpu.hpp"
 
-#if PHARE_HAVE_MKN_GPU
+#if PHARE_HAVE_MKN_GPU or PHARE_HAVE_KOKKOS
 #include "particles_sorting_gpu_mkn.hpp"
 #else // no impl (yet)
 namespace PHARE::core::detail

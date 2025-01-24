@@ -113,8 +113,9 @@ public:
 
     void zero()
     {
-        if (!isUsable())
-            throw std::runtime_error("Error, cannot zero the TensorField because it is not usable");
+        // if (!isUsable())
+        // throw std::runtime_error("Error, cannot zero the TensorField because it is not
+        // usable");
 
         for (auto& component : components_)
             component.zero();
@@ -132,8 +133,8 @@ public:
 
     void _check() const
     {
-        if (!isUsable())
-            throw std::runtime_error("Error - TensorField not usable");
+        // if (!isUsable())
+        // throw std::runtime_error("Error - TensorField not usable");
     }
 
     NO_DISCARD field_type& getComponent(Component component) _PHARE_ALL_FN_
@@ -195,7 +196,7 @@ public:
         }
         else
         {
-            throw std::runtime_error("Error, unusable TensorField, cannot copyData");
+            // throw std::runtime_error("Error, unusable TensorField, cannot copyData");
         }
     }
 

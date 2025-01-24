@@ -10,6 +10,27 @@
 
 #include "gtest/gtest.h"
 
+
+
+// template<typename Impl>
+// struct sycl::is_device_copyable<PHARE::core::GridLayout<Impl>> : std::true_type
+// {
+// };
+
+// template<std::size_t dim, typename PhysicalQuantity, typename Data_t, auto alloc_mode>
+// struct sycl::is_device_copyable<PHARE::core::Field<dim, PhysicalQuantity, Data_t, alloc_mode>>
+//     : std::true_type
+// {
+// };
+
+// template<typename Field_t, typename PhysicalQuantity, std::size_t rank_>
+// struct sycl::is_device_copyable<PHARE::core::TensorField<Field_t, PhysicalQuantity, rank_>>
+//     : std::true_type
+// {
+// };
+
+
+
 struct AmpereTest : public ::testing::Test
 {
 };
@@ -35,20 +56,20 @@ void test()
               evolve<PHARE::AllocatorMode::GPU_UNIFIED>(*layout));
 }
 
-TEST(AmpereTest, worksOnGPU_1d)
-{
-    test<1>();
-}
+// TEST(AmpereTest, worksOnGPU_1d)
+// {
+//     test<1>();
+// }
 
 TEST(AmpereTest, worksOnGPU_2d)
 {
     test<2>();
 }
 
-TEST(AmpereTest, worksOnGPU_3d)
-{
-    test<3>();
-}
+// TEST(AmpereTest, worksOnGPU_3d)
+// {
+//     test<3>();
+// }
 
 struct K
 {

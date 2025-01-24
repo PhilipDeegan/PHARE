@@ -41,8 +41,8 @@ public:
 template<std::size_t dimension, typename... Args>
 void global_fn(Args... args)
 {
-    auto const& [ijk, Jx, B, layout] = std::forward_as_tuple(args...);
-    auto const& [_, By, Bz]          = B();
+    auto const& [ijk, Jx, By, Bz, layout] = std::forward_as_tuple(args...);
+    // auto const& [_, By, Bz]               = B();
 
     if constexpr (dimension == 2)
         Jx(ijk) = layout.template deriv<Direction::Y>(Bz, ijk);
@@ -73,8 +73,12 @@ public:
         auto& Jy = J(Component::Y);
         auto& Jz = J(Component::Z);
 
+        // auto& Bx = J(Component::X);
+        auto& By = J(Component::Y);
+        auto& Bz = J(Component::Z);
+
         layout.evalOnBox(
-            Jx, [=] _PHARE_ALL_FN_(auto&&... args) { global_fn<dimension>(args...); }, Jx, B,
+            Jx, [=] _PHARE_ALL_FN_(auto&&... args) { global_fn<dimension>(args...); }, Jx, By, Bz,
             layout);
 
         // layout.evalOnBox(Jx, [] _PHARE_ALL_FN_(auto&&... args) { JxEq_(args...); }, Jx, B,

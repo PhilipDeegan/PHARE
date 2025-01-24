@@ -2,9 +2,13 @@
 #ifndef PHARE_CORE_DEF_KOKKOS_TOOLS_HPP
 #define PHARE_CORE_DEF_KOKKOS_TOOLS_HPP
 
+
+
 #if __has_include(<Kokkos_Core.hpp>)
 #include <Kokkos_Core.hpp>
 #include <Kokkos_Profiling_ScopedRegion.hpp>
+
+#include "dpct/dpl_extras/algorithm.h"
 
 #define PHARE_HAVE_KOKKOS 1
 #define PHARE_WITH_KOKKOS(...) __VA_ARGS__

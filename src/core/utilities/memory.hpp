@@ -21,6 +21,11 @@ void copy(T0* dst, T1* src, Size const size)
     {
         PHARE_WITH_MKN_GPU(mkn::gpu::copy(dst, src, size));
     }
+    else if (CompileOptions::WithKokkos)
+    {
+        // FINISH
+        std::copy(src, src + size, dst);
+    }
     else
         throw std::runtime_error("Vector::copy NO ALTERNATIVE");
 }
@@ -36,6 +41,11 @@ void fill(Vector& dst, Value const val)
     else if (CompileOptions::WithMknGpu)
     {
         PHARE_WITH_MKN_GPU(mkn::gpu::fill(dst, val));
+    }
+    else if (CompileOptions::WithKokkos)
+    {
+        // FINISH
+        std::fill(dst.begin(), dst.end(), val);
     }
     else
         throw std::runtime_error("Vector::fill NO ALTERNATIVE");

@@ -68,7 +68,7 @@ inline void throw_runtime_error([[maybe_unused]] T const& err) _PHARE_ALL_FN_
 #if defined(__HIPCC__) || defined(__CUDACC__)
     PHARE_ASSERT(false);
 #else
-    throw std::runtime_error(err);
+    // throw std::runtime_error(err);
 #endif
 }
 

@@ -117,6 +117,14 @@ profile:
 - name: test_core
   parent: test_base
   self: core
+  inc: |
+    subprojects/Kokkos/core/src
+    subprojects/Kokkos/tpls/desul/include
+    subprojects/Kokkos/tpls/mdspan/include
+    build/subprojects/Kokkos
+    build/subprojects/Kokkos/core/src
+    build/subprojects/KokkosTools/common
+
   # test: tests/core/(\w)/(test_.*).cpp
 
 - name: test_amr

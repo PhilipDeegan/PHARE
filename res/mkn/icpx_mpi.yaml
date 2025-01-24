@@ -1,5 +1,13 @@
 property:
-  cxx_flags: --std=c++20 -fsized-deallocation -DPHARE_HAVE_MKN_GPU -fPIC
+  cxx_flags: >-
+      --std=c++20 -fsized-deallocation -fPIC
+      -fsycl -fno-sycl-id-queries-fit-in-int -fsycl-dead-args-optimization
+      -fsycl-unnamed-lambda -DDESUL_SYCL_DEVICE_GLOBAL_SUPPORTED -fsycl-targets=spir64_gen
+  lnk_flags: >-
+      -fsycl -fno-sycl-id-queries-fit-in-int -fsycl-dead-args-optimization
+      -DDESUL_SYCL_DEVICE_GLOBAL_SUPPORTED
+      -fsycl-targets=spir64_gen -Xsycl-target-backend \"-device 12.60.7\"
+
 # local:
 #   repo: /mkn/r
 #   mod-repo: /mkn/m
@@ -7,15 +15,20 @@ property:
 #   repo: git@github.com:mkn/
 #   mod-repo: git@github.com:mkn-mod/
 
+# inc:
+#   subprojects/Kokkos/core/src
+#   subprojects/Kokkos/tpls/desul/include
+#   subprojects/Kokkos/tpls/mdspan/include
+
 env: |
   OMPI_CXX=icpx
-#PATH=/opt/mpi/rocm/bin:/opt/rocm/bin:${PATH}
+  PATH=/usr/bin:${PATH}
 compiler:
   mask:
     g++:
-      icpx
+      mpicxx
 file:
   - type: cpp:cxx:cc:c:S
     archiver: ar -cr
     compiler:  mpicxx ${cxx_flags}
-    linker:  mpicxx  --std=c++20
+    linker:  mpicxx  --std=c++20 ${lnk_flags}

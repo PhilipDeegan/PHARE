@@ -4,15 +4,15 @@
 #include <array>
 #include <cstddef>
 #include <string>
-#include <utility>
+// #include <utility>
 #include <vector>
 #include <algorithm>
 
 #include "core/def.hpp"
-#include "core/logger.hpp"
-#include "core/vector.hpp"
+// #include "core/logger.hpp"
+// #include "core/vector.hpp"
 
-#include "core/data/ndarray/ndarray_vector.hpp"
+#include "core/data/ndarray/ndarray_view.hpp"
 
 
 namespace PHARE::core
@@ -39,8 +39,7 @@ public:
 
     Field(std::string const& name, PhysicalQuantity qty, value_type* data = nullptr,
           std::array<std::uint32_t, dim> const& dims = ConstArray<std::uint32_t, dim>())
-        : Super{data, dims}
-        , name_{name}
+        : Super{data, dims} // , name_{name}
         , qty_{qty}
     {
     }
@@ -57,7 +56,7 @@ public:
     }
 
 
-    NO_DISCARD auto& name() const { return name_; }
+    // NO_DISCARD auto& name() const { return name_; }
     NO_DISCARD auto& physicalQuantity() const _PHARE_ALL_FN_ { return qty_; }
 
     void copyData(Field const& source) { Super::fill_from(source); }
@@ -72,7 +71,7 @@ public:
         auto data = field ? field->data() : nullptr;
         if (data)
         {
-            assert(field->name() == this->name());
+            // assert(field->name() == this->name());
             Super::setShape(field->shape());
         }
         Super::setBuffer(data);
@@ -104,7 +103,7 @@ public:
 
 
 private:
-    std::string name_{"No Name"};
+    // std::string name_{"No Name"};
     PhysicalQuantity qty_;
 
     Super& super() _PHARE_ALL_FN_ { return *this; }

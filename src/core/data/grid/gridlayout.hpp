@@ -128,8 +128,8 @@ namespace core
         GridLayout(std::array<double, dimension> const& meshSize,
                    std::array<std::uint32_t, dimension> const& nbrCells,
                    Point<double, dimension> const& origin,
-                   Box<int, dimension> AMRBox = Box<int, dimension>{}, int level_number = 0,
-                   std::vector<Box<int, dimension>> neighbors = std::vector<Box<int, dimension>>{})
+                   Box<int, dimension> AMRBox = Box<int, dimension>{}, int level_number = 0/*,
+                   std::vector<Box<int, dimension>> neighbors = std::vector<Box<int, dimension>>{}*/)
             : meshSize_{meshSize}
             , origin_{origin}
             , nbrPhysicalCells_{nbrCells}
@@ -138,7 +138,7 @@ namespace core
             , ghostEndIndexTable_{initGhostEnd_()}
             , AMRBox_{AMRBox}
             , levelNumber_{level_number}
-            , neighbors_{neighbors}
+        // , neighbors_{neighbors}
         {
             if (AMRBox_.isEmpty())
             {
@@ -175,7 +175,7 @@ namespace core
          */
         NO_DISCARD Point<double, dimension> origin() const noexcept { return origin_; }
 
-        auto& neighbors() const { return neighbors_; }
+        // auto& neighbors() const { return neighbors_; }
 
         /**
          * @brief returns the mesh size in the 'dim' dimensions
@@ -1594,7 +1594,7 @@ namespace core
         Box<int, dimension> AMRBox_;
 
         int levelNumber_ = 0;
-        std::vector<Box<int, dimension>> neighbors_;
+        // std::vector<Box<int, dimension>> neighbors_;
 
 
         // this constexpr initialization only works if primal==0 and dual==1

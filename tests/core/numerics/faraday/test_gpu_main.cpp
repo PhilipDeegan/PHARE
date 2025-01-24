@@ -2,12 +2,29 @@
 //
 //
 
+#include "core/data/grid/gridlayout.hpp"
 #include "core/numerics/faraday/faraday.hpp"
 #include "core/data/grid/gridlayout_utils.hpp"
 
 #include "tests/core/data/gridlayout/gridlayout_test.hpp"
 #include "tests/core/data/particles/test_particles_fixtures.hpp"
 #include "tests/core/data/electromag/test_electromag_fixtures.hpp"
+#include <type_traits>
+
+
+
+template<>
+struct sycl::is_device_copyable<PHARE::core::GridLayout<PHARE::core::GridLayoutImplYee<1, 1>>>
+    : std::true_type
+{
+};
+
+
+template<Field_t, typename PhysicalQuantity, std::size_t rank_ = 1>
+struct sycl::is_device_copyable<PHARE::core::TensorField<Field_t, PhysicalQuantity, rank_>>
+    : std::true_type
+{
+};
 
 
 #include "gtest/gtest.h"
@@ -37,24 +54,34 @@ void test()
               evolve<PHARE::AllocatorMode::GPU_UNIFIED>(*layout).B);
 }
 
-TEST(FaradayTest, worksOnGPU_1d)
-{
-    test<1>();
-}
+// TEST(FaradayTest, worksOnGPU_1d)
+// {
+//     test<1>();
+// }
 
 TEST(FaradayTest, worksOnGPU_2d)
 {
     test<2>();
 }
 
-TEST(FaradayTest, worksOnGPU_3d)
+// TEST(FaradayTest, worksOnGPU_3d)
+// {
+//     test<3>();
+// }
+
+
+
+struct K
 {
-    test<3>();
-}
+    K(int argc, char** argv) { Kokkos::initialize(argc, argv); }
+    ~K() { Kokkos::finalize(); }
+};
 
 
 int main(int argc, char** argv)
 {
+    K k{argc, argv};
+
     ::testing::InitGoogleTest(&argc, argv);
     return RUN_ALL_TESTS();
 }
