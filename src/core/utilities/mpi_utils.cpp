@@ -1,3 +1,5 @@
+#if !defined(PHARE_SKIP_MPI_IN_CORE)
+
 #include "mpi_utils.hpp"
 
 namespace PHARE::core::mpi
@@ -59,3 +61,5 @@ std::int64_t unix_timestamp_now()
 }
 
 } // namespace PHARE::core::mpi
+
+#endif

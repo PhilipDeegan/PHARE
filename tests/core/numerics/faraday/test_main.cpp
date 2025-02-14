@@ -228,8 +228,8 @@ TEST_F(Faraday1DTest, Faraday1DCalculatedOk)
     auto gsi_p_X = this->layout.ghostStartIndex(QtyCentering::primal, Direction::X);
     auto gei_p_X = this->layout.ghostEndIndex(QtyCentering::primal, Direction::X);
 
-    auto const& [Ex, Ey, Ez]          = E();
-    auto const& [Bx, By, Bz]          = B();
+    auto& [Ex, Ey, Ez]                = E();
+    auto& [Bx, By, Bz]                = B();
     auto const& [Bxnew, Bynew, Bznew] = Bnew();
 
     for (auto ix = gsi_p_X; ix <= gei_p_X; ++ix)
@@ -286,8 +286,8 @@ TEST_F(Faraday2DTest, Faraday2DCalculatedOk)
     auto gsi_d_Y = this->layout.ghostStartIndex(QtyCentering::dual, Direction::Y);
     auto gei_d_Y = this->layout.ghostEndIndex(QtyCentering::dual, Direction::Y);
 
-    auto const& [Ex, Ey, Ez]          = E();
-    auto const& [Bx, By, Bz]          = B();
+    auto& [Ex, Ey, Ez]                = E();
+    auto& [Bx, By, Bz]                = B();
     auto const& [Bxnew, Bynew, Bznew] = Bnew();
 
     for (auto ix = gsi_d_X; ix <= gei_d_X; ++ix)
@@ -423,8 +423,8 @@ TEST_F(Faraday3DTest, Faraday3DCalculatedOk)
     auto gsi_d_Z = this->layout.ghostStartIndex(QtyCentering::dual, Direction::Z);
     auto gei_d_Z = this->layout.ghostEndIndex(QtyCentering::dual, Direction::Z);
 
-    auto const& [Ex, Ey, Ez]          = E();
-    auto const& [Bx, By, Bz]          = B();
+    auto& [Ex, Ey, Ez]                = E();
+    auto& [Bx, By, Bz]                = B();
     auto const& [Bxnew, Bynew, Bznew] = Bnew();
 
     for (auto ix = gsi_d_X; ix <= gei_d_X; ++ix)
