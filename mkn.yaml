@@ -31,10 +31,10 @@ profile:
   src: src/core subprojects/phlop/src/phlop/timing/threaded_scope_timer.cpp
   out: phare_core
   sub:
-      cppdict&subprojects/cppdict(https://github.com/LaboratoryOfPlasmaPhysics/cppdict)
-      menum&subprojects/menum(https://github.com/Neargye/magic_enum)
-      phlop&subprojects/phlop(https://github.com/PhilipDeegan/phlop)
-      bstp&subprojects/bstp(https://github.com/bshoshany/thread-pool)
+      cppdict#master&subprojects/cppdict(https://github.com/LaboratoryOfPlasmaPhysics/cppdict)
+      menum#master&subprojects/menum(https://github.com/Neargye/magic_enum)
+      phlop#master&subprojects/phlop(https://github.com/PhilipDeegan/phlop)
+      bstp#master&subprojects/bstp(https://github.com/bshoshany/thread-pool)
 
 - name: amr
   parent: base
@@ -105,25 +105,20 @@ profile:
   self: dictator cpp_etc simulator
 
 - name: test
-  parent: base
-  self: init simulator
-  dep: lang.pybind11 google.test
-  mod: lang.python3
+  self: core
   inc: .
-  link: -pthread
 
-
-- name: test_base
-  inc: .
+- name: test_cpp
+  parent: test
   dep: google.test
 
 - name: test_core
-  parent: test_base
+  parent: test_cpp
   self: core
   # test: tests/core/(\w)/(test_.*).cpp
 
 - name: test_amr
-  parent: test_base
+  parent: test_cpp
   self: amr
 
 - name: test_diagnostics

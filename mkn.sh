@@ -5,7 +5,7 @@ shopt -s expand_aliases
 alias cls="clear; printf '\033[3J'"
 cls
 
-set -e
+set -ex
 
 CARGS=${CARGS:-""}
 
@@ -29,7 +29,7 @@ FILE="tests/core/numerics/ohm/test_tileset_ohm.cpp"
 # FILE="tests/amr/data/particles/copy/test_particledata_copyNd.cpp"
 # FILE="tests/amr/data/particles/stream_pack/test_main.cpp"
 # FILE="tests/amr/data/particles/copy_overlap/test_particledata_copy_periodicNd.cpp"
-FILE="tests/amr/data/particles/test_particles_data.cpp"
+# FILE="tests/amr/data/particles/test_particles_data.cpp"
 TEST="$(clargs) -M ${FILE}"
 
 set -x
@@ -39,11 +39,11 @@ set -x
       mkn clean build -qgp test_core -d google.test,+ -a "-fPIC" ${CARGS}
       mkn clean build -tqgp core -a "-fPIC" -x res/mkn/mpi ${CARGS}
   )
-  [ ! -f "bin/amr/libphare_amr.so" ] && (
-      mkn clean build -qgp amr -a "-fPIC" -x res/mkn/mpi ${CARGS}
-  )
+  # [ ! -f "bin/amr/libphare_amr.so" ] && (
+  #     mkn clean build -qgp amr -a "-fPIC" -x res/mkn/mpi ${CARGS}
+  # )
 
-  # mkn -p test_core ${ARGS} ${CARGS} "$@"
-  mkn -p test_amr ${TEST} ${CARGS} "$@"
+  mkn -p test_core ${TEST} ${CARGS} "$@"
+  # mkn -p test_amr ${TEST} ${CARGS} "$@"
 
 ) 1> >(tee $CWD/.mkn.sh.out ) 2> >(tee $CWD/.mkn.sh.err >&2 )

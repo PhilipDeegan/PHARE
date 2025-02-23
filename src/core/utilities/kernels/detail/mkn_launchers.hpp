@@ -273,15 +273,15 @@ struct TileBlockFunction : public mkn::gpu::StreamFunction<Strat>
     std::size_t ds;
 };
 
-template<typename Boxes, typename Vectors>
-struct ThreadedBoxStreamLauncher : public mkn::gpu::ThreadedStreamLauncher<Vectors>
+
+template<typename Vectors>
+struct ThreadedStreamLauncher : public mkn::gpu::ThreadedStreamLauncher<Vectors>
 {
     using Super = mkn::gpu::ThreadedStreamLauncher<Vectors>;
-    using Box_t = Boxes::value_type;
 
-    ThreadedBoxStreamLauncher(Vectors& vectors, Boxes const& bxes, std::size_t const nthreads = 1)
+
+    ThreadedStreamLauncher(Vectors& vectors, std::size_t const nthreads = 1)
         : Super{vectors, nthreads}
-        , boxes{bxes}
     {
     }
 
@@ -333,6 +333,26 @@ struct ThreadedBoxStreamLauncher : public mkn::gpu::ThreadedStreamLauncher<Vecto
         }
         return *this;
     };
+
+
+
+    Super& super() { return *this; }
+    auto& operator*() { return super(); }
+};
+
+
+template<typename Boxes, typename Vectors>
+struct ThreadedBoxStreamLauncher : public ThreadedStreamLauncher<Vectors>
+{
+    using Super = ThreadedStreamLauncher<Vectors>;
+    using Box_t = Boxes::value_type;
+
+    ThreadedBoxStreamLauncher(Vectors& vectors, Boxes const& bxes, std::size_t const nthreads = 1)
+        : Super{vectors, nthreads}
+        , boxes{bxes}
+    {
+    }
+
 
     template<std::uint16_t impl = 0, typename Fn>
     auto& async_dev(Fn&& fn)
