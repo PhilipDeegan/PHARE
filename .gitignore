@@ -1,3 +1,4 @@
+.mkn*
 bin
 build
 subprojects
@@ -22,3 +23,5 @@ perf.*
 .vscode
 .phare*
 PHARE_REPORT.zip
+*.mkn
+.cache
