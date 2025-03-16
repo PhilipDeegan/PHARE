@@ -72,15 +72,16 @@ struct aFieldLinearTimeInterpolate : public ::testing::Test
 
     Point<double, dim> origin{{0.}};
 
+    GridYee layout{dl, nbrCells, origin};
     std::shared_ptr<FieldDataT> srcOld;
     std::shared_ptr<FieldDataT> srcNew;
     std::shared_ptr<FieldDataT> destNew;
 
 
     aFieldLinearTimeInterpolate()
-        : srcOld{std::make_shared<FieldDataT>(domain, ghost, fieldName, dl, nbrCells, origin, qty)}
-        , srcNew{std::make_shared<FieldDataT>(domain, ghost, fieldName, dl, nbrCells, origin, qty)}
-        , destNew{std::make_shared<FieldDataT>(domain, ghost, fieldName, dl, nbrCells, origin, qty)}
+        : srcOld{std::make_shared<FieldDataT>(domain, ghost, fieldName, layout, qty)}
+        , srcNew{std::make_shared<FieldDataT>(domain, ghost, fieldName, layout, qty)}
+        , destNew{std::make_shared<FieldDataT>(domain, ghost, fieldName, layout, qty)}
     {
         double oldTime = 0.;
         double newTime = 0.5;

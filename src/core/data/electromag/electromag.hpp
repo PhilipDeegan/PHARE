@@ -4,10 +4,30 @@
 #include <string>
 #include <tuple>
 
+#include "core/def.hpp"
 #include "core/hybrid/hybrid_quantities.hpp"
 #include "core/data/vecfield/vecfield_initializer.hpp"
 #include "initializer/data_provider.hpp"
 #include "core/def.hpp"
+
+
+
+namespace PHARE::core::basic
+{
+
+
+template<typename VecFieldT>
+class Electromag
+{
+public:
+    static constexpr std::size_t dimension = VecFieldT::dimension;
+
+    VecFieldT E;
+    VecFieldT B;
+};
+
+
+} // namespace PHARE::core::basic
 
 
 namespace PHARE
@@ -15,30 +35,33 @@ namespace PHARE
 namespace core
 {
     template<typename VecFieldT>
-    class Electromag
+    class Electromag : public basic::Electromag<VecFieldT>
     {
+        using Super = basic::Electromag<VecFieldT>;
+
     public:
+        using Super::B;
+        using Super::E;
+        using vecfield_type                    = VecFieldT;
         static constexpr std::size_t dimension = VecFieldT::dimension;
 
         explicit Electromag(std::string name)
-            : E{name + "_E", HybridQuantity::Vector::E}
-            , B{name + "_B", HybridQuantity::Vector::B}
+            : Super{{name + "_E", HybridQuantity::Vector::E},
+                    {name + "_B", HybridQuantity::Vector::B}}
             , Binit_{}
         {
         }
 
         explicit Electromag(initializer::PHAREDict const& dict)
-            : E{dict["name"].template to<std::string>() + "_"
-                    + dict["electric"]["name"].template to<std::string>(),
-                HybridQuantity::Vector::E}
-            , B{dict["name"].template to<std::string>() + "_"
-                    + dict["magnetic"]["name"].template to<std::string>(),
-                HybridQuantity::Vector::B}
+            : Super{{dict["name"].template to<std::string>() + "_"
+                         + dict["electric"]["name"].template to<std::string>(),
+                     HybridQuantity::Vector::E},
+                    {dict["name"].template to<std::string>() + "_"
+                         + dict["magnetic"]["name"].template to<std::string>(),
+                     HybridQuantity::Vector::B}}
             , Binit_{dict["magnetic"]["initializer"]}
         {
         }
-
-        using vecfield_type = VecFieldT;
 
 
         template<typename GridLayout>
@@ -74,8 +97,31 @@ namespace core
             B.copyData(source.B);
         }
 
-        VecFieldT E;
-        VecFieldT B;
+
+        auto operator()() { return std::forward_as_tuple(E, B); }
+        auto operator()() const { return std::forward_as_tuple(E, B); }
+
+        template<typename V>
+        auto as(auto&& a, auto&&... args)
+        {
+            return V{a(E, args...), a(B, args...)};
+            // std::array components{&E, &B};
+            // return V{for_N<2, for_N_R_mode::make_array>(
+            //     [&](auto i) { return a(components[i], args...); })};
+        }
+
+        template<typename V>
+        auto as(auto&& a, auto&&... args) const
+        {
+            return V{a(E, args...), a(B, args...)};
+            // std::array const components{&E, &B};
+            // return V{for_N<2, for_N_R_mode::make_array>(
+            //     [&](auto i) { return a(components[i], args...); })};
+        }
+
+        // auto operator*() {}
+        // auto operator*() const {}
+
 
     private:
         VecFieldInitializer<dimension> Binit_;
