@@ -2,6 +2,9 @@
 
 name: phare
 
+scm: https://github.com/philipdeegan/phare
+version: mkn
+
 inc: src
 
 property:
