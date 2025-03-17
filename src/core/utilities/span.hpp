@@ -79,7 +79,11 @@ auto make_span(Container const& container)
 {
     return Span<typename Container::value_type>{container.data(), container.size()};
 }
-
+template<typename Data>
+auto make_span(Data* data, std::size_t const& size)
+{
+    return Span<Data>{data, size};
+}
 
 template<typename T, typename SIZE = span_size_default_t>
 class VectorSpan : private StackVar<std::vector<T>>, public core::Span<T, SIZE>

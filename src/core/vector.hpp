@@ -59,7 +59,8 @@ auto constexpr allocator()
             if constexpr (CompileOptions::WithMknAVX)
             {
                 PHARE_WITH_MKN_AVX(
-                    return Allocator<allocator_mode, mkn::kul::AlignedAllocator<Type, 32>>{};)
+                    return Allocator<allocator_mode, mkn::kul::AlignedAllocator<
+                                                         Type, mkn::avx::Options::ALIGN()>>{};)
             }
             else
             {

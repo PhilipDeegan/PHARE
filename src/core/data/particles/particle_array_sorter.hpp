@@ -2,12 +2,12 @@
 #define PHARE_CORE_DATA_PARTICLES_PARTICLE_ARRAY_SORTER_HPP
 
 #include "core/data/particles/particle_array_def.hpp"
-#include "core/vector.hpp"
-
 #include "core/data/particles/sorting/particles_sorting.hpp"
 
 namespace PHARE::core
 {
+
+
 template<typename ParticleArray, std::size_t impl = 0>
 struct ParticleArraySorter
 {

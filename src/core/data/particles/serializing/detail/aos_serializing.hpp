@@ -1,13 +1,10 @@
+// IWYU pragma: private, include "core/data/particles/serializing/particles_serializing.hpp"
 
-#ifndef PHARE_CORE_DATA_PARTICLES_EXPORTING_DETAIL_AOS_SERIALIZING
-#define PHARE_CORE_DATA_PARTICLES_EXPORTING_DETAIL_AOS_SERIALIZING
+#ifndef PHARE_CORE_DATA_PARTICLES_SERIALIZING_DETAIL_AOS_SERIALIZING
+#define PHARE_CORE_DATA_PARTICLES_SERIALIZING_DETAIL_AOS_SERIALIZING
 
-
-#include "core/utilities/box/box.hpp"
-#include "core/data/particles/particle_array_def.hpp"
-#include "core/data/particles/particle_array_appender.hpp"
+#include "core/utilities/span.hpp"
 #include "core/data/particles/serializing/detail/def_serializing.hpp"
-#include <optional>
 
 
 namespace PHARE::core
@@ -22,8 +19,8 @@ template<typename Src>
 void ParticlesSerializer<AoS, CPU>::operator()(std::string const& file_name, Src const& src)
 {
     using Particle_t = typename Src::value_type;
-    std::ofstream f{file_name, std::ios::binary};
-    f.write(reinterpret_cast<char const*>(src.vector().data()), src.size() * sizeof(Particle_t));
+
+    open_file_to_write(file_name).write(src.vector().data(), src.size());
 }
 
 
@@ -36,24 +33,34 @@ void ParticlesDeserializer<AoS, CPU>::operator()(std::string const& file_name, D
 
     using Particle_t = typename Dst::value_type;
 
-    std::ifstream f{file_name, std::ios::binary};
-
-    // Stop eating new lines in binary mode
-    f.unsetf(std::ios::skipws);
-
-    // get its size:
-    std::streampos fileSize;
-    f.seekg(0, std::ios::end);
-    fileSize = f.tellg();
-    f.seekg(0, std::ios::beg);
-
+    auto file            = open_file_from_start(file_name);
     auto const curr_size = dst.size();
-    dst.resize(curr_size + (fileSize / sizeof(Particle_t)));
+    dst.resize(curr_size + (file.size() / sizeof(Particle_t)));
 
-    // read the data:
-    f.read(reinterpret_cast<char*>(dst.vector().data() + curr_size),
-           dst.size() * sizeof(Particle_t));
+    file.read<Particle_t>(dst.vector().data() + curr_size, dst.size() - curr_size);
 }
+
+
+template<>
+template<typename Src, std::uint16_t N, typename Fn>
+void ParticlesDeserializer<AoS, CPU>::readN(std::string const& file_name, Fn fn)
+{
+    using Particle_t  = typename Src::value_type;
+    using Particles_t = std::array<Particle_t, N>;
+
+    auto file           = open_file_from_start(file_name);
+    auto const new_size = file.size() / sizeof(Particle_t);
+    Particles_t particles;
+
+    std::size_t i = 0;
+    for (; i < new_size; i += N)
+        fn(make_span(file.read(particles.data(), N), N));
+
+    auto const last = new_size % N;
+    for (; i < new_size; ++i)
+        fn(make_span(file.read(particles.data(), last), last));
+}
+
 
 // AoSMapped
 template<>
@@ -73,7 +80,16 @@ void ParticlesDeserializer<AoSMapped, CPU>::operator()(std::string const& file_n
 }
 
 
+
+template<>
+template<typename Src, std::uint16_t N, typename Fn>
+void ParticlesDeserializer<AoSMapped, CPU>::readN(std::string const& file_name, Fn fn)
+{
+    ParticlesDeserializer<AoS, CPU>{}.template readN<Src, N>(file_name, fn);
+}
+
+
 } // namespace PHARE::core
 
 
-#endif /* PHARE_CORE_DATA_PARTICLES_EXPORTING_DETAIL_AOS_SERIALIZING */
+#endif /* PHARE_CORE_DATA_PARTICLES_SERIALIZING_DETAIL_AOS_SERIALIZING */

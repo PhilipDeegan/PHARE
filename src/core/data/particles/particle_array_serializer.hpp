@@ -2,7 +2,6 @@
 #define PHARE_CORE_DATA_PARTICLES_PARTICLE_ARRAY_SERIALIZER
 
 
-#include "core/data/particles/serializing/detail/def_serializing.hpp"
 #include "core/data/particles/serializing/particles_serializing.hpp"
 
 namespace PHARE::core
@@ -10,21 +9,19 @@ namespace PHARE::core
 
 
 template<typename Src>
-void serialize_particles(Src const& src, std::string const& file_name)
+void serialize_particles(std::string const& file_name, Src const& src)
 {
     using Serializer = ParticlesSerializer<Src::layout_mode, Src::alloc_mode>;
 
-    Serializer{}.operator()(src, file_name);
+    Serializer{}.operator()(file_name, src);
 }
 
-template<typename Src, typename As = Src>
-Src deserialize_particles(std::string const& file_name)
+template<typename Dst, typename Src = Dst>
+void deserialize_particles(std::string const& file_name, Dst& dst)
 {
-    using Deserializer = ParticlesDeserializer<Src::layout_mode, Src::alloc_mode>;
+    using Deserializer = ParticlesDeserializer<Dst::layout_mode, Dst::alloc_mode>;
 
-    // if As != Src - convert - todo
-
-    return Deserializer{}.operator()(file_name);
+    Deserializer{}.template operator()<Dst, Src>(file_name, dst);
 }
 
 } // namespace PHARE::core

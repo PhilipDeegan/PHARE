@@ -34,6 +34,7 @@ FILE="tests/core/numerics/ion_updater/test_updater_pp_main.cpp"
 # FILE="tests/amr/data/particles/test_particles_data.cpp"
 # FILE="tests/core/data/particles/test_particles_construction.cpp"
 # FILE="tests/amr/data/particles/refine/test_particles_data_split.cpp"
+# FILE="tests/core/data/particles/test_particles_serialization.cpp"
 TEST=" -M ${FILE} "
 CARGS="${CARGS} $(clargs)"
 

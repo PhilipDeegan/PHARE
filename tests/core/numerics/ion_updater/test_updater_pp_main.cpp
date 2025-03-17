@@ -12,11 +12,12 @@
 // #define PHARE_LOG_SCOPE_PRINT 1
 
 
-
 #include "core/utilities/types.hpp"
 #include "core/numerics/ion_updater/ion_updater.hpp"
 #include "core/numerics/ion_updater/ion_updater_pc.hpp"
 #include "core/numerics/ion_updater/ion_updater_per_particle.hpp"
+
+#include "core/data/particles/particle_array_serializer.hpp"
 
 #include "tests/core/data/electromag/test_electromag_fixtures.hpp"
 #include "tests/core/data/ion_population/test_ion_population_fixtures.hpp"
@@ -33,15 +34,19 @@ void PrintTo(ParticleArray<dim, internals> const& arr, std::ostream* os)
     *os << arr;
 }
 
-auto constexpr static WITH_PATCH_GHOST = false;
+bool constexpr static WITH_PATCH_GHOST  = false;
+bool constexpr static USE_SERIALIZATION = 0;
 
-auto static const bytes  = get_env_as("PHARE_GPU_BYTES", std::uint64_t{500000000});
-auto static const cells  = get_env_as("PHARE_CELLS", std::uint32_t{4});
-auto static const ppc    = get_env_as("PHARE_PPC", std::size_t{4});
-auto static const seed   = get_env_as("PHARE_SEED", std::size_t{1012});
-auto static const dt     = get_env_as("PHARE_TIMESTEP", double{.001});
-auto static const shufle = get_env_as("PHARE_UNSORTED", std::size_t{0});
-auto static const do_cmp = get_env_as("PHARE_COMPARE", std::size_t{1});
+auto static const bytes   = get_env_as("PHARE_GPU_BYTES", std::uint64_t{500000000});
+auto static const cells   = get_env_as("PHARE_CELLS", std::uint32_t{4});
+auto static const ppc     = get_env_as("PHARE_PPC", std::size_t{4});
+auto static const seed    = get_env_as("PHARE_SEED", std::size_t{1012});
+auto static const dt      = get_env_as("PHARE_TIMESTEP", double{.001});
+auto static const shufle  = get_env_as("PHARE_UNSORTED", std::size_t{0});
+auto static const do_cmp  = get_env_as("PHARE_COMPARE", std::size_t{0});
+auto static const gen_bin = get_env_as("PHARE_GENERATE_PARTICLES_BIN", std::size_t{0});
+
+std::string static const aos_particles_bin = "aos_particles.bin";
 
 bool static const premain = []() {
     PHARE_WITH_MKN_GPU(                          //
@@ -119,6 +124,10 @@ auto make_ions(GridLayout_t const& layout)
     auto ions_p = std::make_shared<UsableIons_t<Particles_t, interp>>(layout, "protons");
     auto& ions  = *ions_p;
 
+    if constexpr (USE_SERIALIZATION)
+        if (!gen_bin)
+            return ions_p; // NO REF!
+
     EXPECT_EQ(ions.populations[0].particles.domain_particles.size(), 0);
 
     auto disperse = [](auto& particles) {
@@ -145,6 +154,10 @@ auto make_ions(GridLayout_t const& layout)
 
     EXPECT_EQ(ions.populations[0].particles.domain_particles.size(), layout.AMRBox().size() * ppc);
 
+    if constexpr (USE_SERIALIZATION)
+        if (gen_bin)
+            serialize_particles(aos_particles_bin, ions.populations[0].particles.domain_particles);
+
     return ions_p;
 }
 
@@ -153,6 +166,7 @@ auto make_ions(GridLayout_t const& layout)
 template<typename Particles_t, typename GridLayout_t, typename Ions>
 auto from_ions(GridLayout_t const& layout, Ions const& from)
 {
+    using FromParticles_t            = typename Ions::particle_array_type;
     auto constexpr static alloc_mode = Particles_t::alloc_mode;
     auto constexpr static dim        = GridLayout_t::dimension;
     auto constexpr static interp     = GridLayout_t::interp_order;
@@ -165,13 +179,19 @@ auto from_ions(GridLayout_t const& layout, Ions const& from)
         append_particles<type>(src, dst);
     };
 
-    _add_particles_from.template operator()<ParticleType::Domain>(
-        from.populations[0].particles.domain_particles,
-        ions.populations[0].particles.domain_particles);
+    if constexpr (USE_SERIALIZATION)
+        deserialize_particles<Particles_t, FromParticles_t>(
+            aos_particles_bin, ions.populations[0].particles.domain_particles);
+    else
+        _add_particles_from.template operator()<ParticleType::Domain>(
+            from.populations[0].particles.domain_particles,
+            ions.populations[0].particles.domain_particles);
+
     if constexpr (WITH_PATCH_GHOST)
         _add_particles_from.template operator()<ParticleType::Ghost>(
             from.populations[0].particles.patch_ghost_particles,
             ions.populations[0].particles.patch_ghost_particles);
+
     EXPECT_EQ(ions.populations[0].particles.domain_particles.size(), layout.AMRBox().size() * ppc);
     return ions_p;
 }
@@ -281,13 +301,19 @@ struct DefaultIons
     using GridLayout_t = TestGridLayout<typename PHARE_Types<dim, interp>::GridLayout_t>;
 
     GridLayout_t const layout{cells};
-    std::shared_ptr<Ions> init = make_ions<typename Ions::particle_array_type>(layout);
-    std::shared_ptr<Ions> ions = make_ions<typename Ions::particle_array_type>(layout);
+    std::shared_ptr<Ions> init; // = make_ions<typename Ions::particle_array_type>(layout);
+    std::shared_ptr<Ions> ions; // = make_ions<typename Ions::particle_array_type>(layout);
 
     DefaultIons()
     {
         assert(premain);
-        evolve<true>(*ions, *layout);
+        init = make_ions<typename Ions::particle_array_type>(layout);
+
+        if constexpr (!USE_SERIALIZATION)
+        {
+            ions = make_ions<typename Ions::particle_array_type>(layout);
+            evolve<true>(*ions, *layout);
+        }
     }
 };
 
@@ -347,11 +373,18 @@ using Permutations_t = testing::Types< // ! notice commas !
 // )
 
      TestParam<3, LayoutMode::AoS>
-    ,TestParam<3, LayoutMode::AoSMapped>
-PHARE_WITH_THRUST(
-    ,TestParam<3, LayoutMode::SoA>
+
+PHARE_WITH_MKN_AVX(
     ,TestParam<3, LayoutMode::SoAVX>
 )
+
+    ,TestParam<3, LayoutMode::AoSMapped>
+
+PHARE_WITH_THRUST(
+    ,TestParam<3, LayoutMode::SoA>
+    // ,TestParam<3, LayoutMode::SoAVX>
+)
+
 
 PHARE_WITH_MKN_GPU(
     // ,TestParam<1, LayoutMode::AoS, AllocatorMode::GPU_UNIFIED>   // 3
@@ -394,6 +427,10 @@ TYPED_TEST_SUITE(IonUpdaterPPTest, Permutations_t);
 
 TYPED_TEST(IonUpdaterPPTest, updater)
 {
+    if constexpr (PHARE::core::USE_SERIALIZATION)
+        if (gen_bin)
+            return;
+
     auto cmp_ions = this->make_ions();
 
     if (do_cmp)
@@ -401,6 +438,7 @@ TYPED_TEST(IonUpdaterPPTest, updater)
         PHARE_LOG_LINE_SS("Init check!")
         compare(*this->layout, *this->ref.init, *cmp_ions);
     }
+
     compare(*this->layout,   //
             *this->ref.ions, //
             evolve(*cmp_ions, *this->layout));
