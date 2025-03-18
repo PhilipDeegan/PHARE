@@ -5,10 +5,10 @@
 #include <tuple>
 
 #include "core/def.hpp"
+#include "core/utilities/types.hpp"
+#include "initializer/data_provider.hpp"
 #include "core/hybrid/hybrid_quantities.hpp"
 #include "core/data/vecfield/vecfield_initializer.hpp"
-#include "initializer/data_provider.hpp"
-#include "core/def.hpp"
 
 
 
@@ -21,6 +21,17 @@ class Electromag
 {
 public:
     static constexpr std::size_t dimension = VecFieldT::dimension;
+
+    template<typename Em>
+    auto static flat(Em& em)
+    {
+        auto& [Ex, Ey, Ez] = em.E();
+        auto& [Bx, By, Bz] = em.B();
+        return std::forward_as_tuple(Ex, Ey, Ez, Bx, By, Bz);
+    }
+
+    auto flat() { return flat(*this); }
+    auto flat() const { return flat(*this); }
 
     VecFieldT E;
     VecFieldT B;

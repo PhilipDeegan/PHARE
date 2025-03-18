@@ -7,16 +7,19 @@
 #include <cstddef>
 #include <functional>
 #include <tuple>
+#include <type_traits>
 
 
 #include "core/data/grid/gridlayoutdefs.hpp"
 #include "core/def.hpp"
 #include "core/logger.hpp"
+#include "core/models/physical_state.hpp"
 #include "core/operators.hpp"
 
 #include "core/data/grid/gridlayout.hpp"
 #include "core/data/vecfield/vecfield_component.hpp"
 #include "core/utilities/point/point.hpp"
+#include "core/utilities/types.hpp"
 
 
 
@@ -29,7 +32,7 @@ namespace PHARE::core
 // Number of points where the interpolator of order interpOrder
 // will deposit mass/momentum. This is hence the size of the
 // index and weight arrays for interpolation at a given order
-constexpr int nbrPointsSupport(int interpOrder)
+constexpr int nbrPointsSupport(int const interpOrder)
 {
     return interpOrder + 1;
 }
@@ -70,6 +73,11 @@ public:
         weights[0] = 1. - weights[1];
     }
 
+    template<typename M, typename... Args>
+    inline void compute(Args&&... args) const _PHARE_ALL_FN_
+    {
+    }
+
     static constexpr int interp_order = 1;
 };
 
@@ -93,6 +101,11 @@ public:
         weights[0] = 0.5 * coef1 * coef1;
         weights[1] = 0.75 - coef2 * coef2;
         weights[2] = 0.5 * coef3 * coef3;
+    }
+
+    template<typename M, typename... Args>
+    inline void compute(Args&&... args) const _PHARE_ALL_FN_
+    {
     }
 
     static constexpr int interp_order = 2;
@@ -122,6 +135,31 @@ public:
         double const coef2_cub = coef2_sq * coef2;
         double const coef3_sq  = coef3 * coef3;
         double const coef3_cub = coef3_sq * coef3;
+
+        weights[0] = _4_over_3 * coef1 * coef1 * coef1;
+        weights[1] = _2_over_3 - coef2_sq - 0.5 * coef2_cub;
+        weights[2] = _2_over_3 - coef3_sq + 0.5 * coef3_cub;
+        weights[3] = _4_over_3 * coef4 * coef4 * coef4;
+    }
+
+    template<typename M, typename... Args>
+    inline void compute(Args&&... args) const _PHARE_ALL_FN_
+    {
+        constexpr M _4_over_3 = 4. / 3.;
+        constexpr M _2_over_3 = 2. / 3.;
+
+        auto const& [index, coeff, weights] = std::forward_as_tuple(args...);
+
+        // auto const index = static_cast<double>(startIndex) - normalizedPos;
+        auto const coef1 = 1. + 0.5 * index;
+        auto const coef2 = index + 1;
+        auto const coef3 = index + 2;
+        auto const coef4 = 1. - 0.5 * (index + 3);
+
+        auto const coef2_sq  = coef2 * coef2;
+        auto const coef2_cub = coef2_sq * coef2;
+        auto const coef3_sq  = coef3 * coef3;
+        auto const coef3_cub = coef3_sq * coef3;
 
         weights[0] = _4_over_3 * coef1 * coef1 * coef1;
         weights[1] = _2_over_3 - coef2_sq - 0.5 * coef2_cub;
@@ -184,6 +222,18 @@ public:
         }
         return fieldAtParticle;
     }
+
+
+    template<typename... Args>
+    inline void avx(Args&&... args) const _PHARE_ALL_FN_
+    {
+        auto const& [field, weight, value] = std::forward_as_tuple(args...);
+
+
+        //
+        // for (auto ix = 0u; ix < order_size; ++ix)
+        // value
+    }
 };
 
 
@@ -224,6 +274,12 @@ public:
         }
         // assert(!std::isnan(fieldAtParticle));
         return fieldAtParticle;
+    }
+
+
+    template<typename... Args>
+    inline void avx(Args&&... args) const _PHARE_ALL_FN_
+    {
     }
 };
 
@@ -272,6 +328,23 @@ public:
             fieldAtParticle += Yinterp * xWeights[ix];
         }
         return fieldAtParticle;
+    }
+
+    template<std::size_t dim, typename... Args>
+    inline void avx(Args&&... args) const _PHARE_ALL_FN_
+    {
+        auto const& [field, starts, weights, value] = std::forward_as_tuple(args...);
+        auto const order_size                   = weights.size();
+
+        for (auto ix = 0u; ix < order_size; ++ix)
+        {
+            double Yinterp = 0.;
+            for (auto iy = 0u; iy < order_size; ++iy)
+            {
+                double Zinterp = 0.;
+                for (auto iz = 0u; iz < order_size; ++iz) {}
+            }
+        }
     }
 };
 
@@ -553,60 +626,145 @@ public:
         return particle_EB;
     }
 
-    template<std::uint8_t N, typename Array, typename Particles, typename Electromag,
-             typename GridLayout>
-    inline auto m2p_avx(Particles const& particles, Electromag const& Em, GridLayout const& layout,
-                        std::size_t const start) _PHARE_ALL_FN_
+
+    template<typename T, std::size_t S>
+    using Arr = std::array<T, S>;
+
+    template<std::uint8_t N, typename ArrayFp64, typename GridLayout, typename... Args>
+    inline auto m2p_avx(GridLayout const& layout, Args&&... args) _PHARE_ALL_FN_
     {
-        using IndexAndWeights = std::tuple<Starts, Weights, Starts, Weights>;
-        using IndexWeights    = std::array<IndexAndWeights, N>;
-        // using avx_t     = std::array<double, N>;
-        using E_B_tuple = std::array<Array, 6>;
-        using Scalar    = HybridQuantity::Scalar;
+        static_assert(interpOrder == 1);
 
-        auto& [Ex, Ey, Ez] = Em.E();
-        auto& [Bx, By, Bz] = Em.B();
 
-        IndexWeights indexWeightsArr;
+        auto constexpr dual_offset = .5;
 
-        auto constexpr dual_offset    = .5;
-        auto make_indices_and_weights = [&]<auto centering>(auto&... args) mutable {
-            auto const& [i, d, iCell, delta] = std::forward_as_tuple(args...);
-            auto [startIndex, weights]
-                = centered_index_and_weights_from_tuple<centering>(indexWeightsArr[i]);
-            startIndex[d]        = iCell[d] - computeStartLeftShift<centering>(delta);
-            double normalizedPos = iCell[d] + delta;
-            if constexpr (centering == QtyCentering::dual)
-                normalizedPos -= dual_offset;
-            weightComputer_.computeWeight(normalizedPos, startIndex[d], weights[d]);
-        };
+        auto constexpr qts = []() constexpr {
+            using enum HybridQuantity::Scalar;
+            return std::array{Ex, Ey, Ez, Bx, By, Bz};
+        }();
 
-        for (std::size_t i = 0, pidx = start; i < N; ++i, ++pidx)
-        {
-            auto const& iCell = layout.AMRToLocal(particles.iCell(pidx));
-            auto const& delta = particles.delta();
-            for (std::size_t j = 0; j < dim; ++j)
-            {
-                make_indices_and_weights.template operator()<QtyCentering::dual>(i, j, iCell,
-                                                                                 delta[j][pidx]);
-                make_indices_and_weights.template operator()<QtyCentering::primal>(i, j, iCell,
-                                                                                   delta[j][pidx]);
-            }
-        }
+        auto constexpr centerings = for_N<qts.size(), for_N_R_mode::make_array>(
+            [&](auto i) { return GridLayout::centering(qts[i]); });
 
+        auto const& [particles, Em, start] = std::forward_as_tuple(args...);
+        auto const& deltas                 = particles.delta();
+        auto const& iCells                 = particles.iCell();
+
+        auto const fpiCells = [&]() {
+            Arr<ArrayFp64, dim> fpiCells;
+            for (std::size_t i = 0, pidx = start; i < N; ++i, ++pidx)
+                for (std::size_t d = 0; d < dim; ++d)
+                    fpiCells[d][i] = iCells[pidx][d];
+            return fpiCells;
+        }();
+
+        Arr<Arr<ArrayFp64, dim>, 2> centered_pos, centered_starts;
+
+
+        for (std::size_t d = 0; d < dim; ++d)
+            for (std::size_t i = 0, pidx = start; i < N; ++i, ++pidx)
+                for_N<2>([&](auto c) {
+                    auto constexpr centering = static_cast<QtyCentering>(c());
+                    centered_pos[c][d][i]    = fpiCells[d][i] + deltas[d][pidx];
+                    if constexpr (centering == QtyCentering::dual)
+                        centered_pos[c][d][i] -= dual_offset;
+                    centered_starts[c][d][i]
+                        = fpiCells[d][i]
+                          - computeStartLeftShift<static_cast<QtyCentering>(c())>(deltas[d][pidx]);
+                });
+
+        Arr<Arr<ArrayFp64, dim>, qts.size()> starts;
+        for (std::size_t d = 0; d < dim; ++d)
+            for (std::size_t i = 0, pidx = start; i < N; ++i, ++pidx)
+                for_N<qts.size()>([&](auto q) {
+                    auto const qty_centering_i
+                        = static_cast<std::underlying_type_t<QtyCentering>>(centerings[q][d]);
+                    starts[q][d][i] = centered_starts[qty_centering_i][d][i];
+                });
+
+        using AVXCenteredWeights = Arr<Arr<Arr<ArrayFp64, nbrPointsSupport(interpOrder)>, dim>, 2>;
+        AVXCenteredWeights centered_weights; // [centering][dim][support][pidx]
+
+        for_N<dim>([&](auto d) {
+            for_N<2>([&](auto c) {
+                weightComputer_.template compute<ArrayFp64>( //
+                    centered_pos[c][d], starts[c][d], centered_weights[c][d]);
+            });
+        });
+
+        using AVXQuantityWeights
+            = Arr<Arr<Arr<ArrayFp64, nbrPointsSupport(interpOrder)>, dim>, qts.size()>;
+
+        AVXQuantityWeights weights; // [qty][dim][support][pidx]
+        for (std::size_t d = 0; d < dim; ++d)
+            for (std::size_t i = 0, pidx = start; i < N; ++i, ++pidx)
+                for_N<qts.size()>([&](auto q) {
+                    auto const qty_centering_i
+                        = static_cast<std::underlying_type_t<QtyCentering>>(centerings[q][d]);
+                    weights[q][d][i] = centered_weights[qty_centering_i][d][i];
+                });
+
+        using E_B_tuple = Arr<ArrayFp64, 6>;
         E_B_tuple ebs;
-        for (std::size_t i = 0; i < N; ++i)
-            ebs[0][i] = meshToParticle_.template op<GridLayout, Scalar::Ex>(Ex, indexWeightsArr[i]);
-        for (std::size_t i = 0; i < N; ++i)
-            ebs[1][i] = meshToParticle_.template op<GridLayout, Scalar::Ey>(Ey, indexWeightsArr[i]);
-        for (std::size_t i = 0; i < N; ++i)
-            ebs[2][i] = meshToParticle_.template op<GridLayout, Scalar::Ez>(Ez, indexWeightsArr[i]);
-        for (std::size_t i = 0; i < N; ++i)
-            ebs[3][i] = meshToParticle_.template op<GridLayout, Scalar::Bx>(Bx, indexWeightsArr[i]);
-        for (std::size_t i = 0; i < N; ++i)
-            ebs[4][i] = meshToParticle_.template op<GridLayout, Scalar::By>(By, indexWeightsArr[i]);
-        for (std::size_t i = 0; i < N; ++i)
-            ebs[5][i] = meshToParticle_.template op<GridLayout, Scalar::Bz>(Bz, indexWeightsArr[i]);
+
+        auto const em_qtys = Em.flat();
+
+        using Scalar = HybridQuantity::Scalar;
+        meshToParticle_.template avx<dim>(em_qtys, centered_starts, centered_weights, ebs);
+
+        for (std::size_t d = 0; d < dim; ++d)
+            for_N<qts.size()>([&](auto q) {
+                meshToParticle_.template avx<dim>( //
+                    std::get<q>(em_qtys), starts[q][d], weights[q][d], ebs[q]);
+
+                // auto const qty_centering_i
+                //     = static_cast<std::underlying_type_t<QtyCentering>>(centerings[q][d]);
+                // weights[q][d][i] = centered_weights[qty_centering_i][d][i];
+            });
+
+        // auto constexpr dual_offset    = .5;
+        // auto make_indices_and_weights = [&]<auto centering>(auto&... args) mutable {
+        //     auto const& [i, d, iCell, delta] = std::forward_as_tuple(args...);
+        //     auto [startIndex, weights]
+        //         = centered_index_and_weights_from_tuple<centering>(indexWeightsArr[i]);
+        //     startIndex[d]        = iCell[d] - computeStartLeftShift<centering>(delta);
+        //     double normalizedPos = iCell[d] + delta;
+        //     if constexpr (centering == QtyCentering::dual)
+        //         normalizedPos -= dual_offset;
+        //     weightComputer_.template compute<Array>(normalizedPos, startIndex[d], weights[d]);
+        // };
+
+        // for (std::size_t i = 0, pidx = start; i < N; ++i, ++pidx)
+        // {
+        //     auto const& iCell = layout.AMRToLocal(particles.iCell(pidx));
+        //     auto const& delta = particles.delta();
+        //     for (std::size_t j = 0; j < dim; ++j)
+        //     {
+        //         make_indices_and_weights.template operator()<QtyCentering::dual>(i, j, iCell,
+        //                                                                          delta[j][pidx]);
+        //         make_indices_and_weights.template operator()<QtyCentering::primal>(i, j, iCell,
+        //                                                                            delta[j][pidx]);
+        //     }
+        // }
+
+        // for (std::size_t i = 0; i < N; ++i)
+        //     ebs[0][i] = meshToParticle_.template op<GridLayout, Scalar::Ex>(Ex,
+        //     indexWeightsArr[i]);
+        // for (std::size_t i = 0; i < N; ++i)
+        //     ebs[1][i] = meshToParticle_.template op<GridLayout, Scalar::Ey>(Ey,
+        //     indexWeightsArr[i]);
+        // for (std::size_t i = 0; i < N; ++i)
+        //     ebs[2][i] = meshToParticle_.template op<GridLayout, Scalar::Ez>(Ez,
+        //     indexWeightsArr[i]);
+        // for (std::size_t i = 0; i < N; ++i)
+        //     ebs[3][i] = meshToParticle_.template op<GridLayout, Scalar::Bx>(Bx,
+        //     indexWeightsArr[i]);
+        // for (std::size_t i = 0; i < N; ++i)
+        //     ebs[4][i] = meshToParticle_.template op<GridLayout, Scalar::By>(By,
+        //     indexWeightsArr[i]);
+        // for (std::size_t i = 0; i < N; ++i)
+        //     ebs[5][i] = meshToParticle_.template op<GridLayout, Scalar::Bz>(Bz,
+        //     indexWeightsArr[i]);
 
         return ebs;
     }
@@ -796,7 +954,7 @@ protected:
     using Array = std::array<T, size>;
 
     // maybe could be std::uint8_t?
-    using Starts  = Array<uint16_t, dimension>;
+    using Starts  = Array<std::uint16_t, dimension>;
     using Weights = Array<Array<double, nbrPointsSupport(interpOrder)>, dimension>;
 
     Weighter<interpOrder> weightComputer_;

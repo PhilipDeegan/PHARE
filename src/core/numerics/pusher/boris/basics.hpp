@@ -220,10 +220,10 @@ void accelerate_avx(Particles_t& ps, Args&... args) _PHARE_ALL_FN_
 
     using Arr = mkn::avx::Array<Float, N>;
 
-    mkn::avx::Array<Float, N> const one{1};
-    mkn::avx::Array<Float, N> const two{2};
+    Arr const one{1};
+    Arr const two{2};
 
-    auto const ebs = interp.template m2p_avx<N, Arr>(ps, em, layout, pidx);
+    auto const ebs = interp.template m2p_avx<N, Arr>(layout, ps, em, pidx);
     auto const& [pEx, pEy, pEz, pBx, pBy, pBz] = ebs;
 
     auto v0 = mkn::avx::make_span<N>(ps.v_[0], pidx);

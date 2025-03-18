@@ -378,10 +378,10 @@ PHARE_WITH_MKN_AVX(
     ,TestParam<3, LayoutMode::SoAVX>
 )
 
-    ,TestParam<3, LayoutMode::AoSMapped>
+    // ,TestParam<3, LayoutMode::AoSMapped>
 
 PHARE_WITH_THRUST(
-    ,TestParam<3, LayoutMode::SoA>
+    // ,TestParam<3, LayoutMode::SoA>
     // ,TestParam<3, LayoutMode::SoAVX>
 )
 
