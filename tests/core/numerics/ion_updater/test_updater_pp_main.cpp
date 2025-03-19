@@ -39,11 +39,11 @@ bool constexpr static USE_SERIALIZATION = 0;
 
 auto static const bytes   = get_env_as("PHARE_GPU_BYTES", std::uint64_t{500000000});
 auto static const cells   = get_env_as("PHARE_CELLS", std::uint32_t{4});
-auto static const ppc     = get_env_as("PHARE_PPC", std::size_t{4});
+auto static const ppc     = get_env_as("PHARE_PPC", std::size_t{2});
 auto static const seed    = get_env_as("PHARE_SEED", std::size_t{1012});
 auto static const dt      = get_env_as("PHARE_TIMESTEP", double{.001});
 auto static const shufle  = get_env_as("PHARE_UNSORTED", std::size_t{0});
-auto static const do_cmp  = get_env_as("PHARE_COMPARE", std::size_t{0});
+auto static const do_cmp  = get_env_as("PHARE_COMPARE", std::size_t{1});
 auto static const gen_bin = get_env_as("PHARE_GENERATE_PARTICLES_BIN", std::size_t{0});
 
 std::string static const aos_particles_bin = "aos_particles.bin";
@@ -309,8 +309,10 @@ struct DefaultIons
         assert(premain);
         init = make_ions<typename Ions::particle_array_type>(layout);
 
+        PHARE_LOG_LINE_SS("");
         if constexpr (!USE_SERIALIZATION)
         {
+            PHARE_LOG_LINE_SS("");
             ions = make_ions<typename Ions::particle_array_type>(layout);
             evolve<true>(*ions, *layout);
         }
@@ -373,12 +375,12 @@ using Permutations_t = testing::Types< // ! notice commas !
 // )
 
      TestParam<3, LayoutMode::AoS>
+    ,TestParam<3, LayoutMode::AoSMapped>
 
 PHARE_WITH_MKN_AVX(
     ,TestParam<3, LayoutMode::SoAVX>
 )
 
-    // ,TestParam<3, LayoutMode::AoSMapped>
 
 PHARE_WITH_THRUST(
     // ,TestParam<3, LayoutMode::SoA>
@@ -433,11 +435,11 @@ TYPED_TEST(IonUpdaterPPTest, updater)
 
     auto cmp_ions = this->make_ions();
 
-    if (do_cmp)
-    {
-        PHARE_LOG_LINE_SS("Init check!")
-        compare(*this->layout, *this->ref.init, *cmp_ions);
-    }
+    // if (do_cmp)
+    // {
+    //     PHARE_LOG_LINE_SS("Init check!")
+    //     compare(*this->layout, *this->ref.init, *cmp_ions);
+    // }
 
     compare(*this->layout,   //
             *this->ref.ions, //

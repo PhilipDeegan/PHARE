@@ -223,7 +223,7 @@ void accelerate_avx(Particles_t& ps, Args&... args) _PHARE_ALL_FN_
     Arr const one{1};
     Arr const two{2};
 
-    auto const ebs = interp.template m2p_avx<N, Arr>(layout, ps, em, pidx);
+    auto const ebs = interp.template m2p_avx<N, mkn::avx::Array>(layout, ps, em, pidx);
     auto const& [pEx, pEy, pEz, pBx, pBy, pBz] = ebs;
 
     auto v0 = mkn::avx::make_span<N>(ps.v_[0], pidx);
@@ -347,9 +347,9 @@ auto avx_ad_acc_ad(Particles_t& ps, Args&... args) _PHARE_ALL_FN_
     auto constexpr static simdSize = mkn::avx::Span<Float>::N;
 
     auto const& siz = ps.size();
-    auto const& end = siz - (siz % simdSize);
 
-    for (std::size_t i = 0; i < end; i += simdSize)
+    std::size_t i = 0;
+    for (; i < siz; i += simdSize)
     {
         // advance_avx(ps, i, halfDtOverDl);
         for (std::size_t j = 0; j < simdSize; ++j)
@@ -363,7 +363,7 @@ auto avx_ad_acc_ad(Particles_t& ps, Args&... args) _PHARE_ALL_FN_
     }
 
     // do rest
-    for (std::size_t i = end; i < siz; ++i)
+    for (; i < siz; ++i)
     {
         advance_noavx(ps, i, halfDtOverDl);
         accelerate_noavx(ps, i, em, interpolator, layout, halfDtOverDl, dto2m);

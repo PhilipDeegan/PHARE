@@ -1,8 +1,8 @@
 property:
   cxx_flags: >-
     --std=c++20 -fsized-deallocation -fPIC
-    -DPHARE_FORCE_LOG_LINE=1
     -DPHARE_HAVE_MKN_GPU=0
+    -DPHARE_FORCE_LOG_LINE
 
 local:
   repo: /mkn/r

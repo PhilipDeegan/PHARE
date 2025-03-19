@@ -164,10 +164,10 @@ EqualityReport particle_compare(P0 const& p0, P1 const& p1, std::size_t const i 
     }
     else
     {
-        if (!float_equals(p0.delta(), p1.delta()))
-            return EqualityReport{false, "delta mismatch at index: " + idx, i};
         if (!float_equals(p0.v(), p1.v()))
             return EqualityReport{false, "v mismatch at index: " + idx, i};
+        if (!float_equals(p0.delta(), p1.delta()))
+            return EqualityReport{false, "delta mismatch at index: " + idx, i};
     }
 
     return EqualityReport{true};

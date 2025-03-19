@@ -55,13 +55,14 @@ EqualityReport ParticlesComparator<AoSMapped, CPU, SoAVX, CPU>::operator()(PS0 c
         if (ps0.iCell(i) != ps1.iCell(i))
             return EqualityReport{false, "icell mismatch at index: " + idx, i};
 
+        for (std::size_t d = 0; d < 3; ++d)
+            if (!float_equals(ps0.v(i)[d], ps1.v()[d][i]))
+                return EqualityReport{false, "v mismatch at index: " + idx, i};
+
         for (std::size_t d = 0; d < PS0::dimension; ++d)
             if (!float_equals(ps0.delta(i)[d], ps1.delta()[d][i]))
                 return EqualityReport{false, "delta mismatch at index: " + idx + ", dim "
                                                  + std::to_string(d)};
-        for (std::size_t d = 0; d < 3; ++d)
-            if (!float_equals(ps0.v(i)[d], ps1.v()[d][i]))
-                return EqualityReport{false, "v mismatch at index: " + idx, i};
     }
 
     return EqualityReport{true};
