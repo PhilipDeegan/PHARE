@@ -337,9 +337,17 @@ public:
         return fieldAtParticle;
     }
 
-    template<typename... Args>
+    template<typename GridLayout, typename... Args>
     inline auto avx(Args&&... args) const _PHARE_ALL_FN_
     {
+        auto constexpr scalar_qts = []() constexpr {
+            using enum HybridQuantity::Scalar;
+            return std::array{Ex, Ey, Ez, Bx, By, Bz};
+        }();
+
+        auto constexpr centerings = for_N<scalar_qts.size(), for_N_R_mode::make_array>(
+            [&](auto i) { return GridLayout::centering(scalar_qts[i]); });
+
         auto&& [qts, starts, weights] = std::forward_as_tuple(args...);
         using Qts                     = std::decay_t<decltype(qts)>;
         auto constexpr n_qtys         = std::tuple_size_v<Qts>;
@@ -350,11 +358,21 @@ public:
         std::array<Arr, n_qtys> ebs;
 
         // weights[qty][dim][support][pidx]
+        auto constexpr caster
+            = [](auto i) constexpr { return static_cast<std::underlying_type_t<QtyCentering>>(i); };
 
         for_N<n_qtys>([&](auto q) {
-            auto const& field              = std::get<q>(qts);
-            auto const& [xW8s, yW8s, zW8s] = weights[q];
-            auto const& [xSi, ySi, zSi]    = starts[q];
+            auto constexpr xci = caster(centerings[q][0]);
+            auto constexpr yci = caster(centerings[q][1]);
+            auto constexpr zci = caster(centerings[q][2]);
+            auto const& field  = std::get<q>(qts);
+
+            auto const& xW8s = weights[xci][0];
+            auto const& yW8s = weights[yci][1];
+            auto const& zW8s = weights[zci][2];
+            auto const& xSi  = starts[xci][0];
+            auto const& ySi  = starts[yci][1];
+            auto const& zSi  = starts[zci][2];
 
             for (auto ix = 0u; ix < order_size; ++ix)
             {
@@ -365,9 +383,10 @@ public:
                     for (auto iz = 0u; iz < order_size; ++iz)
                         for (std::uint8_t i = 0; i < N_parts; i++)
                         {
-                            assert(xSi[i] + ix < 60000); // uint{-1} == 65535
-                            Zinterp[i]
-                                += field(xSi[i] + ix, ySi[i] + iy, zSi[i] + iz) * zW8s[iz][i];
+                            auto const cell = [](auto const&... args) {
+                                return std::array{static_cast<std::uint32_t>(args)...};
+                            }(xSi[i] + ix, ySi[i] + iy, zSi[i] + iz);
+                            Zinterp[i] += field(cell) * zW8s[iz][i];
                         }
                     Yinterp += Zinterp * yW8s[iy];
                 }
@@ -637,10 +656,10 @@ public:
         pBy = meshToParticle_.template op<GridLayout, Scalar::By>(By, indexWeights);
         pBz = meshToParticle_.template op<GridLayout, Scalar::Bz>(Bz, indexWeights);
 
-        PHARE_LOG_LINE_SS(to_string_with_precision(pEx, 22)
-                          << " " << to_string_with_precision(pEz, 22) << " "
-                          << to_string_with_precision(pBx, 22) << " "
-                          << to_string_with_precision(pBz, 22));
+        // PHARE_LOG_LINE_SS(to_string_with_precision(pEx, 22)
+        //                   << " " << to_string_with_precision(pEz, 22) << " "
+        //                   << to_string_with_precision(pBx, 22) << " "
+        //                   << to_string_with_precision(pBz, 22));
         // PHARE_LOG_LINE_SS(to_string_with_precision(pEx, 22) << ":" << //
         //                   to_string_with_precision(b, 22) << ":" << //
         //                   to_string_with_precision(ret, 22));
@@ -661,19 +680,9 @@ public:
 
         auto constexpr dual_offset = .5;
 
-        auto constexpr qts = []() constexpr {
-            using enum HybridQuantity::Scalar;
-            return std::array{Ex, Ey, Ez, Bx, By, Bz};
-        }();
-
-        auto constexpr centerings = for_N<qts.size(), for_N_R_mode::make_array>(
-            [&](auto i) { return GridLayout::centering(qts[i]); });
-
-
         auto const& [particles, Em, start] = std::forward_as_tuple(args...);
         auto const& deltas                 = particles.delta();
         auto const& iCells                 = particles.iCell();
-        PHARE_LOG_LINE_SS(start);
 
         auto const fpiCells = [&]() {
             Array<ArrayFp64, dim> fpiCells;
@@ -686,73 +695,32 @@ public:
             return fpiCells;
         }();
 
+        using AVXCenteredWeights
+            = Array<Array<Array<ArrayFp64, nbrPointsSupport(interpOrder)>, dim>, 2>;
+        AVXCenteredWeights centered_weights; // [centering][dim][support][pidx]
+
         Array<Array<ArrayFp64, dim>, 2> centered_pos, centered_starts;
-        for (std::size_t d = 0; d < dim; ++d)
-            for (std::size_t i = 0, pidx = start; i < N; ++i, ++pidx)
-                for_N<2>([&](auto c) {
-                    auto constexpr centering = static_cast<QtyCentering>(c());
-                    centered_pos[c][d][i]    = fpiCells[d][i] + deltas[d][pidx];
+
+        for_N<2>([&](auto c) {
+            auto constexpr centering = static_cast<QtyCentering>(c());
+            for (std::size_t d = 0; d < dim; ++d)
+            {
+                for (std::size_t i = 0, pidx = start; i < N; ++i, ++pidx)
+                {
+                    centered_pos[c][d][i] = fpiCells[d][i] + deltas[d][pidx];
                     if constexpr (centering == QtyCentering::dual)
                         centered_pos[c][d][i] -= dual_offset;
                     centered_starts[c][d][i]
                         = fpiCells[d][i] - computeStartLeftShift<centering>(deltas[d][pidx]);
-                });
-
-        // PHARE_LOG_LINE_SS(centered_pos[0][0][0] << " " << centered_pos[1][0][0]);
-
-        using AVXCenteredWeights
-            = Array<Array<Array<ArrayFp64, nbrPointsSupport(interpOrder)>, dim>, 2>;
-        AVXCenteredWeights centered_weights; // [centering][dim][support][pidx]
-        // PHARE_LOG_LINE_SS(centered_weights[1][0][0][0]);
-        // PHARE_LOG_LINE_SS(centered_weights[1][0][1][0]);
-        for_N<2>([&](auto c) {                               // per centering
-            for_N<dim>([&](auto d) {                         // per dim
+                }
                 weightComputer_.template compute<ArrayFp64>( //
                     centered_pos[c][d], centered_starts[c][d], centered_weights[c][d]);
-            });
+            }
         });
-        // PHARE_LOG_LINE_SS(centered_pos[0][0][0]);
-        // PHARE_LOG_LINE_SS(centered_pos[1][0][0]);
-        // PHARE_LOG_LINE_SS(centered_weights[1][0][0][0]);
-        // PHARE_LOG_LINE_SS(centered_weights[1][0][1][0]);
 
-        using AVXQuantityWeights
-            = Array<Array<Array<ArrayFp64, nbrPointsSupport(interpOrder)>, dim>, qts.size()>;
-        AVXQuantityWeights weights; // [qty][dim][support][pidx]
-        for (std::size_t d = 0; d < dim; ++d)
-            for_N<qts.size()>([&](auto q) {
-                auto const qty_centering_i
-                    = static_cast<std::underlying_type_t<QtyCentering>>(centerings[q][d]);
-                weights[q][d] = centered_weights[qty_centering_i][d];
-            });
 
-        // assert(nbrPointsSupport(interpOrder) == 2);
-        // PHARE_LOG_LINE_SS(weights[0][0][0][0]);
-        // PHARE_LOG_LINE_SS(weights[0][0][1][0]);
-
-        Array<Array<ArrayUint16, dim>, qts.size()> starts; // [qty][dim][pidx]
-        for (std::size_t d = 0; d < dim; ++d)
-            for (std::size_t i = 0; i < N; ++i)
-                for_N<qts.size()>([&](auto q) {
-                    auto const qty_centering_i
-                        = static_cast<std::underlying_type_t<QtyCentering>>(centerings[q][d]);
-                    starts[q][d][i] = centered_starts[qty_centering_i][d][i]; // different types!
-                });
-
-        auto const ebs = meshToParticle_.avx(Em.flat(), starts, weights);
-        // PHARE_LOG_LINE_SS(ebs[0][0]);
-        // PHARE_LOG_LINE_SS(ebs[0][1]);
-        // PHARE_LOG_LINE_SS(ebs[0][3]);
-        PHARE_LOG_LINE_SS(to_string_with_precision(ebs[0][0], 22)
-                          << " " << to_string_with_precision(ebs[0][7], 22));
-        PHARE_LOG_LINE_SS(to_string_with_precision(ebs[2][0], 22)
-                          << " " << to_string_with_precision(ebs[2][7], 22));
-        PHARE_LOG_LINE_SS(to_string_with_precision(ebs[3][0], 22)
-                          << " " << to_string_with_precision(ebs[3][7], 22));
-        PHARE_LOG_LINE_SS(to_string_with_precision(ebs[5][0], 22)
-                          << " " << to_string_with_precision(ebs[5][7], 22));
-        // PHARE_LOG_LINE_SS(to_string_with_precision(ebs[0][1], 22));
-        return ebs;
+        return meshToParticle_.template avx<GridLayout>( //
+            Em.flat(), centered_starts, centered_weights);
     }
 
 
@@ -793,10 +761,10 @@ public:
         pBy = meshToParticle_.template op<GridLayout, Scalar::By>(By, indexWeights);
         pBz = meshToParticle_.template op<GridLayout, Scalar::Bz>(Bz, indexWeights);
 
-        PHARE_LOG_LINE_SS(to_string_with_precision(pEx, 22)
-                          << " " << to_string_with_precision(pEz, 22) << " "
-                          << to_string_with_precision(pBx, 22) << " "
-                          << to_string_with_precision(pBz, 22));
+        // PHARE_LOG_LINE_SS(to_string_with_precision(pEx, 22)
+        //                   << " " << to_string_with_precision(pEz, 22) << " "
+        //                   << to_string_with_precision(pBx, 22) << " "
+        //                   << to_string_with_precision(pBz, 22));
         return particle_EB;
     }
 

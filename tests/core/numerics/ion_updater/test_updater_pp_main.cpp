@@ -35,15 +35,15 @@ void PrintTo(ParticleArray<dim, internals> const& arr, std::ostream* os)
 }
 
 bool constexpr static WITH_PATCH_GHOST  = false;
-bool constexpr static USE_SERIALIZATION = 0;
+bool constexpr static USE_SERIALIZATION = 1;
 
 auto static const bytes   = get_env_as("PHARE_GPU_BYTES", std::uint64_t{500000000});
-auto static const cells   = get_env_as("PHARE_CELLS", std::uint32_t{4});
-auto static const ppc     = get_env_as("PHARE_PPC", std::size_t{2});
+auto static const cells   = get_env_as("PHARE_CELLS", std::uint32_t{12});
+auto static const ppc     = get_env_as("PHARE_PPC", std::size_t{400});
 auto static const seed    = get_env_as("PHARE_SEED", std::size_t{1012});
 auto static const dt      = get_env_as("PHARE_TIMESTEP", double{.001});
 auto static const shufle  = get_env_as("PHARE_UNSORTED", std::size_t{0});
-auto static const do_cmp  = get_env_as("PHARE_COMPARE", std::size_t{1});
+auto static const do_cmp  = get_env_as("PHARE_COMPARE", std::size_t{!USE_SERIALIZATION});
 auto static const gen_bin = get_env_as("PHARE_GENERATE_PARTICLES_BIN", std::size_t{0});
 
 std::string static const aos_particles_bin = "aos_particles.bin";
@@ -206,9 +206,9 @@ auto& evolve(Ions& ions, GridLayout_t const& layout)
     assert(ions.populations[0].particles.domain_particles.size() > 0);
     UsableElectromag<dim, alloc_mode> em{layout};
     if constexpr (quiet)
-        udpate(*ions, *em, layout);
+        udpate(*ions, **em, layout);
     else
-        update(*ions, *em, layout);
+        update(*ions, **em, layout);
     assert(ions.populations[0].particles.domain_particles.size() > 0);
     return ions;
 }

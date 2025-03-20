@@ -190,20 +190,29 @@ auto advance_avx(Particles_t& ps, Args const&... args) _PHARE_ALL_FN_
 
     for (std::size_t iDim = 0; iDim < Particles_t::dimension; ++iDim)
     {
-        auto delta = mkn::avx::make_span(ps.delta()[iDim], pidx, N);
+        auto delta = mkn::avx::make_span<N>(ps.delta()[iDim], pidx);
         {
             mkn::avx::Array<Float, N> newdelta{halfDtOverDl[iDim]};
-            newdelta *= mkn::avx::make_span(ps.v()[iDim], pidx, N);
+            newdelta *= mkn::avx::make_span<N>(ps.v()[iDim], pidx);
             newdelta += delta;
             delta = newdelta;
         }
 
+        mkn::avx::Array<Float, N> cells{};
         for (std::size_t i = 0; i < N; ++i)
-        {
-            auto iCell = std::floor(delta[i]);
-            delta[i] -= iCell;
-            ps.iCell(pidx + i)[iDim] += static_cast<int>(iCell);
-        }
+            cells[i] = std::floor(delta[i]);
+
+        delta -= cells;
+
+        for (std::size_t i = 0; i < N; ++i)
+            ps.iCell(pidx + i)[iDim] += static_cast<int>(cells[i]);
+
+        // for (std::size_t i = 0; i < N; ++i)
+        // {
+        //     auto const iCell = std::floor(delta[i]);
+        //     delta[i] -= iCell;
+        //     ps.iCell(pidx + i)[iDim] += static_cast<int>(iCell);
+        // }
     }
 }
 
@@ -351,15 +360,15 @@ auto avx_ad_acc_ad(Particles_t& ps, Args&... args) _PHARE_ALL_FN_
     std::size_t i = 0;
     for (; i < siz; i += simdSize)
     {
-        // advance_avx(ps, i, halfDtOverDl);
-        for (std::size_t j = 0; j < simdSize; ++j)
-            advance_noavx(ps, i + j, halfDtOverDl);
+        advance_avx(ps, i, halfDtOverDl);
+        // for (std::size_t j = 0; j < simdSize; ++j)
+        //     advance_noavx(ps, i + j, halfDtOverDl);
 
         accelerate_avx(ps, i, em, interpolator, layout, halfDtOverDl, dto2m);
 
-        // advance_avx(ps, i, halfDtOverDl);
-        for (std::size_t j = 0; j < simdSize; ++j)
-            advance_noavx(ps, i + j, halfDtOverDl);
+        advance_avx(ps, i, halfDtOverDl);
+        // for (std::size_t j = 0; j < simdSize; ++j)
+        //     advance_noavx(ps, i + j, halfDtOverDl);
     }
 
     // do rest

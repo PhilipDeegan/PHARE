@@ -130,8 +130,11 @@ namespace core
             //     [&](auto i) { return a(components[i], args...); })};
         }
 
-        // auto operator*() {}
-        // auto operator*() const {}
+
+        Super& super() { return *this; }
+        Super const& super() const { return *this; }
+        auto& operator*() { return super(); }
+        auto& operator*() const { return super(); }
 
 
     private:
