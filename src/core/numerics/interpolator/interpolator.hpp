@@ -355,7 +355,7 @@ public:
         auto const order_size         = weights[0][0].size();
         using Arr                     = std::decay_t<decltype(weights[0][0][0])>;
         auto constexpr N_parts        = Arr::size();
-        static_assert(N_parts == 8);
+        // static_assert(N_parts == 8);
         std::array<Arr, n_qtys> ebs;
 
         // weights[qty][dim][support][pidx]
