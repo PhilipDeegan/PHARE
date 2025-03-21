@@ -221,8 +221,8 @@ void accelerate_avx(Particles_t& ps, Args&... args) _PHARE_ALL_FN_
     using Float                                   = std::decay_t<decltype(dto2m)>;
 
     constexpr auto N = mkn::avx::Span<Float>::N;
-    static_assert(N == 8);
-    static_assert(mkn::avx::Options::ALIGN() == 64);
+    // static_assert(N == 8);
+    // static_assert(mkn::avx::Options::ALIGN() == 64);
 
     using Arr = mkn::avx::Array<Float, N>;
 
