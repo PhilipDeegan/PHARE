@@ -11,6 +11,7 @@
 #include "core/utilities/range/range.hpp"
 #include "core/errors.hpp"
 #include "core/logger.hpp"
+#include "core/vector.hpp"
 #include "core/data/particles/particle.hpp"
 
 namespace PHARE::core
@@ -30,6 +31,9 @@ private:
     using ParticleSelector = typename Super::ParticleSelector;
 
 public:
+    BorisPusher() {} // default for shared_ptr usage
+    BorisPusher(std::array<double, dim> const& ms, double const ts) { setMeshAndTimeStep(ms, ts); }
+
     // This move function should be considered when being used so that all particles are pushed
     // twice - see: https://github.com/PHAREHUB/PHARE/issues/571
     /** see Pusher::move() documentation*/
@@ -81,7 +85,10 @@ public:
                        GridLayout const& layout, ParticleSelector firstSelector,
                        ParticleSelector secondSelector) override
     {
-        PHARE_LOG_SCOPE(3, "Boris::move_no_bc");
+        if (rangeIn.size() == 0)
+            return rangeOut;
+
+        PHARE_LOG_SCOPE(1, "Boris::move_no_bc");
 
         // push the particles of half a step
         // rangeIn : t=n, rangeOut : t=n+1/2
@@ -91,19 +98,19 @@ public:
 
         rangeOut = firstSelector(rangeOut);
 
-
         double const dto2m = 0.5 * dt_ / mass;
+
         for (auto idx = rangeOut.ibegin(); idx < rangeOut.iend(); ++idx)
         {
-            auto& currPart = rangeOut.array()[idx];
+            auto& particles = rangeOut.array();
 
-            //  get electromagnetic fields interpolated on the particles of rangeOut stop at newEnd.
-            //  get the particle velocity from t=n to t=n+1
-            accelerate_(currPart, interpolator(currPart, emFields, layout), dto2m);
+            //  get electromagnetic fields interpolated on the particles of rangeOut stop at
+            //  newEnd. get the particle velocity from t=n to t=n+1
+            accelerate_(particles, interpolator(particles, emFields, layout, idx), dto2m, idx);
 
             // now advance the particles from t=n+1/2 to t=n+1 using v_{n+1} just calculated
             // and get a pointer to the first leaving particle
-            postPushStep_(rangeOut, idx);
+            postPushStep_(rangeOut.array(), idx, halfDtOverDl_);
         }
 
         return secondSelector(rangeOut);
@@ -112,10 +119,11 @@ public:
 
 
     /** see Pusher::move() documentation*/
-    void setMeshAndTimeStep(std::array<double, dim> ms, double const ts) override
+    void setMeshAndTimeStep(std::array<double, dim> const& ms,
+                            double const ts) override _PHARE_ALL_FN_
     {
         std::transform(std::begin(ms), std::end(ms), std::begin(halfDtOverDl_),
-                       [ts](double& x) { return 0.5 * ts / x; });
+                       [ts](auto const& x) { return 0.5 * ts / x; });
         dt_ = ts;
     }
 
@@ -124,22 +132,24 @@ public:
 private:
     /** move the particle partIn of half a time step and store it in partOut
      */
-    template<typename Particle>
-    auto advancePosition_(Particle const& partIn, Particle& partOut)
+    template<typename ParticleIn, typename ParticleOut>
+    auto static advancePosition_(ParticleIn const& partIn, ParticleOut& partOut,
+                                 std::array<double, dim> halfDtOverDl) _PHARE_ALL_FN_
     {
         std::array<int, dim> newCell;
         for (std::size_t iDim = 0; iDim < dim; ++iDim)
         {
             double delta
-                = partIn.delta[iDim] + static_cast<double>(halfDtOverDl_[iDim] * partIn.v[iDim]);
+                = partIn.delta()[iDim] + static_cast<double>(halfDtOverDl[iDim] * partIn.v()[iDim]);
 
             double iCell = std::floor(delta);
             if (std::abs(delta) > 2)
             {
-                PHARE_LOG_ERROR("Error, particle moves more than 1 cell, delta >2");
+                // PHARE_LOG_ERROR("Error, particle moves more than 1 cell, delta >2");
+                throw_runtime_error("Error, particle moves more than 1 cell, delta >2");
             }
-            partOut.delta[iDim] = delta - iCell;
-            newCell[iDim]       = static_cast<int>(iCell + partIn.iCell[iDim]);
+            partOut.delta()[iDim] = delta - iCell;
+            newCell[iDim]         = static_cast<int>(iCell + partIn.iCell()[iDim]);
         }
         return newCell;
     }
@@ -153,6 +163,8 @@ private:
      */
     void prePushStep_(ParticleRange const& rangeIn, ParticleRange& rangeOut)
     {
+        using ParticleArray = std::decay_t<decltype(rangeIn.array())>;
+
         auto& inParticles  = rangeIn.array();
         auto& outParticles = rangeOut.array();
         for (auto inIdx = rangeIn.ibegin(), outIdx = rangeOut.ibegin(); inIdx < rangeIn.iend();
@@ -168,44 +180,60 @@ private:
             // to take advantage that we're already looping
             // over rangeIn particles.
 
-            outParticles[outIdx].charge = inParticles[inIdx].charge;
-            outParticles[outIdx].weight = inParticles[inIdx].weight;
-            outParticles[outIdx].v      = inParticles[inIdx].v;
+            outParticles.charge(outIdx) = inParticles.charge(inIdx);
+            outParticles.weight(outIdx) = inParticles.weight(inIdx);
+            outParticles.v(outIdx)      = inParticles.v(inIdx);
 
-            auto newCell = advancePosition_(inParticles[inIdx], outParticles[outIdx]);
-            if (newCell != inParticles[inIdx].iCell)
-                outParticles.change_icell(newCell, outIdx);
+            auto in      = inParticles.begin() + inIdx;
+            auto out     = outParticles.begin() + outIdx;
+            auto newCell = advancePosition_(in, out, halfDtOverDl_);
+
+            if constexpr (ParticleArray::is_mapped)
+            {
+                if (newCell != inParticles.iCell(inIdx))
+                    outParticles.change_icell(newCell, outIdx);
+            }
+            else
+                outParticles.iCell(outIdx) = newCell;
         }
     }
 
-    void postPushStep_(ParticleRange& range, std::size_t idx)
+    template<typename Particles>
+    void static postPushStep_(Particles& particles, std::size_t idx,
+                              std::array<double, dim> halfDtOverDl) _PHARE_ALL_FN_
     {
-        auto& particles = range.array();
-        auto newCell    = advancePosition_(particles[idx], particles[idx]);
-        if (newCell != particles[idx].iCell)
-            particles.change_icell(newCell, idx);
+        auto particle = particles.begin() + idx;
+        auto newCell  = advancePosition_(deref(particle), deref(particle), halfDtOverDl);
+        if constexpr (Particles::is_mapped)
+        {
+            if (newCell != particles.iCell(idx))
+                particles.change_icell(newCell, idx);
+        }
+        else
+            particles.iCell(idx) = newCell;
     }
 
 
     /** Accelerate the particles in rangeIn and put the new velocity in rangeOut
      */
-    template<typename Particle_t, typename ParticleEB>
-    void accelerate_(Particle_t& part, ParticleEB const& particleEB, double const& dto2m)
+
+    template<typename Particles, typename ParticleEB>
+    void static accelerate_(Particles& particles, ParticleEB const& particleEB, double const& dto2m,
+                            std::size_t const idx) _PHARE_ALL_FN_
     {
         auto& [pE, pB]        = particleEB;
         auto& [pEx, pEy, pEz] = pE;
         auto& [pBx, pBy, pBz] = pB;
 
-
-        double const coef1 = part.charge * dto2m;
+        double coef1 = particles.charge(idx) * dto2m;
 
         // We now apply the 3 steps of the BORIS PUSHER
 
         // 1st half push of the electric field
-        double velx1 = part.v[0] + coef1 * pEx;
-        double vely1 = part.v[1] + coef1 * pEy;
-        double velz1 = part.v[2] + coef1 * pEz;
-
+        auto const& in_v                = particles.v(idx);
+        std::array<double, 3> const vel = {in_v[0] + coef1 * pEx, //
+                                           in_v[1] + coef1 * pEy, //
+                                           in_v[2] + coef1 * pEz};
 
         // preparing variables for magnetic rotation
         double const rx = coef1 * pBx;
@@ -236,20 +264,15 @@ private:
         double const mzz = 1. + rz2 - rx2 - ry2;
 
         // magnetic rotation
-        double const velx2 = (mxx * velx1 + mxy * vely1 + mxz * velz1) * invDet;
-        double const vely2 = (myx * velx1 + myy * vely1 + myz * velz1) * invDet;
-        double const velz2 = (mzx * velx1 + mzy * vely1 + mzz * velz1) * invDet;
-
+        double const velx2 = (mxx * vel[0] + mxy * vel[1] + mxz * vel[2]) * invDet;
+        double const vely2 = (myx * vel[0] + myy * vel[1] + myz * vel[2]) * invDet;
+        double const velz2 = (mzx * vel[0] + mzy * vel[1] + mzz * vel[2]) * invDet;
 
         // 2nd half push of the electric field
-        velx1 = velx2 + coef1 * pEx;
-        vely1 = vely2 + coef1 * pEy;
-        velz1 = velz2 + coef1 * pEz;
-
         // Update particle velocity
-        part.v[0] = velx1;
-        part.v[1] = vely1;
-        part.v[2] = velz1;
+        particles.v(idx) = {velx2 + coef1 * pEx, //
+                            vely2 + coef1 * pEy, //
+                            velz2 + coef1 * pEz};
     }
 
 

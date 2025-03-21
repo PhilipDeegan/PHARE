@@ -75,6 +75,9 @@ class Particles:
     def size(self):
         return len(self.weights)
 
+    def __repr__(self):
+        return f"Particles(size: {self.size()}, id: {id(self)})"
+
     def __eq__(self, that):
         if isinstance(that, Particles):
             if self.size() != that.size():
