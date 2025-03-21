@@ -5,6 +5,7 @@
 //  - cxxflags: -DPHARE_LOG_LEVEL=1
 //  - env:      PHARE_SCOPE_TIMING=1
 
+#include "core/def/detail/mkn_avx.hpp"
 #include <memory>
 #define PHARE_SKIP_MPI_IN_CORE
 #define PHARE_UNDEF_ASSERT
@@ -206,9 +207,9 @@ auto& evolve(Ions& ions, GridLayout_t const& layout)
     assert(ions.populations[0].particles.domain_particles.size() > 0);
     UsableElectromag<dim, alloc_mode> em{layout};
     if constexpr (quiet)
-        udpate(*ions, **em, layout);
+        udpate(*ions, *em, layout);
     else
-        update(*ions, **em, layout);
+        update(*ions, *em, layout);
     assert(ions.populations[0].particles.domain_particles.size() > 0);
     return ions;
 }
@@ -455,5 +456,11 @@ int main(int argc, char** argv)
     ::testing::InitGoogleTest(&argc, argv);
     auto r = RUN_ALL_TESTS();
     PHARE_WITH_PHLOP(phlop::threaded::ScopeTimerMan::reset());
+    PHARE_WITH_MKN_AVX({
+        for (auto const& [k, v] : mkn::avx::Counter::I().cnts)
+        {
+            PHARE_LOG_LINE_SS(k << " " << v);
+        }
+    })
     return r;
 }

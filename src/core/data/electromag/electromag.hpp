@@ -22,16 +22,6 @@ class Electromag
 public:
     static constexpr std::size_t dimension = VecFieldT::dimension;
 
-    template<typename Em>
-    auto static flat(Em& em)
-    {
-        auto& [Ex, Ey, Ez] = em.E();
-        auto& [Bx, By, Bz] = em.B();
-        return std::forward_as_tuple(Ex, Ey, Ez, Bx, By, Bz);
-    }
-
-    auto flat() { return flat(*this); }
-    auto flat() const { return flat(*this); }
 
     VecFieldT E;
     VecFieldT B;
@@ -116,18 +106,12 @@ namespace core
         auto as(auto&& a, auto&&... args)
         {
             return V{a(E, args...), a(B, args...)};
-            // std::array components{&E, &B};
-            // return V{for_N<2, for_N_R_mode::make_array>(
-            //     [&](auto i) { return a(components[i], args...); })};
         }
 
         template<typename V>
         auto as(auto&& a, auto&&... args) const
         {
             return V{a(E, args...), a(B, args...)};
-            // std::array const components{&E, &B};
-            // return V{for_N<2, for_N_R_mode::make_array>(
-            //     [&](auto i) { return a(components[i], args...); })};
         }
 
 
@@ -140,6 +124,10 @@ namespace core
     private:
         VecFieldInitializer<dimension> Binit_;
     };
+
 } // namespace core
 } // namespace PHARE
+
+
+
 #endif

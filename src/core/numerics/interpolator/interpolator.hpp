@@ -172,6 +172,7 @@ public:
         weights[1] = _2_over_3 - coef2_sq - 0.5 * coef2_cub;
         weights[2] = _2_over_3 - coef3_sq + 0.5 * coef3_cub;
         weights[3] = _4_over_3 * coef4 * coef4 * coef4;
+        // TODO! MAKE +=!!!! (in place ops++)
     }
 
     static constexpr int interp_order = 3;
@@ -358,14 +359,16 @@ public:
         std::array<Arr, n_qtys> ebs;
 
         // weights[qty][dim][support][pidx]
-        auto constexpr caster
-            = [](auto i) constexpr { return static_cast<std::underlying_type_t<QtyCentering>>(i); };
+        auto const caster
+            = [](auto const i) { return static_cast<std::underlying_type_t<QtyCentering>>(i); };
 
-        for_N<n_qtys>([&](auto q) {
-            auto constexpr xci = caster(centerings[q][0]);
-            auto constexpr yci = caster(centerings[q][1]);
-            auto constexpr zci = caster(centerings[q][2]);
-            auto const& field  = std::get<q>(qts);
+        for (auto q = 0u; q < n_qtys; ++q)
+        {
+            // for_N<n_qtys>([&](auto q) {
+            auto const xci    = caster(centerings[q][0]);
+            auto const yci    = caster(centerings[q][1]);
+            auto const zci    = caster(centerings[q][2]);
+            auto const& field = qts[q];
 
             auto const& xW8s = weights[xci][0];
             auto const& yW8s = weights[yci][1];
@@ -381,18 +384,23 @@ public:
                 {
                     Arr Zinterp = 0.;
                     for (auto iz = 0u; iz < order_size; ++iz)
+                    {
+                        Arr fvs{std::nullopt}; // memory not initialized!
+
                         for (std::uint8_t i = 0; i < N_parts; i++)
-                        {
-                            auto const cell = [](auto const&... args) {
+                            fvs[i] = field([](auto const&... args) {
                                 return std::array{static_cast<std::uint32_t>(args)...};
-                            }(xSi[i] + ix, ySi[i] + iy, zSi[i] + iz);
-                            Zinterp[i] += field(cell) * zW8s[iz][i];
-                        }
-                    Yinterp += Zinterp * yW8s[iy];
+                            }(xSi[i] + ix, ySi[i] + iy, zSi[i] + iz));
+
+                        Zinterp += fvs * zW8s[iz];
+                    }
+                    Zinterp *= yW8s[iy];
+                    Yinterp += Zinterp;
                 }
-                ebs[q] += Yinterp * xW8s[ix];
+                Yinterp *= xW8s[ix];
+                ebs[q] += Yinterp;
             }
-        });
+        } //);
 
 
         return ebs;
@@ -682,13 +690,16 @@ public:
 
         auto const& [particles, Em, start] = std::forward_as_tuple(args...);
         auto const& deltas                 = particles.delta();
-        auto const& iCells                 = particles.iCell();
+        auto const& iCells                 = particles.iCell().data() + start;
+
+        auto const delts = for_N<GridLayout::dimension, for_N_R_mode::make_array>(
+            [&](auto i) { return deltas[i].data() + start; });
 
         auto const fpiCells = [&]() {
             Array<ArrayFp64, dim> fpiCells;
-            for (std::size_t i = 0, pidx = start; i < N; ++i, ++pidx)
+            for (std::size_t i = 0; i < N; ++i)
             {
-                auto const lCell = layout.AMRToLocal(iCells[pidx]);
+                auto const lCell = layout.AMRToLocal(iCells[i]);
                 for (std::size_t d = 0; d < dim; ++d)
                     fpiCells[d][i] = lCell[d];
             }
@@ -705,13 +716,13 @@ public:
             auto constexpr centering = static_cast<QtyCentering>(c());
             for (std::size_t d = 0; d < dim; ++d)
             {
-                for (std::size_t i = 0, pidx = start; i < N; ++i, ++pidx)
+                for (std::size_t i = 0; i < N; ++i)
                 {
-                    centered_pos[c][d][i] = fpiCells[d][i] + deltas[d][pidx];
+                    centered_pos[c][d][i] = fpiCells[d][i] + delts[d][i];
                     if constexpr (centering == QtyCentering::dual)
                         centered_pos[c][d][i] -= dual_offset;
                     centered_starts[c][d][i]
-                        = fpiCells[d][i] - computeStartLeftShift<centering>(deltas[d][pidx]);
+                        = fpiCells[d][i] - computeStartLeftShift<centering>(delts[d][i]);
                 }
                 weightComputer_.template compute<ArrayFp64>( //
                     centered_pos[c][d], centered_starts[c][d], centered_weights[c][d]);
@@ -719,8 +730,7 @@ public:
         });
 
 
-        return meshToParticle_.template avx<GridLayout>( //
-            Em.flat(), centered_starts, centered_weights);
+        return meshToParticle_.template avx<GridLayout>(Em, centered_starts, centered_weights);
     }
 
 

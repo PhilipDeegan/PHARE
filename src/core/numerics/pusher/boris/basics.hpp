@@ -2,10 +2,14 @@
 #define PHARE_CORE_PUSHER_BORIS_BASICS_HPP
 
 #include "core/utilities/types.hpp"
+#include "core/data/electromag/electromag.hpp"
+#include "src/core/data/tensorfield/tensorfield.hpp"
+// /home/deegan/git/phare/mkn/src/core/data/tensorfield/tensorfield.hpp
 
 #include <tuple>
 #include <iterator>
 #include <utility>
+
 
 namespace PHARE::core::boris
 {
@@ -118,10 +122,10 @@ auto advance_noavx(Particles_t& ps, Args const&... args) _PHARE_ALL_FN_
 template<typename Particles_t, typename... Args>
 void accelerate_noavx(Particles_t& ps, Args&... args) _PHARE_ALL_FN_
 {
-    auto const& [pidx, em, interp, layout, halfDtOverDl, dto2m] = std::forward_as_tuple(args...);
-    using Float                = std::decay_t<decltype(halfDtOverDl)>::value_type;
-    static constexpr Float one = 1;
-    static constexpr Float two = 2;
+    auto const& [pidx, em, interp, layout, dto2m] = std::forward_as_tuple(args...);
+    using Float                                   = std::decay_t<decltype(dto2m)>;
+    static constexpr Float one                    = 1;
+    static constexpr Float two                    = 2;
 
     auto const& eb        = interp.m2p(ps.begin() + pidx, em, layout);
     auto& [pE, pB]        = eb;
@@ -184,7 +188,7 @@ template<typename Particles_t, typename... Args>
 auto advance_avx(Particles_t& ps, Args const&... args) _PHARE_ALL_FN_
 {
     auto const& [pidx, halfDtOverDl] = std::forward_as_tuple(args...);
-    using Float                      = std::decay_t<decltype(halfDtOverDl)>::value_type;
+    using Float                      = std::decay_t<decltype(halfDtOverDl[0])>::value_type;
 
     constexpr auto N = mkn::avx::Span<Float>::N;
 
@@ -192,7 +196,7 @@ auto advance_avx(Particles_t& ps, Args const&... args) _PHARE_ALL_FN_
     {
         auto delta = mkn::avx::make_span<N>(ps.delta()[iDim], pidx);
         {
-            mkn::avx::Array<Float, N> newdelta{halfDtOverDl[iDim]};
+            mkn::avx::Array<Float, N> newdelta = halfDtOverDl[iDim];
             newdelta *= mkn::avx::make_span<N>(ps.v()[iDim], pidx);
             newdelta += delta;
             delta = newdelta;
@@ -206,13 +210,6 @@ auto advance_avx(Particles_t& ps, Args const&... args) _PHARE_ALL_FN_
 
         for (std::size_t i = 0; i < N; ++i)
             ps.iCell(pidx + i)[iDim] += static_cast<int>(cells[i]);
-
-        // for (std::size_t i = 0; i < N; ++i)
-        // {
-        //     auto const iCell = std::floor(delta[i]);
-        //     delta[i] -= iCell;
-        //     ps.iCell(pidx + i)[iDim] += static_cast<int>(iCell);
-        // }
     }
 }
 
@@ -220,8 +217,8 @@ auto advance_avx(Particles_t& ps, Args const&... args) _PHARE_ALL_FN_
 template<typename Particles_t, typename... Args>
 void accelerate_avx(Particles_t& ps, Args&... args) _PHARE_ALL_FN_
 {
-    auto const& [pidx, em, interp, layout, halfDtOverDl, dto2m] = std::forward_as_tuple(args...);
-    using Float = std::decay_t<decltype(halfDtOverDl)>::value_type;
+    auto const& [pidx, em, interp, layout, dto2m] = std::forward_as_tuple(args...);
+    using Float                                   = std::decay_t<decltype(dto2m)>;
 
     constexpr auto N = mkn::avx::Span<Float>::N;
     static_assert(N == 8);
@@ -254,16 +251,25 @@ void accelerate_avx(Particles_t& ps, Args&... args) _PHARE_ALL_FN_
     auto const velz1 = vel(v2, pEz);
 
 
-    auto const rx = coef1 * pBx;
-    auto const ry = coef1 * pBy;
-    auto const rz = coef1 * pBz;
 
-    auto const rx2  = rx * rx;
-    auto const ry2  = ry * ry;
-    auto const rz2  = rz * rz;
-    auto const rxry = rx * ry;
-    auto const rxrz = rx * rz;
-    auto const ryrz = ry * rz;
+    auto const _mul_ = [](auto const& a, auto const& b) {
+        auto copy = a;
+        copy *= b;
+        return copy;
+    };
+
+    auto const _sq_ = [&](auto const& a) { return _mul_(a, a); };
+
+    auto const rx = _mul_(coef1, pBx);
+    auto const ry = _mul_(coef1, pBy);
+    auto const rz = _mul_(coef1, pBz);
+
+    auto const rx2  = _sq_(rx);
+    auto const ry2  = _sq_(ry);
+    auto const rz2  = _sq_(rz);
+    auto const rxry = _mul_(rx, ry);
+    auto const rxrz = _mul_(rx, rz);
+    auto const ryrz = _mul_(ry, rz);
 
     // auto const invDet = one / (one + rx2 + ry2 + rz2);
     auto const _invDet = [&]() {
@@ -352,30 +358,35 @@ auto avx_ad_acc_ad(Particles_t& ps, Args&... args) _PHARE_ALL_FN_
 {
     auto const& [em, interpolator, layout, halfDtOverDl, dto2m] = std::forward_as_tuple(args...);
 
+    using Vecfield_t               = std::decay_t<decltype(em)>::vecfield_type;
+    using Field_t                  = Vecfield_t::field_type;
+    using Electromag_vt            = basic::Electromag<basic::TensorField<Field_t>>;
     using Float                    = std::decay_t<decltype(halfDtOverDl)>::value_type;
     auto constexpr static simdSize = mkn::avx::Span<Float>::N;
 
     auto const& siz = ps.size();
 
+    auto const em_view = [&]() { // take as array of views
+        auto const emv = em.template as<Electromag_vt>([](auto const& cptr) { return *cptr; });
+        return std::array{emv.E[0], emv.E[1], emv.E[2], emv.B[0], emv.B[1], emv.B[2]};
+    }();
+
+    auto const nDelts = for_N<Field_t::dimension, for_N_R_mode::make_array>(
+        [&](auto i) { return mkn::avx::Array<Float, simdSize>{halfDtOverDl[i]}; });
+
     std::size_t i = 0;
     for (; i < siz; i += simdSize)
     {
-        advance_avx(ps, i, halfDtOverDl);
-        // for (std::size_t j = 0; j < simdSize; ++j)
-        //     advance_noavx(ps, i + j, halfDtOverDl);
-
-        accelerate_avx(ps, i, em, interpolator, layout, halfDtOverDl, dto2m);
-
-        advance_avx(ps, i, halfDtOverDl);
-        // for (std::size_t j = 0; j < simdSize; ++j)
-        //     advance_noavx(ps, i + j, halfDtOverDl);
+        advance_avx(ps, i, nDelts);
+        accelerate_avx(ps, i, em_view, interpolator, layout, dto2m);
+        advance_avx(ps, i, nDelts);
     }
 
     // do rest
     for (; i < siz; ++i)
     {
         advance_noavx(ps, i, halfDtOverDl);
-        accelerate_noavx(ps, i, em, interpolator, layout, halfDtOverDl, dto2m);
+        accelerate_noavx(ps, i, em, interpolator, layout, dto2m);
         advance_noavx(ps, i, halfDtOverDl);
     }
 }

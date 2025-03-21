@@ -107,7 +107,6 @@ protected:
     template<typename ComponentNames, typename GridLayout>
     auto static make_grids(ComponentNames const& compNames, GridLayout const& layout, tensor_t qty)
     {
-        PHARE_LOG_LINE_SS("make_grids " << compNames[0]);
         auto qts = HybridQuantity::componentsQuantities(qty);
         return for_N<N_elements, for_N_R_mode::make_array>(
             [&](auto i) { return Grid_t{compNames[i], qts[i], layout.allocSize(qts[i])}; });
