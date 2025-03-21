@@ -36,7 +36,7 @@ void PrintTo(ParticleArray<dim, internals> const& arr, std::ostream* os)
 }
 
 bool constexpr static WITH_PATCH_GHOST  = false;
-bool constexpr static USE_SERIALIZATION = 1;
+bool constexpr static USE_SERIALIZATION = 0;
 
 auto static const bytes   = get_env_as("PHARE_GPU_BYTES", std::uint64_t{500000000});
 auto static const cells   = get_env_as("PHARE_CELLS", std::uint32_t{12});
