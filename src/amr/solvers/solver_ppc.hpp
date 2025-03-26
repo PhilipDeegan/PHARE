@@ -1,10 +1,16 @@
 #ifndef PHARE_SOLVER_PPC_HPP
 #define PHARE_SOLVER_PPC_HPP
 
+#include "core/vector.hpp"
 #include "core/def/phare_mpi.hpp"
+#include "core/data/particles/particle_array_def.hpp"
 
-#include <SAMRAI/hier/Patch.h>
+#include "core/numerics/ion_updater/ion_updater.hpp"
+#include "core/numerics/ion_updater/ion_updater_multi_ts.hpp"
 
+#include "core/numerics/ohm/ohm.hpp"
+#include "core/numerics/ampere/ampere.hpp"
+#include "core/numerics/faraday/faraday.hpp"
 
 #include "amr/messengers/hybrid_messenger.hpp"
 #include "amr/messengers/hybrid_messenger_info.hpp"
@@ -13,21 +19,46 @@
 #include "amr/solvers/solver.hpp"
 #include "amr/solvers/solver_ppc_model_view.hpp"
 
-#include "core/numerics/ion_updater/ion_updater.hpp"
-#include "core/numerics/ampere/ampere.hpp"
-#include "core/numerics/faraday/faraday.hpp"
-#include "core/numerics/ohm/ohm.hpp"
-
 #include "core/data/vecfield/vecfield.hpp"
 #include "core/data/grid/gridlayout_utils.hpp"
 
 
-#include <iomanip>
-#include <sstream>
+
+#include <SAMRAI/hier/Patch.h>
 
 namespace PHARE::solver
 {
 // -----------------------------------------------------------------------------
+template<typename Ions, typename Electromag, typename GridLayout>
+struct ImplResolverFns
+{
+    using ParticleArray_t = Ions::particle_array_type;
+
+    auto static constexpr updater_impl()
+    {
+        using enum core::LayoutMode;
+        if constexpr (ParticleArray_t::layout_mode == AoSMapped)
+            return _as_nullptr_<core::IonUpdater<Ions, Electromag, GridLayout>*>();
+#if PHARE_HAVE_MKN_GPU
+        else if (ParticleArray_t::layout_mode == AoSTS)
+            return _as_nullptr_<core::mkn::IonUpdaterMultiTS<Ions, Electromag, GridLayout>*>();
+#endif // PHARE_HAVE_MKN_GPU
+    }
+
+    template<typename T>
+    auto static constexpr _as_nullptr_()
+    {
+        return T{nullptr};
+    }
+};
+
+template<typename Ions, typename Electromag, typename GridLayout>
+struct ImplResolver : ImplResolverFns<Ions, Electromag, GridLayout>
+{
+    using Super        = ImplResolverFns<Ions, Electromag, GridLayout>;
+    using IonUpdater_t = std::decay_t<decltype(*Super::updater_impl())>;
+};
+
 
 template<typename HybridModel, typename AMR_Types>
 class SolverPPC : public ISolver<AMR_Types>
@@ -58,8 +89,12 @@ private:
     Ampere_t ampere_;
     Ohm_t ohm_;
 
-    PHARE::core::IonUpdater<Ions, Electromag, GridLayout> ionUpdater_;
-
+    using ImplResolver_t = ImplResolver<Ions, Electromag, GridLayout>;
+    using IonUpdater_t   = ImplResolver_t::IonUpdater_t;
+    // using IonUpdater_t = std::conditional_t<ParticleArray::is_mapped,
+    //                                         core::IonUpdater<Ions, Electromag, GridLayout>,
+    //                                         core::IonUpdaterPP<Ions, Electromag, GridLayout>>;
+    IonUpdater_t ionUpdater_;
 
 public:
     using patch_t     = typename AMR_Types::patch_t;
@@ -126,12 +161,13 @@ private:
                   double const newTime);
 
 
+
     void moveIons_(level_t& level, ModelViews_t& views, Messenger& fromCoarser,
                    double const currentTime, double const newTime, core::UpdaterMode mode);
 
 
-    void saveState_(level_t& level, ModelViews_t& views);
-    void restoreState_(level_t& level, ModelViews_t& views);
+    void saveState_(ModelViews_t& views);
+    void restoreState_(ModelViews_t& views);
 
 
     struct TimeSetter
@@ -149,6 +185,10 @@ private:
 
 
     // extend lifespan
+    // GPU -> GPU alloc/copy is bugging inside std vector
+
+    // using PHARE_Types    = core::CPU_Types<dimension>;
+    // using LocalParticles = typename PHARE_Types::ParticleArray_t;
     std::unordered_map<std::string, ParticleArray> tmpDomain;
     std::unordered_map<std::string, ParticleArray> patchGhost;
 
@@ -157,16 +197,13 @@ private:
     {
         // vector copy drops the capacity (over allocation of the source)
         // we want to keep the overallocation somewhat - how much to be assessed
-        ParticleArray empty{ps.box()};
 
         if (!map.count(key))
-            map.emplace(key, empty);
+            map.emplace(key, ps);
         else
-            map.at(key) = empty;
+            map.at(key) = ps;
 
-        auto& v = map.at(key);
-        v.reserve(ps.capacity());
-        v.replace_from(ps);
+        // TODO FIX copy capacity - cant use ".reserve(size)" for tile sets
     }
 
 }; // end solverPPC
@@ -214,7 +251,7 @@ void SolverPPC<HybridModel, AMR_Types>::fillMessengerInfo(
 
 
 template<typename HybridModel, typename AMR_Types>
-void SolverPPC<HybridModel, AMR_Types>::saveState_(level_t& level, ModelViews_t& views)
+void SolverPPC<HybridModel, AMR_Types>::saveState_(ModelViews_t& views)
 {
     PHARE_LOG_SCOPE(1, "SolverPPC::saveState_");
 
@@ -232,7 +269,7 @@ void SolverPPC<HybridModel, AMR_Types>::saveState_(level_t& level, ModelViews_t&
 }
 
 template<typename HybridModel, typename AMR_Types>
-void SolverPPC<HybridModel, AMR_Types>::restoreState_(level_t& level, ModelViews_t& views)
+void SolverPPC<HybridModel, AMR_Types>::restoreState_(ModelViews_t& views)
 {
     PHARE_LOG_SCOPE(1, "SolverPPC::restoreState_");
 
@@ -243,8 +280,11 @@ void SolverPPC<HybridModel, AMR_Types>::restoreState_(level_t& level, ModelViews
 
         for (auto& pop : state.ions)
         {
-            pop.domainParticles()     = std::move(tmpDomain.at(ss.str() + "_" + pop.name()));
-            pop.patchGhostParticles() = std::move(patchGhost.at(ss.str() + "_" + pop.name()));
+            auto key = ss.str() + "_" + pop.name();
+            tmpDomain.at(key).check();
+            pop.domainParticles() = std::move(tmpDomain.at(key));
+            pop.domainParticles().check();
+            pop.patchGhostParticles() = std::move(patchGhost.at(key));
         }
     }
 }
@@ -266,7 +306,7 @@ void SolverPPC<HybridModel, AMR_Types>::advanceLevel(hierarchy_t const& hierarch
 
     average_(*level, modelView, fromCoarser, newTime);
 
-    saveState_(*level, modelView);
+    saveState_(modelView);
 
     moveIons_(*level, modelView, fromCoarser, currentTime, newTime, core::UpdaterMode::domain_only);
 
@@ -275,7 +315,7 @@ void SolverPPC<HybridModel, AMR_Types>::advanceLevel(hierarchy_t const& hierarch
 
     average_(*level, modelView, fromCoarser, newTime);
 
-    restoreState_(*level, modelView);
+    restoreState_(modelView);
 
     moveIons_(*level, modelView, fromCoarser, currentTime, newTime, core::UpdaterMode::all);
 
@@ -450,16 +490,21 @@ void SolverPPC<HybridModel, AMR_Types>::moveIons_(level_t& level, ModelViews_t& 
                                                   Messenger& fromCoarser, double const currentTime,
                                                   double const newTime, core::UpdaterMode mode)
 {
+    using ParticleArray_t = Ions::particle_array_type;
+
     PHARE_LOG_SCOPE(1, "SolverPPC::moveIons_");
     PHARE_DEBUG_DO(_debug_log_move_ions(views);)
 
     TimeSetter setTime{views, newTime};
+    auto const dt = newTime - currentTime;
 
-    {
-        auto dt = newTime - currentTime;
+    using enum core::LayoutMode;
+
+    if constexpr (ParticleArray_t::layout_mode == AoSMapped)
         for (auto& state : views)
             ionUpdater_.updatePopulations(state.ions, state.electromagAvg, state.layout, dt, mode);
-    }
+    else
+        ionUpdater_.updatePopulations(views, dt, mode);
 
     // this needs to be done before calling the messenger
     setTime([](auto& state) -> auto& { return state.ions; });
@@ -468,7 +513,8 @@ void SolverPPC<HybridModel, AMR_Types>::moveIons_(level_t& level, ModelViews_t& 
     fromCoarser.fillIonPopMomentGhosts(views.model().state.ions, level, newTime);
 
     for (auto& state : views)
-        ionUpdater_.updateIons(state.ions);
+        IonUpdater_t::updateIons(state.ions);
+
     // no need to update time, since it has been done before
 
     // now Ni and Vi are calculated we can fill pure ghost nodes

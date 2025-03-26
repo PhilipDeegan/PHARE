@@ -6,7 +6,6 @@
 #include <array>
 #include <type_traits>
 #include <unordered_map>
-#include <vector>
 #include <algorithm>
 #include <numeric>
 #include <optional>
@@ -31,7 +30,7 @@ private:
 
 
 public:
-    CellMap(Box<cell_index_t, dim> box)
+    CellMap(Box<cell_index_t, dim> const& box)
         : box_{box}
         , cellIndexes_{box.shape().template toArray<std::uint32_t>()}
     {
@@ -78,8 +77,9 @@ public:
     template<typename CellIndex>
     void addToCell(CellIndex const& cell, std::size_t itemIndex);
 
-    static auto constexpr default_extractor = [](auto const& item) -> auto& { return item.iCell; };
-    using DefaultExtractor                  = decltype(default_extractor);
+    static auto constexpr default_extractor
+        = [](auto const& item) -> auto& { return item.iCell(); };
+    using DefaultExtractor = decltype(default_extractor);
 
 
     // same as above but cell is found with the CellExtractor
@@ -208,15 +208,12 @@ private:
     template<typename Cell>
     auto local_(Cell const& cell) const
     {
-        auto loc{cell};
-        for (std::size_t i = 0; i < loc.size(); ++i)
-        {
-            loc[i] -= box_.lower[i];
-        }
-        return loc;
+        return Point{cell} - box_.lower;
     }
     Box<cell_index_t, dim> box_;
-    NdArrayVector<dim, Indexer> cellIndexes_;
+
+    bool constexpr static c_order = true;
+    NdArrayVector<dim, Indexer, c_order, default_allocator_mode()> cellIndexes_;
 };
 
 
