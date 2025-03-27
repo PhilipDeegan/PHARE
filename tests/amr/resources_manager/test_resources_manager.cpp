@@ -13,13 +13,13 @@
 #include <core/hybrid/hybrid_quantities.hpp>
 #include <core/utilities/types.hpp>
 
+
 #include <SAMRAI/tbox/SAMRAIManager.h>
 #include <SAMRAI/tbox/SAMRAI_MPI.h>
 
 #include "gtest/gtest.h"
 
 #include <string>
-#include <vector>
 
 
 #include "tests/initializer/init_functions.hpp"
@@ -302,6 +302,7 @@ struct ResourceUser
 
     auto get() { return get_as_tuple_or_throw<FieldResource, FieldResource>(resources); }
 
+
     std::vector<Resources> resources;
 };
 
@@ -347,6 +348,7 @@ TEST(usingResources, test_variants_resource_helpers)
     EXPECT_EQ(B.name(), "EM_B");
 }
 
+
 TEST(usingResourcesManager, test_variants)
 {
     ResourceUser resourceUser;
@@ -367,9 +369,15 @@ TEST(usingResourcesManager, test_variants)
     for (int iLevel = 0; iLevel < hierarchy->getNumberOfLevels(); ++iLevel)
         for (auto const& patch : *hierarchy->getPatchLevel(iLevel))
         {
+<<<<<<< HEAD
             auto dataOnPatch = resourcesManager.setOnPatch(*patch, resourceUser);
             auto&& [r0, r1]  = resourceUser.get();
             r1.rho.data()[4] = 5;
+=======
+            auto dataOnPatch            = resourcesManager.setOnPatch(*patch, resourceUser);
+            auto resources              = resourceUser.get();
+            resources[1]->rho.data()[4] = 5;
+>>>>>>> 66c26c49 (initial variant support for resource manager)
             ++patches;
         }
 
@@ -378,8 +386,13 @@ TEST(usingResourcesManager, test_variants)
         for (auto const& patch : *hierarchy->getPatchLevel(iLevel))
         {
             auto dataOnPatch = resourcesManager.setOnPatch(*patch, resourceUser);
+<<<<<<< HEAD
             auto&& [r0, r1]  = resourceUser.get();
             EXPECT_EQ(r1.rho.data()[4], 5);
+=======
+            auto resources   = resourceUser.get();
+            EXPECT_EQ(resources[1]->rho.data()[4], 5);
+>>>>>>> 66c26c49 (initial variant support for resource manager)
             ++checks;
         }
 
