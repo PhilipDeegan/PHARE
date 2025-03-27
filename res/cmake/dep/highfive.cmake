@@ -16,7 +16,6 @@ if(HighFive)
   set(HIGHFIVE_USE_BOOST OFF)
   set(HIGHFIVE_BUILD_DOCS OFF) # conflicts with phare doc target
   set(HIGHFIVE_EXAMPLES OFF)
-  add_subdirectory(${HIGHFIVE_SRC})
 
   message("HighFive enabled - checking HDF5")
 
@@ -36,6 +35,7 @@ if(HighFive)
   else()
       message(WARNING "HDF5 NOT PARALLEL")
   endif()
+  add_subdirectory(${HIGHFIVE_SRC})
 
   message(STATUS "HDF5_LIBRARIES " ${HDF5_LIBRARIES})
   message(STATUS "HDF5_INCLUDE_DIRS " ${HDF5_INCLUDE_DIRS})
