@@ -1,19 +1,19 @@
 #ifndef PHARE_ELECTRONS_HPP
 #define PHARE_ELECTRONS_HPP
 
-#include "core/hybrid/hybrid_quantities.hpp"
-#include "core/data/vecfield/vecfield_component.hpp"
-#include "core/data/grid/gridlayout_utils.hpp"
-// #include "core/data/grid/gridlayoutdefs.hpp"
-// #include "core/utilities/index/index.hpp"
 #include "core/def.hpp"
-// #include "core/logger.hpp"
-
-#include "initializer/data_provider.hpp"
-#include <memory>
-
+#include "core/utilities/variants.hpp"
+#include "core/hybrid/hybrid_quantities.hpp"
+#include "core/data/grid/gridlayout_utils.hpp"
+#include "core/data/vecfield/vecfield_component.hpp"
 #include "core/data/field/initializers/field_user_initializer.hpp"
 
+#include "initializer/data_provider.hpp"
+
+
+
+#include <memory>
+#include <variant>
 
 namespace PHARE::core
 {
@@ -62,41 +62,29 @@ public:
 
     NO_DISCARD Field const& density() const
     {
-        if (isUsable())
-        {
-            return ions_.density();
-        }
-        else
-        {
+        if (!isUsable())
             throw std::runtime_error("Error, cannot return density because "
                                      "StandardHybridElectronFluxComputer is not usable");
-        }
+
+        return ions_.density();
     }
 
     NO_DISCARD Field& density()
     {
-        if (isUsable())
-        {
-            return ions_.density();
-        }
-        else
-        {
+        if (!isUsable())
             throw std::runtime_error("Error, cannot return density because "
                                      "StandardHybridElectronFluxComputer is not usable");
-        }
+
+        return ions_.density();
     }
 
     NO_DISCARD VecField& velocity()
     {
-        if (isUsable())
-        {
-            return Ve_;
-        }
-        else
-        {
+        if (!isUsable())
             throw std::runtime_error("Error, cannot return velocity because "
                                      "StandardHybridElectronFluxComputer is not usable");
-        }
+
+        return Ve_;
     }
 
     void computeDensity() {}
@@ -147,22 +135,23 @@ class ElectronPressureClosure
     using Field      = typename FluxComputer::Field;
 
 public:
-    ElectronPressureClosure(PHARE::initializer::PHAREDict const& dict, FluxComputer const& flux, VecField const& B)
+    ElectronPressureClosure(PHARE::initializer::PHAREDict const& dict, FluxComputer const& flux)
         : flux_{flux}
-        , B_{B}
         , Pe_{"Pe", HybridQuantity::Scalar::P}
     {
     }
+
+    virtual ~ElectronPressureClosure() {}
 
     //-------------------------------------------------------------------------
     //                  start the ResourcesUser interface
     //-------------------------------------------------------------------------
 
-    NO_DISCARD virtual bool isUsable() const { return Pe_.isUsable() and B_.isUsable() and flux_.isUsable(); }
+    NO_DISCARD virtual bool isUsable() const { return core::isUsable(Pe_, flux_); }
 
-    NO_DISCARD virtual bool isSettable() const { return Pe_.isSettable() and B_.isUsable() and flux_.isUsable(); }  // TODO flux was not usable before
+    NO_DISCARD virtual bool isSettable() const { return core::isSettable(Pe_, flux_); }
 
-    struct PressureProperty
+    struct PressureProperty // needed?
     {
         std::string name;
         typename HybridQuantity::Scalar qty;
@@ -170,12 +159,13 @@ public:
 
     using PressureProperties = std::vector<PressureProperty>;
 
+
     NO_DISCARD auto getCompileTimeResourcesViewList() const
     {
-        return std::forward_as_tuple(flux_, B_, Pe_);
+        return std::forward_as_tuple(flux_, Pe_);
     }
 
-    NO_DISCARD auto getCompileTimeResourcesViewList() { return std::forward_as_tuple(flux_, B_, Pe_); }
+    NO_DISCARD auto getCompileTimeResourcesViewList() { return std::forward_as_tuple(flux_, Pe_); }
 
     //-------------------------------------------------------------------------
     //                  ends the ResourcesUser interface
@@ -200,10 +190,20 @@ public:
 
     void virtual computePressure(GridLayout const& /*layout*/) = 0;
 
+
+    NO_DISCARD auto& getRunTimeResourcesViewList() { return resources; }
+    NO_DISCARD auto& getRunTimeResourcesViewList() const { return resources; }
+
+    NO_DISCARD auto& B() const { return get_as_ref_or_throw<VecField const>(resources); }
+    NO_DISCARD auto& B() { return get_as_ref_or_throw<VecField>(resources); }
+
+
 protected:
     FluxComputer flux_;
-    VecField B_;
     Field Pe_;
+
+    using Resources = std::variant<VecField>;
+    std::vector<Resources> resources;
 };
 
 
@@ -224,8 +224,8 @@ public:
     using field_type = Field;
 
     IsothermalElectronPressureClosure(PHARE::initializer::PHAREDict const& dict,
-                                      FluxComputer const& flux, VecField const& B)
-        : Super{dict, flux, B}
+                                      FluxComputer const& flux)
+        : Super{dict, flux}
         , Te_{dict["pressure_closure"]["Te"].template to<double>()}
     {
     }
@@ -269,8 +269,8 @@ public:
     using field_type = Field;
 
     PolytropicElectronPressureClosure(PHARE::initializer::PHAREDict const& dict,
-                                      FluxComputer const& flux, VecField const& B)
-        : Super{dict, flux, B}
+                                      FluxComputer const& flux)
+        : Super{dict, flux}
         , gamma_{dict["pressure_closure"]["Gamma"].template to<double>()}
         , Pe_init_{dict["pressure_closure"]["Pe"].template to<initializer::InitFunction<dim>>()}
     {
@@ -294,7 +294,7 @@ public:
     }
 
 private:
-    double const gamma_ = 5./3.;
+    double const gamma_ = 5. / 3.;
     initializer::InitFunction<dim> Pe_init_;
 };
 
@@ -311,6 +311,7 @@ class CGLElectronPressureClosure : public ElectronPressureClosure<FluxComputer>
     using Super::getCompileTimeResourcesViewList;
     using Super::isSettable;
     using Super::isUsable;
+    using Super::resources;
 
     static constexpr std::size_t dim = VecField::dimension;
 
@@ -318,12 +319,13 @@ class CGLElectronPressureClosure : public ElectronPressureClosure<FluxComputer>
 public:
     using field_type = Field;
 
-    CGLElectronPressureClosure(PHARE::initializer::PHAREDict const& dict,
-                                      FluxComputer const& flux, VecField const& B)
-        : Super{dict, flux, B}
+    CGLElectronPressureClosure(PHARE::initializer::PHAREDict const& dict, FluxComputer const& flux,
+                               VecField const& B)
+        : Super{dict, flux}
         , gamma_{dict["pressure_closure"]["Gamma"].template to<double>()}
         , Pe_init_{dict["pressure_closure"]["Pe"].template to<initializer::InitFunction<dim>>()}
     {
+        resources.emplace_back(B);
     }
 
     void initialize(GridLayout const& layout) override
@@ -344,7 +346,7 @@ public:
     }
 
 private:
-    double const gamma_ = 5./3.;
+    double const gamma_ = 5. / 3.;
     initializer::InitFunction<dim> Pe_init_;
 };
 
@@ -352,15 +354,16 @@ private:
 
 template<typename FluxComputer>
 std::unique_ptr<ElectronPressureClosure<FluxComputer>>
-ElectronPressureClosureFactory(PHARE::initializer::PHAREDict const& dict, FluxComputer& flux, typename FluxComputer::VecField const& B)
+ElectronPressureClosureFactory(PHARE::initializer::PHAREDict const& dict, FluxComputer& flux,
+                               typename FluxComputer::VecField const& B)
 {
     if (dict["pressure_closure"]["name"].template to<std::string>() == "isothermal")
     {
-        return std::make_unique<IsothermalElectronPressureClosure<FluxComputer>>(dict, flux, B);
+        return std::make_unique<IsothermalElectronPressureClosure<FluxComputer>>(dict, flux);
     }
     else if (dict["pressure_closure"]["name"].template to<std::string>() == "polytropic")
     {
-        return std::make_unique<PolytropicElectronPressureClosure<FluxComputer>>(dict, flux, B);
+        return std::make_unique<PolytropicElectronPressureClosure<FluxComputer>>(dict, flux);
     }
     else if (dict["pressure_closure"]["name"].template to<std::string>() == "CGL")
     {
@@ -379,12 +382,14 @@ class ElectronMomentModel
     using Field      = typename FluxComputer::Field;
 
 public:
-    ElectronMomentModel(PHARE::initializer::PHAREDict const& dict, FluxComputer& flux, VecField const& B)
+    ElectronMomentModel(PHARE::initializer::PHAREDict const& dict, FluxComputer& flux,
+                        VecField const& B)
         : dict_{dict}
         , fluxComput_{flux}
         , B_{B}
         , pressureClosure_{ElectronPressureClosureFactory<FluxComputer>(dict, flux, B)}
     {
+        assert(pressureClosure_);
     }
 
     ElectronMomentModel(ElectronMomentModel const& self)
@@ -403,22 +408,26 @@ public:
     NO_DISCARD bool isUsable() const
     {
         // return fluxComput_.isUsable() and pressureClosure_->isUsable();
-        return fluxComput_.isUsable() and B_.isUsable() and pressureClosure_->isUsable();
+        return fluxComput_.isUsable() /*and B_.isUsable()*/ and pressureClosure_->isUsable();
     }
 
-    // NO_DISCARD bool isSettable() const { return fluxComput_.isSettable(); }  // TODO pressureClosure needs also to be settable ?
-    NO_DISCARD bool isSettable() const { return fluxComput_.isSettable() and B_.isSettable() and pressureClosure_->isSettable(); }
+    // NO_DISCARD bool isSettable() const { return fluxComput_.isSettable(); }  // TODO
+    // pressureClosure needs also to be settable ?
+    NO_DISCARD bool isSettable() const
+    {
+        return fluxComput_.isSettable() /*and B_.isSettable()*/ and pressureClosure_->isSettable();
+    }
 
     NO_DISCARD auto getCompileTimeResourcesViewList() const
     {
         // return std::forward_as_tuple(fluxComput_, *pressureClosure_);
-        return std::forward_as_tuple(fluxComput_, B_, *pressureClosure_);
+        return std::forward_as_tuple(fluxComput_, *pressureClosure_);
     }
 
     NO_DISCARD auto getCompileTimeResourcesViewList()
     {
         // return std::forward_as_tuple(fluxComput_, *pressureClosure_);
-        return std::forward_as_tuple(fluxComput_, B_, *pressureClosure_);
+        return std::forward_as_tuple(fluxComput_, *pressureClosure_);
     }
 
     //-------------------------------------------------------------------------
@@ -442,7 +451,7 @@ public:
 private:
     initializer::PHAREDict dict_;
     FluxComputer fluxComput_;
-    VecField B_;
+    VecField B_; // NOT USED HERE!
     std::unique_ptr<ElectronPressureClosure<FluxComputer>> pressureClosure_;
 };
 

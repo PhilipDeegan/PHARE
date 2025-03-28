@@ -23,7 +23,7 @@
 
 using namespace PHARE::core;
 
-const double Te = 0.12;
+double const Te = 0.12;
 
 
 
@@ -89,8 +89,10 @@ PHARE::initializer::PHAREDict createDict()
     dict["electromag"]["magnetic"]["initializer"]["y_component"] = static_cast<InitFunctionT>(by);
     dict["electromag"]["magnetic"]["initializer"]["z_component"] = static_cast<InitFunctionT>(bz);
 
-    dict["electrons"]["pressure_closure"]["name"] = std::string{"isothermal"};
-    dict["electrons"]["pressure_closure"]["Te"]   = Te;
+    dict["electrons"]["pressure_closure"]["name"]  = std::string{"isothermal"};
+    dict["electrons"]["pressure_closure"]["Te"]    = Te;
+    dict["electrons"]["pressure_closure"]["Gamma"] = 1.;
+    dict["electrons"]["pressure_closure"]["Pe"]    = static_cast<InitFunctionT>(ex); // todo?
 
     return dict;
 }
@@ -122,9 +124,9 @@ public:
 };
 
 
-
 template<typename TypeInfo /*= std::pair<DimConst<1>, InterpConst<1>>*/>
-struct ElectronsTest : public ::testing::Test
+struct ElectronsFixture
+
 {
     static constexpr auto dim         = typename TypeInfo::first_type{}();
     static constexpr auto interp      = typename TypeInfo::second_type{}();
@@ -148,10 +150,8 @@ struct ElectronsTest : public ::testing::Test
 
     Electromag<VecFieldND> electromag;
 
-    UsableVecField<dim> J, F, Ve, Vi;
+    UsableVecField<dim> B, J, F, Ve, Vi;
     UsableTensorField<dim> M, protons_M;
-
-    UsableVecField<dim> B;
 
     GridND Nibuffer, NiProtons, Pe;
 
@@ -165,11 +165,11 @@ struct ElectronsTest : public ::testing::Test
     Electrons<StandardHybridElectronFluxComputerT> electrons;
 
     template<typename... Args>
-    auto static _ions(Args&... args)
+    auto static _ions(auto const& dict, Args&... args)
     {
         auto const& [Fi, Nibuffer, NiProtons, Vi, M, protons_M, pack]
             = std::forward_as_tuple(args...);
-        IonsT ions{createDict<dim>()["ions"]};
+        IonsT ions{dict["ions"]};
         {
             auto const& [V, m, d, md] = ions.getCompileTimeResourcesViewList();
             d.setBuffer(&Nibuffer);
@@ -188,8 +188,8 @@ struct ElectronsTest : public ::testing::Test
     }
 
 
-    ElectronsTest()
-        : electromag{createDict<dim>()["electromag"]}
+    ElectronsFixture(PHARE::initializer::PHAREDict const& dict = createDict<dim>())
+        : electromag{dict["electromag"]}
         , B{"B", layout, HybridQuantity::Vector::B}
         , J{"J", layout, HybridQuantity::Vector::J}
         , F{"protons_flux", layout, HybridQuantity::Vector::V}
@@ -202,22 +202,32 @@ struct ElectronsTest : public ::testing::Test
         , NiProtons{"protons_rho", HybridQuantity::Scalar::rho,
                     layout.allocSize(HybridQuantity::Scalar::rho)}
         , Pe{"Pe", HybridQuantity::Scalar::P, layout.allocSize(HybridQuantity::Scalar::P)}
-        , ions{_ions(F, Nibuffer, NiProtons, Vi, M, protons_M, pack)}
+        , ions{_ions(dict, F, Nibuffer, NiProtons, Vi, M, protons_M, pack)}
         , fluxCompute{ions, J}
-        , electrons{createDict<dim>()["electrons"], fluxCompute, B}
+        , electrons{dict["electrons"], fluxCompute, B}
     {
-        /* TODO explain why... we have 2 flux computer : 1 is the flux computer and the same is a copy in the pressure closure */
+        /* TODO explain why... we have 2 flux computer : 1 is the flux computer and the same is a
+         * copy in the pressure closure */
         auto&& emm = std::get<0>(electrons.getCompileTimeResourcesViewList());
         auto&& fc  = std::get<0>(emm.getCompileTimeResourcesViewList());
-        auto&& pc  = std::get<2>(emm.getCompileTimeResourcesViewList());
+        auto&& pc  = std::get<1>(emm.getCompileTimeResourcesViewList());
         auto&& fc_ = std::get<0>(pc.getCompileTimeResourcesViewList());
 
         Ve.set_on(std::get<0>(fc.getCompileTimeResourcesViewList()));
-        B.set_on(std::get<1>(emm.getCompileTimeResourcesViewList()));
+        // B.set_on(std::get<1>(emm.getCompileTimeResourcesViewList()));
         Ve.set_on(std::get<0>(fc_.getCompileTimeResourcesViewList()));
-        B.set_on(std::get<1>(pc.getCompileTimeResourcesViewList()));
 
-        auto const& [_, b, P] = pc.getCompileTimeResourcesViewList();
+        auto const& closure_name
+            = dict["electrons"]["pressure_closure"]["name"].template to<std::string>();
+        if (closure_name == "CGL")
+        {
+            auto& variants = pc.getRunTimeResourcesViewList();
+            EXPECT_EQ(variants.size(), 1);
+            for (auto& var : variants)
+                std::visit([&](VecFieldND& vf) { B.set_on(vf); }, var);
+        }
+
+        auto const& [_, P] = pc.getCompileTimeResourcesViewList();
         P.setBuffer(&Pe);
 
         auto const& [Jx, Jy, Jz]    = J();
@@ -326,6 +336,12 @@ struct ElectronsTest : public ::testing::Test
             });
         }
     }
+};
+
+
+template<typename TypeInfo /*= std::pair<DimConst<1>, InterpConst<1>>*/>
+struct ElectronsTest : public ElectronsFixture<TypeInfo>, public ::testing::Test
+{
 };
 
 
@@ -559,6 +575,46 @@ TYPED_TEST(ElectronsTest, ThatElectronsPressureEqualsNeTe)
 }
 
 
+TEST(ElectronsFactoryTest, ThatThingsAreAsExpectedForCGL)
+{
+    auto dict = createDict<1>();
+
+    dict["electrons"]["pressure_closure"]["name"] = std::string{"CGL"};
+
+    ElectronsFixture<std::pair<DimConst<1>, InterpConst<1>>> fixture{dict};
+
+    auto&& emm = std::get<0>(fixture.electrons.getCompileTimeResourcesViewList());
+    auto&& pc  = std::get<1>(emm.getCompileTimeResourcesViewList());
+
+    auto& B = pc.B();
+}
+
+TEST(ElectronsFactoryTest, ThatConstThingsAreAsExpectedForCGL)
+{
+    auto dict = createDict<1>();
+
+    dict["electrons"]["pressure_closure"]["name"] = std::string{"CGL"};
+
+    ElectronsFixture<std::pair<DimConst<1>, InterpConst<1>>> fixture{dict};
+
+    auto&& emm     = std::get<0>(fixture.electrons.getCompileTimeResourcesViewList());
+    auto const& pc = std::get<1>(emm.getCompileTimeResourcesViewList());
+
+    auto& B = pc.B();
+}
+
+
+TEST(ElectronsFactoryTest, ThatThereIsNoB)
+{
+    auto const dict = createDict<1>();
+
+    ElectronsFixture<std::pair<DimConst<1>, InterpConst<1>>> fixture{dict};
+
+    auto&& emm     = std::get<0>(fixture.electrons.getCompileTimeResourcesViewList());
+    auto const& pc = std::get<1>(emm.getCompileTimeResourcesViewList());
+
+    EXPECT_ANY_THROW(auto& B = pc.B(););
+}
 
 
 int main(int argc, char** argv)

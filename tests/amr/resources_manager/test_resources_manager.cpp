@@ -8,20 +8,19 @@
 #include "core/models/hybrid_state.hpp"
 #include "core/data/vecfield/vecfield.hpp"
 #include "core/data/tensorfield/tensorfield.hpp"
-
+#include "core/utilities/variants.hpp"
 
 #include <core/hybrid/hybrid_quantities.hpp>
 #include <core/utilities/types.hpp>
-#include <string>
-#include <utility>
-#include <vector>
 
 #include <SAMRAI/tbox/SAMRAIManager.h>
 #include <SAMRAI/tbox/SAMRAI_MPI.h>
 
-
 #include "gtest/gtest.h"
 
+#include <string>
+#include <utility>
+#include <vector>
 
 
 #include "tests/initializer/init_functions.hpp"
@@ -255,35 +254,50 @@ INSTANTIATE_TYPED_TEST_SUITE_P(testResourcesManager, aResourceUserCollection, My
 
 
 
-struct Resource
+struct FieldResource
 {
-    using field_type = Field<1, HybridQuantity::Scalar>;
-
     NO_DISCARD auto getCompileTimeResourcesViewList() { return std::forward_as_tuple(rho); }
 
     std::array<std::uint32_t, 1> cells{5};
-    field_type rho{"name", HybridQuantity::Scalar::rho, nullptr, cells};
+    Field1D rho{"name", HybridQuantity::Scalar::rho, nullptr, cells};
 };
+struct VecFieldResource
+{
+    NO_DISCARD auto getCompileTimeResourcesViewList() { return std::forward_as_tuple(B); }
 
+    VecField1D B{"B", HybridQuantity::Vector::B};
+};
 
 struct ResourceUser
 {
-    using Resources = std::variant<Resource>;
+    using Resources = std::variant<FieldResource>;
 
-    ResourceUser() { resources.resize(2, Resource{}); }
+    ResourceUser() { resources.resize(2, FieldResource{}); }
 
     NO_DISCARD std::vector<Resources>& getRunTimeResourcesViewList() { return resources; }
 
-    auto get()
-    {
-        return for_N<2, for_N_R_mode::make_array>(
-            [&](auto i) { return std::visit([&](Resource& val) { return &val; }, resources[i]); });
-    }
+    auto get() { return get_as_tuple_or_throw<FieldResource, FieldResource>(resources); }
 
     std::vector<Resources> resources;
 };
 
 
+TEST(usingResources, test_variants_helpers)
+{
+    using Resources = std::variant<FieldResource, VecFieldResource>;
+
+    std::vector<Resources> resources{FieldResource{}, VecFieldResource{}};
+
+    {
+        auto const&& [rho, B] = get_as_tuple_or_throw<FieldResource, VecFieldResource>(resources);
+    }
+    {
+        auto& rho = get_as_ref_or_throw<FieldResource>(resources);
+    }
+    {
+        auto& B = get_as_ref_or_throw<VecFieldResource>(resources);
+    }
+}
 
 TEST(usingResourcesManager, test_variants)
 {
@@ -305,9 +319,9 @@ TEST(usingResourcesManager, test_variants)
     for (int iLevel = 0; iLevel < hierarchy->getNumberOfLevels(); ++iLevel)
         for (auto const& patch : *hierarchy->getPatchLevel(iLevel))
         {
-            auto dataOnPatch            = resourcesManager.setOnPatch(*patch, resourceUser);
-            auto resources              = resourceUser.get();
-            resources[1]->rho.data()[4] = 5;
+            auto dataOnPatch = resourcesManager.setOnPatch(*patch, resourceUser);
+            auto&& [r0, r1]  = resourceUser.get();
+            r1.rho.data()[4] = 5;
             ++patches;
         }
 
@@ -316,8 +330,8 @@ TEST(usingResourcesManager, test_variants)
         for (auto const& patch : *hierarchy->getPatchLevel(iLevel))
         {
             auto dataOnPatch = resourcesManager.setOnPatch(*patch, resourceUser);
-            auto resources   = resourceUser.get();
-            EXPECT_EQ(resources[1]->rho.data()[4], 5);
+            auto&& [r0, r1]  = resourceUser.get();
+            EXPECT_EQ(r1.rho.data()[4], 5);
             ++checks;
         }
 
