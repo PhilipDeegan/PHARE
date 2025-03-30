@@ -172,17 +172,13 @@ void IonUpdater<Ions, Electromag, GridLayout>::updateAndDepositDomain_(Ions& ion
         // push those in the ghostArea (i.e. stop pushing if they're not out of it)
         // deposit moments on those which leave to go inDomainBox
 
-        auto pushAndAccumulateGhosts = [&](auto& inputArray, bool copyInDomain = false) {
-            auto& outputArray = tmp_particles_.replace_from(inputArray);
+        auto pushAndAccumulateGhosts = [&](auto& outputArray, bool copyInDomain = false) {
+            auto range = makeIndexRange(outputArray);
 
-            inRange  = makeIndexRange(inputArray);
-            outRange = makeIndexRange(outputArray);
-
-            auto enteredInDomain = pusher_->move(inRange, outRange, em, pop.mass(), interpolator_,
+            auto enteredInDomain = pusher_->move(range, range, em, pop.mass(), interpolator_,
                                                  layout, inGhostBox, inDomainBox);
 
             interpolator_(enteredInDomain, pop.density(), pop.flux(), layout);
-
             if (copyInDomain)
             {
                 domain.reserve(domain.size() + enteredInDomain.size());
@@ -200,7 +196,7 @@ void IonUpdater<Ions, Electromag, GridLayout>::updateAndDepositDomain_(Ions& ion
         // since they contribute to nodes that are not shared with neighbor patches an since
         // level border nodes will receive contributions from levelghost old and new particles
         pushAndAccumulateGhosts(pop.patchGhostParticles(), true);
-        pushAndAccumulateGhosts(pop.levelGhostParticles());
+        pushAndAccumulateGhosts(tmp_particles_.replace_from(pop.levelGhostParticles()));
     }
 }
 
