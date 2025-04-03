@@ -192,7 +192,7 @@ void IonUpdaterMultiTS<Ions, Electromag, GridLayout>::updateAndDepositAll_(Model
 
     if constexpr (any_in(Particles::alloc_mode, AllocatorMode::GPU_UNIFIED))
     {
-        in.streamer.host([&](auto const i) {
+        in.streamer.host([&](auto const i) mutable {
             PHARE_LOG_LINE_SS("");
             auto& view     = in.views[i];
             using Launcher = gpu::ChunkLauncher<false>;
@@ -215,7 +215,7 @@ void IonUpdaterMultiTS<Ions, Electromag, GridLayout>::updateAndDepositAll_(Model
     }
     else // if CPU
     {
-        in.streamer.host([&](auto const i) {
+        in.streamer.host([&](auto const i) mutable {
             PHARE_LOG_LINE_SS("");
             auto& view = in.views[i];
 

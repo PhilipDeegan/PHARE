@@ -442,12 +442,11 @@ public: /** Performs the 1D interpolation
     template<typename... Args>
     auto operator()(Args&&... args) _PHARE_ALL_FN_
     {
-        auto const& [field, particle, func, startIndex, weights, coef]
-            = std::forward_as_tuple(args...);
-        auto const& [xStartIndex] = startIndex;
-        auto const& [xWeights]    = weights;
-        auto const& order_size    = xWeights.size();
-        auto const deposit        = func(particle) * particle.weight() * coef;
+        auto&& [field, particle, func, startIndex, weights, coef] = std::forward_as_tuple(args...);
+        auto const& [xStartIndex]                                 = startIndex;
+        auto const& [xWeights]                                    = weights;
+        auto const& order_size                                    = xWeights.size();
+        auto const deposit = func(particle) * particle.weight() * coef;
         for (auto ik = 0u; ik < order_size; ++ik)
             Op{field(xStartIndex + ik)} += deposit * xWeights[ik];
     }
@@ -474,12 +473,11 @@ public: /** Performs the 2D interpolation
     template<typename... Args>
     auto operator()(Args&&... args) _PHARE_ALL_FN_
     {
-        auto const& [field, particle, func, startIndex, weights, coef]
-            = std::forward_as_tuple(args...);
-        auto const& [xStartIndex, yStartIndex] = startIndex;
-        auto const& [xWeights, yWeights]       = weights;
-        auto const& order_size                 = xWeights.size();
-        auto const deposit                     = func(particle) * particle.weight() * coef;
+        auto&& [field, particle, func, startIndex, weights, coef] = std::forward_as_tuple(args...);
+        auto const& [xStartIndex, yStartIndex]                    = startIndex;
+        auto const& [xWeights, yWeights]                          = weights;
+        auto const& order_size                                    = xWeights.size();
+        auto const deposit = func(particle) * particle.weight() * coef;
         for (auto ix = 0u; ix < order_size; ++ix)
         {
             for (auto iy = 0u; iy < order_size; ++iy)
@@ -510,11 +508,10 @@ public: /** Performs the 3D interpolation
     template<typename... Args>
     auto operator()(Args&&... args) _PHARE_ALL_FN_
     {
-        auto const& [field, particle, func, startIndex, weights, coef]
-            = std::forward_as_tuple(args...);
-        auto const& [xStartIndex, yStartIndex, zStartIndex] = startIndex;
-        auto const& [xWeights, yWeights, zWeights]          = weights;
-        auto const& order_size                              = xWeights.size();
+        auto&& [field, particle, func, startIndex, weights, coef] = std::forward_as_tuple(args...);
+        auto const& [xStartIndex, yStartIndex, zStartIndex]       = startIndex;
+        auto const& [xWeights, yWeights, zWeights]                = weights;
+        auto const& order_size                                    = xWeights.size();
 
         auto const deposit = func(particle) * particle.weight() * coef;
 
@@ -800,6 +797,9 @@ public:
                         GridLayout const& layout, Box<int, dim> const amrBox,
                         double coef = 1.) _PHARE_ALL_FN_
     {
+        static_assert(not std::is_const_v<Field>);    // bad!
+        static_assert(not std::is_const_v<VecField>); // bad!
+
         auto& startIndex_           = primal_startIndex_;
         auto& weights_              = primal_weights_;
         auto& [xFlux, yFlux, zFlux] = flux();

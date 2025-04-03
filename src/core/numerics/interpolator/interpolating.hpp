@@ -1,10 +1,9 @@
 #ifndef PHARE_CORE_NUMERICS_INTERPOLATOR_INTERPOLATING_HPP
 #define PHARE_CORE_NUMERICS_INTERPOLATOR_INTERPOLATING_HPP
 
-
-#include "core/data/particles/particle_array_def.hpp"
-#include "core/data/tensorfield/tensorfield.hpp"
 #include "core/utilities/kernels/launchers.hpp"
+#include "core/data/tensorfield/tensorfield.hpp"
+#include "core/data/particles/particle_array_def.hpp"
 
 #include "interpolator.hpp"
 
@@ -34,10 +33,11 @@ public:
     }
 
 
-    template<typename Particles, typename GridLayout, typename VecField, typename Field>
-    void particleToMesh(Particles const& particles, GridLayout const& layout, Field& density,
+    template<typename GridLayout, typename VecField, typename Field>
+    void particleToMesh(ParticleArray_t const& particles, GridLayout const& layout, Field& density,
                         VecField& flux, double coef = 1.) _PHARE_ALL_FN_
     {
+        using Particles = ParticleArray_t;
         // static_assert(Particles::storage_mode == StorageMode::SPAN);
         auto constexpr static alloc_mode = ParticleArray_t::alloc_mode;
         auto constexpr static impl       = ParticleArray_t::impl;

@@ -309,16 +309,16 @@ Box(Point<T, s> lower, Point<T, s> upper) -> Box<T, s>;
 /** This overload of isIn does the same as the one below but takes only
  * one box.
  */
-template<typename T, std::size_t S>
-NO_DISCARD bool isIn(Point<T, S> const& point, Box<T, S> const& box) _PHARE_ALL_FN_
+template<template<typename, std::size_t> typename Point, typename Type, std::size_t SIZE>
+NO_DISCARD bool isIn(Point<Type, SIZE> const& point, Box<Type, SIZE> const& box)
 {
-    auto isIn1D = [](auto const& pos, auto const& lower, auto const& upper) {
+    auto isIn1D = [](auto const pos, auto const lower, auto const upper) {
         return pos >= lower && pos <= upper;
     };
 
     bool pointInBox = true;
 
-    for (auto iDim = 0u; iDim < S; ++iDim)
+    for (auto iDim = 0u; iDim < SIZE; ++iDim)
         pointInBox = pointInBox && isIn1D(point[iDim], box.lower[iDim], box.upper[iDim]);
     if (pointInBox)
         return pointInBox;
@@ -326,18 +326,12 @@ NO_DISCARD bool isIn(Point<T, S> const& point, Box<T, S> const& box) _PHARE_ALL_
     return false;
 }
 
-template<typename T, std::size_t S>
-NO_DISCARD bool isIn(std::array<T, S> const& icell, Box<T, S> const& box) _PHARE_ALL_FN_
-{
-    return isIn(Point{icell}, box);
-}
-
-
-template<typename Particle, typename T, std::size_t S>
-NO_DISCARD bool isIn(Particle const& particle, Box<T, S> const& box) _PHARE_ALL_FN_
+template<typename Particle, typename Type>
+NO_DISCARD bool isIn(Particle const& particle, Box<Type, Particle::dimension> const& box)
 {
     return isIn(particle.iCell(), box);
 }
+
 
 
 /** this overload of isIn takes a Point and a Container of boxes

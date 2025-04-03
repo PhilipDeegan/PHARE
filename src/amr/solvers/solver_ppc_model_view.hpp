@@ -134,6 +134,7 @@ public:
     auto end() { return iterator</*const=*/false>{*this, states.size()}; }
     auto end() const { return iterator</*const=*/true>{*this, states.size()}; }
 
+    auto& operator[](std::size_t const idx) { return states[idx]; }
     auto& operator[](std::size_t const idx) const { return states[idx]; }
 
     auto size() const { return states.size(); }

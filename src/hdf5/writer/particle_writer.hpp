@@ -26,9 +26,9 @@ public:
         auto write_ = [&](auto& soa) {
             h5file.template write_data_set_flat<2>(path + packer_keys[0], soa.weight().data());
             h5file.template write_data_set_flat<2>(path + packer_keys[1], soa.charge().data());
-            h5file.template write_data_set(path + packer_keys[2], soa.iCell().data());
-            h5file.template write_data_set(path + packer_keys[3], soa.delta().data());
-            h5file.template write_data_set(path + packer_keys[4], soa.v().data());
+            h5file.write_data_set(path + packer_keys[2], soa.iCell().data());
+            h5file.write_data_set(path + packer_keys[3], soa.delta().data());
+            h5file.write_data_set(path + packer_keys[4], soa.v().data());
         };
 
         if constexpr (Particles::layout_mode == core::LayoutMode::SoA)
