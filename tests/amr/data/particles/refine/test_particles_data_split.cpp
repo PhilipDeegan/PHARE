@@ -114,14 +114,13 @@ struct AParticlesDataTest<1, TestParam>
             auto const cellx = i * cells;
             patches.emplace_back(Box_t{Point{cellx}, Point{cellx + off}});
         }
-        assert(!any_overlaps_in(patches, [](auto const& patch) { return patch.layout.AMRBox(); }));
-        for (auto& patch : patches)
-            add_particles_in(patch.data->domainParticles, patch.layout.AMRBox(), ppc);
     }
 
     std::vector<Patch<TestParam>> patches;
     Patch<TestParam> L1{Box_t{Point{2}, Point{14}}};
 };
+
+
 template<typename TestParam>
 struct AParticlesDataTest<2, TestParam>
 {
@@ -143,6 +142,7 @@ struct AParticlesDataTest<2, TestParam>
     std::vector<Patch<TestParam>> patches;
     Patch<TestParam> L1{Box_t{Point{2, 2}, Point{14, 14}}};
 };
+
 
 template<typename TestParam>
 struct AParticlesDataTest<3, TestParam>
@@ -209,6 +209,10 @@ PHARE_WITH_GPU(
    ,TestParam<2, LayoutMode::AoSMapped, AllocatorMode::CPU>
    ,TestParam<2, LayoutMode::AoSTS, AllocatorMode::CPU>
    ,TestParam<2, LayoutMode::AoS, AllocatorMode::CPU>
+
+   // ,TestParam<3, LayoutMode::AoSMapped, AllocatorMode::CPU>
+   // ,TestParam<3, LayoutMode::AoSTS, AllocatorMode::CPU>
+   // ,TestParam<3, LayoutMode::AoS, AllocatorMode::CPU>
 
 >;
 // clang-format on

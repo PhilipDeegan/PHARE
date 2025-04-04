@@ -115,19 +115,31 @@ void ParticlesExporter<AoSTS, CPU>::operator()(Src const& src, Dst& dst, Box_t c
 {
     std::size_t constexpr ratio = 2; // to do - get somewhere else
 
-    auto const coarseDstBox = box / ratio;
+    auto const& dstBox           = dst.ghost_box();
+    auto const fineDstOverlapOpt = box * dstBox;
+    if (!fineDstOverlapOpt)
+        return;
 
-    for (auto const& tile : src()) // !expensive!
+    auto const& fineDstOverlap = *fineDstOverlapOpt;
+    auto const coarseDstBox    = box / ratio;
+
+    for (auto const& src_tile : src()) // !expensive!
     {
-        auto const overlap_opt = coarseDstBox * tile;
+        auto const overlap_opt = coarseDstBox * src_tile;
         if (not overlap_opt)
             continue;
 
         auto const overlap        = *overlap_opt;
         auto const fineOverlapBox = overlap * ratio;
-        auto& dst_tile            = *dst().at(fineOverlapBox.lower);
 
-        ParticlesExporter<AoS, CPU>{}(tile(), dst_tile(), box, fn0, fn1);
+        auto const src_dst_overlap_opt = fineOverlapBox * fineDstOverlap;
+        if (!src_dst_overlap_opt)
+            continue;
+
+        auto const& src_dst_overlap = *src_dst_overlap_opt;
+        auto& dst_tile              = *dst().at(src_dst_overlap.lower);
+
+        ParticlesExporter<AoS, CPU>{}(src_tile(), dst_tile(), box, fn0, fn1);
 
 
         // maybe needed?

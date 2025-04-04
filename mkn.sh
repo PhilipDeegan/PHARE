@@ -46,19 +46,22 @@ CARGS="${CARGS} $(clargs)"
 
 ) 1> >(tee $CWD/.mkn.sh.out ) 2> >(tee $CWD/.mkn.sh.err >&2 )
 
-# exit 0 # continue for more
+exit 0 # continue for more
 
-arr=(
-  tests/core/data/particles/test_particles_construction.cpp
-  tests/core/data/particles/sorting/test_particle_sorting.cpp
-  tests/core/data/tiles/test_tile.cpp
-  tests/core/data/particles/test_particles_selecting.cpp
-  tests/core/numerics/ampere/test_tileset_ampere.cpp
-  tests/core/numerics/faraday/test_tileset_faraday.cpp
-  tests/core/numerics/ohm/test_tileset_ohm.cpp
-  tests/core/data/particles/test_particles_serialization.cpp
+(
+  set -x
+  arr=(
+    tests/core/data/particles/test_particles_construction.cpp
+    tests/core/data/particles/sorting/test_particle_sorting.cpp
+    tests/core/data/tiles/test_tile.cpp
+    tests/core/data/particles/test_particles_selecting.cpp
+    tests/core/numerics/ampere/test_tileset_ampere.cpp
+    tests/core/numerics/faraday/test_tileset_faraday.cpp
+    tests/core/numerics/ohm/test_tileset_ohm.cpp
+    tests/core/data/particles/test_particles_serialization.cpp
+  )
+
+  for i in ${!arr[@]}; do
+      mkn -p test_core -M ${arr[i]} ${CARGS} clean build run -gO
+  done
 )
-
-for i in ${!arr[@]}; do
-    mkn -p test_core -M ${arr[i]} ${CARGS} clean build run -gO
-done

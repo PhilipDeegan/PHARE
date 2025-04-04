@@ -67,14 +67,10 @@ class Initialization1DTest(InitializationTest):
         *permute(({"L0": {"B0": Box1D(2, 12), "B1": Box1D(13, 25)}})),
     )
     @unpack
-    def test_domainparticles_have_correct_split_from_coarser_particle(
-        self, interp_order, refinement_boxes
-    ):
+    def test_domainparticles_have_correct_split_from_coarser_particle(self, **kwargs):
         print(f"{self._testMethodName}_{ndim}d")
 
-        self._test_domainparticles_have_correct_split_from_coarser_particle(
-            ndim, interp_order, refinement_boxes
-        )
+        self._test_domainparticles_have_correct_split_from_coarser_particle(**kwargs)
 
     @data({"cells": 40, "smallest_patch_size": 20, "largest_patch_size": 20})
     def test_no_patch_ghost_on_refined_level_case(self, simInput):
