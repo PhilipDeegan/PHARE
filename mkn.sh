@@ -25,9 +25,9 @@ clargs(){
 # FILE="tests/amr/data/particles/stream_pack/test_main.cpp"
 # FILE="tests/amr/data/particles/copy_overlap/test_particledata_copy_periodicNd.cpp"
 # FILE="tests/amr/data/particles/test_particles_data.cpp"
-# FILE="tests/amr/data/particles/refine/test_particles_data_split.cpp"
+FILE="tests/amr/data/particles/refine/test_particles_data_split.cpp"
 # FILE="tests/core/numerics/ion_updater/test_multi_updater.cpp"
-FILE="tests/core/numerics/ion_updater/test_updater_pp_main.cpp"
+# FILE="tests/core/numerics/ion_updater/test_updater_pp_main.cpp"
 TEST=" -M ${FILE} "
 CARGS="${CARGS} $(clargs)"
 
@@ -37,12 +37,12 @@ CARGS="${CARGS} $(clargs)"
       mkn clean build -KOgqtp test_core -d google.test,+ -a "-fPIC" ${CARGS}
       mkn clean build -KOgqtp core -a "-fPIC" ${CARGS}
   )
-  # [ ! -f "bin/amr/libphare_amr.a" ] && (
-  #     mkn clean build -Kqtp amr -a "-fPIC" ${CARGS}
-  # )
+  [ ! -f "bin/amr/libphare_amr.a" ] && (
+      mkn clean build -Kqtp amr -a "-fPIC" ${CARGS}
+  )
 
-  mkn -p test_core ${TEST} ${CARGS} "$@"
-  # mkn -p test_amr ${TEST} ${CARGS} "$@"
+  # mkn -p test_core ${TEST} ${CARGS} "$@"
+  mkn -p test_amr ${TEST} ${CARGS} "$@"
 
 ) 1> >(tee $CWD/.mkn.sh.out ) 2> >(tee $CWD/.mkn.sh.err >&2 )
 

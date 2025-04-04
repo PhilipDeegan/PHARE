@@ -28,6 +28,7 @@ def simulator_shutdown():
     gc.collect()  # force cause we need to be sure it's unloaded
 
 
+# make_simulator_1_1_2_1_0
 # see src/core/data/particles/particle_array_def.hpp
 def make_cpp_simulator(
     cpp_lib, dim, interp, nbrRefinedPart, hier, layout=1, allocator=0
@@ -37,6 +38,7 @@ def make_cpp_simulator(
 
     make_sim = f"make_simulator_{dim}_{interp}_{nbrRefinedPart}_{layout}_{allocator}"
     print("make_sim", make_sim)
+    # assert make_sim == "make_simulator_1_1_2_1_0"
     return getattr(cpp_lib, make_sim)(hier)
 
 
@@ -95,7 +97,7 @@ class Simulator:
         self.cpp_sim = None  # BE
         self.cpp_dw = None  # DRAGONS, i.e. use weakrefs if you have to ref these.
         self.post_advance = kwargs.get("post_advance", None)
-
+        self.initialized = False
         self.print_eol = "\n"
         if kwargs.get("print_one_line", True):
             self.print_eol = "\r"
@@ -148,6 +150,8 @@ class Simulator:
 
     def initialize(self):
         try:
+            if self.initialized:
+                return
             if self.cpp_hier is None:
                 self.setup()
 
@@ -155,6 +159,7 @@ class Simulator:
                 return self
 
             self.cpp_sim.initialize()
+            self.initialized = True
             self._auto_dump()  # first dump might be before first advance
 
             return self
@@ -292,7 +297,7 @@ class Simulator:
         return self.cpp_sim.interp_order  # constexpr static value
 
     def _check_init(self):
-        if self.cpp_sim is None:
+        if not self.initialized:
             self.initialize()
 
     def _log_to_file(self):

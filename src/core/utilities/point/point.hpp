@@ -228,9 +228,7 @@ namespace core
         {
             PHARE_DEBUG_DO({
                 for (auto iDim = 0u; iDim < dim; ++iDim)
-                {
                     assert(r[iDim] >= 0);
-                }
             })
             if constexpr (sizeof(int) == 4)
                 return Point<std::uint32_t, dim>{this->template toArray<std::uint32_t>()};

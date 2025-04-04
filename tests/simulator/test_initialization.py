@@ -51,6 +51,7 @@ class InitializationTest(SimulatorTest):
         largest_patch_size=10,
         cells=120,
         dl=0.1,
+        sim_setup_kwargs={},
         **kwargs,
     ):
         diag_outputs = self.unique_diag_dir_for_test_case(
@@ -193,7 +194,7 @@ class InitializationTest(SimulatorTest):
                     population_name=pop,
                 )
 
-        Simulator(global_vars.sim).initialize().reset()
+        Simulator(global_vars.sim).setup(**sim_setup_kwargs).initialize().reset()
 
         eb_hier = None
         if qty in ["e", "eb"]:

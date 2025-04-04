@@ -56,6 +56,7 @@ class AdvanceTestBase(SimulatorTest):
         timestamps=None,
         block_merging_particles=False,
         diag_outputs="",
+        sim_setup_kwargs={},
     ):
         diag_outputs = self.unique_diag_dir_for_test_case(
             "phare_outputs/advance", ndim, interp_order, diag_outputs
@@ -176,7 +177,7 @@ class AdvanceTestBase(SimulatorTest):
                     population_name=pop,
                 )
 
-        Simulator(global_vars.sim).run()
+        Simulator(sim).setup(**sim_setup_kwargs).run()
 
         eb_hier = None
         if qty in ["e", "eb", "fields"]:

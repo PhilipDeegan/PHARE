@@ -18,15 +18,19 @@ using namespace PHARE::core;
 using namespace PHARE::amr;
 
 
-std::size_t constexpr static dim            = 2;
-std::size_t constexpr static interp         = 1;
-std::size_t constexpr static ghost_cells    = 1;
-std::size_t constexpr static nb_split_parts = 4;
-std::size_t constexpr static ppc            = 10;
-std::size_t constexpr static cells          = 14;
-using GridLayout_t = TestGridLayout<typename core::PHARE_Types<dim, interp>::GridLayout_t>;
-using Box_t        = PHARE::core::Box<int, dim>;
+std::size_t constexpr static interp      = 1;
+std::size_t constexpr static ghost_cells = 2;
+std::size_t constexpr static ppc         = 10;
+std::size_t constexpr static cells       = 14;
 
+auto constexpr nb_split_parts(auto const dim)
+{
+    if (dim == 1)
+        return 2;
+    if (dim == 2)
+        return 4;
+    // retunr
+}
 
 auto static particles_dict()
 {
@@ -37,7 +41,7 @@ auto static particles_dict()
 }
 
 
-template<std::size_t _dim, auto lm, auto am, std::uint8_t _impl = 0>
+template<std::size_t _dim, auto lm, auto am, std::uint8_t _impl = 2>
 struct TestParam
 {
     static_assert(all_are<LayoutMode>(lm));
@@ -47,32 +51,33 @@ struct TestParam
     auto constexpr static layout_mode = lm;
     auto constexpr static alloc_mode  = am;
     auto constexpr static impl        = _impl;
-};
 
-
-template<typename Param>
-struct AParticlesData
-{
-    static constexpr auto dim         = Param::dim;
-    auto constexpr static layout_mode = Param::layout_mode;
-    auto constexpr static alloc_mode  = Param::alloc_mode;
-
+    using Box_t           = PHARE::core::Box<int, dim>;
+    using GridLayout_t    = TestGridLayout<typename core::PHARE_Types<dim, interp>::GridLayout_t>;
     using ParticleArray_t = ParticleArray<
-        dim, ParticleArrayInternals<dim, layout_mode, StorageMode::VECTOR, alloc_mode, /*impl*/ 2>>;
+        dim, ParticleArrayInternals<dim, layout_mode, StorageMode::VECTOR, alloc_mode, impl>>;
 };
 
 
-template<typename AParticlesData>
+
+template<typename TestParam>
 struct Patch
 {
+    auto constexpr static dim = TestParam::dim;
+
+    using ParticleArray_t = TestParam::ParticleArray_t;
+    using ParticlesData_t = ParticlesData<ParticleArray_t>;
+    using GridLayout_t    = TestParam::GridLayout_t;
+    using Box_t           = TestParam::Box_t;
+
     SAMRAI::tbox::Dimension static inline const dimension{dim};
     SAMRAI::hier::BlockId static inline const blockId{0};
     SAMRAI::hier::IntVector static inline const ghostVec{dimension, ghost_cells};
 
-    using ParticleArray_t = AParticlesData::ParticleArray_t;
-    using ParticlesData_t = ParticlesData<ParticleArray_t>;
-
-
+    Patch(Box_t const& box)
+        : layout{box}
+    {
+    }
     Patch(GridLayout_t const& _layout)
         : layout{_layout}
     {
@@ -92,19 +97,37 @@ struct Patch
     SAMRAI::hier::Box const mask{data->getGhostBox()};
 };
 
+template<std::size_t dim, typename TestParam>
+struct AParticlesDataTest;
 
-template<typename ParticlesData>
-struct ParticlesDataTest : public ::testing::Test, public ParticlesData
+template<typename TestParam>
+struct AParticlesDataTest<1, TestParam>
 {
-    using ParticleArray_t = ParticlesData::ParticleArray_t;
+    using Box_t = TestParam::Box_t;
 
-    using Splitter
-        = PHARE::amr::Splitter<PHARE::core::DimConst<dim>, PHARE::core::InterpConst<interp>,
-                               PHARE::core::RefinedParticlesConst<nb_split_parts>>;
+    AParticlesDataTest()
+    {
+        patches.reserve(3);
+        auto const off = cells - 1;
+        for (std::uint8_t i = 0; i < 3; ++i)
+        {
+            auto const cellx = i * cells;
+            patches.emplace_back(Box_t{Point{cellx}, Point{cellx + off}});
+        }
+        assert(!any_overlaps_in(patches, [](auto const& patch) { return patch.layout.AMRBox(); }));
+        for (auto& patch : patches)
+            add_particles_in(patch.data->domainParticles, patch.layout.AMRBox(), ppc);
+    }
 
-    using Refiner = ParticlesRefining<ParticleArray_t, ParticlesDataSplitType::interior, Splitter>;
+    std::vector<Patch<TestParam>> patches;
+    Patch<TestParam> L1{Box_t{Point{2}, Point{14}}};
+};
+template<typename TestParam>
+struct AParticlesDataTest<2, TestParam>
+{
+    using Box_t = TestParam::Box_t;
 
-    ParticlesDataTest()
+    AParticlesDataTest()
     {
         patches.reserve(3 * 3);
         auto const off = cells - 1;
@@ -115,32 +138,77 @@ struct ParticlesDataTest : public ::testing::Test, public ParticlesData
                 auto const celly = j * cells;
                 patches.emplace_back(Box_t{Point{cellx, celly}, Point{cellx + off, celly + off}});
             }
+    }
 
+    std::vector<Patch<TestParam>> patches;
+    Patch<TestParam> L1{Box_t{Point{2, 2}, Point{14, 14}}};
+};
+
+template<typename TestParam>
+struct AParticlesDataTest<3, TestParam>
+{
+    using Box_t = TestParam::Box_t;
+
+    AParticlesDataTest()
+    {
+        patches.reserve(3 * 3);
+        auto const off = cells - 1;
+        for (std::uint8_t i = 0; i < 3; ++i)
+            for (std::uint8_t j = 0; j < 3; ++j)
+                for (std::uint8_t k = 0; k < 3; ++k)
+                {
+                    auto const cellx = i * cells;
+                    auto const celly = j * cells;
+                    auto const cellz = k * cells;
+                    patches.emplace_back(Box_t{Point{cellx, celly, cellz},
+                                               Point{cellx + off, celly + off, cellz + off}});
+                }
+    }
+
+    std::vector<Patch<TestParam>> patches;
+    Patch<TestParam> L1{Box_t{Point{2, 2, 2}, Point{14, 14, 14}}};
+};
+
+
+template<typename TestParam>
+struct ParticlesDataTest : public ::testing::Test,
+                           public AParticlesDataTest<TestParam::dim, TestParam>
+{
+    using Super           = AParticlesDataTest<TestParam::dim, TestParam>;
+    using ParticleArray_t = TestParam::ParticleArray_t;
+
+    using Splitter
+        = PHARE::amr::Splitter<PHARE::core::DimConst<TestParam::dim>,
+                               PHARE::core::InterpConst<interp>,
+                               PHARE::core::RefinedParticlesConst<nb_split_parts(TestParam::dim)>>;
+
+    using Refiner = ParticlesRefining<ParticleArray_t, ParticlesDataSplitType::interior, Splitter>;
+
+    using Super::L1;
+    using Super::patches;
+
+    ParticlesDataTest()
+    {
         assert(!any_overlaps_in(patches, [](auto const& patch) { return patch.layout.AMRBox(); }));
-
         for (auto& patch : patches)
             add_particles_in(patch.data->domainParticles, patch.layout.AMRBox(), ppc);
     }
-
-
-    std::vector<Patch<ParticlesData>> patches;
-    Patch<ParticlesData> L1{GridLayout_t{Box_t{Point{2, 4}, Point{17, 19}}}};
 };
 
 
 // clang-format off
 using ParticlesDatas = testing::Types< //
-
-    AParticlesData<TestParam<dim, LayoutMode::AoSMapped, AllocatorMode::CPU>>
-   ,AParticlesData<TestParam<dim, LayoutMode::AoSTS, AllocatorMode::CPU>>
-   ,AParticlesData<TestParam<dim, LayoutMode::AoS, AllocatorMode::CPU>>
-
+    TestParam<1, LayoutMode::AoSMapped, AllocatorMode::CPU>
+   ,TestParam<1, LayoutMode::AoSTS, AllocatorMode::CPU>
+   ,TestParam<1, LayoutMode::AoS, AllocatorMode::CPU>
 PHARE_WITH_GPU(
-
    // ,AParticlesData<TestParam<3, LayoutMode::SoA, AllocatorMode::CPU>>
    // ,AParticlesData<TestParam<3, LayoutMode::SoATS, AllocatorMode::CPU>>
-
 )
+
+   ,TestParam<2, LayoutMode::AoSMapped, AllocatorMode::CPU>
+   ,TestParam<2, LayoutMode::AoSTS, AllocatorMode::CPU>
+   ,TestParam<2, LayoutMode::AoS, AllocatorMode::CPU>
 
 >;
 // clang-format on

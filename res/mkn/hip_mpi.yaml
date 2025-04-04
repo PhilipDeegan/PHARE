@@ -21,4 +21,4 @@ file:
   - type: cpp:cxx:cc:c:S
     archiver: ar -cr
     compiler:  mpicxx ${cxx_flags}
-    linker:  mpicxx  --std=c++20
+    linker:  mpicxx  --std=c++20 -fuse-ld=mold

@@ -106,7 +106,7 @@ profile:
   out: cpp_etc
 
 - name: py
-  self: dictator cpp_etc simulator
+  self: dictator cpp_etc cpp
 
 - name: test
   self: core
