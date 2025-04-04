@@ -4,39 +4,52 @@
 """
 
 import unittest
-
 import matplotlib
-from ddt import data, ddt
 
+from ddt import data, ddt, unpack
 from tests.simulator.test_initialization import InitializationTest
 
 matplotlib.use("Agg")  # for systems without GUI
 
 ndim = 1
 interp_orders = [1, 2, 3]
+layouts = [1, 3]
+
+
+def permute():
+    import itertools
+
+    def f(interp, layout):
+        return dict(dim=ndim, interp_order=interp, sim_setup_kwargs=dict(layout=layout))
+
+    return [f(*els) for els in itertools.product(interp_orders, layouts)]
 
 
 @ddt
 class Initialization1DTest(InitializationTest):
-    @data(*interp_orders)
-    def test_B_is_as_provided_by_user(self, interp_order):
+    @data(*permute())
+    @unpack
+    def test_B_is_as_provided_by_user(self, **kwargs):
         print(f"{self._testMethodName}_{ndim}d")
-        self._test_B_is_as_provided_by_user(ndim, interp_order)
+        self._test_B_is_as_provided_by_user(**kwargs)
 
-    @data(*interp_orders)
-    def test_bulkvel_is_as_provided_by_user(self, interp_order):
+    @data(*permute())
+    @unpack
+    def test_bulkvel_is_as_provided_by_user(self, **kwargs):
         print(f"{self._testMethodName}_{ndim}d")
-        self._test_bulkvel_is_as_provided_by_user(ndim, interp_order)
+        self._test_bulkvel_is_as_provided_by_user(**kwags)
 
-    @data(*interp_orders)
-    def test_density_is_as_provided_by_user(self, interp_order):
+    @data(*permute())
+    @unpack
+    def test_density_is_as_provided_by_user(self, **kwargs):
         print(f"{self._testMethodName}_{ndim}d")
-        self._test_density_is_as_provided_by_user(ndim, interp_order)
+        self._test_density_is_as_provided_by_user(**kwags)
 
-    @data(*interp_orders)
-    def test_density_decreases_as_1overSqrtN(self, interp_order):
+    @data(*permute())
+    @unpack
+    def test_density_decreases_as_1overSqrtN(self, **kwargs):
         print(f"{self._testMethodName}_{ndim}d")
-        self._test_density_decreases_as_1overSqrtN(ndim, interp_order)
+        self._test_density_decreases_as_1overSqrtN(**kwags)
 
 
 if __name__ == "__main__":
