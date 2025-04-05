@@ -7,6 +7,7 @@
 #include <SAMRAI/hier/Box.h>
 #include <SAMRAI/hier/BoxOverlap.h>
 #include <SAMRAI/hier/IntVector.h>
+#include <SAMRAI/hier/HierarchyNeighbors.h>
 #include <SAMRAI/hier/Patch.h>
 #include <SAMRAI/hier/PatchData.h>
 
@@ -182,8 +183,8 @@ namespace amr
             nbrCell[iDim] = static_cast<std::uint32_t>(domain.numberCells(iDim));
         }
 
-        auto lvlNbr = patch.getPatchLevelNumber();
-        return GridLayoutT{dl, nbrCell, origin, amr::Box<int, dimension>{domain}, lvlNbr};
+        return GridLayoutT{dl, nbrCell, origin, amr::Box<int, dimension>{domain},
+                           patch.getPatchLevelNumber()};
     }
 
     inline auto to_string(SAMRAI::hier::GlobalId const& id)

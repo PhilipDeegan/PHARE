@@ -1,27 +1,29 @@
+import unittest
+
 from pyphare.cpp import cpp_lib
 
 cpp = cpp_lib()
 
-import unittest
-
 import numpy as np
-import pyphare.core.box as boxm
 from ddt import ddt
+
+import pyphare.core.box as boxm
 from pyphare.core.box import Box
+
 from pyphare.core.phare_utilities import assert_fp_any_all_close, np_array_ify
+
 from pyphare.pharein import ElectronModel, MaxwellianFluidModel
 from pyphare.pharein.diagnostics import (
     ElectromagDiagnostics,
     FluidDiagnostics,
     ParticleDiagnostics,
 )
-from pyphare.pharein.simulation import Simulation
+from pyphare.pharein.simulation import Simulation, supported_dimensions
 from pyphare.pharesee.geometry import hierarchy_overlaps, level_ghost_boxes
 from pyphare.pharesee.hierarchy import hierarchy_from
 from pyphare.pharesee.hierarchy.hierarchy import format_timestamp
 from pyphare.pharesee.hierarchy.hierarchy_utils import merge_particles
 from pyphare.simulator.simulator import Simulator
-
 from tests.diagnostic import all_timestamps
 from tests.simulator import SimulatorTest, diff_boxes
 
@@ -54,6 +56,7 @@ class AdvanceTestBase(SimulatorTest):
         timestamps=None,
         block_merging_particles=False,
         diag_outputs="",
+        sim_setup_kwargs={},
     ):
         diag_outputs = self.unique_diag_dir_for_test_case(
             "phare_outputs/advance", ndim, interp_order, diag_outputs
@@ -174,7 +177,7 @@ class AdvanceTestBase(SimulatorTest):
                     population_name=pop,
                 )
 
-        Simulator(global_vars.sim).run()
+        Simulator(sim).setup(**sim_setup_kwargs).run()
 
         eb_hier = None
         if qty in ["e", "eb", "fields"]:
@@ -346,6 +349,9 @@ class AdvanceTestBase(SimulatorTest):
             **kwargs,
         )
 
+        if cpp.mpi_rank() > 0:
+            return
+
         for time_step_idx in range(time_step_nbr + 1):
             coarsest_time = time_step_idx * time_step
 
@@ -399,6 +405,9 @@ class AdvanceTestBase(SimulatorTest):
             cells=cells,
         )
 
+        if cpp.mpi_rank() > 0:
+            return
+
         for time_step_idx in range(time_step_nbr + 1):
             coarsest_time = time_step_idx * time_step
             n_particles_at_t = 0
@@ -435,6 +444,9 @@ class AdvanceTestBase(SimulatorTest):
             largest_patch_size=30,
             **kwargs,
         )
+
+        if cpp.mpi_rank() > 0:
+            return
 
         qties = ["rho"]
         qties += [f"{qty}{xyz}" for qty in ["E", "B", "V"] for xyz in ["x", "y", "z"]]
@@ -749,6 +761,9 @@ class AdvanceTestBase(SimulatorTest):
 
         L0_datahier = _getHier(f"L0_diags")
         L0L1_datahier = _getHier(f"L0L1_diags", refinement_boxes)
+
+        if cpp.mpi_rank() > 0:
+            return
 
         quantities = [f"{EM}{xyz}" for EM in ["E", "B"] for xyz in ["x", "y", "z"]]
         checks = (

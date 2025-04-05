@@ -3,11 +3,13 @@
 
 
 
+
 #include "core/hybrid/hybrid_quantities.hpp"
 #include "core/utilities/types.hpp"
 #include "gridlayoutdefs.hpp"
 #include "core/utilities/constants.hpp"
 #include "core/def.hpp"
+
 
 #include <array>
 #include <vector>
@@ -129,7 +131,7 @@ namespace core
         // ------------------------------------------------------------------------
     public:
         NO_DISCARD constexpr static std::array<QtyCentering, dim>
-        centering(HybridQuantity::Scalar hybridQuantity)
+        safe_centering(HybridQuantity::Scalar& hybridQuantity)
         {
             constexpr gridDataT gridData_{};
             if constexpr (dim == 1)
@@ -176,7 +178,9 @@ namespace core
                         return {{hybridQtyCentering_[gridData_.iMyz][gridData_.idirX]}};
                     case HybridQuantity::Scalar::Mzz:
                         return {{hybridQtyCentering_[gridData_.iMzz][gridData_.idirX]}};
-                    default: throw std::runtime_error("Wrong hybridQuantity");
+                        // default: throw std::runtime_error("Wrong hybridQuantity");
+
+                    default: hybridQuantity = HybridQuantity::Scalar::INVALID;
                 }
             }
 
@@ -244,7 +248,8 @@ namespace core
                     case HybridQuantity::Scalar::Mzz:
                         return {{hybridQtyCentering_[gridData_.iMzz][gridData_.idirX],
                                  hybridQtyCentering_[gridData_.iMzz][gridData_.idirY]}};
-                    default: throw std::runtime_error("Wrong hybridQuantity");
+                    // default: throw std::runtime_error("Wrong hybridQuantity");
+                    default: hybridQuantity = HybridQuantity::Scalar::INVALID;
                 }
             }
 
@@ -332,16 +337,27 @@ namespace core
                         return {{hybridQtyCentering_[gridData_.iMzz][gridData_.idirX],
                                  hybridQtyCentering_[gridData_.iMzz][gridData_.idirY],
                                  hybridQtyCentering_[gridData_.iMzz][gridData_.idirZ]}};
-                    default: throw std::runtime_error("Wrong hybridQuantity");
+                    // default: throw std::runtime_error("Wrong hybridQuantity");
+                    default: hybridQuantity = HybridQuantity::Scalar::INVALID;
                 }
             }
+            return ConstArray<QtyCentering, dim>(core::QtyCentering::primal); // ignored anyway.
+        }
+
+        constexpr static std::array<QtyCentering, dim>
+        centering(HybridQuantity::Scalar hybridQuantity) _PHARE_ALL_FN_
+        {
+            assert(hybridQuantity != HybridQuantity::Scalar::INVALID);
+            std::array<QtyCentering, dim> rval = safe_centering(hybridQuantity);
+            //     throw_runtime_error("Wrong hybridQuantity");
+            return rval;
         }
 
 
 
 
         NO_DISCARD constexpr static std::array<std::array<QtyCentering, dim>, 3>
-        centering(HybridQuantity::Vector hybridQuantity)
+        safe_centering(HybridQuantity::Vector& hybridQuantity)
         {
             switch (hybridQuantity)
             {
@@ -365,12 +381,22 @@ namespace core
                              centering(HybridQuantity::Scalar::Ey),
                              centering(HybridQuantity::Scalar::Ez)}};
 
-
-                default: throw std::runtime_error("Wrong hybridQuantity");
+                default: hybridQuantity = HybridQuantity::Vector::INVALID;
             }
+            // return ConstArray<std::array<QtyCentering, dim>, 3>(
+            //     ConstArray<QtyCentering, dim>(core::QtyCentering::primal)); // ignored anyway.
         }
 
 
+
+        constexpr static std::array<std::array<QtyCentering, dim>, 3>
+        centering(HybridQuantity::Vector hybridQuantity)
+        {
+            std::array<std::array<QtyCentering, dim>, 3> rval = safe_centering(hybridQuantity);
+            // assert(hybridQuantity != HybridQuantity::Vector::INVALID);
+            //     throw_runtime_error("Wrong hybridQuantity");
+            return rval;
+        }
 
 
         NO_DISCARD auto static constexpr dualToPrimal()

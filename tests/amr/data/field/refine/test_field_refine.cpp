@@ -1,24 +1,25 @@
 
 #include "core/def/phare_mpi.hpp"
+#include "core/data/grid/gridlayout.hpp"
+#include "core/data/ndarray/ndarray_vector.hpp"
+
+#include "amr/data/field/refine/field_refiner.hpp"
+#include "amr/data/field/refine/field_linear_refine.hpp"
+#include "amr/data/field/refine/field_refine_operator.hpp"
+
+#include "test_field_refinement_on_hierarchy.hpp"
 
 #include <SAMRAI/tbox/SAMRAIManager.h>
 #include <SAMRAI/tbox/SAMRAI_MPI.h>
 
-#include "gmock/gmock.h"
+// #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
 
-#include "amr/data/field/refine/field_linear_refine.hpp"
-#include "amr/data/field/refine/field_refine_operator.hpp"
-#include "amr/data/field/refine/field_refiner.hpp"
-#include "core/data/grid/gridlayout.hpp"
-
-#include "test_field_refinement_on_hierarchy.hpp"
-
-
-#include <functional>
-#include <iostream>
 #include <numeric>
+#include <iostream>
+#include <functional>
+
 
 using namespace PHARE::core;
 using namespace PHARE::amr;

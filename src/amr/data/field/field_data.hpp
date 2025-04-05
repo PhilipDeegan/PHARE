@@ -57,23 +57,11 @@ namespace amr
                   std::string name, GridLayoutT const& layout, PhysicalQuantity qty)
             : SAMRAI::hier::PatchData(domain, ghost)
             , gridLayout{layout}
-            , field(name, qty, gridLayout.allocSize(qty))
-            , quantity_{qty}
-        {
-        } //
-
-        [[deprecated]] FieldData(SAMRAI::hier::Box const& domain,
-                                 SAMRAI::hier::IntVector const& ghost, std::string name,
-                                 std::array<double, dimension> const& dl,
-                                 std::array<std::uint32_t, dimension> const& nbrCells,
-                                 core::Point<double, dimension> const& origin, PhysicalQuantity qty)
-
-            : SAMRAI::hier::PatchData(domain, ghost)
-            , gridLayout{dl, nbrCells, origin}
-            , field(name, qty, gridLayout.allocSize(qty))
+            , field(name, gridLayout, qty)
             , quantity_{qty}
         {
         }
+
 
         FieldData()                            = delete;
         FieldData(FieldData const&)            = delete;
@@ -86,6 +74,7 @@ namespace amr
         {
             Super::getFromRestart(restart_db);
 
+
             assert(field.vector().size() > 0);
             restart_db->getDoubleArray("field_" + field.name(), field.vector().data(),
                                        field.vector().size()); // do not reallocate!
@@ -95,7 +84,16 @@ namespace amr
         {
             Super::putToRestart(restart_db);
 
-            restart_db->putVector("field_" + field.name(), field.vector());
+            // if constexpr (std::decay_t<decltype(field)>::is_host_mem)
+
+            restart_db->putDoubleArray("field_" + field.name(), field.vector().data(),
+                                       field.vector().size());
+
+            // restart_db->putVector("field_" + field.name(), field.vector());
+            // else
+            // {
+            //     std::abort();
+            // }
         };
 
 

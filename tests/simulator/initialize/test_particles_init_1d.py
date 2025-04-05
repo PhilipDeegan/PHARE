@@ -9,6 +9,7 @@ import matplotlib
 from ddt import data, ddt, unpack
 from pyphare.core.box import Box1D
 from pyphare.cpp import cpp_lib
+from pyphare.cpp import supported_particle_layouts
 
 from tests.simulator.test_initialization import InitializationTest
 
@@ -18,7 +19,23 @@ matplotlib.use("Agg")  # for systems without GUI
 
 ndim = 1
 interp_orders = [1, 2, 3]
+layouts = [1, 3]
 ppc = 25
+
+
+def permute(boxes={}):
+    import itertools
+
+    def f(interp, layout):
+        dic = dict(ndim=ndim, interp_order=interp, sim_setup_kwargs=dict(layout=layout))
+        if boxes:
+            return dict(refinement_boxes=boxes, **dic)
+        return dic
+
+    return [
+        f(*els)
+        for els in itertools.product(interp_orders, supported_particle_layouts())
+    ]
 
 
 def per_interp(dic):
@@ -27,46 +44,37 @@ def per_interp(dic):
 
 @ddt
 class Initialization1DTest(InitializationTest):
-    @data(*interp_orders)
-    def test_nbr_particles_per_cell_is_as_provided(self, interp_order):
+    @data(*permute())
+    @unpack
+    def test_nbr_particles_per_cell_is_as_provided(self, **kwargs):
         print(f"{self._testMethodName}_{ndim}d")
-        self._test_nbr_particles_per_cell_is_as_provided(ndim, interp_order)
+        self._test_nbr_particles_per_cell_is_as_provided(**kwargs)
 
     @data(
-        *per_interp(({"L0": {"B0": Box1D(10, 14)}})),
-        *per_interp(({"L0": {"B0": Box1D(5, 20)}, "L1": {"B0": Box1D(15, 35)}})),
-        *per_interp(({"L0": {"B0": Box1D(2, 12), "B1": Box1D(13, 25)}})),
+        *permute(({"L0": {"B0": Box1D(10, 14)}})),
+        *permute(({"L0": {"B0": Box1D(5, 20)}, "L1": {"B0": Box1D(15, 35)}})),
+        *permute(({"L0": {"B0": Box1D(2, 12), "B1": Box1D(13, 25)}})),
     )
     @unpack
     def test_levelghostparticles_have_correct_split_from_coarser_particle(
-        self, interp_order, refinement_boxes
+        self, **kwargs
     ):
         print(f"{self._testMethodName}_{ndim}d")
 
         self._test_levelghostparticles_have_correct_split_from_coarser_particle(
-            self.getHierarchy(
-                ndim,
-                interp_order,
-                refinement_boxes,
-                "particles",
-                cells=30,
-            )
+            self.getHierarchy(**kwargs, qty="particles", cells=30)
         )
 
     @data(
-        *per_interp(({"L0": {"B0": Box1D(10, 14)}})),
-        *per_interp(({"L0": {"B0": Box1D(5, 20)}, "L1": {"B0": Box1D(15, 35)}})),
-        *per_interp(({"L0": {"B0": Box1D(2, 12), "B1": Box1D(13, 25)}})),
+        *permute(({"L0": {"B0": Box1D(10, 14)}})),
+        *permute(({"L0": {"B0": Box1D(5, 20)}, "L1": {"B0": Box1D(15, 35)}})),
+        *permute(({"L0": {"B0": Box1D(2, 12), "B1": Box1D(13, 25)}})),
     )
     @unpack
-    def test_domainparticles_have_correct_split_from_coarser_particle(
-        self, interp_order, refinement_boxes
-    ):
+    def test_domainparticles_have_correct_split_from_coarser_particle(self, **kwargs):
         print(f"{self._testMethodName}_{ndim}d")
 
-        self._test_domainparticles_have_correct_split_from_coarser_particle(
-            ndim, interp_order, refinement_boxes
-        )
+        self._test_domainparticles_have_correct_split_from_coarser_particle(**kwargs)
 
     @data({"cells": 40, "smallest_patch_size": 20, "largest_patch_size": 20})
     def test_no_patch_ghost_on_refined_level_case(self, simInput):

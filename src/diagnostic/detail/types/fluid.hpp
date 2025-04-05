@@ -5,6 +5,7 @@
 #include "core/numerics/interpolator/interpolator.hpp"
 
 #include "core/data/vecfield/vecfield_component.hpp"
+#include <stdexcept>
 
 namespace PHARE::diagnostic::h5
 {
@@ -86,7 +87,7 @@ void FluidDiagnosticWriter<H5Writer>::compute(DiagnosticProperties& diagnostic)
     if (isActiveDiag(diagnostic, tree, "momentum_tensor"))
     {
         auto computeMomentumTensor
-            = [&](GridLayout& layout, std::string patchID, std::size_t iLvel) {
+            = [&](GridLayout& layout, std::string /*patchID*/, std::size_t /*iLvel*/) {
                   for (auto& pop : ions)
                   {
                       std::string tree{"/ions/pop/" + pop.name() + "/"};
@@ -100,6 +101,7 @@ void FluidDiagnosticWriter<H5Writer>::compute(DiagnosticProperties& diagnostic)
                       // and the former levelGhostPartsNew has been moved to levelGhostPartsOld
                       auto levelGhostParts = core::makeIndexRange(pop.levelGhostParticlesOld());
 
+                      // throw std::runtime_error("no");
                       interpolator(domainParts, pop_momentum_tensor, layout, pop.mass());
                       interpolator(patchGhostParts, pop_momentum_tensor, layout, pop.mass());
                       interpolator(levelGhostParts, pop_momentum_tensor, layout, pop.mass());
@@ -115,7 +117,7 @@ void FluidDiagnosticWriter<H5Writer>::compute(DiagnosticProperties& diagnostic)
             std::string tree{"/ions/pop/" + pop.name() + "/"};
 
             auto computePopMomentumTensor
-                = [&](GridLayout& layout, std::string patchID, std::size_t iLvel) {
+                = [&](GridLayout& layout, std::string /*patchID*/, std::size_t /*iLvel*/) {
                       auto& pop_momentum_tensor = pop.momentumTensor();
                       pop_momentum_tensor.zero();
                       auto domainParts     = core::makeIndexRange(pop.domainParticles());
@@ -126,6 +128,7 @@ void FluidDiagnosticWriter<H5Writer>::compute(DiagnosticProperties& diagnostic)
                       // and the former levelGhostPartsNew has been moved to levelGhostPartsOld
                       auto levelGhostParts = core::makeIndexRange(pop.levelGhostParticlesOld());
 
+                      // throw std::runtime_error("no");
                       interpolator(domainParts, pop_momentum_tensor, layout, pop.mass());
                       interpolator(patchGhostParts, pop_momentum_tensor, layout, pop.mass());
                       interpolator(levelGhostParts, pop_momentum_tensor, layout, pop.mass());

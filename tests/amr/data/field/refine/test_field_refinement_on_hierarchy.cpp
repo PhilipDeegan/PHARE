@@ -1,16 +1,18 @@
+
+
+// #include "core/data/field/field.hpp"
+// #include "core/data/grid/gridlayout_impl.hpp"
+// #include "core/data/grid/gridlayoutdefs.hpp"
+#include "core/data/ndarray/ndarray_vector.hpp"
+
+// #include "amr/data/field/field_geometry.hpp"
+// #include "amr/data/field/field_geometry.hpp"
+// #include "amr/resources_manager/amr_utils.hpp"
+
 #include "test_field_refinement_on_hierarchy.hpp"
 
-#include "gmock/gmock.h"
+// #include "gmock/gmock.h"
 #include "gtest/gtest.h"
-
-
-#include "core/data/field/field.hpp"
-#include "amr/data/field/field_geometry.hpp"
-#include "core/data/grid/gridlayout_impl.hpp"
-#include "core/data/grid/gridlayoutdefs.hpp"
-#include "amr/resources_manager/amr_utils.hpp"
-
-
 
 template<typename TypeInfo /*= std::pair<DimConst<1>, InterpConst<1>>*/>
 struct ALinearFieldRefineTest : public ::testing::Test

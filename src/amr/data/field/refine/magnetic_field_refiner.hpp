@@ -27,7 +27,7 @@ public:
     MagneticFieldRefiner(std::array<core::QtyCentering, dimension> const& centering,
                          SAMRAI::hier::Box const& destinationGhostBox,
                          SAMRAI::hier::Box const& sourceGhostBox,
-                         SAMRAI::hier::IntVector const& ratio)
+                         SAMRAI::hier::IntVector const& /*ratio*/)
         : fineBox_{destinationGhostBox}
         , coarseBox_{sourceGhostBox}
         , centerings_{centering}

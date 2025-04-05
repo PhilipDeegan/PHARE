@@ -8,13 +8,15 @@ import numpy as np
 from dataclasses import dataclass, field
 
 from pyphare.pharesee.run import Run
-from phlop.timing import scope_timer as st
+from pyphare.pharesee.hierarchy import hierarchy_from
+
+import phlop.timing.scope_timer as phst
 
 substeps_per_finer_level = 4
 
 
 @dataclass
-class ScopeTimerFile(st.ScopeTimerFile):
+class ScopeTimerFile(phst.ScopeTimerFile):
     run: Run
     rank: str
     advances: list = field(default_factory=lambda: [])
@@ -144,8 +146,35 @@ class ScopeTimerFile(st.ScopeTimerFile):
 
 
 def file_parser(run, rank, times_filepath):
-    supe = st.file_parser(times_filepath)
+    supe = phst.file_parser(times_filepath)
     return ScopeTimerFile(supe.id_keys, supe.roots, run, str(rank))
+
+
+def _cli_args():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("-f", "--file", default=None, help="timer file")
+    parser.add_argument(
+        "-F", "--filter", default=None, help="filter if function supports it"
+    )
+    return parser
+
+
+def write_scope_timer(scope_timer_filepath=None):
+    if scope_timer_filepath is None:  # assume cli
+        parser = _cli_args()
+        scope_timer_filepath = parser.parse_args().file
+        if not scope_timer_filepath:
+            parser.print_help()
+            sys.exit(1)
+
+    scope_timer_file = phst.file_parser(scope_timer_filepath)
+    phst.write_scope_timings(scope_timer_file, outfile="times.txt")
+    phst.write_root_as_csv(
+        scope_timer_file,
+        "times.csv",
+        ["fn", "dim", "layout", "alloc", "storage", "impl", "time", "norm_ppc"],
+        "update,",
+    )
 
 
 def write_root_as_csv(scope_timer_file, outfile, headers=None, regex=None):
@@ -172,17 +201,36 @@ def print_root_as_csv(scope_timer_file, n_parts, headers=None, regex=None):
 
 def print_variance_across(scope_timer_filepath=None):
     if scope_timer_filepath is None:  # assume cli
-        parser = argparse.ArgumentParser()
-        parser.add_argument("-f", "--file", default=None, help="timer file")
+        parser = _cli_args()
         scope_timer_filepath = parser.parse_args().file
         if not scope_timer_filepath:
             parser.print_help()
             sys.exit(1)
-    st.print_variance_across(scope_timer_filepath)
+    phst.print_variance_across(scope_timer_filepath)
+
+
+def print_scope_timings(scope_timer_filepath=None, sort_worst_first=True, root_id=None):
+    if scope_timer_filepath is None:  # assume cli
+        args = _cli_args().parse_args()
+        scope_timer_filepath = args.file
+        if not scope_timer_filepath:
+            parser.print_help()
+            sys.exit(1)
+        if args.filter:
+            root_id = args.filter
+    phst.print_scope_timings(scope_timer_filepath, sort_worst_first, root_id)
 
 
 if __name__ == "__main__":
-    if len(sys.argv) > 1:
+    if len(sys.argv) == 1:
+        print("usage: $function_name -h")
+        print(
+            "available functions:\n\t"
+            + "\n\t".join([k for k, v in globals().items() if k.startswith("print_")]),
+        )
+    elif len(sys.argv) > 1:
         fn = sys.argv[1]
         sys.argv = [sys.argv[0]] + sys.argv[2:]
+        if fn not in globals():
+            raise ValueError("requested function does not exist")
         globals()[fn]()
