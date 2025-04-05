@@ -32,12 +32,14 @@ class AdvanceTest(AdvanceTestBase):
     def test_overlapped_particledatas_have_identical_particles(
         self, interp_order, refinement_boxes
     ):
+        print(f"{self._testMethodName}_{ndim}d")
         self._test_overlapped_particledatas_have_identical_particles(
             ndim, interp_order, refinement_boxes
         )
 
     @data(*interp_orders)
     def test_L0_particle_number_conservation(self, interp):
+        print(f"{self._testMethodName}_{ndim}d")
         self._test_L0_particle_number_conservation(ndim, interp)
 
     @data(

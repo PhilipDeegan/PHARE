@@ -1,15 +1,21 @@
 #ifndef PHARE_PARTICLES_DATA_SPLIT_HPP
 #define PHARE_PARTICLES_DATA_SPLIT_HPP
 
-
+#include "core/def.hpp"
 #include "core/def/phare_mpi.hpp"
 
-#include "core/def.hpp"
+// #include "core/utilities/constants.hpp"
+#include "core/data/particles/particle_array.hpp"
+#include "core/data/particles/particle_array_def.hpp"
+#include "core/data/particles/particle_array_service.hpp"
+#include "core/data/particles/particle_array_exporter.hpp"
+#include "core/data/particles/particle_array_partitioner.hpp"
+#include "core/data/particles/selecting/detail/def_selecting.hpp"
+
+
 #include "amr/data/particles/particles_data.hpp"
 #include "amr/resources_manager/amr_utils.hpp"
 #include "split.hpp"
-#include "core/utilities/constants.hpp"
-#include "phare_core.hpp"
 #include "amr/amr_constants.hpp"
 
 #include <SAMRAI/geom/CartesianPatchGeometry.h>
@@ -17,7 +23,8 @@
 #include <SAMRAI/hier/RefineOperator.h>
 #include <SAMRAI/pdat/CellOverlap.h>
 
-#include <functional>
+#include <tuple>
+// #include <functional>
 
 
 namespace PHARE
@@ -31,23 +38,160 @@ namespace amr
         coarseBoundaryNew
     };
 
+}
+} // namespace PHARE
 
-    template<std::size_t interp, typename Particle>
-    NO_DISCARD Particle toFineGrid(Particle toFine)
+namespace PHARE::amr
+{
+
+
+
+template<typename Iterator>
+NO_DISCARD auto toFineGrid(Iterator iterator)
+{
+    constexpr auto dim   = Iterator::dimension;
+    constexpr auto ratio = PHARE::amr::refinementRatio;
+
+    core::ParticlePosition<dim> finer{iterator.iCell(), iterator.delta()};
+    auto& [iCell, delta] = finer;
+    for (size_t iDim = 0; iDim < dim; ++iDim)
     {
-        constexpr auto dim   = Particle::dimension;
-        constexpr auto ratio = PHARE::amr::refinementRatio;
+        auto const fineDelta    = delta[iDim] * ratio;
+        auto const fineDeltaInt = static_cast<int>(fineDelta);
+        iCell[iDim]             = iCell[iDim] * ratio + fineDeltaInt;
+        delta[iDim]             = fineDelta - fineDeltaInt;
+    }
 
-        for (size_t iDim = 0; iDim < dim; ++iDim)
+    return finer;
+}
+
+
+
+template<typename ParticleArray, ParticlesDataSplitType splitType, typename Splitter,
+         auto ParticleType_v = ParticleType::Domain>
+struct ParticlesRefining
+{
+    static constexpr auto dim           = Splitter::dimension;
+    static constexpr auto interpOrder   = Splitter::interp_order;
+    static constexpr auto nbRefinedPart = Splitter::nbRefinedPart;
+
+    ParticlesData<ParticleArray>& srcParticlesData;
+    ParticlesData<ParticleArray>& destParticlesData;
+
+
+    // the particle refine operator's job is to fill either domain (during initialization of
+    // new patches) or coarse to fine boundaries (during advance), so we need references to
+    // these arrays on the destination. We don't fill ghosts with this operator, they are
+    // filled from exchanging with neighbor patches.
+    ParticleArray& destParticles = pickDestParticles();
+
+    Splitter split{};
+
+    // the source PatchData is a possible restriction of a "real" patchdata
+    // so that it is the closest from the destination boxes
+    // if all particles from the original source patchdata are in "domainParticles"
+    // they can now be found in either domain of ghost particle arrays of this
+    // temporary restriction "source" patchData
+    // therefore we need references to the domain and ghost particle arrays
+    std::array<ParticleArray const*, 2> particlesArrays{&srcParticlesData.domainParticles,
+                                                        &srcParticlesData.patchGhostParticles};
+
+    auto& pickDestParticles()
+    {
+        bool constexpr putParticlesInCoarseBoundary
+            = splitType == ParticlesDataSplitType::coarseBoundary
+              || splitType == ParticlesDataSplitType::coarseBoundaryOld
+              || splitType == ParticlesDataSplitType::coarseBoundaryNew;
+
+        if constexpr (putParticlesInCoarseBoundary)
         {
-            auto fineDelta     = toFine.delta[iDim] * ratio;
-            int fineDeltaInt   = static_cast<int>(fineDelta);
-            toFine.iCell[iDim] = toFine.iCell[iDim] * ratio + fineDeltaInt;
-            toFine.delta[iDim] = fineDelta - fineDeltaInt;
+            if constexpr (splitType == ParticlesDataSplitType::coarseBoundary)
+                return destParticlesData.levelGhostParticles;
+
+            else if constexpr (splitType == ParticlesDataSplitType::coarseBoundaryOld)
+                return destParticlesData.levelGhostParticlesOld;
+
+            else if constexpr (splitType == ParticlesDataSplitType::coarseBoundaryNew)
+                return destParticlesData.levelGhostParticlesNew; /*
+            else
+                compile error  */
         }
 
-        return toFine;
+        else
+            return destParticlesData.domainParticles;
     }
+
+    void _forBox(core::Box<int, dim> const& destinationBox)
+    {
+        using ArrayParticleArray = typename ParticleArray::template array_type<nbRefinedPart>;
+        auto const splitBox      = getSplitBox(destinationBox);
+
+        auto const per_particle = [&](auto const& particle) {
+            auto refined_info = std::tuple<std::uint16_t, ArrayParticleArray>{0, {}};
+            auto& [p_count, refinedParticles] = refined_info;
+            auto const particleRefinedPos     = toFineGrid(particle);
+            split(particleRefinedPos, particle, refinedParticles);
+            p_count = ParticleArrayPartitioner<ArrayParticleArray>{refinedParticles}(destinationBox)
+                          .size();
+            return refined_info;
+        };
+
+        auto const refiner = [&](auto const& particle) { return toFineGrid(particle); };
+
+        for (auto const& sourceParticlesArray : particlesArrays)
+            export_refined_particles( //
+                *sourceParticlesArray, destParticles, splitBox, refiner, per_particle);
+    }
+
+    void forBoxes(SAMRAI::hier::BoxContainer const& boxes)
+    {
+        std::size_t const curr_size = destParticles.size();
+        for (auto const& box : boxes)
+            _forBox(phare_box_from<dim>(box));
+        _finish(curr_size);
+    }
+
+    template<typename BoxContainer_t>
+    void forBoxes(BoxContainer_t const& boxes)
+    {
+        std::size_t const curr_size = destParticles.size();
+        for (auto const& box : boxes)
+            _forBox(box);
+        _finish(curr_size);
+    }
+
+    void _finish(std::size_t const old_size)
+    {
+        // if constexpr (ParticleArray::layout_mode == core::LayoutMode::AoSMapped)
+        //     destParticles.map_particles(old_size);
+
+        core::ParticleArrayService::sync<2, ParticleType_v>(destParticles);
+    }
+
+    void operator()(SAMRAI::pdat::CellOverlap const& destFieldOverlap)
+    {
+        // We get the source box that contains ghost region in order to get local index later
+        // same for destinationGhostBox and destinationDomainBox the later will allow to get an
+        // index relative to the interior
+        forBoxes(destFieldOverlap.getDestinationBoxContainer());
+    }
+
+    auto static getSplitBox(core::Box<int, dim> destinationBox)
+    {
+        return destinationBox.grow(Splitter::maxCellDistanceFromSplit());
+    }
+
+    ~ParticlesRefining() {}
+};
+
+
+} // namespace PHARE::amr
+
+namespace PHARE
+{
+namespace amr
+{
+
 
 
     template<typename ParticleArray, ParticlesDataSplitType splitType, typename Splitter>
@@ -90,7 +234,6 @@ namespace amr
             auto const& destinationFieldOverlap
                 = dynamic_cast<SAMRAI::pdat::CellOverlap const&>(fineOverlap);
 
-
             // We then need to get our ParticlesData from the patch
             auto destinationParticlesData = std::dynamic_pointer_cast<ParticlesData<ParticleArray>>(
                 destination.getPatchData(destinationComponent));
@@ -99,25 +242,8 @@ namespace amr
                 = std::dynamic_pointer_cast<ParticlesData<ParticleArray>>(
                     source.getPatchData(sourceComponent));
 
-            // Finnaly we need the cartesion geometry of both patch.
-            auto patchGeomDestination
-                = std::dynamic_pointer_cast<SAMRAI::geom::CartesianPatchGeometry>(
-                    destination.getPatchGeometry());
-
-            auto patchGeomSource = std::dynamic_pointer_cast<SAMRAI::geom::CartesianPatchGeometry>(
-                source.getPatchGeometry());
-
-
-
-            TBOX_ASSERT(destinationParticlesData);
-            TBOX_ASSERT(sourceParticlesData);
-            TBOX_ASSERT(patchGeomDestination);
-            TBOX_ASSERT(patchGeomSource);
-
-
-
-            // We have a correct data type, we can now perform the refine
-            refine_(*destinationParticlesData, *sourceParticlesData, destinationFieldOverlap);
+            ParticlesRefining<ParticleArray, splitType, Splitter>{
+                *sourceParticlesData, *destinationParticlesData}(destinationFieldOverlap);
         }
 
     private:
@@ -131,137 +257,6 @@ namespace amr
                 case ParticlesDataSplitType::coarseBoundaryNew: return "coarseBoundaryNew";
                 default: throw std::runtime_error("End of enum class possible range");
             }
-        }
-
-
-        /** @brief given two ParticlesData (destination and source),
-         * an overlap , a ratio and the geometry of both patches, perform the
-         * splitting of coarse particles onto the destination patch
-         */
-        void refine_(ParticlesData<ParticleArray>& destParticlesData,
-                     ParticlesData<ParticleArray> const& srcParticlesData,
-                     SAMRAI::pdat::CellOverlap const& destFieldOverlap) const
-        {
-            // the source PatchData is a possible restriction of a "real" patchdata
-            // so that it is the closest from the destination boxes
-            // if all particles from the original source patchdata are in "domainParticles"
-            // they can now be found in either domain of ghost particle arrays of this
-            // temporary restriction "source" patchData
-            // therefore we need references to the domain and ghost particle arrays
-            auto const& srcInteriorParticles = srcParticlesData.domainParticles;
-            auto const& srcGhostParticles    = srcParticlesData.patchGhostParticles;
-
-            // the particle refine operator's job is to fill either domain (during initialization of
-            // new patches) or coarse to fine boundaries (during advance), so we need references to
-            // these arrays on the destination. We don't fill ghosts with this operator, they are
-            // filled from exchanging with neighbor patches.
-            auto const& destBoxes                = destFieldOverlap.getDestinationBoxContainer();
-            auto& destCoarseBoundaryParticles    = destParticlesData.levelGhostParticles;
-            auto& destDomainParticles            = destParticlesData.domainParticles;
-            auto& destCoarseBoundaryOldParticles = destParticlesData.levelGhostParticlesOld;
-            auto& destCoarseBoundaryNewParticles = destParticlesData.levelGhostParticlesNew;
-
-
-            // We get the source box that contains ghost region in order to get local index later
-            // same for destinationGhostBox and destinationDomainBox the later will allow to get an
-            // index relative to the interior
-
-            Splitter split;
-
-            // The PatchLevelFillPattern had compute boxes that correspond to the expected filling.
-            // In case of a coarseBoundary it will most likely give multiple boxes
-            // in case of interior, this will be just one box usually
-            for (auto const& destinationBox : destBoxes)
-            {
-                std::array particlesArrays{&srcInteriorParticles, &srcGhostParticles};
-                auto splitBox = getSplitBox(destinationBox);
-
-                auto isInDest = [&destinationBox](auto const& particle) //
-                { return isInBox(destinationBox, particle); };
-
-
-                for (auto const& sourceParticlesArray : particlesArrays)
-                {
-                    for (auto const& particle : *sourceParticlesArray)
-                    {
-                        std::array<typename ParticleArray::value_type, nbRefinedPart>
-                            refinedParticles;
-                        auto particleRefinedPos = toFineGrid<interpOrder>(particle);
-
-                        if (isInBox(splitBox, particleRefinedPos))
-                        {
-                            split(particleRefinedPos, refinedParticles);
-
-
-                            // we need to know in which of interior or levelGhostParticlesXXXX
-                            // arrays we must put particles
-
-                            bool constexpr putParticlesInCoarseBoundary
-                                = splitType == ParticlesDataSplitType::coarseBoundary
-                                  || splitType == ParticlesDataSplitType::coarseBoundaryOld
-                                  || splitType == ParticlesDataSplitType::coarseBoundaryNew;
-
-
-
-                            if constexpr (putParticlesInCoarseBoundary)
-                            {
-                                if constexpr (splitType == ParticlesDataSplitType::coarseBoundary)
-                                {
-                                    /*std::cout << "copying " << refinedParticles.size()
-                                              << " particles into levelGhost\n";*/
-                                    std::copy_if(
-                                        std::begin(refinedParticles), std::end(refinedParticles),
-                                        std::back_inserter(destCoarseBoundaryParticles), isInDest);
-                                }
-                                else if constexpr (splitType
-                                                   == ParticlesDataSplitType::coarseBoundaryOld)
-                                {
-                                    /*std::cout << "copying " << refinedParticles.size()
-                                              << " particles into levelGhostOld\n";*/
-                                    std::copy_if(std::begin(refinedParticles),
-                                                 std::end(refinedParticles),
-                                                 std::back_inserter(destCoarseBoundaryOldParticles),
-                                                 isInDest);
-                                }
-                                else //  splitType is coarseBoundaryNew
-                                {
-                                    /*std::cout << "copying " << refinedParticles.size()
-                                              << " particles into levelGhostNew\n";*/
-                                    std::copy_if(std::begin(refinedParticles),
-                                                 std::end(refinedParticles),
-                                                 std::back_inserter(destCoarseBoundaryNewParticles),
-                                                 isInDest);
-                                }
-                            }
-
-                            else
-                            {
-                                /*std::cout << "copying " << refinedParticles.size()
-                                          << " particles into domain\n";*/
-                                std::copy_if(std::begin(refinedParticles),
-                                             std::end(refinedParticles),
-                                             std::back_inserter(destDomainParticles), isInDest);
-                            }
-                        } // end is candidate for split
-                    }     // end loop on particles
-                }         // end loop on source particle arrays
-            }             // loop on destination box
-        }
-
-
-        SAMRAI::hier::Box getSplitBox(SAMRAI::hier::Box const& destinationBox) const
-        {
-            SAMRAI::hier::Box splitBox{destinationBox};
-            SAMRAI::tbox::Dimension dimension{dim};
-            auto growingVec = SAMRAI::hier::IntVector::getZero(dimension);
-
-            for (auto iDim = 0u; iDim < dim; ++iDim)
-            {
-                growingVec[iDim] = Splitter::maxCellDistanceFromSplit();
-            }
-            splitBox.grow(growingVec);
-
-            return splitBox;
         }
     };
 

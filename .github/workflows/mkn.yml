@@ -1,0 +1,39 @@
+name: mkn
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Install system deps (openmpi, hdf5, ccache,...)
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y libopenmpi-dev openmpi-bin libhdf5-openmpi-dev ccache
+
+    - name: "setup"
+      env:
+        MKN_GCC_PREFERRED: 1
+      run: |
+        curl -Lo mkn https://github.com/mkn/mkn/releases/download/latest/mkn_nix
+        chmod +x mkn
+        sudo mkdir /mkn && sudo chown -R $USER /mkn
+
+    - name: "Build/Test"
+      env:
+        MKN_GCC_PREFERRED: 1
+      run: |
+        export PATH="$PWD:$PATH"
+        export KLOG=3
+        export CARGS="-P HDF5_LIB=hdf5,HDF5_PTH=/usr/lib/x86_64-linux-gnu/hdf5/openmpi,HDF5_INC=/usr/include/hdf5/openmpi"
+        ./mkn.sh clean build run -ga '--std=c++20 -fPIC' -x res/mkn/mpi

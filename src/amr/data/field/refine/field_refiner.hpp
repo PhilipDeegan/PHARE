@@ -4,12 +4,13 @@
 
 #include "core/def/phare_mpi.hpp"
 
-
-#include "core/data/grid/gridlayoutdefs.hpp"
-#include "core/data/field/field.hpp"
 #include "field_linear_refine.hpp"
-#include "core/utilities/constants.hpp"
+// #include "core/data/field/field.hpp"
+// #include "core/utilities/constants.hpp"
 #include "core/utilities/point/point.hpp"
+#include "core/data/grid/gridlayoutdefs.hpp"
+
+#include "amr/resources_manager/amr_utils.hpp"
 
 #include <SAMRAI/hier/Box.h>
 

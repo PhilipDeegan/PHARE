@@ -44,7 +44,7 @@ namespace core
             : rho_{densityName(), HybridQuantity::Scalar::rho}
             , massDensity_{massDensityName(), HybridQuantity::Scalar::rho}
             , bulkVelocity_{"bulkVel", HybridQuantity::Vector::V}
-            , populations_{generate(
+            , populations_{generate_from(
                   [&dict](auto ipop) { //
                       return IonPopulation{dict["pop" + std::to_string(ipop)]};
                   },
@@ -250,6 +250,7 @@ namespace core
                 ss << core::to_str(pop);
             return ss.str();
         }
+
 
         NO_DISCARD bool sameMasses() const { return sameMasses_; }
 

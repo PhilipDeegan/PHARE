@@ -1,9 +1,9 @@
 #ifndef PHARE_CORE_NUMERIC_PUSHER_PUSHER_FACTORY_HPP
 #define PHARE_CORE_NUMERIC_PUSHER_PUSHER_FACTORY_HPP
 
-#include <cstddef>
 #include <memory>
 #include <string>
+#include <cstddef>
 
 #include "boris.hpp"
 #include "pusher.hpp"
@@ -17,7 +17,9 @@ namespace core
     public:
         template<std::size_t dim, typename ParticleRange, typename Electromag,
                  typename Interpolator, typename BoundaryCondition, typename GridLayout>
-        static auto makePusher(std::string pusherName)
+        static std::unique_ptr<
+            Pusher<dim, ParticleRange, Electromag, Interpolator, BoundaryCondition, GridLayout>>
+        makePusher(std::string pusherName)
         {
             if (pusherName == "modified_boris")
             {

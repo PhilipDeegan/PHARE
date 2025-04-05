@@ -1,6 +1,7 @@
 #include <type_traits>
 
 
+#include "phare_core.hpp"
 
 #include "core/data/ions/ion_population/ion_population.hpp"
 #include "core/data/ions/ions.hpp"
@@ -27,10 +28,14 @@ using namespace PHARE::core;
 
 static constexpr std::size_t dim         = 1;
 static constexpr std::size_t interpOrder = 1;
-using GridImplYee1D                      = GridLayoutImplYee<dim, interpOrder>;
-using GridYee1D                          = GridLayout<GridImplYee1D>;
-using MaxwellianParticleInitializer1D = MaxwellianParticleInitializer<ParticleArray<1>, GridYee1D>;
 
+using PHARE_TYPES     = PHARE::core::PHARE_Types<dim, interpOrder>;
+using NdArray_t       = typename PHARE_TYPES::Array_t;
+using ParticleArray_t = typename PHARE_TYPES::ParticleArray_t;
+
+using GridImplYee1D                   = GridLayoutImplYee<dim, interpOrder>;
+using GridYee1D                       = GridLayout<GridImplYee1D>;
+using MaxwellianParticleInitializer1D = MaxwellianParticleInitializer<ParticleArray_t, GridYee1D>;
 
 
 class theIons : public ::testing::Test
@@ -41,7 +46,8 @@ protected:
     using SymTensorField1D = SymTensorField<Field1D, HybridQuantity>;
     using InitFunctionT    = PHARE::initializer::InitFunction<1>;
 
-    using IonPopulation1D = IonPopulation<ParticleArray<1>, VecField1D, SymTensorField1D>;
+    using IonPopulation1D = IonPopulation<ParticleArray_t, VecField1D, SymTensorField1D>;
+
     Ions<IonPopulation1D, GridYee1D> ions;
 
     PHARE::initializer::PHAREDict createIonsDict()

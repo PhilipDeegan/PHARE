@@ -8,6 +8,7 @@ import unittest
 import matplotlib
 from ddt import data, ddt, unpack
 from pyphare.core.box import Box1D
+from pyphare.cpp import supported_particle_layouts
 
 from tests.simulator.test_advance import AdvanceTestBase
 
@@ -21,15 +22,24 @@ def per_interp(dic):
     return [(interp, dic) for interp in interp_orders]
 
 
+def permute(dic):
+    import itertools
+
+    return [
+        (dic, *els)
+        for els in itertools.product(interp_orders, supported_particle_layouts())
+    ]
+
+
 @ddt
 class AdvanceTest(AdvanceTestBase):
     @data(
-        *per_interp({}),
-        *per_interp({"L0": [Box1D(10, 19)]}),
-        *per_interp({"L0": [Box1D(8, 20)]}),
+        *permute({}),
+        # *permute({"L0": [Box1D(10, 19)]}),
+        # *permute({"L0": [Box1D(8, 20)]}),
     )
     @unpack
-    def test_overlaped_fields_are_equal(self, interp_order, refinement_boxes):
+    def test_overlaped_fields_are_equal(self, refinement_boxes, interp_order, layout):
         print(f"{self._testMethodName}_{ndim}d")
         time_step_nbr = 3
         time_step = 0.001
@@ -41,6 +51,7 @@ class AdvanceTest(AdvanceTestBase):
             "eb",
             time_step=time_step,
             time_step_nbr=time_step_nbr,
+            sim_setup_kwargs=dict(layout=layout),
         )
         self._test_overlaped_fields_are_equal(datahier, time_step_nbr, time_step)
 
