@@ -1,11 +1,12 @@
 #ifndef PHARE_DIAGNOSTIC_DETAIL_TYPES_FLUID_HPP
 #define PHARE_DIAGNOSTIC_DETAIL_TYPES_FLUID_HPP
 
+#include "core/utilities/range/range.hpp"
 #include "diagnostic/detail/h5typewriter.hpp"
+#include "core/data/vecfield/vecfield_component.hpp"
 #include "core/numerics/interpolator/interpolator.hpp"
 
-#include "core/data/vecfield/vecfield_component.hpp"
-#include <stdexcept>
+// #include <stdexcept>
 
 namespace PHARE::diagnostic::h5
 {
