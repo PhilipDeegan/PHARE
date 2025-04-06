@@ -1,13 +1,6 @@
 #ifndef PHARE_CORE_INCLUDE_HPP
 #define PHARE_CORE_INCLUDE_HPP
 
-
-#include <string>
-#include <vector>
-#include <cstdint>
-#include <functional>
-#include <unordered_map>
-
 #include "core/logger.hpp"
 #include "core/vector.hpp"
 
@@ -29,6 +22,13 @@
 #include "core/utilities/algorithm.hpp"
 
 #include "cppdict/include/dict.hpp"
+
+
+#include <string>
+#include <vector>
+#include <cstdint>
+#include <functional>
+#include <unordered_map>
 
 namespace PHARE::core
 {

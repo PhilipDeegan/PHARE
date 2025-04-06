@@ -92,7 +92,6 @@ public:
     template<typename ModelViews>
     static void move(MultiBoris<ModelViews>& in)
     {
-        using ParticleArray_v            = typename MultiBoris<ModelViews>::ParticleArray_v;
         static constexpr auto alloc_mode = Particles_t::alloc_mode;
 
         auto& streamer = in.streamer;
@@ -148,11 +147,12 @@ public:
                         auto per_any_particle = [=] _PHARE_ALL_FN_(auto& particles,
                                                                    auto&&... args) mutable {
                             auto const& pidx = std::get<1>(std::forward_as_tuple(args...));
-
+#if PHARE_HAVE_THRUST
                             using enum LayoutMode;
-                            if constexpr (any_in(ParticleArray_v::layout_mode, SoA, SoAPC, SoATS))
+                            if constexpr (any_in(Particles_t::layout_mode, SoA, SoAPC, SoATS))
                                 per_particle(detail::SoAZipParticle{particles, pidx}, args...);
                             else
+#endif
                                 per_particle(particles[pidx], args...);
                         };
 

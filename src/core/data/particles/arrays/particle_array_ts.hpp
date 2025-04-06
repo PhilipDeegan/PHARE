@@ -1502,7 +1502,7 @@ void TileSetSpan<Particles, impl>::sync_add_new() _PHARE_ALL_FN_
     }
     else if (Particles::alloc_mode == AllocatorMode::GPU_UNIFIED)
     {
-#if PHARE_HAVE_MKN_GPU
+#if PHARE_HAVE_MKN_GPU and PHARE_HAVE_THRUST
 
         auto const& kidx = mkn::gpu::idx();
         auto& tile       = particles_[kidx];
@@ -1544,7 +1544,7 @@ void TileSetSpan<Particles, impl>::sync_add_new() _PHARE_ALL_FN_
             ++left;
         }
 
-#endif // PHARE_HAVE_MKN_GPU
+#endif // PHARE_HAVE_MKN_GPU and PHARE_HAVE_THRUST
     }
 }
 

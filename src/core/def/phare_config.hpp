@@ -12,25 +12,31 @@
 
 #include <cstdint>
 
-#if PHARE_HAVE_MKN_GPU or PHARE_HAVE_UMPIRE
+#if !defined(PHARE_HAVE_GPU)
+#if PHARE_HAVE_MKN_GPU_HW or PHARE_HAVE_UMPIRE
 #define PHARE_HAVE_GPU 1
-#define PHARE_WITH_GPU(...) __VA_ARGS__
-#else
+#endif // PHARE_HAVE_MKN_GPU_HW or PHARE_HAVE_UMPIRE
+#endif // !defined(PHARE_HAVE_GPU)
+
+
+#if !defined(PHARE_HAVE_GPU)
 #define PHARE_HAVE_GPU 0
-#define PHARE_WITH_GPU(...)
-#endif
+#endif // !defined(PHARE_HAVE_GPU)
+
 
 #if PHARE_HAVE_GPU
 
 #define _PHARE_DEV_FN_ __device__
 #define _PHARE_HST_FN_ __host__
 #define _PHARE_ALL_FN_ _PHARE_HST_FN_ _PHARE_DEV_FN_
+#define PHARE_WITH_GPU(...) __VA_ARGS__
 
 #else // !PHARE_HAVE_GPU
 
 #define _PHARE_DEV_FN_
 #define _PHARE_HST_FN_
 #define _PHARE_ALL_FN_
+#define PHARE_WITH_GPU(...)
 
 #endif // PHARE_HAVE_GPU
 
@@ -39,13 +45,14 @@ namespace PHARE
 {
 struct CompileOptions
 {
-    static constexpr bool WithUmpire = PHARE_HAVE_UMPIRE;
-    static constexpr bool WithMknGpu = PHARE_HAVE_MKN_GPU;
-    static constexpr bool WithMknAVX = PHARE_HAVE_MKN_AVX;
-    static constexpr bool WithRAJA   = PHARE_HAVE_RAJA;
-    static constexpr bool WithThrust = PHARE_HAVE_THRUST;
-    static constexpr bool WithKokkos = PHARE_HAVE_KOKKOS;
-    static constexpr bool WithGpu    = WithUmpire || WithMknGpu;
+    static constexpr bool WithUmpire   = PHARE_HAVE_UMPIRE;
+    static constexpr bool WithMknGpu   = PHARE_HAVE_MKN_GPU;
+    static constexpr bool WithMknGpuHW = PHARE_HAVE_MKN_GPU_HW;
+    static constexpr bool WithMknAVX   = PHARE_HAVE_MKN_AVX;
+    static constexpr bool WithRAJA     = PHARE_HAVE_RAJA;
+    static constexpr bool WithThrust   = PHARE_HAVE_THRUST;
+    static constexpr bool WithKokkos   = PHARE_HAVE_KOKKOS;
+    static constexpr bool WithGpu      = WithUmpire || WithMknGpu;
 };
 
 
