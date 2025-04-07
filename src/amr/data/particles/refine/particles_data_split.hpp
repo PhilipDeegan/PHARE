@@ -4,7 +4,6 @@
 #include "core/def.hpp"
 #include "core/def/phare_mpi.hpp"
 
-// #include "core/utilities/constants.hpp"
 #include "core/data/particles/particle_array.hpp"
 #include "core/data/particles/particle_array_def.hpp"
 #include "core/data/particles/particle_array_service.hpp"
@@ -15,8 +14,9 @@
 
 #include "amr/data/particles/particles_data.hpp"
 #include "amr/resources_manager/amr_utils.hpp"
-#include "split.hpp"
 #include "amr/amr_constants.hpp"
+
+#include "split.hpp"
 
 #include <SAMRAI/geom/CartesianPatchGeometry.h>
 #include <SAMRAI/hier/Box.h>
@@ -24,7 +24,6 @@
 #include <SAMRAI/pdat/CellOverlap.h>
 
 #include <tuple>
-// #include <functional>
 
 
 namespace PHARE
@@ -67,13 +66,15 @@ NO_DISCARD auto toFineGrid(Iterator iterator)
 
 
 
-template<typename ParticleArray, ParticlesDataSplitType splitType, typename Splitter,
-         auto ParticleType_v = ParticleType::Domain>
+template<typename ParticleArray, ParticlesDataSplitType splitType, typename Splitter>
 struct ParticlesRefining
 {
-    static constexpr auto dim           = Splitter::dimension;
-    static constexpr auto interpOrder   = Splitter::interp_order;
-    static constexpr auto nbRefinedPart = Splitter::nbRefinedPart;
+    static constexpr auto dim            = Splitter::dimension;
+    static constexpr auto interpOrder    = Splitter::interp_order;
+    static constexpr auto nbRefinedPart  = Splitter::nbRefinedPart;
+    static constexpr auto ParticleType_v = splitType == ParticlesDataSplitType::interior
+                                               ? ParticleType::Domain
+                                               : ParticleType::Ghost;
 
     ParticlesData<ParticleArray>& srcParticlesData;
     ParticlesData<ParticleArray>& destParticlesData;

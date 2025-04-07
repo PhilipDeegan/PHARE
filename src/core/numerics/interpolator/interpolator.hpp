@@ -936,8 +936,8 @@ protected:
 };
 
 
-template<std::size_t dim, std::size_t interpOrder>
-class MomentumTensorInterpolator : public Interpolator<dim, interpOrder>
+template<std::size_t dim, std::size_t interpOrder, bool atomic_ops = false>
+class MomentumTensorInterpolator : public Interpolator<dim, interpOrder, false>
 {
 public:
     template<typename ParticleRange, typename TensorField, typename GridLayout>

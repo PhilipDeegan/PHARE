@@ -103,13 +103,13 @@ namespace core
         template<typename V>
         auto as(auto&& a, auto&&... args)
         {
-            return V{a(E, args...), a(B, args...)};
+            return V{{a(E, args...)}, {a(B, args...)}};
         }
 
         template<typename V>
         auto as(auto&& a, auto&&... args) const
         {
-            return V{a(E, args...), a(B, args...)};
+            return V{{a(E, args...)}, {a(B, args...)}};
         }
 
 

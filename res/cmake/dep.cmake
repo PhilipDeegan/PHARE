@@ -60,4 +60,4 @@ include("${PHARE_PROJECT_DIR}/res/cmake/dep/magicenum.cmake")
 # KokkosTools
 include("${PHARE_PROJECT_DIR}/res/cmake/dep/kokkos_tools.cmake")
 
-# include("${PHARE_PROJECT_DIR}/res/cmake/dep/mkn.cmake")
+include("${PHARE_PROJECT_DIR}/res/cmake/dep/mkn.cmake")

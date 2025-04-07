@@ -117,7 +117,8 @@ void ParticlesExporter<AoSTS, CPU>::operator()(Src const& src, Dst& dst, Box_t c
 {
     std::size_t constexpr ratio = 2; // to do - get somewhere else
 
-    auto const& dstBox           = dst.ghost_box();
+    auto const& dstBox = dst.ghost_box();
+
     auto const fineDstOverlapOpt = box * dstBox;
     if (!fineDstOverlapOpt)
         return;
@@ -125,7 +126,7 @@ void ParticlesExporter<AoSTS, CPU>::operator()(Src const& src, Dst& dst, Box_t c
     auto const& fineDstOverlap = *fineDstOverlapOpt;
     auto const coarseDstBox    = box / ratio;
 
-    for (auto const& src_tile : src()) // !expensive!
+    for (auto const& src_tile : src()) // !expensive! covers ghost box
     {
         auto const overlap_opt = coarseDstBox * src_tile;
         if (not overlap_opt)

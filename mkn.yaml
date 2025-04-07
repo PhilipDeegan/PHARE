@@ -14,7 +14,7 @@ property:
   mkn.base: base_
   mkn.args: -DPHARE_HAS_HIGHFIVE=1 -DPHARE_DIAG_DOUBLES=1
   mkn.flag: -Wno-macro-redefined -Wno-unknown-cuda-version
-  samrai.ver: master
+  samrai.ver: mpi
 
 
 profile:

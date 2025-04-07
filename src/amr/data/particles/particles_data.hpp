@@ -1,14 +1,23 @@
 #ifndef PHARE_SRC_AMR_DATA_PARTICLES_PARTICLES_DATA_HPP
 #define PHARE_SRC_AMR_DATA_PARTICLES_PARTICLES_DATA_HPP
 
-#include <vector>
-#include <cstddef>
-#include <numeric>
-#include <iterator>
-#include <stdexcept>
-
-#include "core/data/particles/particle_array_def.hpp"
 #include "core/def/phare_mpi.hpp" // needs to be before samrai includes
+
+#include "core/def.hpp"
+#include "core/logger.hpp"
+#include "core/vector.hpp"
+#include "core/utilities/types.hpp"
+
+#include "core/utilities/point/point.hpp"
+#include "core/data/particles/particle_array.hpp"
+#include "core/data/particles/particle_packer.hpp"
+#include "core/data/ions/ion_population/particle_pack.hpp"
+#include "core/utilities/partitionner/partitionner.hpp"
+
+#include "hdf5/detail/hdf5_utils.hpp"
+
+#include "amr/resources_manager/amr_utils.hpp"
+#include "amr/utilities/box/amr_box.hpp"
 
 
 #include <SAMRAI/hier/BoxOverlap.h>
@@ -19,25 +28,11 @@
 #include <SAMRAI/tbox/RestartManager.h>
 #include "SAMRAI/hier/Transformation.h"
 
-
-#include "core/def.hpp"
-#include "core/logger.hpp"
-#include "core/utilities/types.hpp"
-#include "core/vector.hpp"
-
-
-#include "core/data/ions/ion_population/particle_pack.hpp"
-#include "core/data/particles/particle_array.hpp"
-#include "core/data/particles/particle_packer.hpp"
-#include "core/utilities/point/point.hpp"
-#include "core/utilities/partitionner/partitionner.hpp"
-
-
-#include "hdf5/detail/hdf5_utils.hpp"
-
-#include "amr/resources_manager/amr_utils.hpp"
-#include "amr/utilities/box/amr_box.hpp"
-
+#include <vector>
+#include <cstddef>
+// #include <numeric>
+// #include <iterator>
+#include <stdexcept>
 
 namespace PHARE
 {
@@ -375,7 +370,7 @@ namespace amr
 
             SamBox const& sourceBox  = pSource.getBox();
             SamBox const& myGhostBox = getGhostBox();
-            const SamBox intersectionBox{sourceBox * myGhostBox};
+            SamBox const intersectionBox{sourceBox * myGhostBox};
 
             if (!intersectionBox.empty())
             {

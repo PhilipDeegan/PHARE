@@ -222,6 +222,30 @@ auto constexpr base_layout_type()
 }
 
 
+template<typename ParticleArray_t>
+auto count_particles_per_cell(ParticleArray_t const& ps)
+{
+    std::unordered_map<std::string, std::size_t> count_per_cell;
+
+    auto inc_cell = [&](auto const& cell) {
+        auto const p = Point{cell}.str();
+        if (count_per_cell.count(p) == 0)
+            count_per_cell.emplace(p, 0);
+        ++count_per_cell[p];
+    };
+
+    if constexpr (any_in(ParticleArray_t::layout_mode, AoSTS))
+        for (auto const& tile : ps())
+            for (auto const& p : tile())
+                inc_cell(p.iCell());
+    else
+        for (auto const& p : ps)
+            inc_cell(p.iCell());
+
+    return count_per_cell;
+}
+
+
 } // namespace PHARE::core
 
 #endif

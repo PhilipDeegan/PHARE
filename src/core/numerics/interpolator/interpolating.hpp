@@ -14,11 +14,12 @@ namespace PHARE::core
 // simple facade to launch e.g. GPU kernels if needed
 //  and to not need to modify the interpolator much for gpu specifically
 
-template<typename ParticleArray_t, std::size_t interpOrder, bool atomic_ops>
+template<typename ParticleArray_t, std::size_t interpOrder, bool atomic_ops,
+         typename Interpolator_t
+         = Interpolator<ParticleArray_t::dimension, interpOrder, atomic_ops>>
 class Interpolating
 {
     auto constexpr static dim = ParticleArray_t::dimension;
-    using Interpolator_t      = Interpolator<dim, interpOrder, atomic_ops>;
 
 public:
     template<typename Particles, typename VecField, typename GridLayout, typename Field>
@@ -123,7 +124,7 @@ public:
     static void box_kernel(Particles& particles, GridLayout& layout, VecField& flux, Field& density,
                            double coef = 1.) _PHARE_ALL_FN_
     {
-#if PHARE_HAVE_MKN_GPU
+#if PHARE_HAVE_MKN_GPU_HW
         using lobox_t         = Particles::lobox_t;
         using Launcher        = gpu::BoxCellNLauncher<lobox_t>;
         auto const& lobox     = particles.local_box();
@@ -147,14 +148,14 @@ public:
                     interp();
             }
         }
-#endif // PHARE_HAVE_MKN_GPU
+#endif // PHARE_HAVE_MKN_GPU_HW
     }
 
     template<typename Particles, typename GridLayout, typename VecField, typename Field>
     static void chunk_kernel_ts(Particles& particles, GridLayout& layout, VecField& flux,
                                 Field& density, double coef = 1.) _PHARE_ALL_FN_
     {
-#if PHARE_HAVE_MKN_GPU
+#if PHARE_HAVE_MKN_GPU_HW
 
         Point<std::uint32_t, 3> const rcell{threadIdx.z, threadIdx.y, threadIdx.x};
         extern __shared__ double data[];
@@ -191,15 +192,14 @@ public:
         doX.template operator()<3>(flux[2]);
 
 
-#endif // PHARE_HAVE_MKN_GPU
+#endif // PHARE_HAVE_MKN_GPU_HW
     }
 
     template<typename Field, typename Particles, typename GridLayout>
-    static void on_tiles(Particles& particles, GridLayout& layout, double coef = 1.) _PHARE_ALL_FN_
+    static void on_tiles(Particles& particles, GridLayout& layout, double coef = 1.) _PHARE_DEV_FN_
     {
-#if PHARE_HAVE_MKN_GPU == 0
-        throw std::runtime_error("nah");
-#else
+#if PHARE_HAVE_MKN_GPU_HW
+
         static_assert(atomic_ops, "GPU must be atomic");
         using TensorField_t = basic::TensorField<typename Field::Super::Super, 1>;
         extern __shared__ double data[];
@@ -282,11 +282,9 @@ public:
 
     template<typename Particles, typename GridLayout, typename VecField, typename Field>
     static void chunk_kernel_ts_all(Particles& particles, GridLayout& layout, VecField& flux,
-                                    Field& density, double coef = 1.) _PHARE_ALL_FN_
+                                    Field& density, double coef = 1.) _PHARE_DEV_FN_
     {
-#if PHARE_HAVE_MKN_GPU == 0
-        throw std::runtime_error("nah");
-#else
+#if PHARE_HAVE_MKN_GPU_HW
 
         Point<std::uint32_t, 3> const rcell{threadIdx.z, threadIdx.y, threadIdx.x};
         extern __shared__ double data[];
@@ -347,15 +345,15 @@ public:
         doX(fz, flux[2]);
 
 
-#endif // PHARE_HAVE_MKN_GPU
+#endif // PHARE_HAVE_MKN_GPU_HW
     }
 
 
     template<typename Particles, typename GridLayout, typename VecField, typename Field>
     static void chunk_kernel(Particles& particles, GridLayout& layout, VecField& flux,
-                             Field& density, double coef = 1.) _PHARE_ALL_FN_
+                             Field& density, double coef = 1.) _PHARE_DEV_FN_
     {
-#if PHARE_HAVE_MKN_GPU
+#if PHARE_HAVE_MKN_GPU_HW
         auto constexpr static nghosts = GridLayout::nbrGhosts();
         extern __shared__ double data[];
         auto const& lobox = particles.local_box();
@@ -454,7 +452,7 @@ public:
         }
 
 
-#endif // PHARE_HAVE_MKN_GPU
+#endif // PHARE_HAVE_MKN_GPU_HW
     }
 
     template<typename Particles, typename GridLayout, typename VecField, typename Field>
@@ -483,6 +481,30 @@ public:
 
 
     Interpolator_t interp_;
+};
+
+template<std::size_t dim, std::size_t interpOrder, bool atomic_ops = false>
+struct MomentumTensorInterpolating
+{
+    using Interpolator_t = MomentumTensorInterpolator<dim, interpOrder, atomic_ops>;
+
+    Interpolator_t interp_;
+
+public:
+    template<typename Particles_t, typename TensorField, typename GridLayout>
+    inline void operator()(Particles_t& particles, TensorField& momentumTensor,
+                           GridLayout const& layout, double mass = 1.)
+    {
+        using enum LayoutMode;
+
+        if constexpr (any_in(Particles_t::layout_mode, AoSMapped))
+            interp_(particles, momentumTensor, layout, mass);
+        else if constexpr (any_in(Particles_t::layout_mode, AoSTS))
+        {
+            for (auto const& tile : particles())
+                interp_(tile(), momentumTensor, layout, mass);
+        }
+    }
 };
 
 } // namespace PHARE::core

@@ -25,7 +25,7 @@ clargs(){
 # FILE="tests/amr/data/particles/stream_pack/test_main.cpp"
 # FILE="tests/amr/data/particles/copy_overlap/test_particledata_copy_periodicNd.cpp"
 # FILE="tests/amr/data/particles/test_particles_data.cpp"
-# FILE="tests/amr/data/particles/refine/test_particles_data_split.cpp"
+FILE="tests/amr/data/particles/refine/test_particles_data_split.cpp"
 # FILE="tests/core/numerics/ion_updater/test_multi_updater.cpp"
 FILE="tests/core/numerics/ion_updater/test_updater_pp_main.cpp"
 TEST=" -M ${FILE} "

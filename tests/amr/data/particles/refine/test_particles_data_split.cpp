@@ -119,7 +119,7 @@ struct AParticlesDataTest<1, TestParam>
     }
 
     std::vector<Patch<TestParam>> patches;
-    Patch<TestParam> L1{Box_t{Point{2}, Point{14}}};
+    Patch<TestParam> L1{Box_t{Point{3}, Point{12}}};
 };
 
 
@@ -142,7 +142,7 @@ struct AParticlesDataTest<2, TestParam>
     }
 
     std::vector<Patch<TestParam>> patches;
-    Patch<TestParam> L1{Box_t{Point{2, 2}, Point{14, 14}}};
+    Patch<TestParam> L1{Box_t{Point{3, 3}, Point{12, 12}}};
 };
 
 
@@ -168,7 +168,7 @@ struct AParticlesDataTest<3, TestParam>
     }
 
     std::vector<Patch<TestParam>> patches;
-    Patch<TestParam> L1{Box_t{Point{2, 2, 2}, Point{14, 14, 14}}};
+    Patch<TestParam> L1{Box_t{Point{3, 3, 3}, Point{12, 12, 12}}};
 };
 
 
