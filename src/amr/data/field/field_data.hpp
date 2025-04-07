@@ -7,6 +7,7 @@
 
 #include <SAMRAI/hier/PatchData.h>
 #include <SAMRAI/tbox/MemoryUtilities.h>
+#include <stdexcept>
 #include <utility>
 
 #include "core/data/grid/gridlayout.hpp"
@@ -16,6 +17,7 @@
 #include "field_geometry.hpp"
 
 #include "core/logger.hpp"
+#include "initializer/data_provider.hpp"
 
 #include <iostream>
 
@@ -42,6 +44,27 @@ namespace amr
     {
         using Super = SAMRAI::hier::PatchData;
 
+        // not the best but works for the moment
+        bool static constexpr is_tiled = std::is_constructible_v<Grid_t, initializer::PHAREDict,
+                                                                 GridLayoutT, PhysicalQuantity>;
+
+        auto inline static field_dict(std::string const& name)
+        {
+            initializer::PHAREDict dict;
+            dict["tile_size"] = std::size_t{4}; // todo
+            dict["name"]      = name;
+            return dict;
+        }
+
+        Grid_t field_maker(std::string const& name, GridLayoutT const& layout, auto qty)
+        {
+            if constexpr (is_tiled)
+                return {field_dict(name), layout, qty};
+
+            else
+                return {name, layout, qty};
+        }
+
     public:
         static constexpr std::size_t dimension    = GridLayoutT::dimension;
         static constexpr std::size_t interp_order = GridLayoutT::interp_order;
@@ -57,7 +80,7 @@ namespace amr
                   std::string name, GridLayoutT const& layout, PhysicalQuantity qty)
             : SAMRAI::hier::PatchData(domain, ghost)
             , gridLayout{layout}
-            , field(name, gridLayout, qty)
+            , field(field_maker(name, gridLayout, qty))
             , quantity_{qty}
         {
         }
@@ -74,26 +97,39 @@ namespace amr
         {
             Super::getFromRestart(restart_db);
 
-
-            assert(field.vector().size() > 0);
-            restart_db->getDoubleArray("field_" + field.name(), field.vector().data(),
-                                       field.vector().size()); // do not reallocate!
+            if constexpr (is_tiled)
+            {
+                throw std::runtime_error("finish");
+            }
+            else
+            {
+                assert(field.vector().size() > 0);
+                restart_db->getDoubleArray("field_" + field.name(), field.vector().data(),
+                                           field.vector().size()); // do not reallocate!
+            }
         }
 
         void putToRestart(std::shared_ptr<SAMRAI::tbox::Database> const& restart_db) const override
         {
-            Super::putToRestart(restart_db);
+            if constexpr (is_tiled)
+            {
+                throw std::runtime_error("finish");
+            }
+            else
+            {
+                Super::putToRestart(restart_db);
 
-            // if constexpr (std::decay_t<decltype(field)>::is_host_mem)
+                // if constexpr (std::decay_t<decltype(field)>::is_host_mem)
 
-            restart_db->putDoubleArray("field_" + field.name(), field.vector().data(),
-                                       field.vector().size());
+                restart_db->putDoubleArray("field_" + field.name(), field.vector().data(),
+                                           field.vector().size());
 
-            // restart_db->putVector("field_" + field.name(), field.vector());
-            // else
-            // {
-            //     std::abort();
-            // }
+                // restart_db->putVector("field_" + field.name(), field.vector());
+                // else
+                // {
+                //     std::abort();
+                // }
+            }
         };
 
 
