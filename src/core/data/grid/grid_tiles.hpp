@@ -41,125 +41,53 @@ private:
     NdArray_t data;
 };
 
-
-
-template<typename GridLayout_t, typename NdArray_t, typename PhysicalQuantity,
-         bool hasGhosts_ = true>
-class GridTile : public Box<std::int32_t, NdArray_t::dimension>
+template<typename NdArray_t, bool hasGhosts_ = true>
+auto static make_grid(auto&&... args)
 {
-    // using Field_t = Field<NdArray_t::dimension, PhysicalQuantity>;
+    auto const& [box, tile_layout, qty] = std::forward_as_tuple(args...);
 
-    auto static make_grid(auto&&... args)
+    if constexpr (hasGhosts_)
+        return NdArray_t{tile_layout.allocSize(qty)};
+    else
+        return NdArray_t{*(box.shape().as_unsigned() - 1)};
+}
+
+template<typename GridLayout_t, typename NdArray_t>
+struct GridData
+{
+    GridData(auto const& box, GridLayout_t const& patch_layout, auto const& pq)
+        : layout_{patch_layout.copy_as(box)}
+        , data{make_grid<NdArray_t>(box, layout_, pq)}
     {
-        auto const& [box, tile_layout, qty] = std::forward_as_tuple(args...);
-
-        if constexpr (hasGhosts)
-            return NdArray_t{tile_layout.allocSize(qty)};
-        else
-            return NdArray_t{*(box.shape().as_unsigned() - 1)};
     }
 
+    GridLayout_t layout_;
+    NdArray_t data;
+};
 
-public:
-    auto constexpr static hasGhosts = hasGhosts_;
+template<typename GridLayout_t, typename NdArray_t, typename PhysicalQuantity>
+struct GridTile : public GridData<GridLayout_t, NdArray_t>,
+                  public FieldTile<typename NdArray_t::View>
+{
     auto constexpr static dimension = NdArray_t::dimension;
-    using Super                     = Box<std::int32_t, dimension>;
+    using Super                     = GridData<GridLayout_t, NdArray_t>;
+    using View                      = FieldTile<typename NdArray_t::View>;
     using value_type                = NdArray_t;
 
-    GridTile(Super const& box, GridLayout_t const& patch_layout, PhysicalQuantity const pq)
-        : Super{box}
-        , layout_{patch_layout.copy_as(box)}
-        , data{make_grid(box, layout_, pq)}
+    GridTile(auto const& box, GridLayout_t const& patch_layout, PhysicalQuantity const& pq)
+        : Super{box, patch_layout, pq}
+        , View{box, Super::data.data(), Super::data.shape()}
     {
     }
     GridTile(GridTile&&)      = default;
     GridTile(GridTile const&) = delete;
 
-    auto& layout() const { return layout_; }
-    auto& operator()() { return data; }
-    auto& operator()() const { return data; }
-    Super& operator*() _PHARE_ALL_FN_ { return *this; }
-    Super const& operator*() const _PHARE_ALL_FN_ { return *this; }
-
-private:
-    GridLayout_t const layout_;
-    NdArray_t data;
+    auto& layout() const { return Super::layout_; }
+    auto& operator()() { return Super::data; }
+    auto& operator()() const { return Super::data; }
+    View& operator*() _PHARE_ALL_FN_ { return *this; }
+    View const& operator*() const _PHARE_ALL_FN_ { return *this; }
 };
-
-
-
-template<typename GridLayout_t, typename NdArray_t, typename PhysicalQuantity>
-class GridTileSet
-    : public TileSet<GridTile<GridLayout_t, NdArray_t, PhysicalQuantity>, NdArray_t::allocator_mode>
-{
-public:
-    using Super
-        = TileSet<GridTile<GridLayout_t, NdArray_t, PhysicalQuantity>, NdArray_t::allocator_mode>;
-    using type                   = NdArray_t::type;
-    using physical_quantity_type = PhysicalQuantity;
-    // using view_t = TileSetView<FieldTile<GridLayout_t, NdArray_t, PhysicalQuantity>>
-
-    auto constexpr static alloc_mode = NdArray_t::allocator_mode;
-
-    template<typename Dict_t>
-    GridTileSet(Dict_t const& dict, GridLayout_t const& layout, PhysicalQuantity qty)
-        : Super{layout.AMRBox(), dict["tile_size"].template to<std::size_t>(), layout, qty}
-        , name_{dict["name"].template to<std::string>()}
-        , qty_{qty}
-    {
-    }
-
-    GridTileSet(GridTileSet&&)      = default;
-    GridTileSet(GridTileSet const&) = delete;
-
-    NO_DISCARD auto& physicalQuantity() const _PHARE_ALL_FN_ { return qty_; }
-    NO_DISCARD auto& name() const { return name_; }
-
-    template<typename T>
-    void fill(T const v)
-    {
-        for (auto& tile : *this)
-            tile().fill(v);
-    }
-
-    auto& operator()(Point<std::uint32_t, NdArray_t::dimension> const& lCell)
-    {
-        assert(Super::at(lCell));
-        auto& tile      = *Super::at(lCell);
-        auto const cell = lCell - tile.lower();
-        // auto const lcl_tile_box = (*tile) - this->box().lower;
-        // auto const cell         = lCell - lcl_tile_box.lower;
-        return tile()(*cell);
-    }
-
-    auto& operator()(Point<std::uint32_t, NdArray_t::dimension> const& lCell) const
-    {
-        assert(Super::at(lCell));
-        auto& tile      = *Super::at(lCell);
-        auto const cell = lCell - tile.lower();
-        return tile()(*cell);
-    }
-
-    template<typename... IJK>
-    auto& operator()(IJK const&... ijk)
-        requires(sizeof...(IJK) == NdArray_t::dimension)
-    {
-        return (*this)(to_point<std::uint32_t>(ijk...));
-    }
-    template<typename... IJK>
-    auto& operator()(IJK const&... ijk) const
-        requires(sizeof...(IJK) == NdArray_t::dimension)
-    {
-        return (*this)(to_point<std::uint32_t>(ijk...));
-    }
-
-    auto operator*() {} // VIEW
-
-private:
-    std::string const name_;
-    PhysicalQuantity const qty_;
-};
-
 
 
 
@@ -178,13 +106,6 @@ public:
     auto constexpr static dimension  = GridLayout_t::dimension;
     auto constexpr static alloc_mode = alloc_mode_;
 
-    // template<typename Dict_t>
-
-    // TileSetView(Box_t const& box, std::array<std::size_t, dimension> const& tile_size,
-    //             std::array<std::uint32_t, dimension> const& shape, Tile* tiles,
-    //             std::size_t tile_nbr, Tile** cells,
-    //             std::array<std::uint32_t, dimension> const& nbr_cells)
-
     FieldTileSet(std::string const& name, PhysicalQuantity qty)
         : Super{{}, {}, {}, nullptr, 0, nullptr, {}} // set later
         , name_{name}
@@ -201,13 +122,13 @@ public:
     void setBuffer(FieldLike* const field) _PHARE_ALL_FN_
     {
         auto data = field ? field->data() : nullptr;
-        if (data)
-            super() = (*field).as([](auto&&... args) {
-                auto&& [box, tile_size, shape, tiles_data, tiles_size, cells_data, cells_shape]
-                    = std::forward_as_tuple(args...);
-                return Super{box,        tile_size,  shape,      &(*tiles_data[0]),
-                             tiles_size, cells_data, cells_shape};
-            });
+        // if (data)
+        //     super() = (*field).as([](auto&&... args) mutable {
+        //         auto&& [box, tile_size, shape, tiles_data, tiles_size, cells_data, cells_shape]
+        //             = std::forward_as_tuple(args...);
+        //         return Super{box,        tile_size,  shape,      &*tiles_data[0],
+        //                      tiles_size, cells_data, cells_shape};
+        //     });
     }
 
     FieldTileSet(FieldTileSet&&)      = default;
@@ -244,19 +165,6 @@ public:
         return tile()(*cell);
     }
 
-    // template<typename... IJK>
-    // auto& operator()(IJK const&... ijk)
-    //     requires(sizeof...(IJK) == 0)
-    // {
-    //     return super()();
-    // }
-    // template<typename... IJK>
-    // auto& operator()(IJK const&... ijk) const
-    //     requires(sizeof...(IJK) == 0)
-    // {
-    //     return super()();
-    // }
-
     template<typename... IJK>
     auto& operator()(IJK const&... ijk)
         requires(sizeof...(IJK) == NdArray_t::dimension)
@@ -276,20 +184,71 @@ public:
     bool isUsable() const { return Super::data() != nullptr; }
     bool isSettable() const { return !isUsable(); }
 
-    auto operator*() { return *this; }       // interop atm
-    auto operator*() const { return *this; } // interop atm
+    auto& operator*() { return *this; }       // interop atm
+    auto& operator*() const { return *this; } // interop atm
 
     void copyData(FieldTileSet fts) {}
 
 private:
-    Super const& super() { return *this; }
-    Super& super() const { return *this; }
-
+    Super& super() { return *this; }
+    Super const& super() const { return *this; }
 
 
     std::string const name_;
     PhysicalQuantity const qty_;
 };
+
+
+template<typename GridLayout_t, typename NdArray_t, typename PhysicalQuantity>
+class GridTileSet : public TileSet<GridTile<GridLayout_t, NdArray_t, PhysicalQuantity>,
+                                   NdArray_t::allocator_mode>,
+                    public FieldTileSet<GridLayout_t, NdArray_t, PhysicalQuantity>
+{
+public:
+    using Super
+        = TileSet<GridTile<GridLayout_t, NdArray_t, PhysicalQuantity>, NdArray_t::allocator_mode>;
+    using View                   = FieldTileSet<GridLayout_t, NdArray_t, PhysicalQuantity>;
+    using type                   = NdArray_t::type;
+    using physical_quantity_type = PhysicalQuantity;
+    // using view_t = TileSetView<FieldTile<GridLayout_t, NdArray_t, PhysicalQuantity>>
+
+    auto constexpr static alloc_mode = NdArray_t::allocator_mode;
+
+    template<typename Dict_t>
+    GridTileSet(Dict_t const& dict, GridLayout_t const& layout, PhysicalQuantity const& qty)
+        : Super{layout.AMRBox(), dict["tile_size"].template to<std::size_t>(), layout, qty}
+        , View{dict["name"].template to<std::string>(), qty}
+        , name_{dict["name"].template to<std::string>()}
+        , qty_{qty}
+    {
+        View::setBuffer(&super());
+    }
+
+    GridTileSet(GridTileSet&&)      = default;
+    GridTileSet(GridTileSet const&) = delete;
+
+    NO_DISCARD auto& physicalQuantity() const _PHARE_ALL_FN_ { return qty_; }
+    NO_DISCARD auto& name() const { return name_; }
+
+    template<typename T>
+    void fill(T const v)
+    {
+        for (auto& tile : *this)
+            tile().fill(v);
+    }
+
+
+    View& operator*() { return *this; }
+    View const& operator*() const { return *this; }
+
+private:
+    Super& super() { return *this; }
+    Super const& super() const { return *this; }
+
+    std::string const name_;
+    PhysicalQuantity const qty_;
+};
+
 
 
 

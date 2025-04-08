@@ -28,6 +28,8 @@ clargs(){
 FILE="tests/amr/data/particles/refine/test_particles_data_split.cpp"
 # FILE="tests/core/numerics/ion_updater/test_multi_updater.cpp"
 FILE="tests/core/numerics/ion_updater/test_updater_pp_main.cpp"
+FILE="tests/core/data/grid/test_grid_tile_set.cpp"
+
 TEST=" -M ${FILE} "
 CARGS="${CARGS} $(clargs)"
 
