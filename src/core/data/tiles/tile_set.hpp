@@ -21,10 +21,11 @@ namespace PHARE::core
 {
 
 
-template<typename Tile>
+template<typename Tile, typename Span_t = Span<Tile>>
 class TileSetView
 {
 public:
+    using value_type                = Tile;
     using Box_t                     = Box<int, Tile::dimension>;
     static auto constexpr dimension = Tile::dimension;
 
@@ -122,11 +123,11 @@ public:
             reset(i, tileset[i]);
     }
 
-private:
+protected:
     Box_t const box_;
     std::array<std::size_t, dimension> tile_size_;
     std::array<std::uint32_t, dimension> shape_;
-    Span<Tile> tiles_;
+    Span_t tiles_;
     NdArrayView<dimension, Tile*> cells_;
 };
 
@@ -339,6 +340,14 @@ public:
     {
         return TileSetView<View_t>{box_,          tile_size_,    shape_,        tiles_.data(),
                                    tiles_.size(), cells_.data(), cells_.shape()};
+    }
+
+
+    // template<typename V>
+    auto as(auto&& a, auto&&... args)
+    {
+        return a(box_, tile_size_, shape_, tiles_.data(), tiles_.size(), cells_.data(),
+                 cells_.shape(), args...);
     }
 
     void static build_links(TileSet& tile_set)

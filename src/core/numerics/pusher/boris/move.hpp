@@ -5,7 +5,8 @@
 
 #if PHARE_HAVE_MKN_GPU
 // #include "mkn_boris.hpp"
-#include "mkn_boris_capture.hpp"
+// #include "mkn_boris_capture.hpp"
+#include "tile_boris_capture.hpp"
 #endif // PHARE_HAVE_MKN_GPU
 
 

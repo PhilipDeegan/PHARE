@@ -53,11 +53,11 @@ struct UsingResolver<GridLayout_t, LayoutMode::AoSTS, A_>
 
     template<typename T, auto am>
     using nd_array_t = NdArrayVector<dimension, T, /*c_order*/ true, am>;
-    template<typename T, auto am>
-    using nd_array_vt = NdArrayView<dimension, T, /*c_order*/ true>;
+    // template<typename T, auto am>
+    // using nd_array_vt = NdArrayView<dimension, T, /*c_order*/ true>;
 
     using Grid_t  = GridTileSet<GridLayout_t, nd_array_t<double, A_>, HybridQuantity::Scalar>;
-    using Field_t = FieldTileSet<GridLayout_t, nd_array_vt<double, A_>, HybridQuantity::Scalar>;
+    using Field_t = FieldTileSet<GridLayout_t, nd_array_t<double, A_>, HybridQuantity::Scalar>;
 };
 
 // allows ignoring "interp_order" for types that don't need it

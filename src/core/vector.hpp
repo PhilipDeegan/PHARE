@@ -221,6 +221,16 @@ struct Vector
         else
             PHARE::core::gpu::fill(vec, val);
     }
+
+    auto static fill(value_type* const data, std::size_t const size, Type const val)
+    {
+        // todo
+        // if constexpr (allocator_mode == AllocatorMode::CPU)
+        std::fill(data, data + size, val);
+
+        // else
+        //     PHARE::core::gpu::fill(vec, val);
+    }
 };
 
 

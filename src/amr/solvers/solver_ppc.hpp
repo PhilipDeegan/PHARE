@@ -1,27 +1,22 @@
 #ifndef PHARE_SOLVER_PPC_HPP
 #define PHARE_SOLVER_PPC_HPP
 
-#include "core/vector.hpp"
 #include "core/def/phare_mpi.hpp"
-#include "core/data/particles/particle_array_def.hpp"
-
-#include "core/numerics/ion_updater/ion_updater.hpp"
-#include "core/numerics/ion_updater/ion_updater_multi_ts.hpp"
-
 #include "core/numerics/ohm/ohm.hpp"
 #include "core/numerics/ampere/ampere.hpp"
+#include "core/data/vecfield/vecfield.hpp"
 #include "core/numerics/faraday/faraday.hpp"
+#include "core/data/grid/gridlayout_utils.hpp"
+#include "core/numerics/ion_updater/ion_updater.hpp"
+#include "core/data/particles/particle_array_def.hpp"
+#include "core/numerics/ion_updater/ion_updater_multi_ts.hpp"
 
-#include "amr/messengers/hybrid_messenger.hpp"
-#include "amr/messengers/hybrid_messenger_info.hpp"
-#include "amr/resources_manager/amr_utils.hpp"
 
 #include "amr/solvers/solver.hpp"
 #include "amr/solvers/solver_ppc_model_view.hpp"
-
-#include "core/data/vecfield/vecfield.hpp"
-#include "core/data/grid/gridlayout_utils.hpp"
-
+#include "amr/messengers/hybrid_messenger.hpp"
+#include "amr/messengers/hybrid_messenger_info.hpp"
+#include "amr/resources_manager/amr_utils.hpp"
 
 
 #include <SAMRAI/hier/Patch.h>

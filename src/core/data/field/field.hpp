@@ -138,18 +138,6 @@ private:
 
 
 
-template<std::size_t dim, typename PhysicalQuantity, typename Data_t, auto alloc_mode>
-void average(Field<dim, PhysicalQuantity, Data_t, alloc_mode> const& f1,
-             Field<dim, PhysicalQuantity, Data_t, alloc_mode> const& f2,
-             Field<dim, PhysicalQuantity, Data_t, alloc_mode>& avg)
-{
-    std::transform(std::begin(f1), std::end(f1), std::begin(f2), std::begin(avg),
-                   std::plus<double>());
-
-    std::transform(std::begin(avg), std::end(avg), std::begin(avg),
-                   [](double x) { return x * 0.5; });
-}
-
 
 } // namespace PHARE::core
 

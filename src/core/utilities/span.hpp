@@ -37,7 +37,6 @@ struct Span
     NO_DISCARD T const* cdata() const _PHARE_ALL_FN_ { return ptr; }
     NO_DISCARD auto data() const _PHARE_ALL_FN_ { return ptr; }
     NO_DISCARD auto data() _PHARE_ALL_FN_ { return ptr; }
-    // NO_DISCARD T const* const& data() const { return ptr; }
     NO_DISCARD auto begin() _PHARE_ALL_FN_ { return ptr; }
     NO_DISCARD auto begin() const _PHARE_ALL_FN_ { return ptr; }
     NO_DISCARD auto end() _PHARE_ALL_FN_ { return ptr + s; }
@@ -199,6 +198,37 @@ auto flatten(std::vector<std::array<T, size>>& data)
 }
 
 
+template<typename V, typename T, typename SIZE = span_size_default_t>
+struct ViewSpan // represent vector of T as Span of V
+{
+    auto constexpr static real_size = sizeof(T);
+    using value_type                = std::decay_t<V>;
+
+    ViewSpan(V* ptr_ = nullptr, SIZE s_ = 0)
+        : ptr{ptr_}
+        , s{s_}
+    {
+    }
+
+    ViewSpan(ViewSpan&&)                 = default;
+    ViewSpan(ViewSpan const&)            = default;
+    ViewSpan& operator=(ViewSpan&&)      = default;
+    ViewSpan& operator=(ViewSpan const&) = default;
+
+    NO_DISCARD auto& operator[](SIZE i) _PHARE_ALL_FN_ { return *(ptr + (i * real_size)); }
+    NO_DISCARD auto& operator[](SIZE i) const _PHARE_ALL_FN_ { return *(ptr + (i * real_size)); }
+    NO_DISCARD T const* cdata() const _PHARE_ALL_FN_ { return ptr; }
+    NO_DISCARD auto data() const _PHARE_ALL_FN_ { return ptr; }
+    NO_DISCARD auto data() _PHARE_ALL_FN_ { return ptr; }
+    NO_DISCARD auto begin() _PHARE_ALL_FN_ { return ptr; }
+    NO_DISCARD auto begin() const _PHARE_ALL_FN_ { return ptr; }
+    NO_DISCARD auto end() _PHARE_ALL_FN_ { return ptr + s; }
+    NO_DISCARD auto end() const _PHARE_ALL_FN_ { return ptr + s; }
+    NO_DISCARD SIZE const& size() const _PHARE_ALL_FN_ { return s; }
+
+    V* ptr = nullptr;
+    SIZE s = 0;
+};
 
 } // namespace PHARE::core
 
