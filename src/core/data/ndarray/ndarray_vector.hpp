@@ -116,11 +116,11 @@ public:
 
 
 
-    NO_DISCARD auto operator[](NdArrayMask&& mask)
-    {
-        return MaskedView{*this, std::forward<NdArrayMask>(mask)};
-    }
-    NO_DISCARD auto operator[](NdArrayMask const& mask) { return MaskedView{*this, mask}; }
+    // NO_DISCARD auto operator[](NdArrayMask&& mask)
+    // {
+    //     return MaskedView{*this, std::forward<NdArrayMask>(mask)};
+    // }
+    // NO_DISCARD auto operator[](NdArrayMask const& mask) { return MaskedView{*this, mask}; }
 
 
 

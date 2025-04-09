@@ -37,9 +37,11 @@ public:
         , tile_size_{tile_size}
         , shape_{shape}
         , tiles_{tiles, tile_nbr}
-        , cells_{cells, nbr_cells}
+        , cells_{cells, product(nbr_cells)}
+        , cells_shape_{nbr_cells}
     {
     }
+
 
     TileSetView(TileSetView const&) = default;
     TileSetView(TileSetView&&)      = default;
@@ -80,6 +82,7 @@ public:
     }
 
 
+    NO_DISCARD auto box() const { return box_; }
     NO_DISCARD auto shape() const { return shape_; }
     NO_DISCARD auto size() const _PHARE_ALL_FN_ { return tiles_.size(); }
 
@@ -95,20 +98,30 @@ public:
     NO_DISCARD auto& operator[](std::size_t const i) _PHARE_ALL_FN_ { return tiles_[i]; }
     NO_DISCARD auto& operator[](std::size_t const i) const _PHARE_ALL_FN_ { return tiles_[i]; }
 
+    NO_DISCARD auto& operator()() { return tiles_; }
+    NO_DISCARD auto& operator()() const { return tiles_; }
+
+
+    NO_DISCARD auto at(Point<int, dimension> const& amr_point)
+    {
+        return at((amr_point - box_.lower).as_unsigned());
+    }
+    NO_DISCARD auto at(Point<int, dimension> const& amr_point) const
+    {
+        return at((amr_point - box_.lower).as_unsigned());
+    }
+
     template<typename... Index>
     NO_DISCARD auto at(Index... indexes) _PHARE_ALL_FN_
     {
-        // PHARE_LOG_LINE_SS("");
-        assert(cells_(indexes...));
-        return cells_(indexes...);
+        return &cells_[cell_idx(indexes...)];
     }
     template<typename... Index>
     NO_DISCARD auto at(Index... indexes) const _PHARE_ALL_FN_
     {
-        // PHARE_LOG_LINE_SS("");
-        assert(cells_(indexes...));
-        return cells_(indexes...);
+        return &cells_[cell_idx(indexes...)];
     }
+
 
     template<typename Tile_t>
     void reset(std::size_t i, Tile_t& tile)
@@ -124,11 +137,16 @@ public:
     }
 
 protected:
-    Box_t const box_;
+    auto cell_idx(auto const&... ijk) const
+    {
+        return NdArrayViewer<dimension>::idx(cells_shape_, ijk...);
+    }
+
+    Box_t box_;
     std::array<std::size_t, dimension> tile_size_;
     std::array<std::uint32_t, dimension> shape_;
-    Span_t tiles_;
-    NdArrayView<dimension, Tile*> cells_;
+    Span_t tiles_, cells_;
+    std::array<std::uint32_t, dimension> cells_shape_;
 };
 
 

@@ -47,8 +47,8 @@ struct Box
     using value_type                = Point<Type, dim>;
     using This                      = Box<Type, dim>;
 
-    Point_t lower;
-    Point_t upper;
+    Point_t lower{ConstArray<Type, dim>()};
+    Point_t upper{ConstArray<Type, dim>()};
 
     Box()                      = default;
     Box(Box const&)            = default;

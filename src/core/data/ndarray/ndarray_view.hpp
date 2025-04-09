@@ -16,61 +16,66 @@ namespace PHARE::core
 template<std::size_t dim, bool c_ordering = true>
 struct NdArrayViewer
 {
-    template<typename DataType, typename NCells, typename... Indexes>
-    static auto& at(DataType* data, NCells const& nCells, Indexes const&... indexes) _PHARE_ALL_FN_
+    template<typename NCells, template<typename, std::size_t> typename Indexes, typename Index>
+    static auto idx(NCells const& nCells, Indexes<Index, dim> const& indexes)
+    {
+        if constexpr (dim == 1)
+            return idx(nCells, indexes[0]);
+
+        else if constexpr (dim == 2)
+            return idx(nCells, indexes[0], indexes[1]);
+
+        else if constexpr (dim == 3)
+            return idx(nCells, indexes[0], indexes[1], indexes[2]);
+    }
+
+    static auto idx(auto const& nCells, auto const&... indexes)
     {
         auto params = std::forward_as_tuple(indexes...);
-        // static_assert(std::tuple_size_v<std::tuple<Indexes...>> == dim);
 
         if constexpr (dim == 1)
-        {
-            auto i = std::get<0>(params);
-
-            return data[i];
-        }
+            return std::get<0>(params);
 
         if constexpr (dim == 2)
         {
-            auto i = std::get<0>(params);
-            auto j = std::get<1>(params);
+            auto const i = std::get<0>(params);
+            auto const j = std::get<1>(params);
 
             if constexpr (c_ordering)
-                return data[j + i * nCells[1]];
+                return j + i * nCells[1];
             else
-                return data[i + j * nCells[0]];
+                return i + j * nCells[0];
         }
 
         if constexpr (dim == 3)
         {
-            auto i = std::get<0>(params);
-            auto j = std::get<1>(params);
-            auto k = std::get<2>(params);
+            auto const i = std::get<0>(params);
+            auto const j = std::get<1>(params);
+            auto const k = std::get<2>(params);
 
             if constexpr (c_ordering)
-                return data[k + j * nCells[2] + i * nCells[1] * nCells[2]];
+                return k + j * nCells[2] + i * nCells[1] * nCells[2];
             else
-                return data[i + j * nCells[0] + k * nCells[1] * nCells[0]];
+                return i + j * nCells[0] + k * nCells[1] * nCells[0];
         }
     }
 
 
 
-    template<typename DataType, typename NCells, template<typename, std::size_t> typename Indexes,
-             typename Index>
-    NO_DISCARD static auto& at(DataType* data, NCells const& nCells,
+    template<typename NCells, template<typename, std::size_t> typename Indexes, typename Index>
+    NO_DISCARD static auto& at(auto* data, NCells const& nCells,
                                Indexes<Index, dim> const& indexes) _PHARE_ALL_FN_
 
     {
-        if constexpr (dim == 1)
-            return at(data, nCells, indexes[0]);
+        return data[idx(nCells, indexes)];
+    }
 
-        else if constexpr (dim == 2)
-            return at(data, nCells, indexes[0], indexes[1]);
+    template<typename DataType, typename NCells, typename... Indexes>
+    static auto& at(DataType* data, NCells const& nCells, Indexes const&... indexes) _PHARE_ALL_FN_
+    {
+        auto params = std::forward_as_tuple(indexes...);
 
-        else if constexpr (dim == 3)
-            return at(data, nCells, indexes[0], indexes[1], indexes[2]);
-
-        // return data[0]; // nvc++ complains
+        return data[idx(nCells, indexes...)];
     }
 };
 

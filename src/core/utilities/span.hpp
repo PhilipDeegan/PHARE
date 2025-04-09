@@ -215,16 +215,26 @@ struct ViewSpan // represent vector of T as Span of V
     ViewSpan& operator=(ViewSpan&&)      = default;
     ViewSpan& operator=(ViewSpan const&) = default;
 
-    NO_DISCARD auto& operator[](SIZE i) _PHARE_ALL_FN_ { return *(ptr + (i * real_size)); }
-    NO_DISCARD auto& operator[](SIZE i) const _PHARE_ALL_FN_ { return *(ptr + (i * real_size)); }
-    NO_DISCARD T const* cdata() const _PHARE_ALL_FN_ { return ptr; }
+    template<typename P>
+    auto static as(auto&& ptr)
+    {
+        return reinterpret_cast<P>(ptr);
+    }
+
+    auto hax(std::size_t const i) { return as<V*>(as<T*>(ptr) + i); }
+    auto hax(std::size_t const i) const { return as<V const*>(as<T const*>(ptr) + i); }
+
+    NO_DISCARD auto& operator[](SIZE const i) _PHARE_ALL_FN_ { return *hax(i); }
+    NO_DISCARD auto& operator[](SIZE const i) const _PHARE_ALL_FN_ { return *hax(i); }
     NO_DISCARD auto data() const _PHARE_ALL_FN_ { return ptr; }
     NO_DISCARD auto data() _PHARE_ALL_FN_ { return ptr; }
-    NO_DISCARD auto begin() _PHARE_ALL_FN_ { return ptr; }
-    NO_DISCARD auto begin() const _PHARE_ALL_FN_ { return ptr; }
-    NO_DISCARD auto end() _PHARE_ALL_FN_ { return ptr + s; }
-    NO_DISCARD auto end() const _PHARE_ALL_FN_ { return ptr + s; }
     NO_DISCARD SIZE const& size() const _PHARE_ALL_FN_ { return s; }
+
+    // DO NOT USE ON GPU! // USE operator[]!!!!
+    NO_DISCARD auto begin() _PHARE_HST_FN_ { return as<T*>(ptr); }
+    NO_DISCARD auto begin() const _PHARE_HST_FN_ { return as<T const*>(ptr); }
+    NO_DISCARD auto end() _PHARE_HST_FN_ { return as<T*>(ptr) + s; }
+    NO_DISCARD auto end() const _PHARE_HST_FN_ { return as<T const*>(ptr) + s; }
 
     V* ptr = nullptr;
     SIZE s = 0;

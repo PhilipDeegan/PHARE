@@ -51,7 +51,7 @@ struct ParticleArrayDetails
     }
 
     template<typename GridLayout_t>
-    ParticleArrayDetails static FROM(GridLayout_t const& layout)
+    ParticleArrayDetails static FROM(GridLayout_t const& /*layout*/)
     {
         return {GridLayout_t::nbrParticleGhosts()};
     }

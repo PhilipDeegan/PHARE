@@ -70,7 +70,7 @@ struct Patch
 
     GridLayout_t const layout;
     Grid_t rho{field_dict("rho"), layout, HybridQuantity::Scalar::rho};
-    Field_t rho_v = *rho;
+    Field_t& rho_v = *rho;
 };
 
 template<std::size_t dim, typename TestParam>
@@ -177,22 +177,28 @@ PHARE_WITH_GPU(
 
 TYPED_TEST_SUITE(GridFieldTest, ParticlesDatas);
 
+
 namespace PHARE::core
 {
 
-
 TYPED_TEST(GridFieldTest, test_compiles)
 {
-    auto& dst = this->L1;
-}
+    auto& L1 = this->L1;
 
+    EXPECT_EQ(L1.rho().data(), L1.rho_v().data());
+
+    for (auto& tile : L1.rho())
+    {
+        Point const lower{tile.lower};
+        EXPECT_EQ((*L1.rho).at(lower), L1.rho_v.at(lower));
+    }
+}
 
 } // namespace PHARE::core
 
 
 int main(int argc, char** argv)
 {
-    // PHARE::test::amr::SamraiLifeCycle samsam{argc, argv};
     ::testing::InitGoogleTest(&argc, argv);
     return RUN_ALL_TESTS();
 }
