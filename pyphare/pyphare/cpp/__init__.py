@@ -65,4 +65,4 @@ def split_pyarrays_fn(dim, interp, n_particles):
 def supported_particle_layouts():
     # see: src/core/data/particles/particle_array_def.hpp
 
-    return [1, 3]
+    return [1]  # , 3

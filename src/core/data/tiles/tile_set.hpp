@@ -21,7 +21,7 @@ namespace PHARE::core
 {
 
 
-template<typename Tile, typename Span_t = Span<Tile>>
+template<typename Tile, typename Span_t = Span<Tile>, typename CellSpan_t = Span<Tile*>>
 class TileSetView
 {
 public:
@@ -114,12 +114,12 @@ public:
     template<typename... Index>
     NO_DISCARD auto at(Index... indexes) _PHARE_ALL_FN_
     {
-        return &cells_[cell_idx(indexes...)];
+        return cells_[cell_idx(indexes...)];
     }
     template<typename... Index>
     NO_DISCARD auto at(Index... indexes) const _PHARE_ALL_FN_
     {
-        return &cells_[cell_idx(indexes...)];
+        return cells_[cell_idx(indexes...)];
     }
 
 
@@ -145,7 +145,8 @@ protected:
     Box_t box_;
     std::array<std::size_t, dimension> tile_size_;
     std::array<std::uint32_t, dimension> shape_;
-    Span_t tiles_, cells_;
+    Span_t tiles_;
+    CellSpan_t cells_;
     std::array<std::uint32_t, dimension> cells_shape_;
 };
 

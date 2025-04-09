@@ -96,18 +96,22 @@ private:
 };
 
 
+template<typename GridLayout_t, typename NdArray_t, typename NdArray_vt, typename PhysicalQuantity>
+using FieldTileSet_super = TileSetView<
+    FieldTile<NdArray_vt>,
+    ViewSpan<FieldTile<NdArray_vt>, GridTile<GridLayout_t, NdArray_t, PhysicalQuantity>>,
+    ViewSpan<FieldTile<NdArray_vt>*, GridTile<GridLayout_t, NdArray_t, PhysicalQuantity>*>>;
 
 template<typename GridLayout_t, typename NdArray_t, typename PhysicalQuantity,
          auto alloc_mode_ = AllocatorMode::CPU>
 class FieldTileSet
-    : public TileSetView<FieldTile<typename NdArray_t::View>,
-                         ViewSpan<FieldTile<typename NdArray_t::View>,
-                                  GridTile<GridLayout_t, NdArray_t, PhysicalQuantity>>>
+    : public FieldTileSet_super<GridLayout_t, NdArray_t, typename NdArray_t::View, PhysicalQuantity>
 {
+    using NdArray_vt = NdArray_t::View;
+
 public:
-    using Super                      = TileSetView<FieldTile<typename NdArray_t::View>,
-                                                   ViewSpan<FieldTile<typename NdArray_t::View>,
-                                                            GridTile<GridLayout_t, NdArray_t, PhysicalQuantity>>>;
+    using Super = FieldTileSet_super<GridLayout_t, NdArray_t, NdArray_vt, PhysicalQuantity>;
+
     using type                       = NdArray_t::type;
     auto constexpr static dimension  = GridLayout_t::dimension;
     auto constexpr static alloc_mode = alloc_mode_;
@@ -132,8 +136,10 @@ public:
             super() = (*field).as([](auto&&... args) mutable {
                 auto&& [box, tile_size, shape, tiles_data, tiles_size, cells_data, cells_shape]
                     = std::forward_as_tuple(args...);
-                return Super{box,        tile_size,       shape,      &*tiles_data[0],
-                             tiles_size, &*cells_data[0], cells_shape};
+                return Super{box,        tile_size,
+                             shape,      &*tiles_data[0],
+                             tiles_size, reinterpret_cast<FieldTile<NdArray_vt>**>(&*cells_data[0]),
+                             cells_shape};
             });
     }
 

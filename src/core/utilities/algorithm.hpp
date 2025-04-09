@@ -79,8 +79,8 @@ void average(basic::Field<dim, PhysicalQuantity, Data_t> const& f1,
              basic::Field<dim, PhysicalQuantity, Data_t> const& f2,
              basic::Field<dim, PhysicalQuantity, Data_t>& avg)
 {
-    transform(f1, f2, avg, std::plus<double>());
-    transform(avg, avg, [](double x) { return x * 0.5; });
+    core::transform(f1, f2, avg, std::plus<double>());
+    core::transform(avg, avg, [](double x) { return x * 0.5; });
 }
 
 
@@ -108,8 +108,8 @@ template<typename GL, typename ND, typename PQ, auto am>
 void average(FieldTileSet<GL, ND, PQ, am> const& f1, FieldTileSet<GL, ND, PQ, am> const& f2,
              FieldTileSet<GL, ND, PQ, am>& avg)
 {
-    transform(f1, f2, avg, std::plus<double>());
-    transform(avg, avg, [](double x) { return x * 0.5; });
+    core::transform(f1, f2, avg, std::plus<double>());
+    core::transform(avg, avg, [](double x) { return x * 0.5; });
 }
 
 
