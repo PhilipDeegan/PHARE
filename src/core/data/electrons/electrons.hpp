@@ -226,7 +226,7 @@ public:
     IsothermalElectronPressureClosure(PHARE::initializer::PHAREDict const& dict,
                                       FluxComputer const& flux)
         : Super{dict, flux}
-        , Te_{dict["pressure_closure"]["Te"].template to<double>()}
+        , T0_{dict["pressure_closure"]["Te"].template to<double>()}
     {
     }
 
@@ -241,11 +241,11 @@ public:
 
         auto const& Ne_ = this->flux_.density();
         std::transform(std::begin(Ne_), std::end(Ne_), std::begin(this->Pe_),
-                       [this](auto n) { return n * Te_; });
+                       [this](auto n) { return n * T0_; });
     }
 
 private:
-    double const Te_ = 0;
+    double const T0_ = 0;  // TODO has to be const ? correctly inited w. the dict ?
 };
 
 
@@ -273,8 +273,19 @@ public:
         : Super{dict, flux}
         , gamma_{dict["pressure_closure"]["Gamma"].template to<double>()}
         , Pe_init_{dict["pressure_closure"]["Pe"].template to<initializer::InitFunction<dim>>()}
+        , Te_{"Te", HybridQuantity::Scalar::P}
     {
     }
+
+    // TODO Te_ needs to be declared to the resource manager...
+
+    NO_DISCARD bool isUsable() const override { return core::isUsable(this->Pe_, this->flux_, Te_); }
+
+    NO_DISCARD bool isSettable() const override { return core::isSettable(this->Pe_, this->flux_, Te_); }
+
+    //  TODO NO_DISCARD auto getCompileTimeResourcesViewList() 
+    //  cannot override this class from the base class as it is auto... what to do ???
+
 
     void initialize(GridLayout const& layout) override
     {
@@ -289,12 +300,17 @@ public:
             throw std::runtime_error("Error - polytropic pressure closure not usable");
 
         auto const& Ne_ = this->flux_.density();
+
+        // Te_ = this->Pe_ * Ne_;  // straightforward as these quantities are all primal
+        //  TODO use the evalOnGhostBox of gridlayout.hpp:1165 for the division 
+
         std::transform(std::begin(Ne_), std::end(Ne_), std::begin(this->Pe_),
                        [this](auto n) { return n * 0.1 + 0. * gamma_; });
     }
 
 private:
     double const gamma_ = 5. / 3.;
+    Field Te_;
     initializer::InitFunction<dim> Pe_init_;
 };
 
