@@ -237,7 +237,7 @@ public:
         static_assert(Field::is_contiguous, "Error - assumes Field date is contiguous");
 
         if (!this->Pe_.isUsable())
-            throw std::runtime_error("Error - isothermal closure pressure is not usable");
+            throw std::runtime_error("Error - isothermal closure is not usable");
 
         auto const& Ne_ = this->flux_.density();
         std::transform(std::begin(Ne_), std::end(Ne_), std::begin(this->Pe_),
@@ -245,7 +245,7 @@ public:
     }
 
 private:
-    double const T0_ = 0;  // TODO has to be const ? correctly inited w. the dict ?
+    double const T0_ = 0;
 };
 
 
@@ -273,45 +273,68 @@ public:
         : Super{dict, flux}
         , gamma_{dict["pressure_closure"]["Gamma"].template to<double>()}
         , Pe_init_{dict["pressure_closure"]["Pe"].template to<initializer::InitFunction<dim>>()}
-        , Te_{"Te", HybridQuantity::Scalar::P}
     {
     }
-
-    // TODO Te_ needs to be declared to the resource manager...
-
-    NO_DISCARD bool isUsable() const override { return core::isUsable(this->Pe_, this->flux_, Te_); }
-
-    NO_DISCARD bool isSettable() const override { return core::isSettable(this->Pe_, this->flux_, Te_); }
-
-    //  TODO NO_DISCARD auto getCompileTimeResourcesViewList() 
-    //  cannot override this class from the base class as it is auto... what to do ???
-
 
     void initialize(GridLayout const& layout) override
     {
         FieldUserFunctionInitializer::initialize(this->Pe_, layout, Pe_init_);
     }
 
-    void computePressure(GridLayout const& /*layout*/) override
+    void computePressure(GridLayout const& layout) override
     {
         static_assert(Field::is_contiguous, "Error - assumes Field date is contiguous");
 
+
+
+        auto const& N_ = this->flux_.density();
+        auto const& V_ = this->flux_.velocity();
+        auto const& T_ = this->flux_.density();  // TODO should be division of P by N
+
+        Field Tnew{"Te", HybridQuantity::Scalar::P};
+
+        // layout->evalOnBox(Tnew, [&](auto&... ijk) mutable { this->template P_Eq_(PressurePack{Tnew, V_, T_}, ijk...); });
+
+
+
         if (!this->Pe_.isUsable())
-            throw std::runtime_error("Error - polytropic pressure closure not usable");
+            throw std::runtime_error("Error - polytropic closure not usable");
 
         auto const& Ne_ = this->flux_.density();
-
-        // Te_ = this->Pe_ * Ne_;  // straightforward as these quantities are all primal
-        //  TODO use the evalOnGhostBox of gridlayout.hpp:1165 for the division 
-
         std::transform(std::begin(Ne_), std::end(Ne_), std::begin(this->Pe_),
                        [this](auto n) { return n * 0.1 + 0. * gamma_; });
     }
 
 private:
     double const gamma_ = 5. / 3.;
-    Field Te_;
     initializer::InitFunction<dim> Pe_init_;
+    struct PressurePack
+    {
+        Field const &Tnew;
+        VecField const &V;
+        Field const &T;
+    };
+
+    template<typename... IDXs>
+    void P_Eq_(PressurePack&& pack, IDXs const&... ijk) const
+    {
+        auto const& [Tnew, V, T] = pack;
+
+        Tnew(ijk...) = advection_(V, T, {ijk...})
+                       + compression_(V, T, {ijk...});
+    }
+
+    template<typename... IDXs>
+    auto advection_(VecField const& Ve, Field const& Te, IDXs const&... ijk) const
+    {
+        if constexpr (dim == 1)
+            return advection1D_(Ve, Te, {ijk...});
+        if constexpr (dim == 2)
+            return advection2D_(Ve, Te, {ijk...});
+        if constexpr (dim == 3)
+            return advection3D_(Ve, Te, {ijk...});
+    }
+
 };
 
 
@@ -354,7 +377,7 @@ public:
         static_assert(Field::is_contiguous, "Error - assumes Field date is contiguous");
 
         if (!this->Pe_.isUsable())
-            throw std::runtime_error("Error - CGL pressure closure not usable");
+            throw std::runtime_error("Error - CGL closure not usable");
 
         auto const& Ne_ = this->flux_.density();
         std::transform(std::begin(Ne_), std::end(Ne_), std::begin(this->Pe_),

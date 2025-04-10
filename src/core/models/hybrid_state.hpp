@@ -69,7 +69,7 @@ namespace core
 
         NO_DISCARD bool isSettable() const
         {
-            return electromag.isSettable() and ions.isSettable() && J.isSettable() && electrons.isUsable();
+            return electromag.isSettable() and ions.isSettable() && J.isSettable() && electrons.isSettable();
         }
 
 
