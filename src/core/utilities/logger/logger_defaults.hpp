@@ -3,9 +3,15 @@
 
 #include "core/def/phlop.hpp"
 
+#ifdef PHARE_LOG_SCOPE_PRINT
+#define PHARE_SCOPE_TIMER(str) PHARE_LOG_LINE_SS(str) //
+
+#else
 #if PHARE_HAVE_PHLOP
 #define PHARE_SCOPE_TIMER PHLOP_SCOPE_TIMER
 #endif // PHARE_WITH_PHLOP
+
+#endif
 
 #ifndef PHARE_SCOPE_TIMER
 #define PHARE_SCOPE_TIMER(str) // nothing

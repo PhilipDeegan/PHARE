@@ -67,5 +67,4 @@ if (test AND ${PHARE_EXEC_LEVEL_MIN} GREATER 0) # 0 = no tests
   add_subdirectory(pyphare/pyphare_tests/pharein/)
   add_subdirectory(pyphare/pyphare_tests/test_core/)
 
-
 endif()
