@@ -104,21 +104,26 @@ public:
 
     NO_DISCARD auto at(Point<int, dimension> const& amr_point)
     {
+        PHARE_LOG_LINE_SS(cells_.data());
         return at((amr_point - box_.lower).as_unsigned());
     }
     NO_DISCARD auto at(Point<int, dimension> const& amr_point) const
     {
+        PHARE_LOG_LINE_SS(cells_.data());
         return at((amr_point - box_.lower).as_unsigned());
     }
 
     template<typename... Index>
     NO_DISCARD auto at(Index... indexes) _PHARE_ALL_FN_
     {
+        // PHARE_LOG_LINE_SS(cells_.data());
+        // PHARE_LOG_LINE_SS(cell_idx(indexes...));
         return cells_[cell_idx(indexes...)];
     }
     template<typename... Index>
     NO_DISCARD auto at(Index... indexes) const _PHARE_ALL_FN_
     {
+        PHARE_LOG_LINE_SS(cells_.data());
         return cells_[cell_idx(indexes...)];
     }
 

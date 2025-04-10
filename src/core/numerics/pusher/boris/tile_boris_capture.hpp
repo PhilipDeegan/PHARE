@@ -153,9 +153,10 @@ public:
                         };
 
                         auto&& [tile_idx, tileptr, tidx, ws] = tile_picker();
+                        auto& tile_idx_                      = tile_idx; // bindings issue
                         auto const em = electromag.template as<Electromag_vt>([&](auto const& vf) {
                             return core::for_N<3, core::for_N_R_mode::make_array>(
-                                [&](auto i) { return vf[i][tile_idx](); });
+                                [&](auto i) { return vf[i][tile_idx_](); });
                         });
 
                         auto& tile  = *tileptr;

@@ -43,13 +43,43 @@ private:
 };
 
 
+template<std::size_t dim, bool hasGhosts = true>
+auto tile_box(Box<int, dim> const& box, auto&&... args)
+{
+    auto const& [patch_layout, qty] = std::forward_as_tuple(args...);
+
+    if constexpr (hasGhosts)
+    {
+        auto const centerings = patch_layout.centering(qty);
+        auto const growBy     = [&]() {
+            std::array<int, dim> arr;
+            for (std::uint8_t i = 0; i < dim; ++i)
+                arr[i] = patch_layout.nbrGhosts(centerings[i]);
+            return arr;
+        }();
+
+        auto ghostBox      = grow(box, growBy);
+        auto bounded_tgbox = ghostBox * patch_layout.AMRGhostBoxFor(qty);
+        assert(bounded_tgbox);
+        return *bounded_tgbox;
+    }
+    else
+    {
+        auto bounded_tgbox = box * patch_layout.AMRGhostBoxFor(qty);
+        assert(bounded_tgbox);
+        return *bounded_tgbox;
+    }
+}
+
 template<bool hasGhosts = true>
 auto static grid_cells(auto&&... args)
 {
     auto const& [box, tile_layout, qty] = std::forward_as_tuple(args...);
 
     if constexpr (hasGhosts)
+    {
         return tile_layout.allocSize(qty);
+    }
     else
         return *(box.shape().as_unsigned() - 1);
 }
@@ -74,7 +104,7 @@ struct GridTile : public FieldTile<typename NdArray_t::View>
     }
 
     GridTile(auto const& box, GridLayout_t const& patch_layout, PhysicalQuantity const& pq)
-        : GridTile{box, patch_layout.copy_as(box), patch_layout, pq}
+        : GridTile{box, patch_layout.copy_as(tile_box(box, patch_layout, pq)), patch_layout, pq}
     {
     }
     GridTile(GridTile&&)      = default;
@@ -133,18 +163,19 @@ public:
     {
         auto data = field ? field->data() : nullptr;
         if (data)
+        {
             super() = (*field).as([](auto&&... args) mutable {
                 auto&& [box, tile_size, shape, tiles_data, tiles_size, cells_data, cells_shape]
                     = std::forward_as_tuple(args...);
+                assert(cells_data);
                 return Super{box,        tile_size,
                              shape,      &*tiles_data[0],
-                             tiles_size, reinterpret_cast<FieldTile<NdArray_vt>**>(&*cells_data[0]),
+                             tiles_size, reinterpret_cast<FieldTile<NdArray_vt>**>(cells_data),
                              cells_shape};
             });
+        }
     }
 
-    FieldTileSet(FieldTileSet&&)      = default;
-    FieldTileSet(FieldTileSet const&) = default;
 
     NO_DISCARD auto& physicalQuantity() const _PHARE_ALL_FN_ { return qty_; }
     NO_DISCARD auto& name() const { return name_; }
@@ -161,19 +192,19 @@ public:
 
     auto& operator()(Point<std::uint32_t, NdArray_t::dimension> const& lCell)
     {
+        assert(this->isUsable());
         assert(Super::at(lCell));
         auto& tile      = *Super::at(lCell);
-        auto const cell = lCell - tile.lower();
-        // auto const lcl_tile_box = (*tile) - this->box().lower;
-        // auto const cell         = lCell - lcl_tile_box.lower;
+        auto const cell = lCell - (tile.lower - Super::box().lower);
         return tile()(*cell);
     }
 
     auto& operator()(Point<std::uint32_t, NdArray_t::dimension> const& lCell) const
     {
+        assert(this->isUsable());
         assert(Super::at(lCell));
         auto& tile      = *Super::at(lCell);
-        auto const cell = lCell - tile.lower();
+        auto const cell = lCell - (tile.lower - Super::box().lower);
         return tile()(*cell);
     }
 
@@ -206,14 +237,15 @@ public:
 
     NO_DISCARD auto at(auto const&... args) { return super().at(args...); }
     NO_DISCARD auto at(auto const&... args) const { return super().at(args...); }
+    NO_DISCARD auto size() const _PHARE_ALL_FN_ { return Super::box().size(); }
 
 private:
     Super& super() { return *this; }
     Super const& super() const { return *this; }
 
 
-    std::string const name_;
-    PhysicalQuantity const qty_;
+    std::string name_;
+    PhysicalQuantity qty_;
 };
 
 
@@ -234,7 +266,8 @@ public:
 
     template<typename Dict_t>
     GridTileSet(Dict_t const& dict, GridLayout_t const& layout, PhysicalQuantity const& qty)
-        : Super{layout.AMRBox(), dict["tile_size"].template to<std::size_t>(), layout, qty}
+        : Super{layout.AMRGhostBoxFor(qty), dict["tile_size"].template to<std::size_t>(), layout,
+                qty}
         , View{dict["name"].template to<std::string>(), qty}
         , name_{dict["name"].template to<std::string>()}
         , qty_{qty}
@@ -283,6 +316,7 @@ public:
     NO_DISCARD auto begin() const { return super().begin(); }
     NO_DISCARD auto end() { return super().end(); }
     NO_DISCARD auto end() const { return super().end(); }
+    NO_DISCARD auto size() const _PHARE_ALL_FN_ { return super().box().size(); }
 
 private:
     Super& super() { return *this; }

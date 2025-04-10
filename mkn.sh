@@ -29,6 +29,7 @@ FILE="tests/amr/data/particles/refine/test_particles_data_split.cpp"
 # FILE="tests/core/numerics/ion_updater/test_multi_updater.cpp"
 FILE="tests/core/numerics/ion_updater/test_updater_pp_main.cpp"
 FILE="tests/core/data/grid/test_grid_tile_set.cpp"
+FILE="tests/core/data/vecfield/test_vecfield_init.cpp"
 
 TEST=" -M ${FILE} "
 CARGS="${CARGS} $(clargs)"

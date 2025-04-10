@@ -1211,8 +1211,8 @@ namespace core
                 return arr;
             }();
             auto ghostBox = grow(AMRBox_, growBy);
-            // for (std::uint8_t i = 0; i < dimension; ++i)
-            //     ghostBox.upper[i] += (centerings[i] == QtyCentering::primal) ? 1 : 0;
+            for (std::uint8_t i = 0; i < dimension; ++i)
+                ghostBox.upper[i] += (centerings[i] == QtyCentering::primal) ? 1 : 0;
             return ghostBox;
         }
 

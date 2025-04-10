@@ -367,14 +367,6 @@ bool isIn(ICell<T, S> const& icell, BoxContainer const& boxes) _PHARE_ALL_FN_
 
 
 template<typename Type, std::size_t dim, typename OType>
-Box<Type, dim> grow(Box<Type, dim> const& box, OType const& size) _PHARE_ALL_FN_
-{
-    auto copy{box};
-    copy.grow(size);
-    return copy;
-}
-
-template<typename Type, std::size_t dim, typename OType>
 Box<Type, dim> grow(Box<Type, dim> const& box, std::array<Type, dim> const& by) _PHARE_ALL_FN_
 {
     auto copy{box};
@@ -382,6 +374,14 @@ Box<Type, dim> grow(Box<Type, dim> const& box, std::array<Type, dim> const& by) 
     return copy;
 }
 
+
+template<typename Type, std::size_t dim, typename OType>
+Box<Type, dim> grow(Box<Type, dim> const& box, OType const& size) _PHARE_ALL_FN_
+{
+    auto copy{box};
+    copy.grow(size);
+    return copy;
+}
 
 template<typename Type, std::size_t dim, typename T2>
 NO_DISCARD Box<Type, dim> shrink(Box<Type, dim> const& box, T2 const& size) _PHARE_ALL_FN_
