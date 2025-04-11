@@ -25,7 +25,7 @@ class box_iterator;
 template<typename Type, std::size_t dim>
 struct Box
 {
-    static const size_t dimension = dim;
+    static size_t const dimension = dim;
 
 
     Point<Type, dim> lower;
@@ -282,6 +282,16 @@ auto& operator<<(std::ostream& os, Box<Type, dim> const& box)
     return os;
 }
 
+
+template<typename BoxHavers, typename Accessor>
+bool any_overlaps_in(BoxHavers const& havers, Accessor&& fn)
+{
+    for (std::size_t i = 0; i < havers.size() - 1; ++i)
+        for (std::size_t j = i + 1; j < havers.size(); ++j)
+            if (auto overlap = fn(havers[i]) * fn(havers[j]))
+                return true;
+    return false;
+}
 
 
 } // namespace PHARE::core

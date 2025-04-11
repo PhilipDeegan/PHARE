@@ -1,12 +1,6 @@
 #ifndef PHARE_SRC_AMR_DATA_PARTICLES_PARTICLES_DATA_HPP
 #define PHARE_SRC_AMR_DATA_PARTICLES_PARTICLES_DATA_HPP
 
-#include <iterator>
-#include <cstddef>
-#include <numeric>
-#include <stdexcept>
-#include <vector>
-
 #include "core/def/phare_mpi.hpp"
 
 
@@ -25,10 +19,11 @@
 #include "core/data/particles/particle_packer.hpp"
 #include "amr/resources_manager/amr_utils.hpp"
 #include "amr/utilities/box/amr_box.hpp"
-#include "core/utilities/point/point.hpp"
 
-#include "core/logger.hpp"
 
+#include <vector>
+#include <cstddef>
+#include <stdexcept>
 
 
 namespace PHARE

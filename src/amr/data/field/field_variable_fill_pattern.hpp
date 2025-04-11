@@ -69,7 +69,7 @@ public:
                      SAMRAI::hier::BoxGeometry const& src_geometry,
                      SAMRAI::hier::Box const& dst_patch_box, SAMRAI::hier::Box const& src_mask,
                      SAMRAI::hier::Box const& fill_box, bool const fn_overwrite_interior,
-                     SAMRAI::hier::Transformation const& transformation) const
+                     SAMRAI::hier::Transformation const& transformation) const override
     {
 #ifndef DEBUG_CHECK_DIM_ASSERTIONS
         NULL_USE(dst_patch_box);
@@ -113,15 +113,15 @@ public:
                                              transformation);
     }
 
-    std::string const& getPatternName() const { return s_name_id; }
+    std::string const& getPatternName() const override { return s_name_id; }
 
 private:
     FieldFillPattern(FieldFillPattern const&)            = delete;
     FieldFillPattern& operator=(FieldFillPattern const&) = delete;
 
-    static const inline std::string s_name_id = "BOX_GEOMETRY_FILL_PATTERN";
+    static inline std::string const s_name_id = "BOX_GEOMETRY_FILL_PATTERN";
 
-    SAMRAI::hier::IntVector const& getStencilWidth()
+    SAMRAI::hier::IntVector const& getStencilWidth() override
     {
         TBOX_ERROR("getStencilWidth() should not be\n"
                    << "called.  This pattern creates overlaps based on\n"
@@ -146,7 +146,7 @@ private:
     computeFillBoxesOverlap(SAMRAI::hier::BoxContainer const& fill_boxes,
                             SAMRAI::hier::BoxContainer const& node_fill_boxes,
                             SAMRAI::hier::Box const& patch_box, SAMRAI::hier::Box const& data_box,
-                            SAMRAI::hier::PatchDataFactory const& pdf) const
+                            SAMRAI::hier::PatchDataFactory const& pdf) const override
     {
         NULL_USE(node_fill_boxes);
 

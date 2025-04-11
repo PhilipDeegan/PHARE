@@ -1,6 +1,7 @@
 #ifndef PHARE_TEST_CORE_DATA_PARTICLES_TEST_PARTICLES_FIXTURES_HPP
 #define PHARE_TEST_CORE_DATA_PARTICLES_TEST_PARTICLES_FIXTURES_HPP
 
+#include <core/data/particles/particle.hpp>
 #include <string>
 
 namespace PHARE::core
@@ -30,6 +31,31 @@ struct UsableParticlesPopulation
                                                         /*levelGhostParticlesOld=*/nullptr,
                                                         /*levelGhostParticlesNew=*/nullptr};
 };
+
+
+template<std::size_t dim, typename Particle_t = Particle<dim>>
+Particle_t particle(std::array<int, dim> const& icell)
+{
+    return {/*.weight = */ .001,
+            /*.charge = */ 1,
+            /*.iCell  = */ icell,
+            /*.delta  = */ ConstArray<double, dim>(.51),
+            /*.v      = */ {{.002002002002, .003003003003, .004004004004}}};
+}
+
+template<std::size_t dim>
+Particle<dim> particle(int const icell = 15)
+{
+    return particle(ConstArray<int, dim>(icell));
+}
+
+template<typename Particles, typename Box>
+void add_particles_in(Particles& particles, Box const& box, std::size_t const ppc)
+{
+    for (auto const& bix : box)
+        for (std::size_t i = 0; i < ppc; ++i)
+            particles.emplace_back(particle(*bix));
+}
 
 
 } // namespace PHARE::core
