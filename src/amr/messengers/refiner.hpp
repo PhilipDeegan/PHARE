@@ -5,6 +5,8 @@
 #include "core/data/vecfield/vecfield.hpp"
 
 #include "amr/data/field/field_variable_fill_pattern.hpp"
+#include "amr/messengers/field_sum_transaction.hpp"
+
 
 namespace PHARE::amr
 {
@@ -16,13 +18,17 @@ enum class RefinerType {
     InitInteriorPart,
     LevelBorderParticles,
     InteriorGhostParticles,
-    SharedBorder
+    SharedBorder,
+    PatchFieldBorderSum
 };
+
 
 
 template<typename ResourcesManager, RefinerType Type>
 class Refiner : private Communicator<RefinerTypes, ResourcesManager::dimension>
 {
+    using FieldData_t = ResourcesManager::UserField_t::patch_data_type;
+
 public:
     void registerLevel(std::shared_ptr<SAMRAI::hier::PatchHierarchy> const& hierarchy,
                        std::shared_ptr<SAMRAI::hier::PatchLevel> const& level)
@@ -62,6 +68,15 @@ public:
             else if constexpr (Type == RefinerType::PatchGhostField)
             {
                 this->add(algo, algo->createSchedule(level), levelNumber);
+            }
+
+            else if constexpr (Type == RefinerType::PatchFieldBorderSum)
+            {
+                this->add(algo,
+                          algo->createSchedule(
+                              level, 0,
+                              std::make_shared<FieldBorderSumTransactionFactory<FieldData_t>>()),
+                          levelNumber);
             }
 
             // this createSchedule overload is used to initialize fields.
@@ -125,7 +140,7 @@ public:
 
 
     void regrid(std::shared_ptr<SAMRAI::hier::PatchHierarchy> const& hierarchy,
-                const int levelNumber, std::shared_ptr<SAMRAI::hier::PatchLevel> const& oldLevel,
+                int const levelNumber, std::shared_ptr<SAMRAI::hier::PatchLevel> const& oldLevel,
                 double const initDataTime)
     {
         for (auto& algo : this->algos)
