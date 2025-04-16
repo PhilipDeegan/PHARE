@@ -293,10 +293,6 @@ def populateDict():
         add_int(partinit_path + "nbr_part_per_cell", d["nbrParticlesPerCell"])
         add_double(partinit_path + "density_cut_off", d["density_cut_off"])
 
-    add_string("simulation/electromag/name", "EM")
-    add_string("simulation/electromag/electric/name", "E")
-
-    add_string("simulation/electromag/magnetic/name", "B")
     maginit_path = "simulation/electromag/magnetic/initializer/"
     addInitFunction(maginit_path + "x_component", fn_wrapper(modelDict["bx"]))
     addInitFunction(maginit_path + "y_component", fn_wrapper(modelDict["by"]))

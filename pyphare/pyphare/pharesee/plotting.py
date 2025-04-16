@@ -256,13 +256,13 @@ def finest_field_plot(run_path, qty, **kwargs):
     interp = kwargs.get("interp", "nearest")
 
     if qty in ["Bx", "By", "Bz"]:
-        file = os.path.join(run_path, "EM_B.h5")
+        file = os.path.join(run_path, "B.h5")
         if time is None:
             times = get_times_from_h5(file)
             time = times[0]
         interpolator, finest_coords = r.GetB(time, merged=True, interp=interp)[qty]
     elif qty in ["Ex", "Ey", "Ez"]:
-        file = os.path.join(run_path, "EM_E.h5")
+        file = os.path.join(run_path, "E.h5")
         if time is None:
             times = get_times_from_h5(file)
             time = times[0]
@@ -280,7 +280,7 @@ def finest_field_plot(run_path, qty, **kwargs):
             time = times[0]
         interpolator, finest_coords = r.GetNi(time, merged=True, interp=interp)[qty]
     elif qty in ("Jx", "Jy", "Jz"):
-        file = os.path.join(run_path, "EM_B.h5")
+        file = os.path.join(run_path, "B.h5")
         if time is None:
             times = get_times_from_h5(file)
             time = times[0]

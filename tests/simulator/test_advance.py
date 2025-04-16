@@ -178,13 +178,9 @@ class AdvanceTestBase(SimulatorTest):
 
         eb_hier = None
         if qty in ["e", "eb", "fields"]:
-            eb_hier = hierarchy_from(
-                h5_filename=diag_outputs + "/EM_E.h5", hier=eb_hier
-            )
+            eb_hier = hierarchy_from(h5_filename=diag_outputs + "/E.h5", hier=eb_hier)
         if qty in ["b", "eb", "fields"]:
-            eb_hier = hierarchy_from(
-                h5_filename=diag_outputs + "/EM_B.h5", hier=eb_hier
-            )
+            eb_hier = hierarchy_from(h5_filename=diag_outputs + "/B.h5", hier=eb_hier)
         if qty in ["e", "b", "eb"]:
             return eb_hier
 
@@ -215,12 +211,8 @@ class AdvanceTestBase(SimulatorTest):
             return particle_hier
 
         if qty == "fields":
-            eb_hier = hierarchy_from(
-                h5_filename=diag_outputs + "/EM_E.h5", hier=eb_hier
-            )
-            eb_hier = hierarchy_from(
-                h5_filename=diag_outputs + "/EM_B.h5", hier=eb_hier
-            )
+            eb_hier = hierarchy_from(h5_filename=diag_outputs + "/E.h5", hier=eb_hier)
+            eb_hier = hierarchy_from(h5_filename=diag_outputs + "/B.h5", hier=eb_hier)
             mom_hier = hierarchy_from(
                 h5_filename=diag_outputs + "/ions_density.h5", hier=eb_hier
             )

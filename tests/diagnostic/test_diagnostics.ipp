@@ -41,7 +41,7 @@ void electromag_test(Simulator&& sim, std::string out_dir)
     auto& hierarchy   = *sim.hierarchy;
     { // scoped to destruct after dump
         Hi5Diagnostic<Hierarchy, HybridModel> hi5{hierarchy, hybridModel, out_dir, NEW_HI5_FILE};
-        hi5.dMan.addDiagDict(hi5.electromag("/EM_B")).addDiagDict(hi5.electromag("/EM_E"));
+        hi5.dMan.addDiagDict(hi5.electromag("/B")).addDiagDict(hi5.electromag("/E"));
         hi5.dump();
     }
 

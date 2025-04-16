@@ -17,6 +17,24 @@ namespace core
     template<typename VecFieldT>
     class Electromag
     {
+        VecFieldT make_E(auto const& dict)
+        {
+            if (dict.contains("name"))
+                return {dict["name"].template to<std::string>() + "_"
+                            + dict["electric"]["name"].template to<std::string>(),
+                        HybridQuantity::Vector::E};
+            return {"E", HybridQuantity::Vector::E};
+        }
+        VecFieldT make_B(auto const& dict)
+        {
+            if (dict.contains("name"))
+                return {dict["name"].template to<std::string>() + "_"
+                            + dict["magnetic"]["name"].template to<std::string>(),
+                        HybridQuantity::Vector::B};
+            return {"B", HybridQuantity::Vector::B};
+        }
+
+
     public:
         static constexpr std::size_t dimension = VecFieldT::dimension;
 
@@ -28,12 +46,8 @@ namespace core
         }
 
         explicit Electromag(initializer::PHAREDict const& dict)
-            : E{dict["name"].template to<std::string>() + "_"
-                    + dict["electric"]["name"].template to<std::string>(),
-                HybridQuantity::Vector::E}
-            , B{dict["name"].template to<std::string>() + "_"
-                    + dict["magnetic"]["name"].template to<std::string>(),
-                HybridQuantity::Vector::B}
+            : E{make_E(dict)}
+            , B{make_B(dict)}
             , Binit_{dict["magnetic"]["initializer"]}
         {
         }

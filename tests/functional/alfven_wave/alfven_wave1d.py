@@ -116,7 +116,7 @@ def phase_speed(run_path, ampl, xmax):
     from scipy.optimize import curve_fit
     import os
 
-    time = get_times_from_h5(os.path.join(run_path, "EM_B.h5"))
+    time = get_times_from_h5(os.path.join(run_path, "B.h5"))
     r = Run(run_path)
     phase = np.zeros_like(time)
     amplitude = np.zeros_like(time)
@@ -149,7 +149,7 @@ def main():
         vphi, t, phi, a, k = phase_speed(".", 0.01, 1000)
 
         r = Run(".", 0)
-        t = get_times_from_h5("EM_B.h5")
+        t = get_times_from_h5("B.h5")
         fig, ax = plt.subplots(figsize=(9, 5), nrows=1)
 
         B = r.GetB(t[int(len(t) / 2)], merged=True)

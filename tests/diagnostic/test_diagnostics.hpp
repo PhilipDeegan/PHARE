@@ -152,8 +152,8 @@ void validateElectromagDump(Simulator& sim, Hi5Diagnostic& hi5)
 
     auto visit = [&](GridLayout& layout, std::string patchID, std::size_t iLevel) {
         auto path = hi5.getPatchPath(iLevel, patchID) + "/";
-        checkVF(layout, path, "EM_B", hybridModel.state.electromag.B);
-        checkVF(layout, path, "EM_E", hybridModel.state.electromag.E);
+        checkVF(layout, path, "B", hybridModel.state.electromag.B);
+        checkVF(layout, path, "E", hybridModel.state.electromag.E);
     };
 
     PHARE::amr::visitHierarchy<GridLayout>(*sim.hierarchy, *hybridModel.resourcesManager, visit, 0,
@@ -236,7 +236,7 @@ void validateAttributes(Simulator& sim, Hi5Diagnostic& hi5)
     auto nbrPop = dict["simulation"]["ions"]["nbrPopulations"].template to<std::size_t>();
     EXPECT_EQ(nbrPop, expectedPopNbr);
 
-    std::vector<std::string> h5FileTypes{"/EM_B", "/EM_E", "/ions/density", "/ions/bulkVelocity"};
+    std::vector<std::string> h5FileTypes{"/B", "/E", "/ions/density", "/ions/bulkVelocity"};
 
     for (std::size_t i = 0; i < nbrPop; ++i)
     {

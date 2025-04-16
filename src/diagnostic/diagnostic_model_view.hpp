@@ -34,6 +34,7 @@ class ModelView : public IModelView
 
 
 public:
+    using Model_t    = Model;
     using GridLayout = typename Model::gridlayout_type;
     using PatchProperties
         = cppdict::Dict<float, double, std::size_t, std::vector<int>, std::vector<std::uint32_t>,
