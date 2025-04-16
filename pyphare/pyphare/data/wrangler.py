@@ -48,8 +48,8 @@ class DataWrangler:
         }
 
     def extract_is_primal_key_from(self, em_xyz):
-        """extract "Ex" from "EM_E_x" """
-        return "".join(em_xyz.split("_"))[2:]
+        """extract "Ex" from "E_x" """
+        return "".join(em_xyz.split("_"))
 
     def lvl0EM(self):
         return {
