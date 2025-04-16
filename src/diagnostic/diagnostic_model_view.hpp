@@ -22,8 +22,8 @@ template<typename Hierarchy, typename Model>
 class BaseModelView : public IModelView
 {
 public:
-    using GridLayout = typename Model::gridlayout_type;
-    using VecField   = typename Model::vecfield_type;
+    using GridLayout = Model::gridlayout_type;
+    using VecField   = Model::vecfield_type;
     using PatchProperties
         = cppdict::Dict<float, double, std::size_t, std::vector<int>, std::vector<std::uint32_t>,
                         std::vector<double>, std::vector<std::size_t>, std::string,
@@ -91,81 +91,19 @@ protected:
     Hierarchy& hierarchy_;
 };
 
-// we need to check the model type or the template specialization from the typelist will fail to
-// compile for the other model.
-template<typename Model>
-struct is_hybrid_model : std::false_type
-{
-};
 
-template<typename... Args>
-struct is_hybrid_model<solver::HybridModel<Args...>> : std::true_type
-{
-};
+template<typename Hierarchy, typename Model, typename Enable = void>
+class ModelView;
 
-template<typename Model>
-struct is_mhd_model : std::false_type
-{
-};
-
-template<typename... Args>
-struct is_mhd_model<solver::MHDModel<Args...>> : std::true_type
-{
-};
-
-template<typename HybridModel>
-bool constexpr is_valid_hybrid_model = []() {
-    if constexpr (is_hybrid_model<HybridModel>::value)
-    {
-        return std::is_same_v<solver::type_list_to_hybrid_model_t<typename HybridModel::type_list>,
-                              HybridModel>;
-    }
-    else
-    {
-        return false;
-    }
-}();
-
-template<typename MHDModel>
-bool constexpr is_valid_mhd_model = []() {
-    if constexpr (is_mhd_model<MHDModel>::value)
-    {
-        return std::is_same_v<solver::type_list_to_mhd_model_t<typename MHDModel::type_list>,
-                              MHDModel>;
-    }
-    else
-    {
-        return false;
-    }
-}();
-
-struct HybridIdentifier
-{
-};
-struct MHDIdentifier
-{
-};
-
-template<typename Model>
-using ModelIdentifier
-    = std::conditional_t<is_valid_hybrid_model<Model>, HybridIdentifier,
-                         std::conditional_t<is_valid_mhd_model<Model>, MHDIdentifier, void>>;
-
-template<typename Hierarchy, typename Model, typename = ModelIdentifier<Model>>
-class ModelView
-{
-    static_assert(is_valid_hybrid_model<Model> || is_valid_mhd_model<Model>,
-                  "Model must be either a valid HybridModel or MHDModel.");
-};
 
 template<typename Hierarchy, typename Model>
-class ModelView<Hierarchy, Model, HybridIdentifier> : public BaseModelView<Hierarchy, Model>
+class ModelView<Hierarchy, Model, std::enable_if_t<solver::is_hybrid_model_v<Model>, int>>
+    : public BaseModelView<Hierarchy, Model>
 {
     using VecField = typename Model::vecfield_type;
 
 public:
-    using Identifier = HybridIdentifier;
-
+    using Model_t = Model;
     using BaseModelView<Hierarchy, Model>::BaseModelView;
 
     NO_DISCARD VecField& getB() const { return this->model_.state.electromag.B; }
@@ -175,15 +113,16 @@ public:
     NO_DISCARD auto& getIons() const { return this->model_.state.ions; }
 };
 
+
 template<typename Hierarchy, typename Model>
-class ModelView<Hierarchy, Model, MHDIdentifier> : public BaseModelView<Hierarchy, Model>
+class ModelView<Hierarchy, Model, std::enable_if_t<solver::is_mhd_model_v<Model>, int>>
+    : public BaseModelView<Hierarchy, Model>
 {
     using Field    = typename Model::field_type;
     using VecField = typename Model::vecfield_type;
 
 public:
-    using Identifier = MHDIdentifier;
-
+    using Model_t = Model;
     using BaseModelView<Hierarchy, Model>::BaseModelView;
 
     NO_DISCARD Field& getRho() const { return this->model_.state.rho; }

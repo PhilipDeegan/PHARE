@@ -48,10 +48,10 @@ class H5Writer
 
 public:
     using This       = H5Writer<ModelView>;
-    using GridLayout = typename ModelView::GridLayout;
-    using Attributes = typename ModelView::PatchProperties;
+    using Model_t    = ModelView::Model_t;
+    using GridLayout = ModelView::GridLayout;
+    using Attributes = ModelView::PatchProperties;
 
-    using Identifier                  = typename ModelView::Identifier;
     static constexpr auto dimension   = GridLayout::dimension;
     static constexpr auto interpOrder = GridLayout::interp_order;
     static constexpr auto READ_WRITE  = HiFile::AccessMode::OpenOrCreate;
@@ -65,7 +65,7 @@ public:
         , filePath_{hifivePath}
         , modelView_{hier, model}
     {
-        if constexpr (std::is_same_v<Identifier, HybridIdentifier>)
+        if constexpr (solver::is_hybrid_model_v<Model_t>)
             typeWriters_ = {
                 {"info", make_writer<InfoDiagnosticWriter<This>>()},
                 {"meta", make_writer<MetaDiagnosticWriter<This>>()},
@@ -73,7 +73,7 @@ public:
                 {"electromag", make_writer<ElectromagDiagnosticWriter<This>>()},
                 {"particle", make_writer<ParticlesDiagnosticWriter<This>>()} //
             };
-        else if constexpr (std::is_same_v<Identifier, MHDIdentifier>)
+        else if constexpr (solver::is_mhd_model_v<Model_t>)
             typeWriters_ = {
                 {"meta", make_writer<MetaDiagnosticWriter<This>>()},
                 {"mhd", make_writer<MHDDiagnosticWriter<This>>()},

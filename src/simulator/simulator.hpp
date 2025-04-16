@@ -1,6 +1,7 @@
 #ifndef PHARE_SIMULATOR_SIMULATOR_HPP
 #define PHARE_SIMULATOR_SIMULATOR_HPP
 
+#include <amr/physical_models/hybrid_model.hpp>
 #include <vector>
 #include <string>
 
@@ -112,6 +113,17 @@ public:
     using SimFunctors      = typename core::PHARE_Sim_Types::SimulationFunctors;
 
     using Integrator = PHARE::amr::Integrator<dimension>;
+
+    static_assert(
+        std::is_same_v<decltype(solver::mhd_model_from_type_list(typename MHDModel::type_list{})),
+                       MHDModel>);
+
+    static_assert(!solver::is_hybrid_model_v<MHDModel>);
+    static_assert(!solver::is_mhd_model_v<HybridModel>);
+
+    static_assert(solver::is_hybrid_model_v<HybridModel>);
+    static_assert(solver::is_mhd_model_v<MHDModel>);
+
 
 protected:
     // provided to force flush for diags

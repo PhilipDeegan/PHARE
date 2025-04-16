@@ -2,6 +2,7 @@
 #define PHARE_HYBRID_MODEL_HPP
 
 #include <string>
+#include <utility>
 
 #include "initializer/data_provider.hpp"
 #include "core/models/hybrid_state.hpp"
@@ -43,7 +44,8 @@ public:
     using ParticleInitializerFactory
         = core::ParticleInitializerFactory<particle_array_type, gridlayout_type>;
 
-    static inline std::string const model_name = "HybridModel";
+    static constexpr std::string_view const model_type_name = "HybridModel";
+    static inline std::string const model_name              = std::string{model_type_name};
 
 
     core::HybridState<Electromag, Ions, Electrons> state;
@@ -194,6 +196,24 @@ struct type_list_to_hybrid_model
 
 template<typename TypeList>
 using type_list_to_hybrid_model_t = typename type_list_to_hybrid_model<TypeList>::type;
+
+
+template<typename Model>
+auto constexpr is_hybrid_model(Model* m) -> decltype(m->model_type_name, bool())
+{
+    return Model::model_type_name == "HybridModel";
+}
+
+template<typename... Args>
+auto constexpr is_hybrid_model(Args...)
+{
+    return false;
+}
+
+template<typename Model>
+auto constexpr is_hybrid_model_v = is_hybrid_model((Model*)(nullptr));
+
+
 
 } // namespace PHARE::solver
 

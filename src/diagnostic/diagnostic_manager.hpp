@@ -7,6 +7,7 @@
 #include "initializer/data_provider.hpp"
 #include "diagnostic_props.hpp"
 
+#include <amr/physical_models/hybrid_model.hpp>
 #include <type_traits>
 #include <utility>
 #include <cmath>
@@ -23,11 +24,11 @@ template<typename DiagManager>
 void registerDiagnostics(DiagManager& dMan, initializer::PHAREDict const& diagsParams)
 {
     auto const diagTypes = []() {
-        if constexpr (std::is_same_v<typename DiagManager::Identifier, HybridIdentifier>)
+        if constexpr (solver::is_hybrid_model_v<typename DiagManager::Model_t>)
         {
             return std::vector<std::string>{"fluid", "electromag", "particles", "meta", "info"};
         }
-        else if constexpr (std::is_same_v<typename DiagManager::Identifier, MHDIdentifier>)
+        else if constexpr (solver::is_mhd_model_v<typename DiagManager::Model_t>)
         {
             return std::vector<std::string>{"mhd", "meta", "electromag"};
         }
@@ -67,7 +68,7 @@ template<typename Writer>
 class DiagnosticsManager : public IDiagnosticsManager
 {
 public:
-    using Identifier = typename Writer::Identifier;
+    using Model_t = typename Writer::Model_t;
 
     bool dump(double timeStamp, double timeStep) override;
 

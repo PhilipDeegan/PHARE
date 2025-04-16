@@ -7,6 +7,7 @@
 
 
 #include <SAMRAI/hier/PatchLevel.h>
+#include <utility>
 
 #include "amr/messengers/mhd_messenger_info.hpp"
 #include "core/models/mhd_state.hpp"
@@ -37,7 +38,8 @@ public:
     using grid_type              = Grid_t;
     using resources_manager_type = amr::ResourcesManager<gridlayout_type, Grid_t>;
 
-    static inline std::string const model_name = "MHDModel";
+    static constexpr std::string_view const model_type_name = "MHDModel";
+    static inline std::string const model_name              = std::string{model_type_name};
 
     state_type state;
     std::shared_ptr<resources_manager_type> resourcesManager;
@@ -144,6 +146,22 @@ struct type_list_to_mhd_model
 
 template<typename TypeList>
 using type_list_to_mhd_model_t = typename type_list_to_mhd_model<TypeList>::type;
+
+
+template<typename Model>
+auto constexpr is_mhd_model(Model* m) -> decltype(m->model_type_name, bool())
+{
+    return Model::model_type_name == "MHDModel";
+}
+
+template<typename... Args>
+auto constexpr is_mhd_model(Args...)
+{
+    return false;
+}
+
+template<typename Model>
+auto constexpr is_mhd_model_v = is_mhd_model((Model*)(nullptr));
 
 } // namespace PHARE::solver
 
