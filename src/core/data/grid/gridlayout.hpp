@@ -1150,6 +1150,30 @@ namespace core
 
 
 
+        template<typename Field>
+        auto ghostBoxFor(Field const& field) const
+        {
+            return _BoxFor(field, [&](auto const& centering, auto const direction) {
+                return this->ghostStartToEnd(centering, direction);
+            });
+        }
+
+        template<typename Field>
+        auto AMRGhostBoxFor(Field const& field) const
+        {
+            auto const centerings = centering(field);
+            auto const growBy     = [&]() {
+                std::array<int, dimension> arr;
+                for (std::uint8_t i = 0; i < dimension; ++i)
+                    arr[i] = nbrGhosts(centerings[i]);
+                return arr;
+            }();
+            auto ghostBox = grow(AMRBox_, growBy);
+            for (std::uint8_t i = 0; i < dimension; ++i)
+                ghostBox.upper[i] += (centerings[i] == QtyCentering::primal) ? 1 : 0;
+            return ghostBox;
+        }
+
 
         template<typename Field, typename Fn>
         void evalOnBox(Field& field, Fn&& fn) const
@@ -1204,6 +1228,30 @@ namespace core
                     }
                 }
             }
+        }
+
+
+        template<typename Field, typename Fn>
+        auto _BoxFor(Field const& field, Fn startToEnd) const
+        {
+            std::array<std::uint32_t, dimension> lower, upper;
+
+            auto const [ix0, ix1] = startToEnd(field, Direction::X);
+            lower[0]              = ix0;
+            upper[0]              = ix1;
+            if constexpr (dimension > 1)
+            {
+                auto const [iy0, iy1] = startToEnd(field, Direction::Y);
+                lower[1]              = iy0;
+                upper[1]              = iy1;
+            }
+            if constexpr (dimension == 3)
+            {
+                auto const [iz0, iz1] = startToEnd(field, Direction::Z);
+                lower[2]              = iz0;
+                upper[2]              = iz1;
+            }
+            return Box<std::uint32_t, dimension>{lower, upper};
         }
 
 

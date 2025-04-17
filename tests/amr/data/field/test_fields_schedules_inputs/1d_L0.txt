@@ -11,20 +11,17 @@ Main
 }
 PatchHierarchy
 {
-    max_levels  =   2
+    max_levels  =   1
     // vector of coarse ratio with dim dimension
-    ratio_to_coarser
-    {
-        level_1 =   2
-    }
+
     largest_patch_size
     {
-        level_0 =   64
+        level_0 =   32
         // All finer level will use same values in as level_0
     }
     smallest_patch_size
     {
-        level_0 =   10
+        level_0 =   32
         // All finer level will use same values in as level_0
      }
 }
@@ -33,18 +30,7 @@ LoadBalancer
 }
 StandardTagAndInitialize
 {
-    at_0
-    {
-        cycle = 0
-        tag_0
-        {
-            tagging_method = "REFINE_BOXES"
-            level_0
-            {
-                boxes = [ (10) , (50)]
-            }
-        }
-    }
+
 }
 GriddingAlgorithm
 {

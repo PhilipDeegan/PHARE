@@ -1,9 +1,13 @@
-add_subdirectory(copy)
-add_subdirectory(copy_overlap)
-add_subdirectory(stream_pack)
-add_subdirectory(refine)
 
-function(_add_amr_particles_test src_name)
+add_subdirectory(coarsening)
+add_subdirectory(copy_pack)
+add_subdirectory(geometry)
+add_subdirectory(overlap)
+add_subdirectory(refine)
+add_subdirectory(variable)
+add_subdirectory(time_interpolate)
+
+function(_add_amr_fields_test src_name)
 
     add_executable(${src_name} ${src_name}.cpp)
 
@@ -23,10 +27,9 @@ function(_add_amr_particles_test src_name)
 
     add_phare_test(${src_name} ${CMAKE_CURRENT_BINARY_DIR})
 
-endfunction(_add_amr_particles_test)
+endfunction(_add_amr_fields_test)
 
-file(COPY "test_particles_schedules_inputs" DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
+file(COPY "test_fields_schedules_inputs" DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
 
-_add_amr_particles_test(test_particles_data)
-_add_amr_particles_test(test_particles_schedules)
+_add_amr_fields_test(test_fields_schedules)
 
