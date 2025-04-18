@@ -126,7 +126,9 @@ void IonUpdater<Ions, Electromag, GridLayout>::updateAndDepositDomain_(Ions& ion
 
     auto domainBox = layout.AMRBox();
 
-    auto inDomainBox = [&domainBox](auto& particleRange) //
+    auto const noop = [](auto& particleRange) { return particleRange; };
+
+    auto const inDomainBox = [&domainBox](auto& particleRange) //
     {
         auto& box = domainBox;
         return particleRange.array().partition(
@@ -137,14 +139,14 @@ void IonUpdater<Ions, Electromag, GridLayout>::updateAndDepositDomain_(Ions& ion
     auto ghostBox{domainBox};
     ghostBox.grow(partGhostWidth);
 
-    auto inGhostBox = [&](auto& particleRange) {
+    auto const inGhostBox = [&](auto& particleRange) {
         return particleRange.array().partition(
             [&](auto const& cell) { return isIn(Point{cell}, ghostBox); });
     };
 
     for (auto& pop : ions)
     {
-        ParticleArray& domain = pop.domainParticles();
+        auto& domain = tmp_particles_.replace_from(pop.domainParticles());
 
         // first push all domain particles
         // push them while still inDomainBox
@@ -154,11 +156,8 @@ void IonUpdater<Ions, Electromag, GridLayout>::updateAndDepositDomain_(Ions& ion
         auto inRange  = makeIndexRange(domain);
         auto outRange = makeIndexRange(domain);
 
-        auto inDomain = pusher_->move(
-            inRange, outRange, em, pop.mass(), interpolator_, layout,
-            [](auto& particleRange) { return particleRange; }, inDomainBox);
-
-        interpolator_(inDomain, pop.density(), pop.flux(), layout);
+        pusher_->move(inRange, outRange, em, pop.mass(), interpolator_, layout, noop, noop);
+        interpolator_(domain, pop.density(), pop.flux(), layout);
 
         // TODO : we can erase here because we know we are working on a state
         // that has been saved in the solverPPC
@@ -166,29 +165,27 @@ void IonUpdater<Ions, Electromag, GridLayout>::updateAndDepositDomain_(Ions& ion
         // it kind of pretends not to be by being independent object in core...
         // note we need to erase here if using the back_inserter for ghost copy
         // otherwise they will be added after leaving domain particles.
-        domain.erase(makeRange(domain, inDomain.iend(), domain.size()));
+
+        // auto const now_ghosts_particles = makeRange(domain, inDomain.iend(), domain.size());
+        //                 std::copy(now_ghosts_particles.begin(), now_ghosts_particles.end(),
+        //                   std::back_inserter(domain));
+        // domain.erase(makeRange(domain, inDomain.iend(), domain.size()));
+
 
         // then push patch and level ghost particles
         // push those in the ghostArea (i.e. stop pushing if they're not out of it)
         // deposit moments on those which leave to go inDomainBox
 
-        auto pushAndAccumulateGhosts = [&](auto& inputArray, bool copyInDomain = false) {
+        auto pushAndAccumulateGhosts = [&](auto& inputArray) {
             auto& outputArray = tmp_particles_.replace_from(inputArray);
 
             inRange  = makeIndexRange(inputArray);
             outRange = makeIndexRange(outputArray);
 
-            auto enteredInDomain = pusher_->move(inRange, outRange, em, pop.mass(), interpolator_,
-                                                 layout, inGhostBox, inDomainBox);
+            auto ghosts = pusher_->move(inRange, outRange, em, pop.mass(), interpolator_, layout,
+                                        inGhostBox, inDomainBox);
 
-            interpolator_(enteredInDomain, pop.density(), pop.flux(), layout);
-
-            if (copyInDomain)
-            {
-                domain.reserve(domain.size() + enteredInDomain.size());
-                std::copy(enteredInDomain.begin(), enteredInDomain.end(),
-                          std::back_inserter(domain));
-            }
+            interpolator_(ghosts, pop.density(), pop.flux(), layout);
         };
 
         // After this function is done domain particles overlaping ghost layers of neighbor patches
@@ -199,7 +196,9 @@ void IonUpdater<Ions, Electromag, GridLayout>::updateAndDepositDomain_(Ions& ion
         // On the contrary level ghost particles entering the domain here do not need to be copied
         // since they contribute to nodes that are not shared with neighbor patches an since
         // level border nodes will receive contributions from levelghost old and new particles
-        pushAndAccumulateGhosts(pop.patchGhostParticles(), true);
+
+
+        // pushAndAccumulateGhosts(pop.patchGhostParticles(), true);
         pushAndAccumulateGhosts(pop.levelGhostParticles());
     }
 }
@@ -220,6 +219,8 @@ void IonUpdater<Ions, Electromag, GridLayout>::updateAndDepositAll_(Ions& ions,
     auto domainBox                = layout.AMRBox();
     auto ghostBox{domainBox};
     ghostBox.grow(partGhostWidth);
+
+    auto const noop = [](auto& particleRange) { return particleRange; };
 
     auto inDomainBox = [&domainBox](auto& particleRange) //
     {
@@ -248,11 +249,10 @@ void IonUpdater<Ions, Electromag, GridLayout>::updateAndDepositAll_(Ions& ions,
         auto& domainParticles = pop.domainParticles();
         auto domainPartRange  = makeIndexRange(domainParticles);
 
-        auto inDomain = pusher_->move(
-            domainPartRange, domainPartRange, em, pop.mass(), interpolator_, layout,
-            [](auto const& particleRange) { return particleRange; }, inDomainBox);
+        auto inDomain = pusher_->move(domainPartRange, domainPartRange, em, pop.mass(),
+                                      interpolator_, layout, noop, inDomainBox);
 
-        domainParticles.erase(makeRange(domainParticles, inDomain.iend(), domainParticles.size()));
+        auto now_ghosts = makeRange(domainParticles, inDomain.iend(), domainParticles.size());
 
         auto pushAndCopyInDomain = [&](auto&& particleRange) {
             auto inGhostLayerRange = pusher_->move(particleRange, particleRange, em, pop.mass(),
@@ -266,10 +266,15 @@ void IonUpdater<Ions, Electromag, GridLayout>::updateAndDepositAll_(Ions& ions,
                 makeRange(particleArray, inGhostLayerRange.iend(), particleArray.size()));
         };
 
-        pushAndCopyInDomain(makeIndexRange(pop.patchGhostParticles()));
+        // pushAndCopyInDomain(makeIndexRange(pop.patchGhostParticles()));
         pushAndCopyInDomain(makeIndexRange(pop.levelGhostParticles()));
 
         interpolator_(makeIndexRange(domainParticles), pop.density(), pop.flux(), layout);
+
+        auto& patchGhost = pop.patchGhostParticles();
+        patchGhost.reserve(patchGhost.size() + now_ghosts.size());
+        std::copy(now_ghosts.begin(), now_ghosts.end(), std::back_inserter(patchGhost));
+        domainParticles.erase(now_ghosts);
     }
 }
 

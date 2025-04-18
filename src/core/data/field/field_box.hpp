@@ -68,7 +68,7 @@ public:
     template<typename Operator>
     void op(std::vector<value_type> const& vec, std::size_t seek = 0);
 
-    void set(std::vector<value_type>& vec);
+    void append_to(std::vector<value_type>& vec);
 };
 
 
@@ -94,7 +94,7 @@ void FieldBox<Field_t>::op(std::vector<value_type> const& vec, std::size_t seek)
 }
 
 template<typename Field_t>
-void FieldBox<Field_t>::set(std::vector<value_type>& vec)
+void FieldBox<Field_t>::append_to(std::vector<value_type>& vec)
 {
     // reserve vec before use!
     auto src_it = lcl_box.begin();

@@ -64,7 +64,7 @@ public:
     TensorField()                                     = delete;
     TensorField(TensorField const& source)            = default;
     TensorField(TensorField&& source)                 = default;
-    TensorField& operator=(TensorField const& source) = delete;
+    TensorField& operator=(TensorField const& source) = default;
     TensorField& operator=(TensorField&& source)      = default;
 
     TensorField(std::string const& name, tensor_t physQty)

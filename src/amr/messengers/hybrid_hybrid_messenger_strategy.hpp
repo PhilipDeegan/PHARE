@@ -155,41 +155,49 @@ namespace amr
         {
             auto const level = hierarchy->getPatchLevel(levelNumber);
 
-            magSharedNodesRefiners_.registerLevel(hierarchy, level);
-            elecSharedNodesRefiners_.registerLevel(hierarchy, level);
-            currentSharedNodesRefiners_.registerLevel(hierarchy, level);
+            auto const register_refiners
+                = [&](auto&... refiners) { (refiners.registerLevel(hierarchy, level), ...); };
 
-            magPatchGhostsRefiners_.registerLevel(hierarchy, level);
-            magGhostsRefiners_.registerLevel(hierarchy, level);
-            elecGhostsRefiners_.registerLevel(hierarchy, level);
-            currentGhostsRefiners_.registerLevel(hierarchy, level);
+            auto const register_vec
+                = [&](auto& vec) { std::for_each(vec.begin(), vec.end(), register_refiners); };
 
-            rhoGhostsRefiners_.registerLevel(hierarchy, level);
-            velGhostsRefiners_.registerLevel(hierarchy, level);
+            auto const register_vecs = [&](auto&... vecs) { (register_vec(vecs), ...); };
 
-            patchGhostPartRefiners_.registerLevel(hierarchy, level);
-            domainGhostPartRefiners_.registerLevel(hierarchy, level);
+            register_refiners(               //
+                magSharedNodesRefiners_,     //
+                elecSharedNodesRefiners_,    //
+                currentSharedNodesRefiners_, //
+                magPatchGhostsRefiners_,     //
+                magGhostsRefiners_,          //
+                elecGhostsRefiners_,         //
+                currentGhostsRefiners_,      //
+                rhoGhostsRefiners_,          //
+                velGhostsRefiners_,          //
+                patchGhostPartRefiners_,     //
+                domainGhostPartRefiners_     //
+            );
 
-            for (auto& popFluxBorderSumRefiners : popFluxBorderSumRefiners_)
-                popFluxBorderSumRefiners.registerLevel(hierarchy, level);
+            register_vecs(popFluxBorderSumRefiners_, popDensityBorderSumRefiners_);
 
             // root level is not initialized with a schedule using coarser level data
             // so we don't create these schedules if root level
             // TODO this 'if' may not be OK if L0 is regrided
             if (levelNumber != rootLevelNumber)
             {
-                // those are for refinement
-                magneticInitRefiners_.registerLevel(hierarchy, level);
-                electricInitRefiners_.registerLevel(hierarchy, level);
-                domainParticlesRefiners_.registerLevel(hierarchy, level);
-                lvlGhostPartOldRefiners_.registerLevel(hierarchy, level);
-                lvlGhostPartNewRefiners_.registerLevel(hierarchy, level);
+                register_refiners(
+                    // these are for refinement
+                    magneticInitRefiners_,    //
+                    electricInitRefiners_,    //
+                    domainParticlesRefiners_, //
+                    lvlGhostPartOldRefiners_, //
+                    lvlGhostPartNewRefiners_, //
 
-                // and these for coarsening
-                magnetoSynchronizers_.registerLevel(hierarchy, level);
-                electroSynchronizers_.registerLevel(hierarchy, level);
-                densitySynchronizers_.registerLevel(hierarchy, level);
-                ionBulkVelSynchronizers_.registerLevel(hierarchy, level);
+                    // and these for coarsening
+                    magnetoSynchronizers_,   //
+                    electroSynchronizers_,   //
+                    densitySynchronizers_,   //
+                    ionBulkVelSynchronizers_ //
+                );
             }
         }
 
@@ -349,17 +357,20 @@ namespace amr
         {
             PHARE_LOG_SCOPE(1, "HybridHybridMessengerStrategy::fillIonGhostParticles");
 
-            // domainGhostPartRefiners_.fill(level.getLevelNumber(), fillTime);
+            domainGhostPartRefiners_.fill(level.getLevelNumber(), fillTime);
 
-            for (auto patch : level)
-            {
-                auto dataOnPatch = resourcesManager_->setOnPatch(*patch, ions);
+            auto const& vistor = [&]() {
                 for (auto& pop : ions)
-                {
                     pop.patchGhostParticles().clear();
-                }
-            }
-            patchGhostPartRefiners_.fill(level.getLevelNumber(), fillTime);
+            };
+
+            visitLevel(level, *resourcesManager_, vistor, ions);
+
+            // for (auto patch : level)
+            // {
+            //     auto dataOnPatch = resourcesManager_->setOnPatch(*patch, ions);
+            // }
+            // patchGhostPartRefiners_.fill(level.getLevelNumber(), fillTime);
         }
 
 
@@ -393,6 +404,35 @@ namespace amr
                 }
             }
         }
+
+        void fillDensityBorders(IonsT& ions, SAMRAI::hier::PatchLevel& level,
+                                double const fillTime) override
+        {
+            auto constexpr N = core::detail::tensor_field_dim_from_rank<1>();
+            using V          = FieldT::value_type;
+
+            for (std::size_t i = 0; i < ions.size(); ++i)
+            {
+                for (auto patch : level)
+                {
+                    auto dataOnPatch = resourcesManager_->setOnPatch(*patch, ions, sumVec);
+                    auto& pop        = *(ions.begin() + i);
+                    std::memcpy(sumField.data(), pop.density().data(),
+                                pop.density().size() * sizeof(V));
+                }
+
+                popDensityBorderSumRefiners_[i].fill(level.getLevelNumber(), fillTime);
+
+                for (auto patch : level)
+                {
+                    auto dataOnPatch = resourcesManager_->setOnPatch(*patch, ions, sumVec);
+                    auto& pop        = *(ions.begin() + i);
+                    std::memcpy(pop.density().data(), sumField.data(),
+                                pop.density().size() * sizeof(V));
+                }
+            }
+        }
+
 
 
 
@@ -734,6 +774,11 @@ namespace amr
                     .addStaticRefiner(
                         core::VecFieldNames{sumVec}, vecfield, nullptr, sumVec.name(),
                         std::make_shared<FieldGhostInterpOverlapFillPattern<GridLayoutT>>());
+
+                popDensityBorderSumRefiners_.emplace_back(resourcesManager_)
+                    .addStaticRefiner(
+                        core::VecFieldNames{sumVec}, vecfield, nullptr, sumVec.name(),
+                        std::make_shared<FieldGhostInterpOverlapFillPattern<GridLayoutT>>());
             }
         }
 
@@ -1041,6 +1086,7 @@ namespace amr
         using FieldGhostSumRefinerPool   = RefinerPool<rm_t, RefinerType::PatchFieldBorderSum>;
 
         std::vector<FieldGhostSumRefinerPool> popFluxBorderSumRefiners_;
+        std::vector<FieldGhostSumRefinerPool> popDensityBorderSumRefiners_;
 
         InitRefinerPool magneticInitRefiners_{resourcesManager_};
         InitRefinerPool electricInitRefiners_{resourcesManager_};

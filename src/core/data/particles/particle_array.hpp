@@ -95,12 +95,8 @@ public:
     NO_DISCARD auto back() { return particles_.back(); }
     NO_DISCARD auto front() { return particles_.front(); }
 
-    auto erase(IndexRange_& range) { cellMap_.erase(particles_, range); }
-    auto erase(IndexRange_&& range)
-    {
-        // TODO move ctor for range?
-        cellMap_.erase(std::forward<IndexRange_>(range));
-    }
+    // auto erase(IndexRange_ const& range) { cellMap_.erase(particles_, range); }
+    auto erase(IndexRange_ range) { cellMap_.erase(range); }
 
     iterator erase(iterator first, iterator last)
     {

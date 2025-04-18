@@ -206,6 +206,16 @@ namespace amr
         }
     }
 
+    template<typename ResMan, typename Action, typename... Args>
+    void visitLevel(SAMRAI_Types::level_t& level, ResMan& resman, Action&& action, Args&&... args)
+    {
+        for (auto& patch : level)
+        {
+            auto guard = resman.setOnPatch(*patch, args...);
+            action();
+        }
+    }
+
 
     template<typename GridLayout, typename ResMan, typename Action, typename... Args>
     void visitHierarchy(SAMRAI::hier::PatchHierarchy& hierarchy, ResMan& resman, Action&& action,
