@@ -58,10 +58,10 @@ namespace PHARE::core
 
 TYPED_TEST(FieldScheduleHierarchyTest, testing_hyhy_schedules)
 {
-    auto constexpr static dim = TypeParam::dim;
-
-    using GridLayout_t = TestFixture::TestParam::GridLayout_t;
-    using FieldData_t  = TestFixture::ResourceManager_t::UserField_t::patch_data_type;
+    auto constexpr static dim    = TypeParam::dim;
+    using GridLayout_t           = TestFixture::TestParam::GridLayout_t;
+    using FieldData_t            = TestFixture::ResourceManager_t::UserField_t::patch_data_type;
+    auto constexpr static interp = GridLayout_t::interp_order;
 
     auto lvl0  = this->hierarchy.basicHierarchy->hierarchy()->getPatchLevel(0);
     auto& rm   = *this->hierarchy.resourcesManagerHybrid;
@@ -123,7 +123,7 @@ TYPED_TEST(FieldScheduleHierarchyTest, testing_hyhy_schedules)
                         box.upper += 1;
                         return box;
                     }();
-                    auto const noverlap = shrink(primalDomainBox, 1); // based on interp?
+                    auto const noverlap = shrink(primalDomainBox, 1 + (interp > 1));
 
                     for (auto const ghost_layer : domGhostBox.remove(noverlap))
                         for (auto const& neighbor : neighbors)

@@ -359,6 +359,9 @@ namespace amr
 
             domainGhostPartRefiners_.fill(level.getLevelNumber(), fillTime);
 
+            fillFluxBorders(ions, level, fillTime);    // torm but for testing
+            fillDensityBorders(ions, level, fillTime); //
+
             auto const& vistor = [&]() {
                 for (auto& pop : ions)
                     pop.patchGhostParticles().clear();
@@ -415,7 +418,7 @@ namespace amr
             {
                 for (auto patch : level)
                 {
-                    auto dataOnPatch = resourcesManager_->setOnPatch(*patch, ions, sumVec);
+                    auto dataOnPatch = resourcesManager_->setOnPatch(*patch, ions, sumField);
                     auto& pop        = *(ions.begin() + i);
                     std::memcpy(sumField.data(), pop.density().data(),
                                 pop.density().size() * sizeof(V));
@@ -425,7 +428,7 @@ namespace amr
 
                 for (auto patch : level)
                 {
-                    auto dataOnPatch = resourcesManager_->setOnPatch(*patch, ions, sumVec);
+                    auto dataOnPatch = resourcesManager_->setOnPatch(*patch, ions, sumField);
                     auto& pop        = *(ions.begin() + i);
                     std::memcpy(pop.density().data(), sumField.data(),
                                 pop.density().size() * sizeof(V));

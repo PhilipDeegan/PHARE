@@ -285,13 +285,13 @@ namespace amr
                 for (auto const& overlapBox : pOverlap.getDestinationBoxContainer())
                     numberParticles += patchGhostParticles.nbr_particles_in(
                         shift(phare_box_from<dim>(overlapBox), noffset));
-                return numberParticles * sizeof(Particle_t);
+                return sizeof(std::size_t) + numberParticles * sizeof(Particle_t);
             }
             // else
 
             auto const& pOverlap{dynamic_cast<SAMRAI::pdat::CellOverlap const&>(overlap)};
 
-            return countNumberParticlesIn_(pOverlap) * sizeof(Particle_t);
+            return sizeof(std::size_t) + countNumberParticlesIn_(pOverlap) * sizeof(Particle_t);
         }
 
 

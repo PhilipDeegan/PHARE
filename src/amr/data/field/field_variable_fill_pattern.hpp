@@ -210,7 +210,8 @@ public:
 
         SAMRAI::hier::BoxContainer dest;
         dest.push_back(samrai_box_from(intersect));
-        dest.removeIntersections(dst_cast.pureInteriorFieldBox());
+        dest.removeIntersections(samrai_box_from(shrink(
+            dst_ghost_box, Gridlayout_t::nbrGhosts() + 1 + (Gridlayout_t::interp_order > 1))));
 
         return std::make_shared<FieldOverlap>(dest, transformation);
     }

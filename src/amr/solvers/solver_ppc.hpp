@@ -266,7 +266,7 @@ void SolverPPC<HybridModel, AMR_Types>::advanceLevel(hierarchy_t const& hierarch
 
     average_(*level, modelView, fromCoarser, newTime);
 
-    saveState_(*level, modelView);
+    // saveState_(*level, modelView);
 
     moveIons_(*level, modelView, fromCoarser, currentTime, newTime, core::UpdaterMode::domain_only);
 
@@ -275,7 +275,7 @@ void SolverPPC<HybridModel, AMR_Types>::advanceLevel(hierarchy_t const& hierarch
 
     average_(*level, modelView, fromCoarser, newTime);
 
-    restoreState_(*level, modelView);
+    // restoreState_(*level, modelView);
 
     moveIons_(*level, modelView, fromCoarser, currentTime, newTime, core::UpdaterMode::all);
 

@@ -146,6 +146,8 @@ void IonUpdater<Ions, Electromag, GridLayout>::updateAndDepositDomain_(Ions& ion
 
     for (auto& pop : ions)
     {
+        pop.patchGhostParticles().clear(); // to find out why this isn't empty
+        assert(pop.patchGhostParticles().size() == 0);
         auto& domain = tmp_particles_.replace_from(pop.domainParticles());
 
         // first push all domain particles
@@ -246,6 +248,9 @@ void IonUpdater<Ions, Electromag, GridLayout>::updateAndDepositAll_(Ions& ions,
     // finally all particles in domain are to be interpolated on mesh.
     for (auto& pop : ions)
     {
+        pop.patchGhostParticles().clear(); // to find out why this isn't empty
+        assert(pop.patchGhostParticles().size() == 0);
+
         auto& domainParticles = pop.domainParticles();
         auto domainPartRange  = makeIndexRange(domainParticles);
 

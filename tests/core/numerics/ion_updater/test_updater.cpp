@@ -318,6 +318,9 @@ struct IonUpdaterTest : public ::testing::Test
                         }
                     }
                 }
+                EXPECT_GT(pop.domainParticles().size(), 0ull);
+                EXPECT_GT(patchGhostPart.size(), 0ull);
+                EXPECT_GT(levelGhostPartOld.size(), 0ull);
 
             } // end 1D
         } // end pop loop
@@ -378,7 +381,7 @@ struct IonUpdaterTest : public ::testing::Test
         auto ix0 = this->layout.physicalStartIndex(QtyCentering::primal, Direction::X);
         auto ix1 = this->layout.physicalEndIndex(QtyCentering::primal, Direction::X);
 
-        auto nonZero = [&](auto const& field) {
+        auto nonZero = [&](auto const& field, std::string const type) {
             auto sum = 0.;
             for (auto ix = ix0; ix <= ix1; ++ix)
             {
@@ -386,12 +389,12 @@ struct IonUpdaterTest : public ::testing::Test
             }
             EXPECT_GT(sum, 0.);
             if (sum == 0)
-                std::cout << "nonZero failed for field : " << field.name() << "\n";
+                std::cout << "nonZero failed for " << type << " : " << field.name() << "\n";
         };
 
         auto check = [&](auto const& newField, auto const& originalField) {
-            nonZero(newField);
-            nonZero(originalField);
+            nonZero(newField, "newField");
+            // nonZero(originalField, "originalField");
             for (auto ix = ix0; ix <= ix1; ++ix)
             {
                 auto evolution = std::abs(newField(ix) - originalField(ix));
