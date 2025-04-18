@@ -22,6 +22,7 @@
 #include "amr/resources_manager/amr_utils.hpp"
 
 #include "core/numerics/interpolator/interpolator.hpp"
+#include "core/numerics/interpolator/interpolating.hpp"
 #include "core/hybrid/hybrid_quantities.hpp"
 #include "core/data/particles/particle_array.hpp"
 #include "core/data/vecfield/vecfield_component.hpp"
@@ -46,6 +47,7 @@ namespace PHARE
 {
 namespace amr
 {
+
 
     /** \brief An HybridMessenger is the specialization of a HybridMessengerStrategy for hybrid to
      * hybrid data communications.
@@ -82,7 +84,7 @@ namespace amr
         using DefaultCoarsenOp  = BaseCoarsenOp<DefaultFieldCoarsener<dimension>>;
 
     public:
-        static const inline std::string stratName    = "HybridModel-HybridModel";
+        static inline std::string const stratName    = "HybridModel-HybridModel";
         static constexpr std::size_t rootLevelNumber = 0;
 
 
@@ -191,7 +193,7 @@ namespace amr
          , all quantities that are in initialization refiners need to be regridded
          */
         void regrid(std::shared_ptr<SAMRAI::hier::PatchHierarchy> const& hierarchy,
-                    const int levelNumber,
+                    int const levelNumber,
                     std::shared_ptr<SAMRAI::hier::PatchLevel> const& oldLevel,
                     IPhysicalModel& model, double const initDataTime) override
         {
@@ -388,17 +390,17 @@ namespace amr
                     auto& density     = pop.density();
                     auto& flux        = pop.flux();
 
-                    interpolate_(makeRange(patchGhosts), density, flux, layout);
+                    interpolate_(patchGhosts, density, flux, layout);
 
                     if (level.getLevelNumber() > 0) // no levelGhost on root level
                     {
                         // then grab levelGhostParticlesOld and levelGhostParticlesNew
                         // and project them with alpha and (1-alpha) coefs, respectively
                         auto& levelGhostOld = pop.levelGhostParticlesOld();
-                        interpolate_(makeRange(levelGhostOld), density, flux, layout, 1. - alpha);
+                        interpolate_(levelGhostOld, density, flux, layout, 1. - alpha);
 
                         auto& levelGhostNew = pop.levelGhostParticlesNew();
-                        interpolate_(makeRange(levelGhostNew), density, flux, layout, alpha);
+                        interpolate_(levelGhostNew, density, flux, layout, alpha);
                     }
                 }
             }
@@ -410,7 +412,7 @@ namespace amr
          * calculated from particles Note : the ghost schedule only fills the total density
          * and bulk velocity and NOT population densities and fluxes. These partial
          * densities and fluxes are thus not available on ANY ghost node.*/
-        virtual void fillIonMomentGhosts(IonsT& ions, SAMRAI::hier::PatchLevel& level,
+        virtual void fillIonMomentGhosts(IonsT& /*ions*/, SAMRAI::hier::PatchLevel& level,
                                          double const afterPushTime) override
         {
             rhoGhostsRefiners_.fill(level.getLevelNumber(), afterPushTime);
@@ -480,12 +482,9 @@ namespace amr
                         auto& levelGhostParticlesNew = pop.levelGhostParticlesNew();
                         auto& levelGhostParticles    = pop.levelGhostParticles();
 
-                        core::swap(levelGhostParticlesNew, levelGhostParticlesOld);
-                        core::empty(levelGhostParticlesNew);
-                        core::empty(levelGhostParticles);
-                        std::copy(std::begin(levelGhostParticlesOld),
-                                  std::end(levelGhostParticlesOld),
-                                  std::back_inserter(levelGhostParticles));
+                        std::swap(levelGhostParticlesNew, levelGhostParticlesOld);
+                        levelGhostParticlesNew.clear();
+                        levelGhostParticles = levelGhostParticlesOld;
 
                         if (level.getLevelNumber() == 0)
                         {
@@ -737,9 +736,7 @@ namespace amr
                     auto& levelGhostParticlesOld = pop.levelGhostParticlesOld();
                     auto& levelGhostParticles    = pop.levelGhostParticles();
 
-                    core::empty(levelGhostParticles);
-                    std::copy(std::begin(levelGhostParticlesOld), std::end(levelGhostParticlesOld),
-                              std::back_inserter(levelGhostParticles));
+                    levelGhostParticles = levelGhostParticlesOld;
                 }
             }
         }
@@ -757,11 +754,9 @@ namespace amr
         void debug_print(VecFieldT const& B, GridLayoutT const& layout, int loc, int ix, int iy,
                          std::string const& aftbef)
         {
-            auto& Bx       = B(core::Component::X);
-            auto& By       = B(core::Component::Y);
-            auto& Bz       = B(core::Component::Z);
-            auto const& dx = layout.meshSize()[0];
-            auto const& dy = layout.meshSize()[1];
+            auto const& [Bx, By, Bz] = B();
+            auto const& dx           = layout.meshSize()[0];
+            auto const& dy           = layout.meshSize()[1];
 
             if (loc == 3) // w hi, y hi
             {
@@ -801,13 +796,10 @@ namespace amr
             {
                 if constexpr (dimension == 2)
                 {
-                    auto _         = resourcesManager_->setOnPatch(*patch, B);
-                    auto layout    = layoutFromPatch<GridLayoutT>(*patch);
-                    auto& Bx       = B(core::Component::X);
-                    auto& By       = B(core::Component::Y);
-                    auto& Bz       = B(core::Component::Z);
-                    auto const& dx = layout.meshSize()[0];
-                    auto const& dy = layout.meshSize()[1];
+                    auto _               = resourcesManager_->setOnPatch(*patch, B);
+                    auto layout          = layoutFromPatch<GridLayoutT>(*patch);
+                    auto const& [dx, dy] = layout.meshSize();
+                    auto& [Bx, By, Bz]   = B();
 
                     auto boundaries = lvlBoundary.getEdgeBoundaries(patch->getGlobalId());
                     for (auto& boundary : boundaries)
@@ -959,7 +951,7 @@ namespace amr
 
                             // maybe we should keep these for some time
                             // as comments in case they are useful again
-                            PHARE_DEBUG_DO(const std::string before = "BEFORE";
+                            PHARE_DEBUG_DO(std::string const before = "BEFORE";
                                            debug_print(B, layout, loc, ix, iy, before);)
                             Bx(ix, iy - 1)
                                 = Bx(ix + 1, iy - 1) + dx / dy * (By(ix, iy) - By(ix, iy - 1));
@@ -967,7 +959,7 @@ namespace amr
                             By(ix - 1, iy)
                                 = By(ix - 1, iy + 1) + dy / dx * (Bx(ix, iy) - Bx(ix - 1, iy));
 
-                            PHARE_DEBUG_DO(const std::string after = "AFTER";
+                            PHARE_DEBUG_DO(std::string const after = "AFTER";
                                            debug_print(B, layout, loc, ix, iy, after);)
                         }
                     } // end corner loops
@@ -989,7 +981,10 @@ namespace amr
         std::unordered_map<std::size_t, double> beforePushCoarseTime_;
         std::unordered_map<std::size_t, double> afterPushCoarseTime_;
 
-        core::Interpolator<dimension, interpOrder> interpolate_;
+        // core::Interpolator<dimension, interpOrder> interpolate_;
+        core::Interpolating<typename HybridModel::particle_array_type, interpOrder,
+                            /*atomic_ops*/ false>
+            interpolate_;
 
         using rm_t                    = ResourcesManagerT;
         using RefineOperator          = SAMRAI::hier::RefineOperator;
