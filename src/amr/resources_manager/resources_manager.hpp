@@ -280,6 +280,25 @@ namespace amr
         }
 
 
+        auto getIDsList(auto&&... keys)
+        {
+            auto const Fn = [&](auto& key) {
+                if (auto const id = getID(key))
+                    return *id;
+                throw std::runtime_error("bad key");
+            };
+            return std::array{Fn(keys)...};
+        }
+
+        void print_resources() const
+        {
+            for (auto& [key, _] : nameToResourceInfo_)
+            {
+                PHARE_LOG_LINE_SS(key);
+            }
+        }
+
+
 
         ~ResourcesManager()
         {
