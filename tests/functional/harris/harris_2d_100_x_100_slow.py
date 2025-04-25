@@ -2,17 +2,13 @@
 
 import os
 import numpy as np
-import matplotlib as mpl
 from pathlib import Path
 
 import pyphare.pharein as ph
-
 from pyphare.cpp import cpp_lib
 from pyphare.simulator.simulator import startMPI
 
 import harris_2d as base
-
-mpl.use("Agg")
 
 SCOPE_TIMING = os.getenv("PHARE_SCOPE_TIMING", "False").lower() in ("true", "1", "t")
 """

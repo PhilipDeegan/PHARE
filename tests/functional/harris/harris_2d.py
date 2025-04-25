@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+import os
 import numpy as np
 
 import pyphare.pharein as ph
@@ -9,10 +10,10 @@ from pyphare.simulator.simulator import startMPI
 
 from tests.simulator import SimulatorTest
 
+if not os.environ.get("DISPLAY"):
+    ph.NO_GUI()  # servers without screens
 
-ph.NO_GUI()
 cpp = cpp_lib()
-
 
 diag_outputs = "phare_outputs/test/harris/2d"
 time_step_nbr = 1000
@@ -160,6 +161,148 @@ def plot_file_for_qty(plot_dir, qty, time):
     return f"{plot_dir}/harris_{qty}_t{time}.png"
 
 
+def realtime_plots(new_time, post_op):
+    if cpp.mpi_rank() == 0:
+        from pyphare.pharesee.hierarchy.fromsim import hierarchy_from_sim
+        import matplotlib.pyplot as plt
+
+        plt.clf()
+
+        axes = []
+
+        def add_ax():
+            axes.append(
+                post_op.fig.add_subplot(post_op.rows, post_op.cols, len(axes) + 1)
+            )
+            return axes[-1]
+
+        for c in ["x", "y", "z"]:
+            hierarchy_from_sim(post_op.live, qty=f"EM_B_{c}").plot(
+                ax=add_ax(), qty=f"{c}", plot_patches=True
+            )
+
+        plt.draw()
+        plt.pause(0.01)
+
+
+def b3(sim, x, y, z, lx, ly, lz):
+    L = sim.simulation_domain()[0]
+    mid = L / 2
+
+    X = (x - mid).reshape(lx, ly, lz)
+    Y = (y - mid).reshape(lx, ly, lz)
+    Z = (z - mid).reshape(lx, ly, lz)
+
+    U, V, W = -X, -Y, -Z
+
+    # Normalize vectors to unit length
+    magnitude = np.sqrt(U**2 + V**2 + W**2) + 1e-5  # Avoid division by zero
+
+    # Normalize vectors (unit length)
+    U /= magnitude
+    V /= magnitude
+    W /= magnitude
+
+    # Define circular mask (radius = 25)
+    radius = L * 0.4
+    diff = 0.2
+
+    # outer mask
+    mask = X**2 + Y**2 + Z**2 <= (radius + diff) ** 2
+    U[~mask] = 0
+    V[~mask] = 0
+    W[~mask] = 0
+
+    # inner mask
+    mask = X**2 + Y**2 + Z**2 >= (radius - diff) ** 2
+    U[~mask] = 0
+    V[~mask] = 0
+    W[~mask] = 0
+
+    U *= 0.001
+    V *= 0.001
+    W *= 0.001
+
+    return U, V, W
+
+
+def b2(sim, x, y, lx, ly):
+    L = sim.simulation_domain()[0]
+    mid = L / 2
+
+    X = x - mid
+    Y = y - mid
+
+    U, V = -X, -Y
+
+    # Normalize vectors to unit length
+    magnitude = np.sqrt(U**2 + V**2) + 1e-5  # Avoid division by zero
+
+    # Normalize vectors (unit length)
+    U /= magnitude
+    V /= magnitude
+
+    # Define circular mask (radius = 25)
+    radius = L * 0.4
+    diff = 0.2
+
+    # outer mask
+    mask = X**2 + Y**2 <= (radius + diff) ** 2
+    U[~mask] = 0
+    V[~mask] = 0
+
+    # inner mask
+    mask = X**2 + Y**2 >= (radius - diff) ** 2
+    U[~mask] = 0
+    V[~mask] = 0
+
+    U *= 0.001
+    V *= 0.001
+
+    return U, V
+
+
+def update(post_op):
+    from pyphare.pharesee.hierarchy.fromsim import hierarchy_from_sim
+
+    live = post_op.live
+    sim = live.simulation
+
+    hier = None
+    for c in ["x", "y"]:
+        hier = hierarchy_from_sim(live, qty=f"EM_B_{c}", hier=hier)
+    for lvl_nbr, level in hier.levels(hier.times()[0]).items():
+        for ip, patch in enumerate(level.patches):
+            pdata_names = list(patch.patch_datas.keys())
+            for i, name in enumerate(pdata_names):
+                pd = patch.patch_datas[name]
+                nbrGhosts = pd.ghosts_nbr
+                select = tuple([slice(nbrGhost, -(nbrGhost)) for nbrGhost in nbrGhosts])
+                pd[pd.box] += b2(sim, *pd.meshgrid(), *pd.size)[i][select]
+
+
+class PostOp:
+    def __init__(self, live, diag_dir):
+        import matplotlib.pyplot as plt
+
+        plt.ion()
+        plt.show()
+
+        self.live = live
+        self.diag_dir = diag_dir
+        self.cols = 3
+        self.rows = 2
+        self.scale = 4
+        figsize = (self.cols * self.scale, self.rows * self.scale)
+        self.fig = plt.figure(figsize=figsize)
+        self.fig.tight_layout()
+
+    def __call__(self, new_time):
+        ...
+        # realtime_plots(new_time, self)
+        # update(self)
+
+
 class HarrisTest(SimulatorTest):
     def __init__(self, *args, **kwargs):
         super(HarrisTest, self).__init__(*args, **kwargs)
@@ -176,7 +319,9 @@ class HarrisTest(SimulatorTest):
         diag_dir = diag_dir if diag_dir else diag_outputs
         sim = sim if sim else config()
         self.register_diag_dir_for_cleanup(diag_dir)
-        Simulator(sim).run().reset()
+        live = Simulator(sim)
+        live.post_advance = PostOp(live, diag_dir)
+        live.run().reset()
         return self
 
     def plot(self, timestamps, diag_dir, plot_dir):

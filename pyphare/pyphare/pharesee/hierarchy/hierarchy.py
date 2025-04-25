@@ -229,14 +229,15 @@ class PatchHierarchy(object):
             time = self._default_time()
         return list(self.levels(time).keys())
 
-    def add_time(self, time, patch_level, h5file, selection_box=None):
+    def add_time(self, time, patch_level, h5file=None, selection_box=None):
         formated_time = format_timestamp(time)
 
         self.time_hier[format_timestamp(time)] = patch_level
         if selection_box is not None:
             self.selection_box[formated_time] = selection_box
 
-        self.data_files[h5file.filename] = h5file
+        if h5file:
+            self.data_files[h5file.filename] = h5file
         self.update()
 
     def is_homogeneous(self):

@@ -2,7 +2,6 @@
 
 import os
 import numpy as np
-import matplotlib as mpl
 from pathlib import Path
 
 import pyphare.pharein as ph
@@ -10,8 +9,6 @@ from pyphare.cpp import cpp_lib
 from pyphare.simulator.simulator import startMPI
 
 import harris_2d as base
-
-mpl.use("Agg")
 
 SCOPE_TIMING = os.getenv("PHARE_SCOPE_TIMING", "False").lower() in ("true", "1", "t")
 """
@@ -34,7 +31,6 @@ cells = (100, 100)
 final_time = 50
 time_step = 0.005
 timestamps = np.arange(0, final_time + time_step, final_time / 5)
-
 diag_dir = "phare_outputs/harris_2d_100_x_100"
 plot_dir = Path(f"{diag_dir}_plots")
 plot_dir.mkdir(parents=True, exist_ok=True)
@@ -78,8 +74,8 @@ class HarrisTest(base.HarrisTest):
 
     def test_run(self):
         super(HarrisTest, self).test_run(diag_dir, config())
-        if cpp.mpi_rank() == 0:
-            self.plot(timestamps, diag_dir, plot_dir)
+        # if cpp.mpi_rank() == 0:
+        #     self.plot(timestamps, diag_dir, plot_dir)
 
         if SCOPE_TIMING:
             self.scope_timing(diag_dir)
