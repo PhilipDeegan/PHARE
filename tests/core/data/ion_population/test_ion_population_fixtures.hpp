@@ -17,25 +17,31 @@
 namespace PHARE::core
 {
 
+
 template<typename ParticleArray_, std::size_t interp_>
 struct UsableIonsDefaultTypes
 {
 public:
-    auto static constexpr dim    = ParticleArray_::dimension;
-    auto static constexpr interp = interp_;
+    auto static constexpr dim         = ParticleArray_::dimension;
+    auto static constexpr interp      = interp_;
+    auto static constexpr alloc_mode  = ParticleArray_::alloc_mode;
+    auto static constexpr layout_mode = ParticleArray_::layout_mode;
 
-    using PHARE_Types         = PHARE::core::PHARE_Types<dim, interp>;
-    using ParticleArray_t     = ParticleArray_;
-    using Array_t             = NdArrayVector<dim, double, /*c_ordering*/ true>;
-    using Grid_t              = Grid<Array_t, HybridQuantity::Scalar>;
-    using UsableVecField_t    = UsableVecField<dim>;
-    using UsableTensorField_t = UsableTensorField<dim, /*rank = */ 2>;
-    using GridLayout_t        = typename PHARE_Types::GridLayout_t;
-    using VecField_t          = typename UsableVecField_t::Super;
-    using TensorField_t       = typename UsableTensorField_t::Super;
+    using PHARE_Types     = PHARE::core::PHARE_Types<dim, interp, layout_mode, alloc_mode>;
+    using GridLayout_t    = PHARE_Types::GridLayout_t;
+    using ParticleArray_t = ParticleArray_;
+
+    using UsableVecField_t = UsableVecField<GridLayout_t, alloc_mode, layout_mode>;
+    using UsableTensorField_t
+        = UsableTensorField<GridLayout_t, /*rank=*/2, alloc_mode, layout_mode>;
+
+    using Grid_t        = UsableTensorField_t::Grid_t;
+    using VecField_t    = UsableVecField_t::Super;
+    using TensorField_t = UsableTensorField_t::Super;
 
     using IonPopulation_t = IonPopulation<ParticleArray_t, VecField_t, TensorField_t>;
 };
+
 
 auto inline pop_dict(std::string const& name, std::size_t const ppc = 0)
 {
@@ -59,6 +65,7 @@ class UsableIonsPopulation : public _defaults::IonPopulation_t
     using ParticleArray_t = _defaults::ParticleArray_t;
     using Super           = IonPopulation<ParticleArray_t, VecField_t, TensorField_t>;
 
+
     void set()
     {
         auto&& [_F, _M, _d, _particles] = Super::getCompileTimeResourcesViewList();
@@ -68,19 +75,30 @@ class UsableIonsPopulation : public _defaults::IonPopulation_t
         _particles.setBuffer(&particles.pack());
     }
 
+    _defaults::Grid_t make_grid(std::string const& name, auto qty) const
+    {
+        if constexpr (_defaults::layout_mode == LayoutMode::AoSTS)
+            return {field_dict(layout_, name), layout_, qty};
+        else
+            return {name, layout_, qty};
+    }
+
 public:
     UsableIonsPopulation(initializer::PHAREDict const& dict, GridLayout_t const& layout)
         : Super{dict}
-        , rho{this->name() + "_rho", layout, HybridQuantity::Scalar::rho}
+        , layout_{layout}
+        , rho{make_grid(this->name() + "_rho", HybridQuantity::Scalar::rho)}
         , F{this->name() + "_flux", layout, HybridQuantity::Vector::V}
         , M{this->name() + "_momentumTensor", layout, HybridQuantity::Tensor::M}
-        , particles{this->name(), grow(layout.AMRBox(), GridLayout_t::nbrParticleGhosts() + 1)}
+        , particles{this->name(), layout}
     {
+        rho.fill(.1);
         set();
     }
 
     UsableIonsPopulation(UsableIonsPopulation const& that)
         : Super{pop_dict(that.name())}
+        , layout_{that.layout_}
         , rho{that.rho}
         , F{that.F}
         , M{that.M}
@@ -89,12 +107,17 @@ public:
         set();
     }
 
+    UsableIonsPopulation(UsableIonsPopulation&&)                 = default;
+    UsableIonsPopulation& operator=(UsableIonsPopulation const&) = delete;
+    UsableIonsPopulation& operator=(UsableIonsPopulation&&)      = default;
 
-    Super& view() { return *this; }
-    Super const& view() const { return *this; }
-    auto& operator*() { return view(); }
-    auto& operator*() const { return view(); }
 
+    Super& super() { return *this; }
+    Super const& super() const { return *this; }
+    auto& operator*() { return super(); }
+    auto& operator*() const { return super(); }
+
+    GridLayout_t layout_;
     _defaults::Grid_t rho;
     _defaults::UsableVecField_t F;
     _defaults::UsableTensorField_t M;
@@ -122,6 +145,7 @@ class UsableIons
     }
 
 
+
     auto static super(Super const supe)
     {
         initializer::PHAREDict dict;
@@ -144,13 +168,26 @@ class UsableIons
             super_pops.emplace_back(*pop);
     }
 
+
+    _defaults::Grid_t make_grid(std::string const& name, auto qty) const
+    {
+        if constexpr (_defaults::layout_mode == LayoutMode::AoSTS)
+            return {field_dict(layout_, name), layout_, qty};
+        else
+            return {name, layout_, qty};
+    }
+
 public:
+    using ParticleArray_t = typename _defaults::ParticleArray_t;
+
     UsableIons(GridLayout_t const& layout, initializer::PHAREDict const& dict)
         : Super{dict}
-        , rho{"rho", HybridQuantity::Scalar::rho, layout.allocSize(HybridQuantity::Scalar::rho)}
+        , layout_{layout}
+        , rho{make_grid("rho", HybridQuantity::Scalar::rho)}
         , Vi{"bulkVel", layout, HybridQuantity::Vector::V}
         , M{"momentumTensor", layout, HybridQuantity::Tensor::M}
     {
+        rho.fill(.1);
         auto& super_pops = Super::getRunTimeResourcesViewList();
         populations.reserve(super_pops.size());
         for (std::size_t i = 0; i < super_pops.size(); ++i)
@@ -171,6 +208,7 @@ public:
 
     UsableIons(UsableIons const& that)
         : Super(super(*that))
+        , layout_{that.layout_}
         , rho{that.rho}
         , Vi{that.Vi}
         , M{that.M}
@@ -179,11 +217,16 @@ public:
         set();
     }
 
-    Super& view() { return *this; }
-    Super const& view() const { return *this; }
-    auto& operator*() { return view(); }
-    auto& operator*() const { return view(); }
+    UsableIons(UsableIons&&)                 = default;
+    UsableIons& operator=(UsableIons const&) = delete;
+    UsableIons& operator=(UsableIons&&)      = default;
 
+    Super& super() { return *this; }
+    Super const& super() const { return *this; }
+    auto& operator*() { return super(); }
+    auto& operator*() const { return super(); }
+
+    GridLayout_t layout_;
     _defaults::Grid_t rho;
     _defaults::UsableVecField_t Vi;
     _defaults::UsableTensorField_t M;
@@ -197,6 +240,7 @@ using UsableIonsPopulation_t
 
 template<typename ParticleArray_t, std::size_t interp = 1>
 using UsableIons_t = UsableIons<UsableIonsDefaultTypes<ParticleArray_t, interp>>;
+
 
 
 } // namespace PHARE::core

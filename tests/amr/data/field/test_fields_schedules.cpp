@@ -108,7 +108,7 @@ TYPED_TEST(FieldScheduleHierarchyTest, testing_hyhy_schedules)
         auto domainSamBox    = patch->getBox();
         auto const domainBox = phare_box_from<dim>(domainSamBox);
 
-        auto const neighbors = core::generate(
+        auto const neighbors = core::generate_from(
             [](auto const& el) { return phare_box_from<dim>(el); },
             hier_nbrs.getSameLevelNeighbors(domainSamBox, patch->getPatchLevelNumber()));
         auto const ncells = core::sum_from(

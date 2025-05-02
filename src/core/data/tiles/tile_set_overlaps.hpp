@@ -1,0 +1,135 @@
+#ifndef PHARE_CORE_DATA_TILES_TILE_SET_OVERLAPS_HPP
+#define PHARE_CORE_DATA_TILES_TILE_SET_OVERLAPS_HPP
+
+
+#include "core/def.hpp"
+#include "core/utilities/span.hpp"
+#include "core/utilities/types.hpp"
+#include "core/utilities/box/box.hpp"
+#include "core/data/ndarray/ndarray_vector.hpp"
+
+
+#include <unordered_set>
+
+
+namespace PHARE::core
+{
+template<std::size_t dim, typename T>
+struct NdSpanSet
+{
+    NdSpanSet(Box<std::uint32_t, dim> const box, std::size_t const size)
+        : vec(size, 0)
+        , displs(size, 0)
+        , box_{box}
+
+    {
+    }
+
+    auto& box() const { return box_; }
+
+    Box<std::uint32_t, dim> box_;
+    std::vector<T> vec;
+    std::vector<span_size_default_t> displs;
+    NdArrayVector<dim, Span<T>> cells{box_.shape()};
+};
+
+template<typename TileSet_t, typename GridLayout_t>
+auto make_nd_span_set_from(TileSet_t& tiles, GridLayout_t const& layout, auto const ghostboxer)
+{
+    // auto constexpr static nbPartGhosts = GridLayout_t::nbrParticleGhosts();
+    auto constexpr static dim = GridLayout_t::dimension;
+
+    using Tile_t      = TileSet_t::value_type;
+    using NdArrViewer = NdArrayViewer<dim>;
+    using NdSpanSet_t = NdSpanSet<dim, Tile_t*>;
+
+    auto const lcl_box = [](auto const& box) {
+        return box_from_zero_to_upper_minus_one(*box.shape().as_unsigned());
+    };
+
+    auto const patch_ghost_box = lcl_box(ghostboxer(layout.AMRBox()));
+
+    NdArrayVector<dim, std::size_t> tiles_per_cell{patch_ghost_box.shape()};
+
+    auto const map = [&](auto const fn) {
+        for (auto& tile : tiles)
+            for (auto const& bix : lcl_box(ghostboxer(tile)))
+                fn(tile, bix);
+    };
+
+    map([&](auto&, auto const& bix) { tiles_per_cell(bix) += 1; });
+
+    NdSpanSet<dim, Tile_t*> spanset{patch_ghost_box, sum(tiles_per_cell)};
+
+    std::size_t offset = 0;
+    for (auto const& bix : patch_ghost_box)
+    {
+        spanset.cells(bix).s = tiles_per_cell(bix);
+        auto const idx       = NdArrViewer::idx(patch_ghost_box.shape(), *bix);
+        spanset.displs[idx]  = offset;
+        offset += spanset.cells(bix).s;
+    }
+
+    tiles_per_cell.zero();
+
+    map([&](auto& tile, auto const& bix) {
+        auto const idx = NdArrViewer::idx(patch_ghost_box.shape(), *bix);
+        spanset.vec[spanset.displs[idx] + tiles_per_cell(bix)] = &tile;
+        ++tiles_per_cell(bix);
+    });
+
+    for (auto const& bix : patch_ghost_box)
+        spanset.cells(bix).ptr
+            = &spanset.vec[spanset.displs[NdArrViewer::idx(patch_ghost_box.shape(), *bix)]];
+
+    return spanset;
+}
+
+template<auto quantity, typename TileSet_t, typename GridLayout_t>
+auto make_qty_nd_span_set_from(TileSet_t& tiles, GridLayout_t const& layout)
+{
+    return make_nd_span_set_from(tiles, layout, [&](auto const& box) {
+        return layout.copy_as(box).AMRGhostBoxFor(quantity);
+    });
+}
+
+
+template<typename TileSet_t, typename GridLayout_t>
+auto make_particle_nd_span_set_from(TileSet_t& tiles, GridLayout_t const& layout)
+{
+    return make_nd_span_set_from(tiles, layout, [](auto const& box) {
+        return grow(box, GridLayout_t::nbrParticleGhosts());
+    });
+}
+
+template<std::size_t dim, typename T>
+auto unique_tiles_for(NdSpanSet<dim, T> const& spanset, Box<std::uint32_t, dim> const& box)
+{
+    assert(spanset.box() * box);
+    std::unordered_set<T> tiles;
+    for (auto const& bix : box)
+        for (auto& tile_ptr : spanset.cells(bix))
+            tiles.insert(tile_ptr);
+
+    return tiles;
+}
+template<std::size_t dim, typename T>
+auto unique_tiles_for(NdSpanSet<dim, T> const& spanset, Point<std::uint32_t, dim> const& point)
+{
+    return unique_tiles_for(spanset, asBox(point));
+}
+
+
+
+template<std::size_t dim, typename T>
+void onBox(NdSpanSet<dim, T> const& spanset, Box<std::uint32_t, dim> const& box, auto&& fn)
+{
+    for (auto& tp : unique_tiles_for(spanset, box))
+        fn(*tp);
+}
+
+
+} // namespace PHARE::core
+
+
+#endif

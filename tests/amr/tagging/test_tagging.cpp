@@ -184,7 +184,7 @@ struct TestTagger : public ::testing::Test
 
     GridLayoutT layout;
 
-    UsableVecField<dim> B, E;
+    UsableVecField<GridLayoutT> B, E;
 
     SinglePatchHybridModel model;
     std::vector<int> tags;

@@ -8,7 +8,7 @@
 #include "core/data/vecfield/vecfield.hpp"
 #include "core/hybrid/hybrid_quantities.hpp"
 #include "core/data/vecfield/vecfield_component.hpp"
-#include "core/numerics/interpolator/interpolator.hpp"
+#include "core/numerics/interpolator/interpolating.hpp"
 
 #include "refiner_pool.hpp"
 #include "synchronizer_pool.hpp"
@@ -17,6 +17,7 @@
 #include "amr/data/field/refine/field_refiner.hpp"
 #include "amr/messengers/hybrid_messenger_info.hpp"
 #include "amr/messengers/hybrid_messenger_strategy.hpp"
+
 #include "amr/data/field/field_variable_fill_pattern.hpp"
 #include "amr/data/field/refine/field_refine_operator.hpp"
 #include "amr/data/field/refine/electric_field_refiner.hpp"
@@ -26,6 +27,7 @@
 #include "amr/data/field/coarsening/magnetic_field_coarsener.hpp"
 #include "amr/data/particles/particles_variable_fill_pattern.hpp"
 #include "amr/data/field/time_interpolate/field_linear_time_interpolate.hpp"
+
 
 
 #include <SAMRAI/hier/IntVector.h>
@@ -459,10 +461,10 @@ namespace amr
                         // then grab levelGhostParticlesOld and levelGhostParticlesNew
                         // and project them with alpha and (1-alpha) coefs, respectively
                         auto& levelGhostOld = pop.levelGhostParticlesOld();
-                        interpolate_(makeRange(levelGhostOld), density, flux, layout, 1. - alpha);
+                        interpolate_(levelGhostOld, density, flux, layout, 1. - alpha);
 
                         auto& levelGhostNew = pop.levelGhostParticlesNew();
-                        interpolate_(makeRange(levelGhostNew), density, flux, layout, alpha);
+                        interpolate_(levelGhostNew, density, flux, layout, alpha);
                     }
                 }
             }
@@ -474,7 +476,7 @@ namespace amr
          * calculated from particles Note : the ghost schedule only fills the total density
          * and bulk velocity and NOT population densities and fluxes. These partial
          * densities and fluxes are thus not available on ANY ghost node.*/
-        virtual void fillIonMomentGhosts(IonsT& ions, SAMRAI::hier::PatchLevel& level,
+        virtual void fillIonMomentGhosts(IonsT& /*ions*/, SAMRAI::hier::PatchLevel& level,
                                          double const afterPushTime) override
         {
             PHARE_LOG_SCOPE(1, "HybridHybridMessengerStrategy::fillIonMomentGhosts");
@@ -811,11 +813,9 @@ namespace amr
         void debug_print(VecFieldT const& B, GridLayoutT const& layout, int loc, int ix, int iy,
                          std::string const& aftbef)
         {
-            auto& Bx       = B(core::Component::X);
-            auto& By       = B(core::Component::Y);
-            auto& Bz       = B(core::Component::Z);
-            auto const& dx = layout.meshSize()[0];
-            auto const& dy = layout.meshSize()[1];
+            auto const& [Bx, By, Bz] = B();
+            auto const& dx           = layout.meshSize()[0];
+            auto const& dy           = layout.meshSize()[1];
 
             if (loc == 3) // w hi, y hi
             {
@@ -855,13 +855,10 @@ namespace amr
             {
                 if constexpr (dimension == 2)
                 {
-                    auto _         = resourcesManager_->setOnPatch(*patch, B);
-                    auto layout    = layoutFromPatch<GridLayoutT>(*patch);
-                    auto& Bx       = B(core::Component::X);
-                    auto& By       = B(core::Component::Y);
-                    auto& Bz       = B(core::Component::Z);
-                    auto const& dx = layout.meshSize()[0];
-                    auto const& dy = layout.meshSize()[1];
+                    auto _               = resourcesManager_->setOnPatch(*patch, B);
+                    auto layout          = layoutFromPatch<GridLayoutT>(*patch);
+                    auto const& [dx, dy] = layout.meshSize();
+                    auto& [Bx, By, Bz]   = B();
 
                     auto boundaries = lvlBoundary.getEdgeBoundaries(patch->getGlobalId());
                     for (auto& boundary : boundaries)
@@ -1047,7 +1044,10 @@ namespace amr
         std::unordered_map<std::size_t, double> beforePushCoarseTime_;
         std::unordered_map<std::size_t, double> afterPushCoarseTime_;
 
-        core::Interpolator<dimension, interpOrder> interpolate_;
+        // core::Interpolator<dimension, interpOrder> interpolate_;
+        core::Interpolating<typename HybridModel::particle_array_type, interpOrder,
+                            /*atomic_ops*/ false>
+            interpolate_;
 
         using rm_t                    = ResourcesManagerT;
         using RefineOperator          = SAMRAI::hier::RefineOperator;

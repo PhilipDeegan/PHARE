@@ -453,6 +453,7 @@ namespace amr
             using ResourcesResolver_t = ResourceResolver<This, ResourcesView>;
 
             if (nameToResourceInfo_.count(view.name()) == 0)
+
             {
                 ResourcesInfo info;
                 info.variable = ResourcesResolver_t::make_shared_variable(view);
@@ -481,6 +482,23 @@ namespace amr
 
             obj.setBuffer(
                 getResourcesPointer_<ResourcesType, RequestedPtr>(resourceInfoIt->second, patch));
+        }
+
+        template<typename ResourcesUser, typename ResourcesType, typename RequestedPtr>
+        void setFieldResourcesInternal_(ResourcesUser& obj, ResourcesType resourceType,
+                                        // ResourcesProperties const& resourcesProperties,
+                                        SAMRAI::hier::Patch const& patch, RequestedPtr) const
+        {
+            // PHARE_LOG_LINE_STR("setFieldResourcesInternal_ " << obj.name());
+            std::string const& resourcesName = obj.name();
+            auto const& resourceInfoIt       = nameToResourceInfo_.find(resourcesName);
+
+            if (resourceInfoIt == nameToResourceInfo_.end())
+                throw std::runtime_error("Resources not found !");
+
+            auto data = getResourcesPointer_<ResourcesType, RequestedPtr>(
+                resourceType, resourceInfoIt->second, patch);
+            obj.setBuffer(data);
         }
 
 
