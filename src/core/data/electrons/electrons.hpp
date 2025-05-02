@@ -10,6 +10,8 @@
 
 #include "initializer/data_provider.hpp"
 
+#include "core/utilities/index/index.hpp"
+
 
 
 #include <memory>
@@ -273,7 +275,6 @@ public:
         : Super{dict, flux}
         , gamma_{dict["pressure_closure"]["Gamma"].template to<double>()}
         , Pe_init_{dict["pressure_closure"]["Pe"].template to<initializer::InitFunction<dim>>()}
-//      , Te_{"Pe", HybridQuantity::Scalar::P}  // TODO should be HybridQuantity::Scalar::T ?
     {
     }
 
@@ -289,27 +290,28 @@ public:
         if (!this->Pe_.isUsable())
             throw std::runtime_error("Error - polytropic closure not usable");
 
-
-
         auto const& N_ = this->flux_.density();
         auto const& V_ = this->flux_.velocity();
-        auto const& T_ = this->flux_.density();  // TODO should be division of P by N
+
+        auto T_ = this->Pe_;  // TODO not very nice... I want to create an empty field of same size as Pe_
+
+        std::transform (this->Pe_.begin(), this->Pe_.end(), N_.begin(), T_.begin(), [this](auto p, auto n) { return  p/n ; });
+
+
 
         Field Tnew{"Te", HybridQuantity::Scalar::P};
 
-        // layout->evalOnBox(Tnew, [&](auto&... ijk) mutable { this->template P_Eq_(PressurePack{Tnew, V_, T_}, ijk...); });
+        layout.evalOnBox(Tnew, [&](auto&... ijk) mutable { this->template P_Eq_(PressurePack{Tnew, V_, T_}, ijk...); });
 
 
 
-        auto const& Ne_ = this->flux_.density();
-        std::transform(std::begin(Ne_), std::end(Ne_), std::begin(this->Pe_),
-                       [this](auto n) { return n * 0.1; });  // TODO utiliser autre chose que transform et aller chercher Tnew
+        // std::transform(std::begin(Ne_), std::end(Ne_), std::begin(this->Pe_),
+        //                [this](auto n) { return n * 0.1; });  // TODO utiliser autre chose que transform et aller chercher Tnew
     }
 
 private:
     double const gamma_ = 5. / 3.;
     initializer::InitFunction<dim> Pe_init_;
-//  Field Te_;
 
     struct PressurePack
     {
@@ -323,8 +325,9 @@ private:
     {
         auto const& [Tnew, V, T] = pack;
 
-        Tnew(ijk...) = advection_(V, T, {ijk...});
-                       // + compression_(V, T, {ijk...});
+        Tnew(ijk...) = T(ijk...);
+        // Tnew(ijk...) = advection_(V, T, {ijk...});
+        //              + compression_(V, T, {ijk...});
     }
 
     template<typename... IDXs>
@@ -338,22 +341,11 @@ private:
             return advection3D_(Ve, Te, {ijk...});
     }
 
-//    template<auto component, typename VecField>
-//    auto advection1D_(VecField const& Ve, Field const& Te, MeshIndex<1> index) const
-//    {
-//        auto const& Vy = Ve(Component::Y);
-//        auto const& Vz = Ve(Component::Z);
-//
-//        auto const& By = B(Component::Y);
-//        auto const& Bz = B(Component::Z);
-//
-//        auto constexpr momentsToEx = GridLayout::momentsToEx();
-//        auto const vyOnEx          = GridLayout::project(Vy, index, momentsToEx);
-//        auto const vzOnEx          = GridLayout::project(Vz, index, momentsToEx);
-//        auto const byOnEx          = GridLayout::project(By, index, GridLayout::ByToEx());
-//        auto const bzOnEx          = GridLayout::project(Bz, index, GridLayout::BzToEx());
-//
-//        return -vyOnEx * bzOnEx + vzOnEx * byOnEx;
+    template<auto component, typename VecField>
+    auto advection1D_(VecField const& Ve, Field const& Te, MeshIndex<1> index) const
+    {
+          return 0.0*Te(index[0]);
+    }
 
 };
 
