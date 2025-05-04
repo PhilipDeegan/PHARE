@@ -178,13 +178,14 @@ public:
 
     auto getE(std::string componentName)
     {
-        std::vector<PatchData<std::vector<double>, dimension>> patchDatas;
+        std::vector<PatchData<py_array_t<double>, dimension>> patchDatas;
 
         auto& E = model_.state.electromag.E;
 
         auto visit = [&](GridLayout& grid, std::string patchID, std::size_t /*iLevel*/) {
             auto compo = PHARE::core::Components::componentMap().at(componentName);
-            setPatchDataFromField(patchDatas.emplace_back(), E.getComponent(compo), grid, patchID);
+            setPyPatchDataFromField(patchDatas.emplace_back(), E.getComponent(compo), grid,
+                                    patchID);
         };
 
         PHARE::amr::visitLevel<GridLayout>(*hierarchy_.getPatchLevel(lvl_),
@@ -197,13 +198,14 @@ public:
 
     auto getVi(std::string componentName)
     {
-        std::vector<PatchData<std::vector<double>, dimension>> patchDatas;
+        std::vector<PatchData<py_array_t<double>, dimension>> patchDatas;
 
         auto& V = model_.state.ions.velocity();
 
         auto visit = [&](GridLayout& grid, std::string patchID, std::size_t /*iLevel*/) {
             auto compo = PHARE::core::Components::componentMap().at(componentName);
-            setPatchDataFromField(patchDatas.emplace_back(), V.getComponent(compo), grid, patchID);
+            setPyPatchDataFromField(patchDatas.emplace_back(), V.getComponent(compo), grid,
+                                    patchID);
         };
 
         PHARE::amr::visitLevel<GridLayout>(*hierarchy_.getPatchLevel(lvl_),

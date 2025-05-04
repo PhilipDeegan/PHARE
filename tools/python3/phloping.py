@@ -181,6 +181,17 @@ def print_variance_across(scope_timer_filepath=None):
     st.print_variance_across(scope_timer_filepath)
 
 
+def print_scope_timings(scope_timer_filepath=None):
+    if scope_timer_filepath is None:  # assume cli
+        parser = argparse.ArgumentParser()
+        parser.add_argument("-f", "--file", default=None, help="timer file")
+        scope_timer_filepath = parser.parse_args().file
+        if not scope_timer_filepath:
+            parser.print_help()
+            sys.exit(1)
+    st.print_scope_timings(scope_timer_filepath)
+
+
 if __name__ == "__main__":
     if len(sys.argv) > 1:
         fn = sys.argv[1]

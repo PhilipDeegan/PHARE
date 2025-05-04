@@ -8,7 +8,7 @@ import pyphare.pharein as ph
 from pyphare.cpp import cpp_lib
 from pyphare.simulator.simulator import startMPI
 
-from . import harris_2d as base
+import harris_2d as base
 
 SCOPE_TIMING = os.getenv("PHARE_SCOPE_TIMING", "False").lower() in ("true", "1", "t")
 """
@@ -25,18 +25,19 @@ SCOPE_TIMING = os.getenv("PHARE_SCOPE_TIMING", "False").lower() in ("true", "1",
 LOAD_BALANCE = os.getenv("LOAD_BALANCE", "True").lower() in ("true", "1", "t")
 
 cpp = cpp_lib()
-startMPI()
 
 cells = (100, 100)
 final_time = 50
-time_step = 0.005
+time_step = 0.001
 timestamps = np.arange(0, final_time + time_step, final_time / 5)
-diag_dir = "phare_outputs/harris_2d_100_x_100"
+
+diag_dir = "phare_outputs/harris_2d_100_x_100_slow"
 plot_dir = Path(f"{diag_dir}_plots")
 plot_dir.mkdir(parents=True, exist_ok=True)
 
 
 def config():
+    startMPI()
     sim = ph.Simulation(
         time_step=time_step,
         final_time=final_time,
@@ -68,12 +69,12 @@ def config():
     return sim
 
 
-class HarrisTest(base.HarrisTest):
+class HelmholtzTest(base.HelmholtzTest):
     def __init__(self, *args, **kwargs):
-        super(HarrisTest, self).__init__(*args, **kwargs)
+        super(HelmholtzTest, self).__init__(*args, **kwargs)
 
     def test_run(self):
-        super(HarrisTest, self).test_run(diag_dir, config())
+        super(HelmholtzTest, self).test_run(diag_dir, config())
         if cpp.mpi_rank() == 0:
             self.plot(timestamps, diag_dir, plot_dir)
 
@@ -83,4 +84,4 @@ class HarrisTest(base.HarrisTest):
 
 
 if __name__ == "__main__":
-    HarrisTest().test_run().tearDown()
+    HelmholtzTest().test_run().tearDown()
