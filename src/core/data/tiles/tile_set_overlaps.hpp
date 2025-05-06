@@ -68,7 +68,6 @@ auto make_nd_span_set_from(GridLayout_t const& layout, auto const ghostboxer)
 {
     auto constexpr static dim = GridLayout_t::dimension;
 
-    using Tile_t      = Box<int, dim>;
     using NdArrViewer = NdArrayViewer<dim>;
 
     TileBoxSpanSet<dim> spanset{layout, ghostboxer(layout)};
