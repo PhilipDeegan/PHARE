@@ -47,6 +47,7 @@ namespace amr
         }
 
         auto const& pureInteriorFieldBox() const { return pureInteriorFieldBox_; }
+        auto const& interiorFieldBox() const { return interiorFieldBox_; }
 
         SAMRAI::hier::Box const patchBox;
 

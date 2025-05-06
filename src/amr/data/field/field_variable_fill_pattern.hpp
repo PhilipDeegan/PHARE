@@ -119,7 +119,7 @@ private:
     FieldFillPattern(FieldFillPattern const&)            = delete;
     FieldFillPattern& operator=(FieldFillPattern const&) = delete;
 
-    static const inline std::string s_name_id = "BOX_GEOMETRY_FILL_PATTERN";
+    static inline std::string const s_name_id = "BOX_GEOMETRY_FILL_PATTERN";
 
     SAMRAI::hier::IntVector const& getStencilWidth()
     {
@@ -159,7 +159,21 @@ private:
 
         SAMRAI::hier::BoxContainer overlap_boxes(fill_boxes);
         overlap_boxes.intersectBoxes(data_box);
-        return pdf.getBoxGeometry(patch_box)->setUpOverlap(overlap_boxes, transformation);
+
+        auto geom = pdf.getBoxGeometry(patch_box);
+        auto basic_overlap
+            = pdf.getBoxGeometry(patch_box)->setUpOverlap(overlap_boxes, transformation);
+
+        if (!opt_overwrite_interior_)
+            return basic_overlap;
+
+        assert(*opt_overwrite_interior_ == false);
+        auto& overlap         = dynamic_cast<FieldOverlap const&>(*basic_overlap);
+        auto destinationBoxes = overlap.getDestinationBoxContainer();
+        auto& casted          = dynamic_cast<FieldGeometryBase<dimension> const&>(*geom);
+        destinationBoxes.removeIntersections(casted.interiorFieldBox());
+
+        return std::make_shared<FieldOverlap>(destinationBoxes, overlap.getTransformation());
     }
 
     std::optional<bool> opt_overwrite_interior_{nullptr};
