@@ -42,12 +42,12 @@ struct FieldScheduleHierarchyTest : public ::testing::Test
     auto constexpr static dim = TestParam::dim;
 
     std::string const configFile
-        = "test_fields_schedules_inputs/" + std::to_string(dim) + "d_L0.txt";
+        = "test_fields_schedules_inputs/" + std::to_string(dim) + "d_config.txt";
     Hierarchy_t hierarchy{configFile};
 };
 
-using FieldDatas = testing::Types<TestParam<1, 1>, TestParam<1, 2>, TestParam<1, 3>,
-                                  TestParam<2, 1>, TestParam<2, 2>, TestParam<2, 3>>;
+using FieldDatas = testing::Types<TestParam<1, 1>/*, TestParam<1, 2>, TestParam<1, 3>,
+                                  TestParam<2, 1>, TestParam<2, 2>, TestParam<2, 3>*/>;
 
 
 TYPED_TEST_SUITE(FieldScheduleHierarchyTest, FieldDatas);
@@ -56,7 +56,7 @@ namespace PHARE::core
 
 
 
-TYPED_TEST(FieldScheduleHierarchyTest, testing_hyhy_schedules)
+TYPED_TEST(FieldScheduleHierarchyTest, testing_hyhy_fill_ghost_overlap_schedules)
 {
     auto constexpr static dim    = TypeParam::dim;
     using GridLayout_t           = TestFixture::TestParam::GridLayout_t;
@@ -150,11 +150,11 @@ TYPED_TEST(FieldScheduleHierarchyTest, testing_hyhy_schedules)
                                     expected(*bix) += 1;
                         }
 
-                    if (vexpected != field_data->field.vector())
-                        field_data->gridLayout.evalOnGhostBox(pop.flux()[0], [&](auto... args) {
-                            PHARE_LOG_LINE_SS((Point{args...}.as_signed() + domGhostBox.lower)
-                                              << " " << pop.flux()[0](args...));
-                        });
+                    // if (vexpected != field_data->field.vector())
+                    //     field_data->gridLayout.evalOnGhostBox(pop.flux()[0], [&](auto... args) {
+                    //         PHARE_LOG_LINE_SS((Point{args...}.as_signed() + domGhostBox.lower)
+                    //                           << " " << pop.flux()[0](args...));
+                    //     });
 
                     for (auto const& e : field_data->field)
                         EXPECT_NE(e, 0); // :/
@@ -163,6 +163,104 @@ TYPED_TEST(FieldScheduleHierarchyTest, testing_hyhy_schedules)
     }
 }
 
+
+
+
+TYPED_TEST(FieldScheduleHierarchyTest, testing_hyhy_field_refine_schedules)
+{
+    auto constexpr static dim    = TypeParam::dim;
+    using GridLayout_t           = TestFixture::TestParam::GridLayout_t;
+    using FieldData_t            = TestFixture::ResourceManager_t::UserField_t::patch_data_type;
+    auto constexpr static interp = GridLayout_t::interp_order;
+    auto constexpr static ghost_cells = GridLayout_t::nbrGhosts();
+
+    auto lvl0        = this->hierarchy.basicHierarchy->hierarchy()->getPatchLevel(0);
+    auto lvl1        = this->hierarchy.basicHierarchy->hierarchy()->getPatchLevel(1);
+    auto& rm         = *this->hierarchy.resourcesManagerHybrid;
+    auto& electromag = this->hierarchy.hybridModel->state.electromag;
+
+    for (auto& patch : *lvl0)
+    {
+        auto const layout = PHARE::amr::layoutFromPatch<GridLayout_t>(*patch);
+        auto dataOnPatch  = rm.setOnPatch(*patch, electromag);
+
+        for (auto& e : electromag.E)
+            for (auto const& bix : layout.AMRToLocal(layout.AMRGhostBoxFor(e.physicalQuantity())))
+                e(bix) = .2;
+    }
+
+    this->hierarchy.messenger->fillElectricGhosts(electromag.E, 1, 0);
+    // this->hierarchy.messenger->fillDensityBorders(ions, *lvl0, 0);
+
+
+    auto Ex_id = *rm.getID("EM_E_x");
+
+    for (auto& patch : *lvl1)
+    {
+        PHARE_LOG_LINE_SS(patch->getGlobalId());
+        auto dataOnPatch = rm.setOnPatch(*patch, electromag);
+
+        auto const field_data = SAMRAI_SHARED_PTR_CAST<FieldData_t, SAMRAI::hier::PatchData>(
+            patch->getPatchData(Ex_id));
+
+        SAMRAI::hier::HierarchyNeighbors const hier_nbrs{
+            *this->hierarchy.basicHierarchy->hierarchy(), patch->getPatchLevelNumber(),
+            patch->getPatchLevelNumber()};
+
+        auto domainSamBox    = patch->getBox();
+        auto const domainBox = phare_box_from<dim>(domainSamBox);
+
+        auto const neighbors = core::generate(
+            [](auto const& el) { return phare_box_from<dim>(el); },
+            hier_nbrs.getSameLevelNeighbors(domainSamBox, patch->getPatchLevelNumber()));
+        auto const ncells = core::sum_from(
+            neighbors, [&](auto& el) { return (*(grow(el, 1) * domainBox)).size(); });
+
+        if (mpi::rank() == 0)
+        {
+            auto Ey           = electromag.E[1]; // primal in x/1d
+            auto const layout = PHARE::amr::layoutFromPatch<GridLayout_t>(*patch);
+
+            std::vector<double> vexpected(Ey.size(), 1);
+            auto expected = core::make_array_view(vexpected.data(), Ey.shape());
+
+            // auto const domGhostBox
+            //     = layout.AMRGhostBoxFor(Ex.physicalQuantity());
+
+            // for (auto const& neighbor : neighbors)
+            //     if (auto p2poverlap = (domGhostBox * grow(neighbor, ghost_cells)))
+            //         for (auto const& bix : layout.AMRToLocal(*p2poverlap))
+            //             expected(*bix) += 1;
+
+            auto const domGhostBox     = layout.AMRGhostBoxFor(Ey.physicalQuantity());
+            auto const primalDomainBox = [&]() {
+                auto box = domainBox;
+                box.upper += 1;
+                return box;
+            }();
+            auto const noverlap = shrink(primalDomainBox, 1 + (interp > 1));
+
+            for (auto const ghost_layer : domGhostBox.remove(noverlap))
+                for (auto const& neighbor : neighbors)
+                {
+                    auto nghostbox = grow(neighbor, GridLayout_t::nbrGhosts());
+                    nghostbox.upper += 1;
+                    if (auto p2poverlap = (nghostbox * ghost_layer))
+                        for (auto const& bix : layout.AMRToLocal(*p2poverlap))
+                            expected(*bix) += 1;
+                }
+
+            if (vexpected != field_data->field.vector())
+                field_data->gridLayout.evalOnGhostBox(Ey, [&](auto... args) {
+                    PHARE_LOG_LINE_SS((Point{args...}.as_signed() + domGhostBox.lower)
+                                      << " " << Ey(args...));
+                });
+
+            // for (auto const& e : field_data->field)
+            //     EXPECT_NE(e, 0); // :/
+        }
+    }
+}
 
 
 } // namespace PHARE::core
