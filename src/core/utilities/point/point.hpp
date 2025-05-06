@@ -258,6 +258,13 @@ namespace core
 
         operator std::array<Type, dim>() const _PHARE_ALL_FN_ { return r; }
 
+
+        template<typename To>
+        auto as() const _PHARE_ALL_FN_
+        {
+            return Point<To, dim>{this->template toArray<To>()};
+        }
+
         auto as_unsigned() const _PHARE_ALL_FN_
         {
             PHARE_DEBUG_DO({
@@ -265,14 +272,14 @@ namespace core
                     assert(r[iDim] >= 0);
             })
             if constexpr (sizeof(int) == 4)
-                return Point<std::uint32_t, dim>{this->template toArray<std::uint32_t>()};
+                return as<std::uint32_t>();
             // else no return cause not yet handled
         }
 
         auto as_signed() const
         {
             if constexpr (sizeof(Type) == 4)
-                return Point<std::int32_t, dim>{this->template toArray<std::int32_t>()};
+                return as<std::int32_t>();
             // else no return cause not yet handled
         }
 

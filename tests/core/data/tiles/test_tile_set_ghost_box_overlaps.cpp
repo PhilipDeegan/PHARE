@@ -225,6 +225,25 @@ auto patch_tile_field(TileSetTest_t& self)
               static_cast<std::size_t>(std::pow(cells + (nbrGhosts * 2) + 1, self.dim)));
 }
 
+
+
+template<typename TileSetTest_t>
+auto from_layout_for_quantity(TileSetTest_t& self)
+{
+    using GridLayout_t     = TileSetTest_t::GridLayout_t;
+    using UsableVecField_t = UsableVecField<GridLayout_t, AllocatorMode::CPU, LayoutMode::AoSTS>;
+    auto constexpr static nbrGhosts = GridLayout_t::nbrGhosts();
+    auto constexpr static quanitity = HybridQuantity::Scalar::Vx;
+
+    auto const pid = 0;
+    auto& p0       = self.patches[pid]; // origin patch
+    auto const ss0 = make_nd_span_set_for_qty(p0.layout, quanitity);
+    EXPECT_EQ(ss0.box().size(), p0.layout.AMRGhostBoxFor(quanitity).size());
+    EXPECT_EQ(ss0.box().size(),
+              static_cast<std::size_t>(std::pow(cells + (nbrGhosts * 2) + 1, self.dim)));
+}
+
+
 // clang-format off
 using Permutations_t = testing::Types<
     TestParam<1, 1,LayoutMode::AoSTS, AllocatorMode::CPU>
@@ -247,6 +266,13 @@ TYPED_TEST(TileSetOverlapsTest, patch_tile_field)
 {
     patch_tile_field(*this);
 }
+
+
+TYPED_TEST(TileSetOverlapsTest, from_layout_for_quantity)
+{
+    from_layout_for_quantity(*this);
+}
+
 
 
 } // namespace PHARE::core

@@ -134,8 +134,9 @@ template<typename Patches>
 void cmp_update(UpdaterMode mode, Patches& patches)
 {
     using GridLayout_t = Patches::value_type::GridLayout_t;
-    using Boxing_t     = PHARE::core::UpdaterSelectionBoxing<GridLayout_t>;
-    using Particles    = Patches::value_type::ParticleArray_t;
+    // using Boxing_t     = PHARE::core::UpdaterSelectionBoxing<GridLayout_t>;
+    using Boxing_t  = PHARE::core::UpdaterTileSetSelectionBoxing<GridLayout_t>;
+    using Particles = Patches::value_type::ParticleArray_t;
     auto constexpr function_id
         = join_string_views_v<detail::strings::update, Particles::type_id, detail::strings::cma>;
     PHARE_LOG_LINE_STR(function_id);

@@ -33,8 +33,8 @@ FILE="tests/core/numerics/ampere/test_tileset_ampere.cpp"
 FILE="tests/core/numerics/faraday/test_tileset_faraday.cpp"
 FILE="tests/core/numerics/ion_updater/test_updater_pp_main.cpp"
 FILE="tests/core/data/test_vector.cpp"
-FILE="tests/core/numerics/ion_updater/test_multi_updater.cpp"
 FILE="tests/core/data/tiles/test_tile_set_ghost_box_overlaps.cpp"
+FILE="tests/core/numerics/ion_updater/test_multi_updater.cpp"
 
 
 TEST=" -M ${FILE} "
