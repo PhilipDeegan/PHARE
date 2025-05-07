@@ -274,7 +274,7 @@ protected:
     void sync_tile_add_new(std::size_t const tidx) _PHARE_ALL_FN_;
     void sync_tile_rm_left(std::size_t const tidx) _PHARE_ALL_FN_;
 
-    void sort(auto from, auto to){
+    void static sort(auto from, auto to) _PHARE_ALL_FN_{
         PHARE_WITH_THRUST({ //
             thrust::sort(thrust::seq, from, to /*, std::greater<>()*/);
         })
@@ -1183,7 +1183,8 @@ void TileSetSpan<Particles, impl>::sync(Args&&... args) _PHARE_ALL_FN_
     }
     else if (Particles::alloc_mode == AllocatorMode::GPU_UNIFIED)
     {
-        static_assert(PHARE_HAVE_MKN_GPU);
+        if (!PHARE_HAVE_MKN_GPU)
+            throw std::runtime_error("no gpu impl");
 
         PHARE_WITH_MKN_GPU({
             auto const& [stream] = std::forward_as_tuple(args...);

@@ -199,6 +199,9 @@ void ParticlesExporter<AoSTS, CPU>::move_particles(Src& src, Dst& dst, Box_t con
 
         src_tile().resize(not_in_box.size());
     }
+
+    src.sync();
+    dst.sync();
 }
 
 

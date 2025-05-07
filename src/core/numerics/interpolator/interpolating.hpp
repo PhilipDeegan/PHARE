@@ -261,10 +261,10 @@ public:
         {
             for (std::size_t i = 0; i < rho.size(); ++i)
             {
-                density.data()[i] = rho.data()[i];
-                flux0.data()[i]   = fx.data()[i];
-                flux1.data()[i]   = fy.data()[i];
-                flux2.data()[i]   = fz.data()[i];
+                density.data()[i] += rho.data()[i];
+                flux0.data()[i] += fx.data()[i];
+                flux1.data()[i] += fy.data()[i];
+                flux2.data()[i] += fz.data()[i];
             }
         };
 
