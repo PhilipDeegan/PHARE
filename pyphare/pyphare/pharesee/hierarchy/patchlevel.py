@@ -5,6 +5,9 @@ class PatchLevel:
         self.level_number = lvl_nbr
         self.patches = patches
 
+    def __getitem__(self, idx):
+        return self.patches[idx]
+
     def __iter__(self):
         return self.patches.__iter__()
 
