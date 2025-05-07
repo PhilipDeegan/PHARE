@@ -34,6 +34,7 @@ class ModelView : public IModelView
 
 
 public:
+    using Model_t    = Model;
     using GridLayout = typename Model::gridlayout_type;
     using PatchProperties
         = cppdict::Dict<float, double, std::size_t, std::vector<int>, std::vector<std::uint32_t>,
@@ -46,10 +47,9 @@ public:
     {
     }
 
-    NO_DISCARD std::vector<VecField*> getElectromagFields() const
-    {
-        return {&model_.state.electromag.B, &model_.state.electromag.E};
-    }
+    NO_DISCARD VecField& getB() const { return model_.state.electromag.B; }
+
+    NO_DISCARD VecField& getE() const { return model_.state.electromag.E; }
 
     NO_DISCARD auto& getIons() const { return model_.state.ions; }
 

@@ -47,6 +47,7 @@ public:
     using This       = H5Writer<ModelView>;
     using GridLayout = typename ModelView::GridLayout;
     using Attributes = typename ModelView::PatchProperties;
+    using Model_t    = ModelView::Model_t;
 
     static constexpr auto dimension   = GridLayout::dimension;
     static constexpr auto interpOrder = GridLayout::interp_order;

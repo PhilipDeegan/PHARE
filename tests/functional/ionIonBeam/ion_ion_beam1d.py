@@ -108,7 +108,7 @@ def yaebx(x, a, b):
 
 
 def growth_b_right_hand(run_path, time_offset):
-    file = os.path.join(run_path, "EM_B.h5")
+    file = os.path.join(run_path, "B.h5")
     times = get_times_from_h5(file)
     dt = times[1] - times[0]
     r = Run(run_path)

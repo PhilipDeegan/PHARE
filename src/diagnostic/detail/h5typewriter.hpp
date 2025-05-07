@@ -20,6 +20,7 @@ template<typename Writer>
 class H5TypeWriter : public PHARE::diagnostic::TypeWriter
 {
 public:
+    using Model_t                   = Writer::Model_t;
     using Attributes                = typename Writer::Attributes;
     static constexpr auto dimension = Writer::dimension;
 

@@ -199,7 +199,7 @@ class ElectromagDiagnostics(Diagnostics):
             )
             raise ValueError(error_msg.format(kwargs["quantity"]))
         else:
-            self.quantity = "/EM_" + kwargs["quantity"]
+            self.quantity = f"/{kwargs['quantity']}"
 
     def to_dict(self):
         return {

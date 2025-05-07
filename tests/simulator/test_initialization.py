@@ -195,13 +195,9 @@ class InitializationTest(SimulatorTest):
 
         eb_hier = None
         if qty in ["e", "eb"]:
-            eb_hier = hierarchy_from(
-                h5_filename=diag_outputs + "/EM_E.h5", hier=eb_hier
-            )
+            eb_hier = hierarchy_from(h5_filename=diag_outputs + "/E.h5", hier=eb_hier)
         if qty in ["b", "eb"]:
-            eb_hier = hierarchy_from(
-                h5_filename=diag_outputs + "/EM_B.h5", hier=eb_hier
-            )
+            eb_hier = hierarchy_from(h5_filename=diag_outputs + "/B.h5", hier=eb_hier)
         if qty in ["e", "b", "eb"]:
             return eb_hier
 

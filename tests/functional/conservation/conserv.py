@@ -164,7 +164,7 @@ def energies(path, kkind="iso"):
     as a function of time.
     """
     r = Run(path)
-    times = get_times_from_h5(r.path + "/EM_B.h5")
+    times = get_times_from_h5(r.path + "/B.h5")
     Bnrj = np.zeros_like(times)
     K = np.zeros_like(times)
     for it, t in enumerate(times):

@@ -24,8 +24,8 @@ from .utils import (
 logger = getLogger(__name__)
 
 quantities_per_file = {
-    "EM_B": "B",
-    "EM_E": "E",
+    "B": "B",
+    "E": "E",
     "ions_bulkVelocity": "Vi",
     "ions_density": "Ni",
     "particle_count": "nppc",
@@ -92,7 +92,7 @@ class Run:
     def GetB(self, time, merged=False, interp="nearest", all_primal=True, **kwargs):
         if merged:
             all_primal = False
-        hier = self._get_hierarchy(time, "EM_B.h5", **kwargs)
+        hier = self._get_hierarchy(time, "B.h5", **kwargs)
         if not all_primal:
             return self._get(hier, time, merged, interp)
 
@@ -102,7 +102,7 @@ class Run:
     def GetE(self, time, merged=False, interp="nearest", all_primal=True, **kwargs):
         if merged:
             all_primal = False
-        hier = self._get_hierarchy(time, "EM_E.h5", **kwargs)
+        hier = self._get_hierarchy(time, "E.h5", **kwargs)
         if not all_primal:
             return self._get(hier, time, merged, interp)
 
@@ -218,7 +218,7 @@ class Run:
         return list_of_mass[0]
 
     def GetDomainSize(self, **kwargs):
-        h5_filename = "EM_B.h5"  # _____ TODO : could be another file
+        h5_filename = "B.h5"  # _____ TODO : could be another file
 
         import h5py
 
