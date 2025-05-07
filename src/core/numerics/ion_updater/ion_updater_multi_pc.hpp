@@ -118,7 +118,8 @@ void IonUpdaterMultiPC<Ions, Electromag, GridLayout>::updateAndDepositDomain_(Mo
             return;
 
         auto copy_in = [&](auto const j) {
-            ParticleArrayService::copy_ghost_into_domain(*in.particles[i], *in.particles[j]);
+            throw std::runtime_error("fix");
+            // ParticleArrayService::copy_ghost_into_domain(*in.particles[i], *in.particles[j]);
         };
 
         if (in.particle_type[i - 1] == DOMAIN_ID)
@@ -188,7 +189,8 @@ void IonUpdaterMultiPC<Ions, Electromag, GridLayout>::updateAndDepositAll_(Model
             return;
 
         auto copy_in = [&](auto const j) {
-            ParticleArrayService::copy_ghost_into_domain(*in.particles[i], *in.particles[j]);
+            throw std::runtime_error("fix");
+            // ParticleArrayService::copy_ghost_into_domain(*in.particles[i], *in.particles[j]);
             in.pviews[j].reset(*in.particles[j]);
         };
 

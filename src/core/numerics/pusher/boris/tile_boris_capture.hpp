@@ -145,8 +145,8 @@ public:
                     if (particle_array.size() == 0)
                         return;
 
-                    auto pps                     = *particle_array;
-                    [[maybe_unused]] auto ps_ptr = &particle_array; // only for CPU
+                    auto pps = *particle_array;
+                    // [[maybe_unused]] auto ps_ptr = &particle_array; // only for CPU
 
                     auto per_tile = [=] _PHARE_ALL_FN_(auto const& tile_picker) mutable {
                         auto per_particle = [=] _PHARE_ALL_FN_(auto&&... args) mutable {
@@ -176,11 +176,12 @@ public:
                             bool const moved_tile = !array_equals(new_cell, tile_cell);
                             if (moved_tile)
                             {
-                                if constexpr (Particles::alloc_mode == AllocatorMode::GPU_UNIFIED)
-                                    pps.icell_changer(particle, tile_cell, pidx, particle.iCell());
-                                else // otherwise just push back
-                                    ps_ptr->icell_changer(particle, tile_cell, pidx,
-                                                          particle.iCell());
+                                // if constexpr (Particles::alloc_mode ==
+                                // AllocatorMode::GPU_UNIFIED)
+                                pps.icell_changer(particle, tile_cell, pidx, particle.iCell());
+                                // else // otherwise just push back
+                                //     ps_ptr->icell_changer(particle, tile_cell, pidx,
+                                //                           particle.iCell());
                             }
                         };
 
@@ -244,8 +245,7 @@ public:
                     {
                         std::size_t tileidx    = 0;
                         auto const tile_picker = [&]() { // REF!
-                            // NOT SPAN TILE!
-                            return std::make_tuple(tileidx, &(*ps_ptr)()[tileidx], 0, 1);
+                            return std::make_tuple(tileidx, &pps()[tileidx], 0, 1);
                         };
 
                         for (; tileidx < particle_array().size(); ++tileidx)
@@ -262,8 +262,7 @@ public:
                 }
 
                 per_particles(pop.domainParticles());
-                // per_particles(pop.patchGhostParticles());
-                // per_particles(pop.levelGhostParticles());
+                per_particles(pop.levelGhostParticles());
             };
 
 
@@ -271,53 +270,21 @@ public:
                 per_pop(pop);
         }
 
+        streamer.host([&](auto const i) mutable {
+            constexpr static std::uint32_t PHASE = 1;
 
-        if constexpr (Particles::alloc_mode == AllocatorMode::GPU_UNIFIED)
-        {
-            streamer.host([&](auto const i) mutable {
-                constexpr static std::uint32_t PHASE = 1;
+            in.streamer.streams[i].sync();
+            auto& view = in.views[i];
 
-                PHARE_LOG_LINE_SS(i);
-                in.streamer.streams[i].sync();
-                auto& view = in.views[i];
+            for (auto& pop : view.ions)
+            {
+                pop.domainParticles().template sync<1>();
+                (*pop.domainParticles()).sync(in.streamer.streams[i]);
 
-                for (auto& pop : view.ions)
-                {
-                    PHARE_LOG_LINE_SS(in.streamer.streams.size());
-
-                    auto pps = *pop.domainParticles();
-                    pps.template sync<PHASE, ParticleType::Domain>(in.streamer.streams[i]);
-                    ParticleArrayService::sync<PHASE, ParticleType::Domain>(pop.domainParticles());
-
-                    // ParticleArrayService::sync<PHASE, ParticleType::Ghost>(
-                    //     pop.patchGhostParticles());
-                    // (*pop.patchGhostParticles())
-                    //     .template sync<PHASE, ParticleType::Ghost>(in.streamer.streams[i]);
-
-                    // ParticleArrayService::sync<PHASE, ParticleType::Ghost>(
-                    //     pop.levelGhostParticles());
-                    // (*pop.levelGhostParticles())
-                    //     .template sync<PHASE, ParticleType::Ghost>(in.streamer.streams[i]);
-                }
-            });
-        }
-        else
-        {
-            streamer.host([&](auto const i) mutable {
-                constexpr static std::uint32_t PHASE = 1;
-
-                auto& view = in.views[i];
-
-                for (auto& pop : view.ions)
-                {
-                    ParticleArrayService::sync<PHASE, ParticleType::Domain>(pop.domainParticles());
-                    // ParticleArrayService::sync<PHASE, ParticleType::Ghost>(
-                    //     pop.patchGhostParticles());
-                    // ParticleArrayService::sync<PHASE, ParticleType::Ghost>(
-                    //     pop.levelGhostParticles());
-                };
-            });
-        }
+                pop.levelGhostParticles().template sync<1>();
+                (*pop.levelGhostParticles()).sync(in.streamer.streams[i]);
+            }
+        });
     }
 };
 

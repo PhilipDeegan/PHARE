@@ -5,6 +5,8 @@
 
 #include "core/utilities/memory.hpp"
 #include "core/data/particles/appending/detail/def_appending.hpp"
+
+
 #include <iterator>
 
 namespace PHARE::core
@@ -56,6 +58,8 @@ template<auto type, typename Src, typename Dst>
 void ParticlesAppender<AoSMapped, CPU, AoSTS, GPU_UNIFIED>::operator()( //
     Src const& src, Dst& dst)
 {
+    PHARE_LOG_SCOPE(2, "ParticlesAppender<AoSMapped, CPU, AoSTS, GPU_UNIFIED>::operator()");
+
     auto const overlap = src.box() * dst.ghost_box();
     if (!overlap)
         return;
@@ -79,7 +83,7 @@ void ParticlesAppender<AoSMapped, CPU, AoSTS, GPU_UNIFIED>::operator()( //
         if (auto const size = src.nbr_particles_in(bix))
             finish(dst.local_cell(bix), size);
 
-    dst.template sync<2, type>();
+    dst.sync();
 }
 
 template<>
@@ -87,6 +91,8 @@ template<auto type, typename Src, typename Dst>
 void ParticlesAppender<AoSMapped, CPU, AoSTS, CPU>::operator()( //
     Src const& src, Dst& dst)
 {
+    PHARE_LOG_SCOPE(2, "ParticlesAppender<AoSMapped, CPU, AoSTS, CPU>::operator()");
+
     auto const overlap = src.box() * dst.box();
     if (!overlap)
         return;
@@ -102,7 +108,7 @@ void ParticlesAppender<AoSMapped, CPU, AoSTS, CPU>::operator()( //
         if (auto size = src.nbr_particles_in(bix))
             finish(dst.local_cell(bix), size);
 
-    dst.template sync<2, type>();
+    dst.sync();
 }
 
 

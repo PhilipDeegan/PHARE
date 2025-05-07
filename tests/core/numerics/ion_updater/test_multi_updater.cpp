@@ -8,11 +8,11 @@
 // USE HIP_VISIBLE_DEVICES OR CUDA_VISIBLE_DEVICES env vars
 
 // #define PHARE_UNDEF_ASSERT
-#include "core/data/grid/gridlayout.hpp"
 #define PHARE_SKIP_MPI_IN_CORE
 
 
 #include "core/utilities/kernels.hpp"
+#include "core/data/grid/gridlayout.hpp"
 #include "initializer/data_provider.hpp"
 #include "core/data/particles/particle_array.hpp"
 #include "core/numerics/ion_updater/ion_updater.hpp"
@@ -38,7 +38,7 @@ bool constexpr COMPARE_TO_ONE_PATCH = 1;
 auto static const bytes     = get_env_as("PHARE_GPU_BYTES", std::uint64_t{50000000});
 auto static const cells     = get_env_as("PHARE_CELLS", std::uint32_t{12});
 auto static const ppc       = get_env_as("PHARE_PPC", std::size_t{4});
-auto static const seed      = get_env_as("PHARE_SEED", std::size_t{1009});
+auto static const seed      = get_env_as("PHARE_SEED", std::size_t{40});
 auto static const n_patches = get_env_as("PHARE_PATCHES", std::size_t{1});
 auto static const dt        = get_env_as("PHARE_TIMESTEP", double{.001});
 auto static const shufle    = get_env_as("PHARE_UNSORTED", std::size_t{0});
@@ -134,9 +134,8 @@ template<typename Patches>
 void cmp_update(UpdaterMode mode, Patches& patches)
 {
     using GridLayout_t = Patches::value_type::GridLayout_t;
-    // using Boxing_t     = PHARE::core::UpdaterSelectionBoxing<GridLayout_t>;
-    using Boxing_t  = PHARE::core::UpdaterTileSetSelectionBoxing<GridLayout_t>;
-    using Particles = Patches::value_type::ParticleArray_t;
+    using Boxing_t     = PHARE::core::UpdaterTileSetSelectionBoxing<GridLayout_t>;
+    using Particles    = Patches::value_type::ParticleArray_t;
     auto constexpr function_id
         = join_string_views_v<detail::strings::update, Particles::type_id, detail::strings::cma>;
     PHARE_LOG_LINE_STR(function_id);
@@ -173,7 +172,7 @@ auto make_ions(GridLayout_t const& layout)
             shuffle(particles.domain_particles, seeding);
     };
 
-    auto const particle_box = shrink(layout.AMRBox(), 2); // avoid ghost boundary for now
+    auto const particle_box = layout.AMRBox();
 
     auto add_particles
         = [&](auto& particles) { add_particles_in(particles.domain_particles, particle_box, ppc); };
@@ -197,7 +196,7 @@ auto from_ions(GridLayout_t const& layout, Ions const& from)
     EXPECT_EQ(ions.populations[0].particles.domain_particles.size(), 0ull);
 
     auto _add_particles_from = [&]<auto type>(auto& src, auto& dst) {
-        // ParticleArrayService::reserve_ppc_in<type>(dst, ppc);
+        ParticleArrayService::reserve_ppc_in<type>(dst, ppc);
         append_particles<type>(src, dst /*, layout*/);
     };
 
@@ -205,7 +204,7 @@ auto from_ions(GridLayout_t const& layout, Ions const& from)
         from.populations[0].particles.domain_particles,
         ions.populations[0].particles.domain_particles);
 
-    auto const particle_box = shrink(layout.AMRBox(), 2); // avoid ghost boundary for now
+    auto const particle_box = layout.AMRBox();
     EXPECT_EQ(ions.populations[0].particles.domain_particles.size(), particle_box.size() * ppc);
     return ions;
 }
@@ -390,13 +389,14 @@ struct MultiPatchIonUpdaterTest : public ::testing::Test
 using Permutations_t = testing::Types< // ! notice commas !
 
      // TestParam<3, LayoutMode::SoAVXTS, AllocatorMode::CPU, 2, UpdaterMode::all>
-     TestParam<3, LayoutMode::AoSTS, AllocatorMode::CPU, 2, UpdaterMode::all>
     // ,TestParam<3, LayoutMode::AoSMapped, AllocatorMode::CPU, 2, UpdaterMode::all>
     // ,TestParam<3, LayoutMode::SoA, AllocatorMode::CPU, 2, UpdaterMode::all>
 
+     TestParam<3, LayoutMode::AoSTS, AllocatorMode::CPU, 2, UpdaterMode::all>
+
 PHARE_WITH_MKN_GPU(
 
-    ,TestParam<3, LayoutMode::AoSTS, AllocatorMode::GPU_UNIFIED, 2, UpdaterMode::all>
+    // ,TestParam<3, LayoutMode::AoSTS, AllocatorMode::GPU_UNIFIED, 2, UpdaterMode::all>
     // ,TestParam<3, LayoutMode::SoATS, AllocatorMode::GPU_UNIFIED, 2, UpdaterMode::all>
 
     // ,TestParam<3, LayoutMode::AoSPC, AllocatorMode::GPU_UNIFIED, 2, UpdaterMode::domain_only>

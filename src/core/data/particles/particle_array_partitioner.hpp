@@ -1,3 +1,5 @@
+// to #include "core/data/particles/particle_array_partitioner.hpp"
+
 #ifndef PHARE_CORE_DATA_PARTICLES_PARTICLE_ARRAY_PARTITIONER_HPP
 #define PHARE_CORE_DATA_PARTICLES_PARTICLE_ARRAY_PARTITIONER_HPP
 
@@ -29,6 +31,17 @@ struct ParticleArrayPartitioner
     ParticleArray& particles;
     // box_t box;
 };
+
+template<typename Particles_t>
+auto partition_particles(Particles_t& particles, auto const box)
+{
+    return ParticleArrayPartitioner<Particles_t>{particles}(box);
+}
+template<typename Particles_t>
+auto partition_particles_not_in(Particles_t& particles, auto const box)
+{
+    return ParticleArrayPartitioner<Particles_t>{particles}.notIn(box);
+}
 
 } // namespace PHARE::core
 

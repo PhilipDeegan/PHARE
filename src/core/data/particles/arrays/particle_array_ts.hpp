@@ -2,6 +2,7 @@
 #define PHARE_CORE_DATA_PARTICLES_PARTICLE_ARRAY_TILE_SET_HPP
 
 
+#include "core/def/detail/thrust.hpp"
 #include "core/def/phare_config.hpp"
 #include "core/operators.hpp"
 #include "core/data/tiles/tile_set.hpp"
@@ -28,11 +29,6 @@ struct TileSetParticleArrayDetails : public ParticleArrayDetails
     std::size_t interp_order = 1; // for fields per tile
     std::size_t tile_size    = 4;
 
-
-    // TileSetParticleArrayDetails(TileSetParticleArrayDetails const&)            = delete;
-    // TileSetParticleArrayDetails(TileSetParticleArrayDetails&&)                 = default;
-    // TileSetParticleArrayDetails& operator=(TileSetParticleArrayDetails&&)      = default;
-    // TileSetParticleArrayDetails& operator=(TileSetParticleArrayDetails const&) = default;
 
     template<typename GridLayout_t>
     TileSetParticleArrayDetails static FROM(GridLayout_t const& layout,
@@ -117,8 +113,6 @@ public:
     }
 
 
-
-
     ParticlesTile& operator=(ParticlesTile const&) = default;
     ParticlesTile& operator=(ParticlesTile&&)      = default;
 
@@ -141,7 +135,6 @@ public:
     void reset(ParticlesTile<P, N>& tile)
     {
         (*this)().reset(tile());
-        // fx.reset(tile.fx);
     }
 
 private:
@@ -255,17 +248,10 @@ public:
     auto& operator()(locell_t const& cell) _PHARE_ALL_FN_ { return (*particles_.at(cell))(); }
     auto& operator()(locell_t const& cell) const _PHARE_ALL_FN_ { return (*particles_.at(cell))(); }
 
-    template<std::uint8_t PHASE = 0, auto type = ParticleType::Domain>
-    void sync() _PHARE_ALL_FN_;
 
-    template<std::uint8_t PHASE = 0, auto type = ParticleType::Domain, typename... Args>
+    template<typename... Args>
     void sync(Args&&... args) _PHARE_ALL_FN_;
 
-    template<std::uint8_t PHASE = 0, auto type = ParticleType::Domain>
-    void sync_add_new() _PHARE_ALL_FN_;
-
-    template<std::uint8_t PHASE = 0, auto type = ParticleType::Domain>
-    void sync_rm_left() _PHARE_ALL_FN_;
 
     void clear()
     {
@@ -285,6 +271,20 @@ public:
     }
 
 protected:
+    void sync_tile_add_new(std::size_t const tidx) _PHARE_ALL_FN_;
+    void sync_tile_rm_left(std::size_t const tidx) _PHARE_ALL_FN_;
+
+    void sort(auto from, auto to){
+        PHARE_WITH_THRUST({ //
+            thrust::sort(thrust::seq, from, to /*, std::greater<>()*/);
+        })
+        //
+        PHARE_WITH_THRUST_ELSE({ //
+            std::sort(from, to /*, std::greater<>()*/);
+        }) //
+    }
+
+
     TileSetView<ParticlesTile<Particles, NdArrayView<dim, double>>> particles_;
     NdArrayView<dim, Span<std::size_t>> gaps_;
     NdArrayView<dim, SIZE_T> off_sets_, gap_idx_, add_into_, cap_, left_;
@@ -465,8 +465,10 @@ public:
         return lobox_t{local_cell(from.lower), local_cell(from.upper)};
     }
 
+    // PHASE 0 == init
+    // PHASE 1 == post move sync
     template<std::uint8_t PHASE = 0, auto type = ParticleType::Domain>
-    void sync(); // after move
+    void sync();
 
     template<auto type>
     void trim();
@@ -483,9 +485,9 @@ public:
     }
 
 
-    auto& insert(TileSetVector const& src);
+    // auto& insert(TileSetVector const& src);
 
-    auto& insert_domain_from(TileSetVector& src);
+    auto& insert_domain_from(TileSetVector& src); // torm
 
 
     void replace_from(This const& that)
@@ -498,10 +500,7 @@ public:
         particles_ = that.particles_;
         box_       = that.box_;
         ghost_box_ = that.ghost_box_;
-        // p2c_       = that.p2c_;
     }
-
-
 
 
     void static resize(Particles& ps, std::size_t const& s, bool const& copy = true)
@@ -517,7 +516,6 @@ public:
     {
         if constexpr (CompileOptions::WithMknGpu and alloc_mode == AllocatorMode::GPU_UNIFIED)
             PHARE_WITH_MKN_GPU(mkn::gpu::resize(v, s, copy));
-
         else
             v.resize(s);
     }
@@ -535,7 +533,6 @@ public:
     {
         if constexpr (CompileOptions::WithMknGpu and alloc_mode == AllocatorMode::GPU_UNIFIED)
             PHARE_WITH_MKN_GPU(mkn::gpu::reserve(v, s, copy));
-
         else
             v.reserve(s);
     }
@@ -553,6 +550,16 @@ public:
     }
 
 protected:
+    void sync_check_realloc();
+
+    auto on_tiles(auto&& fn)
+    {
+        for (auto& tile : particles_)
+            fn(tile);
+    }
+
+
+
     TileSetParticleArrayDetails details;
 
     std::size_t ghost_cells_;
@@ -580,48 +587,10 @@ protected:
 
     std::size_t total_size = 0;
 
-    template<auto type>
-    void sync_cpu_gaps_and_tmp();
-    template<auto type>
-    void sync_gpu_gaps_and_tmp();
-
-    template<auto type>
-    void sync_gpu_gaps_and_tmp_impl0();
-
-    template<auto type>
-    void sync_gpu_gaps_and_tmp_impl1();
-
-
-
-    auto on_tiles(auto&& fn)
-    {
-        for (auto& tile : particles_)
-            fn(tile);
-    }
-
-
-
 }; // TileSetVector<Particles>
 
 
 
-template<typename Particles, std::uint8_t impl>
-auto& TileSetVector<Particles, impl>::insert(TileSetVector const& /*src*/)
-{
-    // std::size_t added = 0;
-    // for (auto const& bix : local_box(box()))
-    // {
-    //     auto& from = src(bix);
-    //     auto& to   = (*this)(bix);
-    //     added += from.size();
-    //     to.reserve(to.size() + from.size());
-    //     std::copy(from.begin(), from.end(), std::back_inserter(to));
-    // }
-    // if (added)
-    //     sync<2>();
-
-    return *this;
-}
 
 template<typename Particles, std::uint8_t impl>
 auto& TileSetVector<Particles, impl>::insert_domain_from(TileSetVector& src)
@@ -669,6 +638,7 @@ layout*/);
     return *this;
 }
 
+
 template<typename Particles, std::uint8_t impl>
 template<auto type>
 auto& TileSetVector<Particles, impl>::reserve_ppc(std::size_t const& ppc)
@@ -685,12 +655,10 @@ auto& TileSetVector<Particles, impl>::reserve_ppc(std::size_t const& ppc)
         });
 
     if constexpr (type == ParticleType::Ghost)
-    {
         on_tiles([&](auto& tile) {
             reserve(tile(), additional * tile.size());
             reserve(gaps_(local_cell(tile.lower)), additional * tile.size());
         });
-    }
 
     return *this;
 }
@@ -699,214 +667,42 @@ auto& TileSetVector<Particles, impl>::reserve_ppc(std::size_t const& ppc)
 
 template<typename Particles, std::uint8_t impl>
 template<auto type>
-void TileSetVector<Particles, impl>::trim()
+void TileSetVector<Particles, impl>::trim() // change to erase(box)
 {
     static_assert(std::is_same_v<decltype(type), ParticleType>);
-
-    // currently using views for gpu partition
-    reset_views();
-    // update_from(reset_particle_views_fn(), particles_views_);
-
-    if constexpr (type == ParticleType::Ghost)
-    {
-        for (std::size_t i = 0; i < particles_.size(); i++)
-        {
-            if (particles_views_[i]().size() == 0)
-                continue;
-
-            auto& tile = particles_[i];
-            auto& tbox = *tile;
-            auto& view = particles_views_[i];
-            if (tbox * box_ != tbox) // includes ghost cells
-                resize(tile(), ParticleArrayPartitioner<PSpan_t>{view()}(box_).size());
-        }
-
-        // for (auto const& ghost_layer_box : local_box().remove(local_box(box_)))
-        //     for (auto const& bix : ghost_layer_box)
-        //     {
-        //         cell_size_(bix) = 0;
-        //         particles_(bix).clear();
-        //         gaps_(bix).clear();
-        //     }
-    }
-
-    if constexpr (type == ParticleType::Domain)
-    {
-        throw std::runtime_error("NO");
-    }
-}
-
-template<typename Particles, std::uint8_t impl>
-template<auto type>
-void TileSetVector<Particles, impl>::sync_cpu_gaps_and_tmp()
-{
-    // PHARE_LOG_LINE_STR("sync_cpu_gaps_and_tmp " << magic_enum::enum_name(type));
-
-    for (auto& tile : particles_)
-    {
-        auto const bix = local_cell(tile.lower);
-        auto& real     = tile();
-        auto& gaps     = gaps_(bix);
-        while (gaps.size())
-        {
-            real.assign(real.size() - 1, gaps.back());
-            gaps.pop_back();
-            real.pop_back();
-        }
-        PHARE_ASSERT(gaps.size() == 0);
-    }
-}
-
-
-template<typename Particles, std::uint8_t impl>
-template<auto type>
-void TileSetVector<Particles, impl>::sync_gpu_gaps_and_tmp_impl0()
-{
-    { // calculate reserve size
-        PHARE_LOG_SCOPE(2, "TileSetVector::sync_gpu_gaps_and_tmp::reserve_scan ");
-
-        for (std::size_t i = 0; i < particles_.size(); ++i)
-        {
-            auto const bix = local_cell(particles_[i].lower);
-            auto& real     = particles_[i]();
-            if constexpr (any_in(impl_v, 1, 2))
-            {
-                // push_back is done on device requires over allocation
-                // cell_size_(bix) = particles_views_(bix).size();
-                // real.resize(particles_views_(bix).size());
-                resize(real, particles_views_[i]().size());
-            }
-            reserve(real, real.size() + add_into_(bix));
-        };
-    }
-
-    { // add incoming particles
-        PHARE_LOG_SCOPE(2, "TileSetVector::sync_gpu_gaps_and_tmp::add ");
-
-        for (std::size_t i = 0; i < particles_.size(); ++i)
-        {
-            auto const bix        = local_cell(particles_[i].lower);
-            auto& real            = particles_[i]();
-            auto const& gaps      = gaps_(bix);
-            auto const& gaps_size = gap_idx_(bix);
-            for (std::size_t gidx = 0; gidx < gaps_size; ++gidx)
-            {
-                auto const& idx     = gaps[gidx];
-                auto const& newcell = local_cell(real.iCell(idx));
-                emplace_back((*particles_.at(newcell))(), real, idx);
-            }
-        }
-    }
-
-    { // delete outgoing particles
-        PHARE_LOG_SCOPE(2, "TileSetVector::sync_gpu_gaps_and_tmp::delete ");
-        for (std::size_t i = 0; i < particles_.size(); ++i)
-        {
-            auto const bix        = local_cell(particles_[i].lower);
-            auto const& gaps_size = gap_idx_(bix);
-            {
-                auto& gaps = gaps_(bix);
-                std::sort(gaps.begin(), gaps.begin() + gaps_size, std::greater<>()); // use thrust ?
-            }
-            auto& real       = particles_[i]();
-            auto const& gaps = gaps_(bix);
-            for (std::size_t gidx = 0; gidx < gaps_size; ++gidx)
-            {
-                auto const& idx = gaps[gidx];
-                real.assign(real.size() - 1, idx);
-                real.pop_back();
-            }
-            gap_idx_(bix)  = 0;
-            add_into_(bix) = 0;
-        }
-    }
-}
-
-template<typename Particles, std::uint8_t impl>
-template<auto type>
-void TileSetVector<Particles, impl>::sync_gpu_gaps_and_tmp_impl1()
-{
 }
 
 
 
 template<typename Particles, std::uint8_t impl>
-template<auto type>
-void TileSetVector<Particles, impl>::sync_gpu_gaps_and_tmp()
+void TileSetVector<Particles, impl>::sync_check_realloc()
 {
     // PHARE_LOG_LINE_STR("sync_gpu_gaps_and_tmp " << magic_enum::enum_name(type));
-    PHARE_LOG_SCOPE(2, "TileSetVector::sync_gpu_gaps_and_tmp ");
+    PHARE_LOG_SCOPE(2, "TileSetVector::sync_gpu_gaps_and_tmp::reserve_scan ");
 
-    // if constexpr (impl == 0)
-    // {
-    sync_gpu_gaps_and_tmp_impl0<type>();
-    // }
-    // else if constexpr (impl == 1)
-    // {
-    //     sync_gpu_gaps_and_tmp_impl1<type>();
-    // }
-    // else
-    //     throw std::runtime_error("No impl");
+    for (std::size_t i = 0; i < particles_.size(); ++i)
+    {
+        auto const bix = local_cell(particles_[i].lower);
+        auto& real     = particles_[i]();
+        reserve(real, particles_views_[i]().size() + add_into_(bix));
+        resize(real, particles_views_[i]().size());
+    };
 }
 
-template<typename Particles, std::uint8_t impl>
-void TileSetVector<Particles, impl>::reset_index_wrapper_map()
-{
-    resize(p2c_, total_size);
-
-    auto const fill = [](auto p, auto o, auto s, auto b) { std::fill(p + o, p + o + s, b); };
-
-    std::size_t offset = 0;
-
-    on_tiles([&](auto& tile) {
-        auto const bix = local_cell(tile.lower);
-
-        auto const& cs = cell_size_(bix);
-        resize(gaps_(bix), cs);
-        off_sets_(bix) = offset;
-
-        if (cs)
-        {
-            if constexpr (alloc_mode == AllocatorMode::GPU_UNIFIED)
-            {
-                PHARE_WITH_THRUST( //
-                    thrust::fill(thrust::device, p2c_.begin() + offset, p2c_.begin() + offset + cs,
-                                 *bix));
-                PHARE_WITH_THRUST_ELSE(
-                    PHARE_LOG_LINE_SS("Thrust not found for TileSetVector<Particles, "
-                                      "impl>::reset_index_wrapper_map"); //
-                    fill(p2c_.begin(), offset, cs, bix);                 //
-                )
-            }
-            else
-                fill(p2c_.begin(), offset, cs, bix);
-        }
-
-        offset += cs;
-        cap_(bix) = tile().capacity();
-    });
-}
 
 template<typename Particles, std::uint8_t impl>
 template<std::uint8_t PHASE, auto type>
 void TileSetVector<Particles, impl>::sync()
 {
+    static_assert(PHASE >= 0 or PHASE <= 1);
     static_assert(std::is_same_v<decltype(type), ParticleType>);
     static_assert(type != ParticleType::All);
 
     PHARE_LOG_SCOPE(2, "TileSetVector::sync");
-    // PHARE_LOG_LINE_STR("sync " << static_cast<std::uint32_t>(PHASE) << " "
-    //                            << magic_enum::enum_name(type));
-    // auto const lbox = local_box();
+    // PHARE_LOG_LINE_STR("sync " << magic_enum::enum_name(type));
 
-    if constexpr (PHASE < 2 and alloc_mode == AllocatorMode::CPU)
-        sync_cpu_gaps_and_tmp<type>();
-
-    if constexpr (PHASE < 2 and alloc_mode == AllocatorMode::GPU_UNIFIED)
-        sync_gpu_gaps_and_tmp<type>();
-
-    if constexpr (PHASE == 1 || type == ParticleType::Domain)
-        trim<ParticleType::Ghost>();
+    if constexpr (PHASE == 1)
+        sync_check_realloc();
 
     total_size = 0;
     for (auto const& tile : particles_)
@@ -915,41 +711,23 @@ void TileSetVector<Particles, impl>::sync()
         cell_size_(local_cell(tile.lower)) = tile().size();
     }
 
-    if constexpr (alloc_mode == AllocatorMode::GPU_UNIFIED)
-    {
-        PHARE_LOG_SCOPE(2, "TileSetVector::sync::reset");
-        static_assert(impl < 3); // otherwise unhandled
-        if constexpr (impl < 2)
+    auto const per_cell = [&](auto& tile) {
+        auto const bix  = local_cell(tile.lower);
+        auto const& cs  = cell_size_(bix);
+        auto const& cap = tile().capacity();
+        auto& gaps      = gaps_(bix);
+        if (gaps.size() < cs)
         {
-            // reset_index_wrapper_map();
+            reserve(gaps, cap, false);
+            resize(gaps, cs, false);
         }
-        else // if (PHASE == 2)
-        {
-            auto const per_cell = [&](auto& tile) {
-                auto const bix  = local_cell(tile.lower);
-                auto const& cs  = cell_size_(bix);
-                auto const& cap = tile().capacity();
-                auto& gaps      = gaps_(bix);
-                if (gaps.size() < cs)
-                {
-                    reserve(gaps, cap, false);
-                    resize(gaps, cs, false);
-                }
-                cap_(bix) = cap;
-            };
+        cap_(bix) = cap;
+    };
 
-            if constexpr (type == ParticleType::Domain)
-                on_tiles(per_cell);
+    on_tiles(per_cell);
 
-            // if constexpr (ParticleType::Domain)
-            // {}
-        }
-    }
-
-    {
-        PHARE_LOG_SCOPE(2, "TileSetVector::sync::reset_views");
-        reset_views();
-    }
+    PHARE_LOG_SCOPE(2, "TileSetVector::sync::reset_views");
+    reset_views();
 }
 
 
@@ -979,8 +757,6 @@ struct TileSetParticles : public Super_
     TileSetParticles(Args&&... args) _PHARE_ALL_FN_ : Super{std::forward<Args>(args)...}
     {
     }
-
-
 
     TileSetParticles(TileSetParticles const& from)            = default;
     TileSetParticles(TileSetParticles&& from)                 = default;
@@ -1014,22 +790,6 @@ struct TileSetParticles : public Super_
     auto data() _PHARE_ALL_FN_ { return particles_.data(); }
 
 
-
-    template<auto S = storage_mode, typename = std::enable_if_t<S == StorageMode::VECTOR>>
-    auto operator[](Box<std::uint32_t, dimension> const& local) const
-    {
-        std::vector<Particle_t> out;
-        out.reserve(sum_from(local, [&](auto const& b) { return particles_(b.toArray()).size(); }));
-        for (auto const& b : local)
-            std::copy(particles_(b).begin(), particles_(b).end(), std::back_inserter(out));
-        return out;
-    }
-    template<auto S = storage_mode, typename = std::enable_if_t<S == StorageMode::VECTOR>>
-    auto operator[](Box<int, dimension> const& amr) const
-    {
-        return (*this)[Super::local_box(amr)];
-    }
-
     Super& operator*() { return *this; }
     Super const& operator*() const { return *this; }
 
@@ -1039,29 +799,18 @@ struct TileSetParticles : public Super_
                         std::size_t const idx,
                         std::array<int, dimension> const& newcell) _PHARE_ALL_FN_
     {
-        if constexpr (storage_mode == StorageMode::VECTOR)
+        bool constexpr static ATOMIC = true;
+        bool constexpr static GPU    = alloc_mode == AllocatorMode::GPU_UNIFIED;
+
+        using Op = Operators<typename Super::SIZE_T, ATOMIC, GPU>;
+
+        Super::gaps_(cell)[Op{Super::gap_idx_(cell)}.increment_return_old()] = idx;
+
+        if (isIn(newcell, Super::ghost_box()))
         {
-            Super::get_vec(Super::gaps_(cell)).emplace_back(idx);
-            if (isIn(newcell, Super::ghost_box()))
-                Super::get_vec((*this)(Super::local_tile_cell(newcell))).emplace_back(p).iCell();
+            auto const nc = Super::local_tile_cell(newcell);
+            Op{Super::add_into_(nc)}.increment_return_old();
         }
-        else if constexpr (storage_mode == StorageMode::SPAN)
-        {
-            bool constexpr static ATOMIC = alloc_mode == AllocatorMode::GPU_UNIFIED;
-            bool constexpr static GPU    = alloc_mode == AllocatorMode::GPU_UNIFIED;
-
-            using Op = Operators<typename Super::SIZE_T, ATOMIC, GPU>;
-
-            Super::gaps_(cell)[Op{Super::gap_idx_(cell)}.increment_return_old()] = idx;
-
-            if (isIn(newcell, Super::ghost_box()))
-            {
-                auto const nc = Super::local_tile_cell(newcell);
-                Op{Super::add_into_(nc)}.increment_return_old();
-            }
-        }
-        else
-            throw std::runtime_error("no");
 
         return *this;
     }
@@ -1069,7 +818,6 @@ struct TileSetParticles : public Super_
 
     template<typename T>
     struct index_wrapper;
-
     auto operator[](std::size_t const& s) _PHARE_ALL_FN_ { return index_wrapper<This>{this, s}; }
     auto operator[](std::size_t const& s) const _PHARE_ALL_FN_
     {
@@ -1077,7 +825,6 @@ struct TileSetParticles : public Super_
     }
 
     void print() const {}
-
     void check() const {}
 
     auto max_size() const
@@ -1132,10 +879,6 @@ struct tile_set_iterator_storage<LayoutMode::SoA, Particles>
 
     tile_set_iterator_storage(Particles ps) _PHARE_ALL_FN_ : Super{ps} {}
 
-    // auto& operator*() _PHARE_ALL_FN_ { return particle; }
-    // auto& operator*() const _PHARE_ALL_FN_ { return particle; }
-
-    // per_tile_particles* particles;
     void set() { particle = Particle_t{particles.data()[l], i}; }
 
     Particle_t particle;
@@ -1151,19 +894,9 @@ struct tile_set_iterator_storage<LayoutMode::SoAVX, Particles>
     using Particle_t = typename SoAVXZipParticle_t<per_tile_particles, is_const>::value_type;
     using Super::l, Super::i, Super::particles;
 
-
     tile_set_iterator_storage(Particles ps) _PHARE_ALL_FN_ : Super{ps} {}
 
-    // auto& operator*() _PHARE_ALL_FN_ { return particle; }
-    // auto& operator*() const _PHARE_ALL_FN_ { return particle; }
-
     void set() { particle = Particle_t{particles.data()[l], i}; }
-
-    // auto& charge() const _PHARE_ALL_FN_ { return particle.charge(); }
-    // auto& delta() const _PHARE_ALL_FN_ { return particle.delta(); }
-    // auto& iCell() const _PHARE_ALL_FN_ { return particle.iCell(); }
-    // auto& weight() const _PHARE_ALL_FN_ { return particle.weight(); }
-    // auto& v() const _PHARE_ALL_FN_ { return particle.v(); }
 
     Particle_t particle;
 };
@@ -1185,9 +918,6 @@ struct tile_set_iterator_storage<LayoutMode::AoS, Particles>
 
     tile_set_iterator_storage(Particles ps) _PHARE_ALL_FN_ : Super{ps} {}
 
-    // auto& operator*() _PHARE_ALL_FN_ { return *particle; }
-    // auto& operator*() const _PHARE_ALL_FN_ { return *particle; }
-
     auto& charge() _PHARE_ALL_FN_ { return particles.data()[l][i].charge(); }
     auto& delta() _PHARE_ALL_FN_ { return particles.data()[l][i].delta(); }
     auto& iCell() _PHARE_ALL_FN_ { return particles.data()[l][i].iCell(); }
@@ -1200,7 +930,6 @@ struct tile_set_iterator_storage<LayoutMode::AoS, Particles>
     auto& weight() const _PHARE_ALL_FN_ { return particles.data()[l][i].weight(); }
     auto& v() const _PHARE_ALL_FN_ { return particles.data()[l][i].v(); }
 
-    // Particle_p particle;
     void set() { /*noop*/ }
 };
 
@@ -1306,15 +1035,7 @@ struct TileSetParticles<OuterSuper>::iterator_impl : public tile_set_iterator_su
     }
 
 
-
-    // auto& operator*() _PHARE_ALL_FN_ { return particles.data()[l][i]; }
-    // auto& operator*() const _PHARE_ALL_FN_ { return particles.data()[l][i]; }
-
-
     auto copy() const _PHARE_ALL_FN_ { return particles.data()[l][i]; }
-
-    // T particles;
-    // std::size_t l = 0, i = 0;
 };
 
 
@@ -1331,15 +1052,13 @@ struct tile_set_index_wrapper_storage<LayoutMode::SoA, Particles>
 
     template<typename PerTileParticles_t>
     tile_set_index_wrapper_storage(PerTileParticles_t p, std::size_t const i) _PHARE_ALL_FN_
-        : /*particles{p},*/
-          particle{*p, i}
+        : particle{*p, i}
     {
     }
 
     auto& operator*() _PHARE_ALL_FN_ { return particle; }
     auto& operator*() const _PHARE_ALL_FN_ { return particle; }
 
-    per_tile_particles* particles;
     Particle_t particle;
 };
 #else
@@ -1356,23 +1075,21 @@ struct tile_set_index_wrapper_storage<LayoutMode::AoS, Particles>
 
     template<typename PerTileParticles_t>
     tile_set_index_wrapper_storage(PerTileParticles_t p, std::size_t const i) _PHARE_ALL_FN_
-        : /*particles{p},*/
-          particle{&p->data()[i]}
+        : particle{&p->data()[i]}
     {
     }
 
     auto& operator*() _PHARE_ALL_FN_ { return *particle; }
     auto& operator*() const _PHARE_ALL_FN_ { return *particle; }
 
-    // per_tile_particles* particles;
     Particle_p particle;
 };
 
 template<auto layout_mode, typename Particles>
 struct tile_set_index_wrapper_storage
 {
-    // unused
-}; // default;
+    // unused default;
+};
 
 template<typename T>
 struct tile_set_index_wrapper_super
@@ -1448,165 +1165,148 @@ struct TileSetParticles<ParticlesSuper>::index_wrapper
 
 
 
-
 template<typename Particles, std::uint8_t impl>
-template<std::uint8_t PHASE, auto type>
-void TileSetSpan<Particles, impl>::sync() _PHARE_ALL_FN_
-{
-    PHARE_LOG_SCOPE(2, "TileSetSpan::sync()");
-
-    auto view = *this;
-    PHARE_WITH_MKN_GPU({
-        mkn::gpu::GDLauncher{particles_.size()}([=] _PHARE_ALL_FN_() mutable {
-            view.template sync_add_new<PHASE, type>();
-            __syncthreads();
-            view.template sync_rm_left<PHASE, type>();
-        });
-    })
-}
-
-template<typename Particles, std::uint8_t impl>
-template<std::uint8_t PHASE, auto type, typename... Args>
+template<typename... Args>
 void TileSetSpan<Particles, impl>::sync(Args&&... args) _PHARE_ALL_FN_
 {
     PHARE_LOG_SCOPE(2, "TileSetSpan::sync(stream)");
 
-    assert(this);
     auto& view = *this;
+
     if constexpr (Particles::alloc_mode == AllocatorMode::CPU)
     {
-        view.template sync_add_new<PHASE, type>();
-        view.template sync_rm_left<PHASE, type>();
+        for (std::size_t tidx = 0; tidx < particles_.size(); ++tidx)
+            sync_tile_add_new(tidx);
+
+        for (std::size_t tidx = 0; tidx < particles_.size(); ++tidx)
+            sync_tile_rm_left(tidx);
     }
     else if (Particles::alloc_mode == AllocatorMode::GPU_UNIFIED)
     {
-        if (!PHARE_HAVE_MKN_GPU)
-            throw std::runtime_error("NO GPU IMPL!");
+        static_assert(PHARE_HAVE_MKN_GPU);
 
-        // single
-        // PHARE_WITH_MKN_GPU({
-        //     auto const& [stream] = std::forward_as_tuple(args...);
-        //     mkn::gpu::GDLauncher<true>{particles_.size()}.stream(
-        //         stream, [=] _PHARE_ALL_FN_() mutable {
-        //             view.template sync_add_new<PHASE, type>();
-        //             __syncthreads();
-        //             view.template sync_rm_left<PHASE, type>();
-        //         });
-        // })
-
-
-        // split
         PHARE_WITH_MKN_GPU({
-            PHARE_LOG_LINE_SS(particles_.size());
             auto const& [stream] = std::forward_as_tuple(args...);
-            assert(stream());
-            mkn::gpu::GDLauncher<true>{particles_.size()}.stream(
-                stream,
-                [=] _PHARE_ALL_FN_() mutable { view.template sync_add_new<PHASE, type>(); });
-
-            stream.sync();
-            PHARE_LOG_LINE_SS("");
-            stream.sync();
-
-            mkn::gpu::GDLauncher<true>{particles_.size()}.stream(
-                stream,
-                [=] _PHARE_ALL_FN_() mutable { view.template sync_add_new<PHASE, type>(); });
-            PHARE_LOG_LINE_SS("");
+            mkn::gpu::GDLauncher<true>{particles_.size()} //
+                .stream(stream, [=] _PHARE_ALL_FN_() mutable {
+                    view.sync_tile_add_new(mkn::gpu::idx());
+                    __syncthreads();
+                    view.sync_tile_rm_left(mkn::gpu::idx());
+                });
         })
     }
+    else
+        throw std::runtime_error("no");
 }
 
 
 template<typename Particles, std::uint8_t impl>
-template<std::uint8_t PHASE, auto type>
-void TileSetSpan<Particles, impl>::sync_add_new() _PHARE_ALL_FN_
+void TileSetSpan<Particles, impl>::sync_tile_add_new(std::size_t const tidx) _PHARE_ALL_FN_
 {
-    // if constexpr (Particles::alloc_mode == AllocatorMode::CPU)
-    // {
-    //     throw std::runtime_error("CPU NEEDS IMPL!");
-    // }
-    // else if (Particles::alloc_mode == AllocatorMode::GPU_UNIFIED)
+    bool constexpr static ATOMIC = true;
+    bool constexpr static GPU    = alloc_mode == AllocatorMode::GPU_UNIFIED;
+
+    using Op = Operators<SIZE_T, ATOMIC, GPU>;
+
+    auto& tile     = particles_[tidx];
+    auto& real     = tile();
+    auto const bix = local_cell(tile.lower);
+
+    auto const& n_gaps = gap_idx_(bix);
     {
-        // #if PHARE_HAVE_MKN_GPU and PHARE_HAVE_THRUST
-
-        // auto const& kidx = mkn::gpu::idx();
-        // auto& tile       = particles_[kidx];
-        // auto& real       = tile();
-        // auto const bix   = local_cell(tile.lower);
-
-        // auto const& n_gaps = gap_idx_(bix);
-        // {
-        //     auto& gaps = gaps_(bix);
-        //     thrust::sort(thrust::seq, gaps.data(), gaps.data() + n_gaps /*, std::greater<>()*/);
-        // }
-
-        // auto& left       = left_(bix);
-        // auto const& gaps = gaps_(bix);
-        // for (std::size_t i = 0; i < n_gaps; ++i)
-        // {
-        //     auto const& gidx    = gaps[n_gaps - (1 + i)];
-        //     auto const& newcell = local_tile_cell(real.iCell(gidx));
-        //     auto const& cap     = cap_(newcell);
-        //     auto& nparts        = (*particles_.at(newcell))();
-        //     auto npidx          = nparts.size();
-
-        //     while (true)
-        //     {
-        //         if (npidx >= cap)
-        //             return;
-        //         auto inc = npidx + 1;
-        //         auto old = atomicCAS(nparts.size_address(), npidx, inc);
-        //         if (npidx != old)
-        //         {
-        //             ++npidx;
-        //             continue;
-        //         }
-        //         else
-        //             break;
-        //     }
-
-        //     nparts.assign(real, gidx, npidx);
-        //     ++left;
-        // }
-
-        // #endif // PHARE_HAVE_MKN_GPU and PHARE_HAVE_THRUST
+        auto& gaps = gaps_(bix);
+        sort(gaps.data(), gaps.data() + n_gaps /*, std::greater<>()*/);
     }
-}
 
-
-
-
-template<typename Particles, std::uint8_t impl>
-template<std::uint8_t PHASE, auto type>
-void TileSetSpan<Particles, impl>::sync_rm_left() _PHARE_ALL_FN_
-{
-    if constexpr (Particles::alloc_mode == AllocatorMode::CPU)
+    auto& left       = left_(bix);
+    auto const& gaps = gaps_(bix);
+    for (std::size_t i = 0; i < n_gaps; ++i)
     {
-        throw std::runtime_error("CPU NEEDS IMPL!");
-    }
-    else if (Particles::alloc_mode == AllocatorMode::GPU_UNIFIED)
-    {
-#if PHARE_HAVE_MKN_GPU
+        auto const& gidx    = gaps[n_gaps - (1 + i)];
+        auto const& newcell = local_tile_cell(real.iCell(gidx));
+        auto const& cap     = cap_(newcell);
+        auto& nparts        = (*particles_.at(newcell))();
+        auto npidx          = nparts.size();
 
-        auto const& kidx = mkn::gpu::idx();
-        auto& tile       = particles_[kidx];
-        auto& real       = tile();
-        auto const bix   = local_cell(tile.lower);
-        auto const& gaps = gaps_(bix);
-        auto& left       = left_(bix);
-        auto& gaps_size  = gap_idx_(bix);
-        add_into_(bix) -= left;
-        while (left)
+        while (true)
         {
-            auto const& pidx = gaps[gaps_size - 1];
-            real.assign(real.size() - 1, pidx);
-            real.pop_back();
-            --gaps_size;
-            --left;
+            if (npidx >= cap)
+                return;
+            auto inc = npidx + 1;
+            auto old = Op::compare_and_swap(nparts.size_address(), npidx, inc);
+            if (npidx != old)
+            {
+                ++npidx;
+                continue;
+            }
+            else
+                break;
         }
 
-#endif // PHARE_HAVE_MKN_GPU
+        nparts.assign(real, gidx, npidx);
+        ++left;
     }
+}
+
+
+
+template<typename Particles, std::uint8_t impl>
+void TileSetSpan<Particles, impl>::sync_tile_rm_left(std::size_t const tidx) _PHARE_ALL_FN_
+{
+    auto& tile       = particles_[tidx];
+    auto& real       = tile();
+    auto const bix   = local_cell(tile.lower);
+    auto const& gaps = gaps_(bix);
+    auto& left       = left_(bix);
+    auto& gaps_size  = gap_idx_(bix);
+    add_into_(bix) -= left;
+    while (left)
+    {
+        auto const& pidx = gaps[gaps_size - 1];
+        real.assign(real.size() - 1, pidx);
+        real.pop_back();
+        --gaps_size;
+        --left;
+    }
+}
+
+
+
+template<typename Particles, std::uint8_t impl>
+void TileSetVector<Particles, impl>::reset_index_wrapper_map()
+{
+    resize(p2c_, total_size);
+
+    auto const fill = [](auto p, auto o, auto s, auto b) { std::fill(p + o, p + o + s, b); };
+
+    std::size_t offset = 0;
+
+    on_tiles([&](auto& tile) {
+        auto const bix = local_cell(tile.lower);
+        auto const& cs = cell_size_(bix);
+        resize(gaps_(bix), cs);
+        off_sets_(bix) = offset;
+
+        if (cs)
+        {
+            if constexpr (alloc_mode == AllocatorMode::GPU_UNIFIED)
+            {
+                PHARE_WITH_THRUST( //
+                    thrust::fill(thrust::device, p2c_.begin() + offset, p2c_.begin() + offset + cs,
+                                 *bix));
+                PHARE_WITH_THRUST_ELSE(
+                    PHARE_LOG_LINE_SS("Thrust not found for TileSetVector<Particles, "
+                                      "impl>::reset_index_wrapper_map"); //
+                    fill(p2c_.begin(), offset, cs, bix);                 //
+                )
+            }
+            else
+                fill(p2c_.begin(), offset, cs, bix);
+        }
+
+        offset += cs;
+        cap_(bix) = tile().capacity();
+    });
 }
 
 

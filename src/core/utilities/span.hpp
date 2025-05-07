@@ -1,3 +1,5 @@
+// to #include "core/utilities/span.hpp"
+
 // C++11 version of https://en.cppreference.com/w/cpp/container/span
 #ifndef PHARE_CORE_UTILITIES_SPAN_HPP
 #define PHARE_CORE_UTILITIES_SPAN_HPP

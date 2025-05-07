@@ -9,6 +9,7 @@
 #include "core/numerics/interpolator/interpolator.hpp"
 #include "core/numerics/interpolator/interpolating.hpp"
 #include "core/numerics/ion_updater/ion_updater_def.hpp"
+#include "core/data/particles/particle_array_exporter.hpp"
 
 
 namespace PHARE::core::mkn
@@ -188,15 +189,16 @@ void IonUpdaterMultiTS<Ions, Electromag, GridLayout>::updateAndDepositAll_(Model
     in.streamer.host([&](auto const i) mutable {
         auto& view = in.views[i];
 
-        auto per_ghost = [&](auto& domain, auto& ghost) {
-            ParticleArrayService::copy_ghost_into_domain(ghost, domain, view.layout);
-            ghost.clear();
+        auto const per_pop = [](auto& pop) {
+            auto& domain = pop.domainParticles();
+            for (auto const& box : domain.ghost_box().remove(domain.box()))
+                move_particles(domain, pop.patchGhostParticles(), box,
+                               GridLayout::nbrParticleGhosts());
+            move_particles(pop.levelGhostParticles(), domain, domain.box());
         };
 
-        auto per_ghosts = [&](auto& domain, auto&... ghosts) { (per_ghost(domain, ghosts), ...); };
-
         for (auto& pop : view.ions)
-            per_ghosts(pop.domainParticles(), pop.patchGhostParticles(), pop.levelGhostParticles());
+            per_pop(pop);
     });
 
 
@@ -209,15 +211,17 @@ void IonUpdaterMultiTS<Ions, Electromag, GridLayout>::updateAndDepositAll_(Model
 
             for (auto& pop : view.ions)
             {
-                auto const pps = *pop.domainParticles();
-                PHARE_LOG_LINE_SS(pop.domainParticles().size() << " " << pps.size());
+                auto const domain = *pop.domainParticles();
+                auto const pghost = *pop.patchGhostParticles();
+                PHARE_LOG_LINE_SS(pop.domainParticles().size() << " " << domain.size());
                 Launcher launcher{1, 0};
                 launcher.b.x = kernel::warp_size();
-                launcher.g.x = pps().size();
+                launcher.g.x = domain().size();
                 launcher.ds  = 9 * 9 * 9 * 4 * 8; // !!!!
                 launcher.stream(in.streamer.streams[i],
                                 [=, layout = view.layout] __device__() mutable {
-                                    Interpolating_t::template on_tiles<field_type>(pps, layout);
+                                    Interpolating_t::template on_tiles<field_type>(domain, layout);
+                                    Interpolating_t::template on_tiles<field_type>(pghost, layout);
                                 });
                 in.streamer.streams[i].sync();
             }
@@ -231,8 +235,12 @@ void IonUpdaterMultiTS<Ions, Electromag, GridLayout>::updateAndDepositAll_(Model
 
             Interpolating_t interp;
             for (auto& pop : view.ions)
+            {
                 interp.particleToMesh(pop.domainParticles(), view.layout, pop.density(),
                                       pop.flux());
+                interp.particleToMesh(pop.patchGhostParticles(), view.layout, pop.density(),
+                                      pop.flux());
+            }
         });
     }
 

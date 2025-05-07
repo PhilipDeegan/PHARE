@@ -21,11 +21,7 @@ void append_particles(Src const& src, Dst& dst)
 
     Appending{0, src.size()}.template operator()<type>(src, dst);
 
-
-    PHARE_LOG_LINE_SS(dst.size());
-    PHARE_LOG_LINE_SS(old_size);
-    PHARE_LOG_LINE_SS(src.size());
-    PHARE_DEBUG_DO(assert(dst.size() == old_size + src.size());)
+    assert(dst.size() == old_size + src.size());
 }
 
 

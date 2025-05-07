@@ -6,8 +6,8 @@
 #include "core/utilities/box/box.hpp"
 #include "core/data/particles/particle_array_def.hpp"
 #include "core/data/particles/particle_array_appender.hpp"
+#include "core/data/particles/particle_array_partitioner.hpp"
 #include "core/data/particles/exporting/detail/def_exporting.hpp"
-#include <optional>
 
 
 namespace PHARE::core
@@ -19,39 +19,41 @@ using enum AllocatorMode;
 
 template<>
 template<typename Src, typename Dst, typename Box_t, typename Fn0>
-void ParticlesExporter<AoSMapped, CPU>::operator()(Src const& src, Dst& dst, Box_t const& box,
-                                                   Fn0 fn0)
+void ParticlesExporter<AoSMapped, CPU>::move_particles(Src& src, Dst& dst, Box_t const& box,
+                                                       Fn0 fn0)
 {
-    constexpr static std::uint16_t N = 256;
+    static_assert(false);
 
-    using ArrayParticleArray = typename Src::template array_type<N>;
-    using SpanParticleArray  = Src::Span_t;
+    // constexpr static std::uint16_t N = 256;
 
-    std::uint16_t big_buffer_cnt = 0;
-    ArrayParticleArray big_buffer;
-    SpanParticleArray span{big_buffer};
+    // using ArrayParticleArray = typename Src::template array_type<N>;
+    // using SpanParticleArray  = Src::Span_t;
 
-    auto const send = [&]() {
-        assert(big_buffer_cnt <= N);
-        span.resize(big_buffer_cnt);
-        append_particles<ParticleType::Domain>(span, dst);
-        big_buffer_cnt = 0;
-    };
+    // std::uint16_t big_buffer_cnt = 0;
+    // ArrayParticleArray big_buffer;
+    // SpanParticleArray span{big_buffer};
 
-    for (auto const& particle : src)
-    {
-        if (not isIn(particle, box))
-            continue;
+    // auto const send = [&]() {
+    //     assert(big_buffer_cnt <= N);
+    //     span.resize(big_buffer_cnt);
+    //     append_particles<ParticleType::Domain>(span, dst);
+    //     big_buffer_cnt = 0;
+    // };
 
-        auto&& [p_count, buffer] = fn0(particle);
-        if (big_buffer_cnt + p_count > N)
-            send();
-        std::copy(buffer.data(), buffer.data() + p_count, big_buffer.data() + big_buffer_cnt);
-        big_buffer_cnt += p_count;
-    }
+    // for (auto const& particle : src)
+    // {
+    //     if (not isIn(particle, box))
+    //         continue;
 
-    if (big_buffer_cnt)
-        send();
+    //     auto&& [p_count, buffer] = fn0(particle);
+    //     if (big_buffer_cnt + p_count > N)
+    //         send();
+    //     std::copy(buffer.data(), buffer.data() + p_count, big_buffer.data() + big_buffer_cnt);
+    //     big_buffer_cnt += p_count;
+    // }
+
+    // if (big_buffer_cnt)
+    //     send();
 }
 
 
@@ -169,6 +171,52 @@ void ParticlesExporter<AoSTS, GPU_UNIFIED>::operator()(Src const& src, Dst& dst,
                                                        Fn0 fn0, Fn1 fn1)
 {
     ParticlesExporter<AoSTS, CPU>{}(src, dst, box, fn0, fn1);
+}
+
+
+template<>
+template<typename Src, typename Dst, typename Box_t>
+void ParticlesExporter<AoSTS, CPU>::move_particles(Src& src, Dst& dst, Box_t const& box,
+                                                   std::size_t const growby)
+{
+    static_assert(Src::layout_mode == Dst::layout_mode);
+    assert(src().size() == dst().size());
+
+    for (std::size_t tidx = 0; tidx < src().size(); ++tidx)
+    {
+        auto& src_tile     = src()[tidx];
+        auto const src_box = grow(src_tile, growby);
+        if (!(box * src_box))
+            continue;
+
+        auto& dst_tile        = dst()[tidx];
+        auto const not_in_box = partition_particles_not_in(src_tile(), box);
+        auto const start      = not_in_box.size();
+        auto const end        = src_tile().size();
+
+        if (auto const size = end - start)
+            append_particles<ParticleType::Domain>(src_tile().view(start, size), dst_tile());
+
+        src_tile().resize(not_in_box.size());
+    }
+}
+
+
+template<> // slow
+template<typename Src, typename Dst, typename Box_t>
+void ParticlesExporter<AoSTS, GPU_UNIFIED>::move_particles(Src& src, Dst& dst, Box_t const& box,
+                                                           std::size_t const growby)
+{
+    ParticlesExporter<AoSTS, CPU>{}.move_particles(src, dst, box, growby);
+}
+
+
+template<> // slow
+template<typename Src, typename Dst, typename Box_t, typename Fn0>
+void ParticlesExporter<AoSTS, GPU_UNIFIED>::move_particles(Src& src, Dst& dst, Box_t const& box,
+                                                           Fn0 fn0)
+{
+    static_assert(false);
 }
 
 

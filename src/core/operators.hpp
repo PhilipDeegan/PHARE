@@ -2,17 +2,14 @@
 #define PHARE_CORE_OPERATORS_HPP
 
 #include "core/def.hpp"
+#include "core/utilities/span.hpp"
 
 #ifndef PHARE_HAVE_GPU
 #define PHARE_HAVE_GPU 0
 #endif
 
-// #include "hip/amd_detail/amd_hip_atomic.h"
 #include <atomic>
 
-#if PHARE_HAVE_GPU
-// #include <cuda_runtime.h>
-#endif
 
 namespace PHARE::core
 {
@@ -67,16 +64,33 @@ struct Operators
         }
         else if constexpr (atomic)
         {
-            throw std::runtime_error("finish");
-            // auto& atomic_t = *reinterpret_cast<std::atomic<T>*>(&t);
-            // T tmp          = atomic_t.load();
-            // while (!atomic_t.compare_exchange_weak(tmp, tmp + v)) {}
+            // update to C++20 atomic_ref (same as below but less hacky)
+            auto& atomic_t = *reinterpret_cast<std::atomic<T>*>(&t);
+            T tmp          = atomic_t.load();
+            while (!atomic_t.compare_exchange_weak(tmp, tmp + 1)) {}
+            return tmp;
         }
         else
         {
             T tmp = t;
             ++t;
             return tmp;
+        }
+    }
+
+    auto static compare_and_swap(T* addr, T compare, T value) _PHARE_ALL_FN_
+    {
+        if constexpr (GPU and atomic)
+        {
+            return atomicCAS(addr, compare, value);
+        }
+        else if constexpr (atomic)
+        {
+            auto& atomic_t = *reinterpret_cast<std::atomic<T>*>(addr);
+            T old          = atomic_t.load();
+            if (atomic_t.compare_exchange_weak(compare, value))
+                return value;
+            return old;
         }
     }
 

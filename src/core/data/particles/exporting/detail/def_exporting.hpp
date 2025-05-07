@@ -18,8 +18,10 @@ struct ParticlesExporter
     auto constexpr static layout_mode = layout_mde;
     auto constexpr static alloc_mode  = alloc_mde;
 
+    template<typename Src, typename Dst, typename Box_t>
+    void move_particles(Src& src, Dst& dst, Box_t const& box, std::size_t const growby = 0);
     template<typename Src, typename Dst, typename Box_t, typename Fn0>
-    void operator()(Src const& src, Dst& dst, Box_t const& box, Fn0 fn0);
+    void move_particles(Src& src, Dst& dst, Box_t const& box, Fn0 fn0);
 
     template<typename Src, typename Dst, typename Box_t, typename Refiner, typename Transformer>
     void operator()(Src const&, Dst&, Box_t const&, Refiner, Transformer);
