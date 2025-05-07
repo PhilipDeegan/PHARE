@@ -340,6 +340,7 @@ private:
         //     return advection2D_(Ve, Te, index);
         // if constexpr (dim == 3)
         //     return advection3D_(Ve, Te, index);
+        return 0.;
     }
 
     template<typename Field, typename VecField>

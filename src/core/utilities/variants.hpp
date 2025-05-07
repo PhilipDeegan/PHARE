@@ -12,8 +12,7 @@ namespace PHARE::core
 template<typename T>
 auto ptr_or_null_for_type()
 {
-    using Ret = std::conditional_t<std::is_const_v<T>, void const*, void*>;
-    return [](T& arg) mutable -> Ret { return &arg; };
+    return [](T& arg) mutable -> void* { return const_cast<std::decay_t<T>*>(&arg); };
 }
 
 template<typename... Ts>
