@@ -204,7 +204,7 @@ protected:
     FluxComputer flux_;
     Field Pe_;
 
-    using Resources = std::variant<VecField>;
+    using Resources = std::variant<VecField, Field>;
     std::vector<Resources> resources;
 };
 
@@ -269,6 +269,7 @@ class PolytropicElectronPressureClosure : public ElectronPressureClosure<FluxCom
 
 public:
     using field_type = Field;
+    using Super::resources;
 
     PolytropicElectronPressureClosure(PHARE::initializer::PHAREDict const& dict,
                                       FluxComputer const& flux)
@@ -276,6 +277,8 @@ public:
         , gamma_{dict["pressure_closure"]["Gamma"].template to<double>()}
         , Pe_init_{dict["pressure_closure"]["Pe"].template to<initializer::InitFunction<dim>>()}
     {
+        Field Te_{"Te", HybridQuantity::Scalar::P};
+        resources.emplace_back(Te_);
     }
 
     void initialize(GridLayout const& layout) override
@@ -293,15 +296,13 @@ public:
         auto const& N_ = this->flux_.density();
         auto const& V_ = this->flux_.velocity();
 
-        auto T_ = this->Pe_;  // TODO not very nice... I want to create an empty field of same size as Pe_
+        Field Te_ = get_as_ref_or_throw<Field>(resources);
 
-        std::transform (this->Pe_.begin(), this->Pe_.end(), N_.begin(), T_.begin(), [this](auto p, auto n) { return  p/n ; });
+        std::transform (this->Pe_.begin(), this->Pe_.end(), N_.begin(), Te_.begin(), [this](auto p, auto n) { return  p/n ; });
 
 
 
-        Field Tnew{"Te", HybridQuantity::Scalar::P};
-
-        layout.evalOnBox(Tnew, [&](auto&... ijk) mutable { this->template P_Eq_(PressurePack{Tnew, V_, T_}, ijk...); });
+        layout.evalOnBox(Te_, [&](auto&... ijk) mutable { this->template P_Eq_(PressurePack{V_, Te_}, ijk...); });
 
 
 
@@ -313,38 +314,38 @@ private:
     double const gamma_ = 5. / 3.;
     initializer::InitFunction<dim> Pe_init_;
 
+    template<typename Field, typename VecField>
     struct PressurePack
     {
-        Field const &Tnew;
         VecField const &V;
-        Field const &T;
+        Field &T;
     };
 
-    template<typename... IDXs>
-    void P_Eq_(PressurePack&& pack, IDXs const&... ijk) const
+    template<typename PressurePack>
+    void P_Eq_(PressurePack&& pack, auto&... ijk) const
     {
-        auto const& [Tnew, V, T] = pack;
+        auto const& [V, T] = pack;
 
-        Tnew(ijk...) = T(ijk...);
-        // Tnew(ijk...) = advection_(V, T, {ijk...});
+        // Tnew(ijk...) = T(ijk...);
+        T(ijk...) = advection_(V, T, ijk...);
         //              + compression_(V, T, {ijk...});
     }
 
-    template<typename... IDXs>
-    auto advection_(VecField const& Ve, Field const& Te, IDXs const&... ijk) const
+    template<typename Field, typename VecField>
+    auto advection_(VecField const& Ve, Field const& Te, auto&... ijk) const
     {
         if constexpr (dim == 1)
-            return advection1D_(Ve, Te, {ijk...});
-        if constexpr (dim == 2)
-            return advection2D_(Ve, Te, {ijk...});
-        if constexpr (dim == 3)
-            return advection3D_(Ve, Te, {ijk...});
+            return advection1D_(Ve, Te, ijk...);
+        // if constexpr (dim == 2)
+        //     return advection2D_(Ve, Te, index);
+        // if constexpr (dim == 3)
+        //     return advection3D_(Ve, Te, index);
     }
 
-    template<auto component, typename VecField>
-    auto advection1D_(VecField const& Ve, Field const& Te, MeshIndex<1> index) const
+    template<typename Field, typename VecField>
+    auto advection1D_(VecField const& Ve, Field const& Te, auto&... ijk) const
     {
-          return 0.0*Te(index[0]);
+          return 0.0*Te(ijk...);
     }
 
 };

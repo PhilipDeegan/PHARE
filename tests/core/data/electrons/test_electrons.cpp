@@ -219,12 +219,17 @@ struct ElectronsFixture
 
         auto const& closure_name
             = dict["electrons"]["pressure_closure"]["name"].template to<std::string>();
+
+        auto visitors = overloads{[&](VecFieldND& vf) { B.set_on(vf); },
+                                  [](auto&) { },
+                                  };
+
         if (closure_name == "CGL")
         {
             auto& variants = pc.getRunTimeResourcesViewList();
             EXPECT_EQ(variants.size(), 1);
             for (auto& var : variants)
-                std::visit([&](VecFieldND& vf) { B.set_on(vf); }, var);
+                std::visit(visitors, var);
         }
 
         auto const& [_, P] = pc.getCompileTimeResourcesViewList();
