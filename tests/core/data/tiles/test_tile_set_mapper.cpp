@@ -89,7 +89,6 @@ TYPED_TEST(TileMappingTest, view_outputs)
     auto static constexpr dimension = TestFixture::dimension;
     using TileSet_t                 = TestFixture::TileSet_t;
     using Tile_t                    = TileSet_t::value_type;
-    using TileSet_t                 = TestTileSet<Tile_t>;
     using Box_t                     = TileSet_t::Box_t;
 
 
