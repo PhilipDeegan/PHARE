@@ -45,7 +45,7 @@ namespace amr
     class FieldData : public SAMRAI::hier::PatchData
     {
         using Super      = SAMRAI::hier::PatchData;
-        using value_type = Grid_t::value_type;
+        using value_type = Grid_t::type;
         using SetEqualOp = core::Equals<value_type>;
 
         // not the best but works for the moment

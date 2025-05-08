@@ -7,7 +7,7 @@
 #include "core/utilities/span.hpp"
 #include "core/utilities/box/box.hpp"
 #include "core/data/tiles/tile_set.hpp"
-#include "core/data/field/field_box.hpp"
+// #include "core/data/field/field_box.hpp"
 #include "core/utilities/types.hpp"
 
 
@@ -18,6 +18,9 @@
 
 namespace PHARE::core
 {
+
+template<typename Field_t>
+class FieldBox;
 
 template<typename GridLayout_t, typename NdArray_t, typename PhysicalQuantity, auto alloc_mde>
 class FieldTile : public Box<std::int32_t, NdArray_t::dimension>
@@ -140,6 +143,11 @@ struct GridTile : public FieldTile<GridLayout_t, typename NdArray_t::View, Physi
     auto& operator()() const { return arr; }
     Super& operator*() _PHARE_ALL_FN_ { return *this; }
     Super const& operator*() const _PHARE_ALL_FN_ { return *this; }
+
+
+
+    auto& operator()(std::array<std::uint32_t, dimension> const& idx) { return arr(idx); }
+    auto& operator()(std::array<std::uint32_t, dimension> const& idx) const { return arr(idx); }
 
 
     template<typename... IJK>
@@ -311,8 +319,10 @@ public:
     using physical_quantity_type = PhysicalQuantity;
     using value_type             = GridTile<GridLayout_t, NdArray_t, PhysicalQuantity>;
     using Super::operator[];
+    using View::operator();
 
     auto constexpr static alloc_mode = NdArray_t::allocator_mode;
+    auto constexpr static dimension  = View::dimension;
 
     template<typename Dict_t>
     GridTileSet(Dict_t const& dict, GridLayout_t const& layout, PhysicalQuantity const& qty)
@@ -344,18 +354,18 @@ public:
             tile().fill(v);
     }
 
-    template<typename... IJK>
-    auto& operator()(IJK const&... ijk)
-        requires(sizeof...(IJK) == NdArray_t::dimension)
-    {
-        return (**this)(to_point<std::uint32_t>(ijk...));
-    }
-    template<typename... IJK>
-    auto& operator()(IJK const&... ijk) const
-        requires(sizeof...(IJK) == NdArray_t::dimension)
-    {
-        return (**this)(to_point<std::uint32_t>(ijk...));
-    }
+    // template<typename... IJK>
+    // auto& operator()(IJK const&... ijk)
+    //     requires(sizeof...(IJK) == NdArray_t::dimension)
+    // {
+    //     return (**this)(to_point<std::uint32_t>(ijk...));
+    // }
+    // template<typename... IJK>
+    // auto& operator()(IJK const&... ijk) const
+    //     requires(sizeof...(IJK) == NdArray_t::dimension)
+    // {
+    //     return (**this)(to_point<std::uint32_t>(ijk...));
+    // }
 
     auto& operator()() { return super()(); }
     auto& operator()() const { return super()(); }

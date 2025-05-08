@@ -25,17 +25,11 @@ clargs(){
 # FILE="tests/amr/data/particles/copy_overlap/test_particledata_copy_periodicNd.cpp"
 # FILE="tests/amr/data/particles/test_particles_data.cpp"
 FILE="tests/amr/data/particles/refine/test_particles_data_split.cpp"
-FILE="tests/core/data/vecfield/test_vecfield_init.cpp"
 FILE="tests/core/data/grid/test_grid_tile_set.cpp"
-FILE="tests/core/data/particles/sorting/test_particle_sorting.cpp"
-FILE="tests/core/numerics/ohm/test_tileset_ohm.cpp"
-FILE="tests/core/numerics/ampere/test_tileset_ampere.cpp"
-FILE="tests/core/numerics/faraday/test_tileset_faraday.cpp"
 FILE="tests/core/numerics/ion_updater/test_updater_pp_main.cpp"
-FILE="tests/core/data/test_vector.cpp"
 FILE="tests/core/numerics/ion_updater/test_multi_updater.cpp"
 FILE="tests/core/data/tiles/test_tile_set_ghost_box_overlaps.cpp"
-
+FILE="tests/core/data/tiles/test_tile_set_mapper.cpp"
 
 TEST=" -M ${FILE} "
 CARGS="${CARGS} $(clargs)"
@@ -62,7 +56,9 @@ CARGS="${CARGS} $(clargs)"
 (
   set -xe
   arr=(
+    tests/core/data/test_vector.cpp
     tests/core/data/tiles/test_tile.cpp
+    tests/core/data/vecfield/test_vecfield_init.cpp
     tests/core/data/particles/test_particles_construction.cpp
     tests/core/data/particles/sorting/test_particle_sorting.cpp
     tests/core/data/particles/test_particles_selecting.cpp

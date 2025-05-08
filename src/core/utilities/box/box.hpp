@@ -10,6 +10,8 @@
 
 
 #include <limits>
+#include <tuple>
+#include <utility>
 #include <vector>
 #include <cstddef>
 #include <iostream>
@@ -210,6 +212,7 @@ struct Box
 
 
     std::vector<Box> remove(Box const& that) const;
+    std::vector<Box> remove_all(auto&&... them) const;
     Box merge(Box const& that) const;
     Box remove_edge(Box const& that) const;
 };
@@ -506,6 +509,42 @@ std::vector<Box<Type, dim>> Box<Type, dim>::remove(Box<Type, dim> const& to_remo
     return remaining;
 }
 
+
+template<typename Type, std::size_t dim>
+std::vector<Box<Type, dim>> Box<Type, dim>::remove_all(auto&&... them) const
+{
+    auto const add_to_vec = [](auto& vec, auto&& res) {
+        for (auto const& r : res)
+            vec.emplace_back(r);
+    };
+
+    auto const&& arr = std::array{them...};
+
+    std::vector<Box<Type, dim>> remaining = this->remove(arr[0]);
+    for (std::uint16_t a = 1; a < arr.size(); ++a)
+    {
+        auto const& to_rm = arr[a];
+        std::vector<Box<Type, dim>> tmp;
+        std::vector<std::size_t> remove;
+
+        for (std::uint16_t r = 0; r < remaining.size(); ++r)
+        {
+            auto const& rem = remaining[r];
+            if (rem * to_rm)
+            {
+                remove.emplace_back(r);
+                add_to_vec(tmp, rem.remove(to_rm));
+            }
+        }
+
+        for (auto it = remove.rbegin(); it != remove.rend(); ++it)
+            remaining.erase(remaining.begin() + *it);
+
+        add_to_vec(remaining, tmp);
+    }
+
+    return remaining;
+}
 
 
 template<typename Type, std::size_t dim>

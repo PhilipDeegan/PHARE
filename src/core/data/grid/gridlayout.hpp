@@ -775,20 +775,17 @@ namespace core
          * @brief localToAMR returns the AMR index associated with the given local one.
          * This method only deals with **cell** indexes.
          */
-        template<typename T>
-        NO_DISCARD auto localToAMR(Point<T, dimension> const& localPoint) const
+
+        NO_DISCARD auto localToAMR(Point<std::uint32_t, dimension> const& localPoint) const
         {
-            static_assert(std::is_integral_v<T>, "Error, must be MeshIndex (integral Point)");
-            Point<T, dimension> pointAMR;
+            Point<int, dimension> pointAMR;
 
             // any direction, it's the same because we want cells
             auto localStart = physicalStartIndex(QtyCentering::dual, Direction::X);
 
-            //
             for (auto i = 0u; i < dimension; ++i)
-            {
                 pointAMR[i] = localPoint[i] + (AMRBox_.lower[i] - localStart);
-            }
+
             return pointAMR;
         }
 
@@ -797,16 +794,10 @@ namespace core
          * @brief localToAMR returns the AMR box associated with the given local one.
          * This method only deals with **cell** indexes.
          */
-        template<typename T>
-        NO_DISCARD auto localToAMR(Box<T, dimension> const& localBox) const
+
+        NO_DISCARD auto localToAMR(Box<std::uint32_t, dimension> const& localBox) const
         {
-            static_assert(std::is_integral_v<T>, "Error, must be MeshIndex (integral Point)");
-            auto AMRBox = Box<T, dimension>{};
-
-            AMRBox.lower = localToAMR(localBox.lower);
-            AMRBox.upper = localToAMR(localBox.upper);
-
-            return AMRBox;
+            return Box<int, dimension>{localToAMR(localBox.lower), localToAMR(localBox.upper)};
         }
 
 
