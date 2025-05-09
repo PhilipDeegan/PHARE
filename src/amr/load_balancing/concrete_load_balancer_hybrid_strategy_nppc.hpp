@@ -76,8 +76,8 @@ void ConcreteLoadBalancerHybridStrategyNPPC<PHARE_T>::compute(
         // The lb_view is a CellData, meaning that it is dual as the index of an amr box
         core::Box<std::uint32_t, dimension> local_box{
             core::Point{core::ConstArray<std::uint32_t, dimension>()},
-            core::Point{
-                core::generate([](auto const& nCell) { return nCell - 1; }, layout.nbrCells())}};
+            core::Point{core::generate_from([](auto const& nCell) { return nCell - 1; },
+                                            layout.nbrCells())}};
 
         auto amr_iter = layout.AMRBox().begin();
         auto lcl_iter = local_box.begin();

@@ -4,6 +4,7 @@
 #include <string>
 
 #include "initializer/data_provider.hpp"
+#include "core/data/grid/grid.hpp" // !?!
 #include "core/models/hybrid_state.hpp"
 #include "amr/physical_models/physical_model.hpp"
 #include "core/data/ions/particle_initializers/particle_initializer_factory.hpp"
@@ -32,6 +33,7 @@ public:
     using electrons_t            = Electrons;
     using patch_t                = typename AMR_Types::patch_t;
     using level_t                = typename AMR_Types::level_t;
+    using State_t                = typename core::HybridState<Electromag, Ions, Electrons>;
     using gridlayout_type        = GridLayoutT;
     using electromag_type        = Electromag;
     using vecfield_type          = typename Electromag::vecfield_type;
@@ -40,17 +42,17 @@ public:
     using ions_type              = Ions;
     using particle_array_type    = typename Ions::particle_array_type;
     using resources_manager_type = amr::ResourcesManager<gridlayout_type, grid_type>;
-    using ParticleInitializerFactory
+    using ParticleInitializerFactory_t
         = core::ParticleInitializerFactory<particle_array_type, gridlayout_type>;
 
-    static const inline std::string model_name = "HybridModel";
+    static inline std::string const model_name = "HybridModel";
 
 
-    core::HybridState<Electromag, Ions, Electrons> state;
+    State_t state;
     std::shared_ptr<resources_manager_type> resourcesManager;
 
 
-    virtual void initialize(level_t& level) override;
+    void initialize(level_t& level) override;
 
 
     /**
@@ -70,7 +72,7 @@ public:
      * @brief fillMessengerInfo describes which variables of the model are to be initialized or
      * filled at ghost nodes.
      */
-    virtual void fillMessengerInfo(std::unique_ptr<amr::IMessengerInfo> const& info) const override;
+    void fillMessengerInfo(std::unique_ptr<amr::IMessengerInfo> const& info) const override;
 
 
     NO_DISCARD auto setOnPatch(patch_t& patch)
@@ -132,7 +134,7 @@ void HybridModel<GridLayoutT, Electromag, Ions, Electrons, AMR_Types, Grid_t>::i
         for (auto& pop : ions)
         {
             auto const& info         = pop.particleInitializerInfo();
-            auto particleInitializer = ParticleInitializerFactory::create(info);
+            auto particleInitializer = ParticleInitializerFactory_t::create(info);
             particleInitializer->loadParticles(pop.domainParticles(), layout);
         }
 
@@ -166,7 +168,6 @@ void HybridModel<GridLayoutT, Electromag, Ions, Electrons, AMR_Types, Grid_t>::f
     hybridInfo.ghostCurrent.push_back(core::VecFieldNames{state.J});
     hybridInfo.ghostBulkVelocity.push_back(hybridInfo.modelIonBulkVelocity);
 
-
     auto transform_ = [](auto& ions, auto& inserter) {
         std::transform(std::begin(ions), std::end(ions), std::back_inserter(inserter),
                        [](auto const& pop) { return pop.name(); });
@@ -175,6 +176,12 @@ void HybridModel<GridLayoutT, Electromag, Ions, Electrons, AMR_Types, Grid_t>::f
     transform_(state.ions, hybridInfo.levelGhostParticlesOld);
     transform_(state.ions, hybridInfo.levelGhostParticlesNew);
     transform_(state.ions, hybridInfo.patchGhostParticles);
+
+    for (auto const& pop : state.ions)
+    {
+        hybridInfo.ghostFlux.emplace_back(pop.flux());
+        hybridInfo.sumBorderFields.emplace_back(pop.density().name());
+    }
 }
 
 

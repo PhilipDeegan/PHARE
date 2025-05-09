@@ -184,13 +184,13 @@ struct TestTagger : public ::testing::Test
 
     GridLayoutT layout;
 
-    UsableVecField<dim> B, E;
+    UsableVecField<GridLayoutT> B, E;
 
     SinglePatchHybridModel model;
     std::vector<int> tags;
 
     TestTagger()
-        : layout{TestGridLayout<GridLayoutT>::make(20)}
+        : layout{TestGridLayout<GridLayoutT>::make(20u)}
         , B{"EM_B", layout, HybridQuantity::Vector::B}
         , E{"EM_E", layout, HybridQuantity::Vector::E}
         , model{createDict<dim>()}

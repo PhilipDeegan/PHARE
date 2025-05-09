@@ -11,6 +11,7 @@
 #include "core/data/ions/ions.hpp"
 #include "core/numerics/ampere/ampere.hpp"
 #include "core/numerics/interpolator/interpolator.hpp"
+#include "core/numerics/interpolator/interpolating.hpp"
 #include "core/numerics/moments/moments.hpp"
 #include "core/numerics/ohm/ohm.hpp"
 #include "initializer/data_provider.hpp"
@@ -33,6 +34,10 @@ namespace solver
         static constexpr auto dimension    = GridLayoutT::dimension;
         static constexpr auto interp_order = GridLayoutT::interp_order;
 
+        using ParticleArray_t = HybridModel::particle_array_type;
+        using Interpolating_t
+            = core::Interpolating<ParticleArray_t, interp_order, /*atomic_interp*/ false>;
+
         PHARE::core::Ohm<GridLayoutT> ohm_;
         PHARE::core::Ampere<GridLayoutT> ampere_;
 
@@ -48,7 +53,9 @@ namespace solver
                                 amr::IMessenger<IPhysicalModelT>& messenger, double initDataTime,
                                 bool isRegridding) override
         {
-            core::Interpolator<dimension, interp_order> interpolate_;
+            // core::Interpolator<dimension, interp_order> interpolate_;
+            Interpolating_t interpolate_;
+
             auto& hybridModel = static_cast<HybridModel&>(model);
             auto& level       = amr_types::getLevel(*hierarchy, levelNumber);
 
@@ -79,8 +86,7 @@ namespace solver
                 }
             }
 
-            // now all particles are here
-            // we must compute moments.
+            // now all particles are here, we must compute moments.
 
             for (auto& patch : level)
             {
@@ -91,7 +97,18 @@ namespace solver
 
                 core::resetMoments(ions);
                 core::depositParticles(ions, layout, interpolate_, core::DomainDeposit{});
-                core::depositParticles(ions, layout, interpolate_, core::PatchGhostDeposit{});
+            }
+
+            hybMessenger.fillFluxBorders(hybridModel.state.ions, level, initDataTime);
+            hybMessenger.fillDensityBorders(hybridModel.state.ions, level, initDataTime);
+
+
+            for (auto& patch : level)
+            {
+                auto& ions             = hybridModel.state.ions;
+                auto& resourcesManager = hybridModel.resourcesManager;
+                auto dataOnPatch       = resourcesManager->setOnPatch(*patch, ions);
+                auto layout            = amr::layoutFromPatch<GridLayoutT>(*patch);
 
                 if (!isRootLevel(levelNumber))
                 {
