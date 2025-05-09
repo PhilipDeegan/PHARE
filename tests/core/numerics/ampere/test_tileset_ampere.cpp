@@ -125,13 +125,6 @@ struct TestParam
     auto constexpr static impl        = _impl;
 };
 
-auto inline static field_dict(std::string const& name)
-{
-    initializer::PHAREDict dict;
-    dict["tile_size"] = tile_size;
-    dict["name"]      = name;
-    return dict;
-}
 
 
 

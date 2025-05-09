@@ -56,14 +56,7 @@ struct InitFunctor
     std::size_t idx = 0;
 };
 
-auto static field_dict(std::string const& name)
-{
-    initializer::PHAREDict dict;
-    dict["tile_size"]    = tile_size;
-    dict["interp_order"] = interp;
-    dict["name"]         = name;
-    return dict;
-}
+
 
 template<std::size_t dim>
 auto static em_dict()
@@ -107,13 +100,7 @@ struct Patch
         }
     }
 
-    Grid_t make_grid(std::string const& name, auto qty) const
-    {
-        if constexpr (TestParam::layout_mode == LayoutMode::AoSTS)
-            return {field_dict(name), layout, qty};
-        else
-            return {name, layout, qty};
-    }
+    Grid_t make_grid(std::string const& name, auto qty) const { return {name, layout, qty}; }
 
     GridLayout_t const layout;
 

@@ -36,7 +36,6 @@ auto constexpr nb_split_parts(auto const dim)
 auto static particles_dict()
 {
     initializer::PHAREDict dict;
-    dict["tile_size"]    = std::size_t{cells};
     dict["interp_order"] = interp;
     return dict;
 }

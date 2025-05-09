@@ -1,6 +1,7 @@
 #ifndef PHARE_CORE_DATA_TILES_TILE_SET_MAPPER_HPP
 #define PHARE_CORE_DATA_TILES_TILE_SET_MAPPER_HPP
 
+#include "core/logger.hpp"
 #include "core/utilities/types.hpp"
 #include "core/utilities/point/point.hpp"
 
@@ -31,10 +32,8 @@ struct Tiler<TileSet_t, 0> : public ATiler<TileSet_t>
     template<typename... Args>
     auto f(Args&&... args);
 
-
-    std::array<std::uint32_t, ATiler<TileSet_t>::dimension> const& shape = this->tile_set.shape();
-    std::array<std::size_t, ATiler<TileSet_t>::dimension> const& tile_size
-        = this->tile_set.tile_size();
+    std::array<std::uint32_t, ATiler<TileSet_t>::dimension> const& shape;
+    std::array<std::size_t, ATiler<TileSet_t>::dimension> const& tile_size;
 };
 
 template<typename TileSet_t>
@@ -522,13 +521,144 @@ auto Tiler<TileSet_t, 2>::f(Args&&... args)
     }
 }
 
-template<std::uint8_t impl = 0, typename TileSet_t, typename... Args>
-void tile_set_make_tiles(TileSet_t& tile_set, Args&&... args)
+template<typename TileSet_t>
+struct Tiler<TileSet_t, 3> : public ATiler<TileSet_t>
 {
-    Tiler<TileSet_t, impl>{tile_set}.f(args...);
+    template<typename... Args>
+    auto f(Args&&... args);
+};
+
+template<typename TileSet_t>
+template<typename... Args>
+auto Tiler<TileSet_t, 3>::f(Args&&... args)
+{
+    auto constexpr static dim = TileSet_t::dimension;
+    using Box_t               = TileSet_t::Box_t;
+    auto const& shape         = this->box.shape();
+    auto& tiles               = this->tile_set();
+
+    auto split_1d = [](int const length) {
+        if (length % 3 == 0)
+            if (auto part = length / 3; part < 8)
+                return std::vector<int>(part, 3);
+
+        if (length < 8)
+            return std::vector<int>{length};
+
+        auto const border = 4;
+        auto middle       = length - 2 * border;
+        std::vector<int> sizes{border};
+
+        while (middle >= 7)
+            if ((middle - 7) % 3 == 0)
+            {
+                sizes.emplace_back(7);
+                middle -= 7;
+            }
+            else
+            {
+                auto const mod = 3 + middle % 2;
+                sizes.emplace_back(mod);
+                middle -= mod;
+            }
+
+        while (middle >= 5)
+            if ((middle - 5) % 3 == 0)
+            {
+                sizes.emplace_back(5);
+                middle -= 5;
+            }
+            else
+            {
+                sizes.emplace_back(3);
+                middle -= 3;
+            }
+
+        if (middle > 0)
+            sizes.back() += middle;
+
+        sizes.push_back(border);
+        return sizes;
+    };
+
+    auto const get_ranges = [](auto const& sizes) {
+        std::vector<std::pair<std::size_t, std::size_t>> ranges;
+        auto current = 0;
+        for (auto const s : sizes)
+        {
+            ranges.emplace_back(current, current + s);
+            current += s;
+        }
+        return ranges;
+    };
+
+    auto const& box = this->box;
+
+    auto const subdivide_1d = [&](auto const size_x) {
+        auto const x_sizes  = split_1d(size_x);
+        auto const x_ranges = get_ranges(x_sizes);
+        for (auto const& [xlo, xhi] : x_ranges)
+            tiles.emplace_back(Box_t{Point{xlo} + box.lower, Point{xhi} + box.lower - 1}, args...);
+    };
+
+    auto const subdivide_2d = [&](auto const size_x, auto const size_y) {
+        auto const x_sizes  = split_1d(size_x);
+        auto const y_sizes  = split_1d(size_y);
+        auto const x_ranges = get_ranges(x_sizes);
+        auto const y_ranges = get_ranges(y_sizes);
+        for (auto const& [xlo, xhi] : x_ranges)
+            for (auto const& [ylo, yhi] : y_ranges)
+                tiles.emplace_back(
+                    Box_t{Point{xlo, ylo} + box.lower, Point{xhi, yhi} + box.lower - 1}, args...);
+    };
+
+    auto const subdivide_3d = [&](auto const size_x, auto const size_y, auto const size_z) {
+        auto const x_sizes  = split_1d(size_x);
+        auto const y_sizes  = split_1d(size_y);
+        auto const z_sizes  = split_1d(size_z);
+        auto const x_ranges = get_ranges(x_sizes);
+        auto const y_ranges = get_ranges(y_sizes);
+        auto const z_ranges = get_ranges(z_sizes);
+        tiles.reserve(x_ranges.size() * y_ranges.size() * z_ranges.size());
+        std::size_t count = 0;
+        for (auto const& [xlo, xhi] : x_ranges)
+            for (auto const& [ylo, yhi] : y_ranges)
+                for (auto const& [zlo, zhi] : z_ranges)
+                    tiles.emplace_back(Box_t{Point{xlo, ylo, zlo} + box.lower,
+                                             Point{xhi, yhi, zhi} + box.lower - 1},
+                                       args...),
+                        ++count;
+
+        assert(tiles.capacity() == count);
+        PHARE_LOG_LINE_SS(tiles.size());
+        PHARE_LOG_LINE_SS(tiles.capacity());
+        PHARE_LOG_LINE_SS(count);
+    };
+
+    if constexpr (dim == 1)
+        subdivide_1d(shape[0]);
+    if constexpr (dim == 2)
+        subdivide_2d(shape[0], shape[1]);
+    if constexpr (dim == 3)
+        subdivide_3d(shape[0], shape[1], shape[2]);
 }
 
+template<std::uint8_t impl = 3, typename TileSet_t, typename... Args>
+void tile_set_make_tiles(TileSet_t& tile_set, Args&&... args)
+{
+    // PHARE_LOG_LINE_SS(tile_set().size());
+    Tiler<TileSet_t, impl>{tile_set}.f(args...);
+    // PHARE_LOG_LINE_SS(tile_set().size());
+}
 
+template<typename TileSet_t, typename TileSet0>
+TileSet_t tile_set_make_from_tiles(TileSet_t const& from, auto&&... args)
+{
+    TileSet_t out;
+    for (auto const& in : from())
+        out.tiles.emplace_back(in, args...);
+    return out;
+}
 
 } // namespace PHARE::core
 

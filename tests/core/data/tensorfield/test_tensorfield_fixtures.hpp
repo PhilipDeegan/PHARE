@@ -34,14 +34,6 @@ struct UsableTensorFieldImpl
     using Super_t    = TensorField<Field_t, HybridQuantity, rank>;
 };
 
-auto static field_dict(auto& layout, std::string const& name)
-{
-    initializer::PHAREDict dict;
-    dict["tile_size"]    = std::size_t{4};
-    dict["interp_order"] = layout.interp_order;
-    dict["name"]         = name;
-    return dict;
-}
 
 
 
@@ -155,13 +147,8 @@ protected:
     auto static make_grids(ComponentNames const& compNames, GridLayout const& layout, tensor_t qty)
     {
         auto qts = HybridQuantity::componentsQuantities(qty);
-        return for_N<N_elements, for_N_R_mode::make_array>([&](auto i) {
-            if constexpr (layout_mde == LayoutMode::AoSTS)
-                return Grid_t{field_dict(layout, compNames[i]), layout, qts[i]};
-            else
-                return Grid_t{compNames[i], layout, qts[i]};
-            /*return Grid_t{compNames[i], qts[i], layout.allocSize(qts[i])};*/
-        });
+        return for_N<N_elements, for_N_R_mode::make_array>(
+            [&](auto i) { return Grid_t{compNames[i], layout, qts[i]}; });
     }
 
     std::array<Grid_t, N_elements> xyz;

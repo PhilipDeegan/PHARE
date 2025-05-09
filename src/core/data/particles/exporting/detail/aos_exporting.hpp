@@ -8,6 +8,7 @@
 #include "core/data/particles/particle_array_appender.hpp"
 #include "core/data/particles/particle_array_partitioner.hpp"
 #include "core/data/particles/exporting/detail/def_exporting.hpp"
+#include <stdexcept>
 
 
 namespace PHARE::core
@@ -22,7 +23,7 @@ template<typename Src, typename Dst, typename Box_t, typename Fn0>
 void ParticlesExporter<AoSMapped, CPU>::move_particles(Src& src, Dst& dst, Box_t const& box,
                                                        Fn0 fn0)
 {
-    static_assert(false);
+    throw std::runtime_error("finish");
 
     // constexpr static std::uint16_t N = 256;
 
@@ -219,7 +220,7 @@ template<typename Src, typename Dst, typename Box_t, typename Fn0>
 void ParticlesExporter<AoSTS, GPU_UNIFIED>::move_particles(Src& src, Dst& dst, Box_t const& box,
                                                            Fn0 fn0)
 {
-    static_assert(false);
+    throw std::runtime_error("finish");
 }
 
 

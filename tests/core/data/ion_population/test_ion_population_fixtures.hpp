@@ -77,10 +77,7 @@ class UsableIonsPopulation : public _defaults::IonPopulation_t
 
     _defaults::Grid_t make_grid(std::string const& name, auto qty) const
     {
-        if constexpr (_defaults::layout_mode == LayoutMode::AoSTS)
-            return {field_dict(layout_, name), layout_, qty};
-        else
-            return {name, layout_, qty};
+        return {name, layout_, qty};
     }
 
 public:
@@ -171,10 +168,7 @@ class UsableIons
 
     _defaults::Grid_t make_grid(std::string const& name, auto qty) const
     {
-        if constexpr (_defaults::layout_mode == LayoutMode::AoSTS)
-            return {field_dict(layout_, name), layout_, qty};
-        else
-            return {name, layout_, qty};
+        return {name, layout_, qty};
     }
 
 public:

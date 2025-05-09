@@ -69,6 +69,7 @@ namespace core
         template<typename GridLayout>
         void initialize(GridLayout const& layout)
         {
+            assert(B.isUsable());
             Binit_.initialize(B, layout);
         }
 

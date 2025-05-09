@@ -95,11 +95,22 @@ TYPED_TEST(TileMappingTest, view_outputs)
     auto& self = *this;
 
     auto const doBox = [&](auto const box) {
-        PHARE_LOG_LINE_SS(box);
+        PHARE_LOG_LINE_SS(box << " " << box.shape());
 
         TileSet_t tiles;
-        Tiler<TileSet_t, 2>{{tiles, box}}.f();
+        Tiler<TileSet_t, 3>{{tiles, box}}.f();
         // self.print(tiles);
+
+        EXPECT_GT(tiles.size(), 0);
+
+        for (auto const& tile : tiles)
+        {
+            auto const& shape = tile.shape();
+
+            PHARE_LOG_LINE_SS(tile << " " << shape);
+            EXPECT_TRUE(shape > 2);
+            EXPECT_TRUE(shape < 8);
+        }
 
         EXPECT_TRUE(this->all_in(tiles, box));
         EXPECT_FALSE(any_overlaps_in(tiles, [](auto const& tile) { return tile; }));
@@ -108,12 +119,12 @@ TYPED_TEST(TileMappingTest, view_outputs)
 
     PHARE_LOG_LINE_SS("");
 
-    doBox(Box_t{ConstArray<int, dimension>(0), {32, 31, 25}});
+    // doBox(Box_t{ConstArray<int, dimension>(0), {4, 4, 13}});
 
-    // for (std::uint8_t i = 4; i < 33; ++i)
-    //     for (std::uint8_t j = 4; j < 33; ++j)
-    //         for (std::uint8_t k = 4; k < 33; ++k)
-    // doBox(Box_t{ConstArray<int, dimension>(0), {i, j, k}});
+    for (std::uint8_t i = 4; i < 33; ++i)
+        for (std::uint8_t j = 4; j < 33; ++j)
+            for (std::uint8_t k = 4; k < 33; ++k)
+                doBox(Box_t{ConstArray<int, dimension>(0), {i, j, k}});
 }
 
 // TYPED_TEST(TileMappingTest, simpleSymmetric)

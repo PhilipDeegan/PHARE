@@ -197,7 +197,7 @@ public:
     auto constexpr static alloc_mode = NdArray_t::allocator_mode;
 
     FieldTileSet(std::string const& name, PhysicalQuantity qty)
-        : Super{{}, {}, {}, nullptr, 0, nullptr, {}} // set later
+        : Super{{}, nullptr, 0, nullptr, {}} // set later
         , name_{name}
         , qty_{qty}
     {
@@ -217,14 +217,10 @@ public:
         if (data)
         {
             super() = (*field).as([](auto&&... args) mutable {
-                auto&& [box, tile_size, shape, tiles_data, tiles_size, cells_data, cells_shape]
+                auto&& [box, tiles_data, tiles_size, cells_data, cells_shape]
                     = std::forward_as_tuple(args...);
                 assert(cells_data);
-                return Super{box,
-                             tile_size,
-                             shape,
-                             &*tiles_data[0],
-                             tiles_size,
+                return Super{box, &*tiles_data[0], tiles_size,
                              reinterpret_cast<FieldTile<GridLayout_t, NdArray_vt, PhysicalQuantity,
                                                         alloc_mode>**>(cells_data),
                              cells_shape};
@@ -324,10 +320,9 @@ public:
     auto constexpr static alloc_mode = NdArray_t::allocator_mode;
     auto constexpr static dimension  = View::dimension;
 
-    template<typename Dict_t>
-    GridTileSet(Dict_t const& dict, GridLayout_t const& layout, PhysicalQuantity const& qty)
-        : Super{layout.AMRBox(), dict["tile_size"].template to<std::size_t>(), layout, qty}
-        , View{dict["name"].template to<std::string>(), qty}
+    GridTileSet(std::string const& name, GridLayout_t const& layout, PhysicalQuantity const& qty)
+        : Super{layout.AMRBox(), layout, qty}
+        , View{name, qty}
         , layout_{layout}
     {
         View::setBuffer(&super());
@@ -414,6 +409,20 @@ void reduce_into(GridTiles_t const& tiles, Grid_t& grid)
     }
 }
 
+
+template<typename T>
+struct is_field_tile_set : std::false_type
+{
+};
+
+
+template<typename GL, typename Arr, typename PQ>
+struct is_field_tile_set<FieldTileSet<GL, Arr, PQ>> : std::true_type
+{
+};
+
+template<typename T>
+auto static constexpr is_field_tile_set_v = is_field_tile_set<T>::value;
 
 } // namespace PHARE::core
 

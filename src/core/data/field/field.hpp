@@ -138,6 +138,24 @@ private:
 
 
 
+template<typename T>
+struct is_field : std::false_type
+{
+};
+
+
+template<std::size_t dim, typename PQ, typename D, auto am>
+struct is_field<Field<dim, PQ, D, am>> : std::true_type
+{
+};
+template<std::size_t dim, typename PQ, typename D>
+struct is_field<basic::Field<dim, PQ, D>> : std::true_type
+{
+};
+
+
+template<typename T>
+auto static constexpr is_field_v = is_field<T>::value;
 
 } // namespace PHARE::core
 

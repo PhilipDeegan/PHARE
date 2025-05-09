@@ -26,7 +26,6 @@ std::size_t constexpr static ghost_cells = 1;
 auto static particles_dict()
 {
     initializer::PHAREDict dict;
-    dict["tile_size"]    = std::size_t{cells};
     dict["interp_order"] = interp;
     return dict;
 }

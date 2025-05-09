@@ -103,11 +103,36 @@ namespace core
         {
             return for_N_all<dim>([&](auto iDim) { return r[iDim] < arr[iDim]; });
         }
+        auto operator<(auto const& v) const _PHARE_ALL_FN_
+        {
+            return for_N_all<dim>([&](auto iDim) { return r[iDim] < v; });
+        }
         template<template<typename, std::size_t> typename Arr, typename T>
         auto operator<=(Arr<T, dim> const& arr) const _PHARE_ALL_FN_
         {
             return for_N_all<dim>([&](auto iDim) { return r[iDim] <= arr[iDim]; });
         }
+
+
+        template<template<typename, std::size_t> typename Arr, typename T>
+        auto operator>(Arr<T, dim> const& arr) const _PHARE_ALL_FN_
+        {
+            return for_N_all<dim>([&](auto iDim) { return r[iDim] > arr[iDim]; });
+        }
+        auto operator>(auto const& v) const _PHARE_ALL_FN_
+        {
+            return for_N_all<dim>([&](auto iDim) { return r[iDim] > v; });
+        }
+        template<template<typename, std::size_t> typename Arr, typename T>
+        auto operator>=(Arr<T, dim> const& arr) const _PHARE_ALL_FN_
+        {
+            return for_N_all<dim>([&](auto iDim) { return r[iDim] >= arr[iDim]; });
+        }
+        auto operator>=(auto const& v) const _PHARE_ALL_FN_
+        {
+            return for_N_all<dim>([&](auto iDim) { return r[iDim] >= v; });
+        }
+
 
 
         template<typename DestType = Type>
@@ -234,17 +259,6 @@ namespace core
         Point operator/(Type const& value) const _PHARE_ALL_FN_
         {
             return {for_N_make_array<dim>([&](auto i) { return (*this)[i] / value; })};
-        }
-
-
-        template<template<typename, std::size_t> typename Arr, typename T>
-        auto operator>=(Arr<T, dim> const& arr) const _PHARE_ALL_FN_
-        {
-            return for_N_all<dim>([&](auto iDim) { return r[iDim] >= arr[iDim]; });
-        }
-        auto operator>=(auto const& v) const _PHARE_ALL_FN_
-        {
-            return for_N_all<dim>([&](auto iDim) { return r[iDim] >= v; });
         }
 
         NO_DISCARD constexpr auto size() const { return dim; }

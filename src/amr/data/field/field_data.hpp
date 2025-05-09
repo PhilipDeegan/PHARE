@@ -52,21 +52,10 @@ namespace amr
         bool static constexpr is_tiled = std::is_constructible_v<Grid_t, initializer::PHAREDict,
                                                                  GridLayoutT, PhysicalQuantity>;
 
-        auto inline static field_dict(std::string const& name)
-        {
-            initializer::PHAREDict dict;
-            dict["tile_size"] = std::size_t{4}; // todo
-            dict["name"]      = name;
-            return dict;
-        }
 
         Grid_t field_maker(std::string const& name, GridLayoutT const& layout, auto qty)
         {
-            if constexpr (is_tiled)
-                return {field_dict(name), layout, qty};
-
-            else
-                return {name, layout, qty};
+            return {name, layout, qty};
         }
 
     public:

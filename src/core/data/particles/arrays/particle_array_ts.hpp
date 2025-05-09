@@ -27,7 +27,6 @@ namespace PHARE::core
 struct TileSetParticleArrayDetails : public ParticleArrayDetails
 {
     std::size_t interp_order = 1; // for fields per tile
-    std::size_t tile_size    = 4;
 
 
     template<typename GridLayout_t>
@@ -39,7 +38,6 @@ struct TileSetParticleArrayDetails : public ParticleArrayDetails
         return {
             {super},
             cppdict::get_value(dict, "interp_order", defaults.interp_order),
-            cppdict::get_value(dict, "tile_size", defaults.tile_size),
         };
     }
 };
@@ -93,6 +91,10 @@ public:
         , fy{ndarray_builder(field_ghost_box)}
         , fz{ndarray_builder(field_ghost_box)}
     {
+        if constexpr (Particles::storage_mode == StorageMode::VECTOR)
+            particles.reserve(1);
+        PHARE_LOG_LINE_SS(box);
+        PHARE_LOG_LINE_SS(particles.data());
     }
 
     ParticlesTile(ParticlesTile const&) = default;
@@ -388,6 +390,7 @@ public:
     void emplace_back(Particle_t const& p)
     {
         auto const locell = local_cell(p.iCell());
+        assert(particles_.at(locell));
         (*particles_.at(locell))().emplace_back(p);
         if constexpr (inc_)
             _inc(locell);
@@ -435,7 +438,12 @@ public:
     }
     auto reset_particle_views_fn()
     {
-        return [&](std::size_t const i) { return SpnTile{particles_[i]}; };
+        return [&](std::size_t const i) {
+            PHARE_LOG_LINE_SS(i << " " << particles_.size());
+            assert(particles_[i]().data());
+            assert(particles_[i]().data());
+            return SpnTile{particles_[i]};
+        };
     }
 
     void reset_index_wrapper_map();
@@ -578,7 +586,7 @@ protected:
     nd_array_t<SIZE_T> cap_{local_box().shape()};
     nd_array_t<std::size_t> cell_size_{local_box().shape()};
 
-    TileSet<VecTile, alloc_mode> particles_{box_ /*safe_box_*/, details.tile_size, *this};
+    TileSet<VecTile, alloc_mode> particles_{box_, *this};
 
     // only used for GPU
     TileSet<SpnTile, alloc_mode> particles_views_{

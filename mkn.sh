@@ -30,6 +30,7 @@ FILE="tests/core/numerics/ion_updater/test_updater_pp_main.cpp"
 FILE="tests/core/numerics/ion_updater/test_multi_updater.cpp"
 FILE="tests/core/data/tiles/test_tile_set_ghost_box_overlaps.cpp"
 FILE="tests/core/data/tiles/test_tile_set_mapper.cpp"
+FILE="tests/core/data/particles/test_particles_construction.cpp"
 
 TEST=" -M ${FILE} "
 CARGS="${CARGS} $(clargs)"

@@ -166,8 +166,8 @@ struct OhmTileTest : public ::testing::Test
         UsableElectromag_t em{layout}, emNew{layout};
         UsableVecField_t J{"J", layout, HybridQuantity::Vector::J};
         UsableVecField_t V{"V", layout, HybridQuantity::Vector::V};
-        Field_t n{field_dict(layout, "rho"), layout, HybridQuantity::Scalar::rho};
-        Field_t P{field_dict(layout, "P"), layout, HybridQuantity::Scalar::P};
+        Field_t n{"rho", layout, HybridQuantity::Scalar::rho};
+        Field_t P{"P", layout, HybridQuantity::Scalar::P};
     };
 
     template<auto am = AllocatorMode::CPU>

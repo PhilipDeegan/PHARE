@@ -14,9 +14,8 @@ using namespace PHARE;
 using namespace PHARE::core;
 
 
-std::size_t constexpr static interp    = 1;
-std::size_t constexpr static cells     = 14;
-std::size_t constexpr static tile_size = 4;
+std::size_t constexpr static interp = 1;
+std::size_t constexpr static cells  = 14;
 
 
 template<std::size_t _dim, auto lm, auto am, std::uint8_t _impl = 2>
@@ -36,14 +35,7 @@ struct TestParam
     using GridLayout_t = TestGridLayout<typename PhareTypes::GridLayout_t>;
 };
 
-auto static field_dict(std::string const& name)
-{
-    initializer::PHAREDict dict;
-    dict["tile_size"]    = tile_size;
-    dict["interp_order"] = interp;
-    dict["name"]         = name;
-    return dict;
-}
+
 
 
 template<typename TestParam>
@@ -69,7 +61,7 @@ struct Patch
 
 
     GridLayout_t const layout;
-    Grid_t rho{field_dict("rho"), layout, HybridQuantity::Scalar::rho};
+    Grid_t rho{"rho", layout, HybridQuantity::Scalar::rho};
     Field_t& rho_v = *rho;
 };
 
