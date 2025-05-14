@@ -1,18 +1,69 @@
 #ifndef PHARE_CORE_DATA_FIELD_FIELD_BASE_HPP
 #define PHARE_CORE_DATA_FIELD_FIELD_BASE_HPP
 
-#include <array>
-#include <cstddef>
-#include <string>
-#include <utility>
-#include <vector>
-#include <algorithm>
-
 #include "core/def.hpp"
-#include "core/logger.hpp"
+#include "core/data/ndarray/ndarray_view.hpp"
+#include "core/def/phare_config.hpp"
 
-#include "core/data/ndarray/ndarray_vector.hpp"
 
+#include <array>
+#include <string>
+#include <cstddef>
+
+
+namespace PHARE::core
+{
+template<typename PhysicalQuantity, typename Data_t = double>
+struct FieldOpts
+{
+    using physical_quantity_type = PhysicalQuantity;
+    using value_type             = Data_t;
+
+    std::size_t dim;
+    AllocatorMode alloc_mode;
+};
+
+
+} // namespace PHARE::core
+
+namespace PHARE::core::basic
+{
+
+template<auto opts> // NO STRINGS OR STD LIB!
+class Field : public NdArrayView<opts.dim, typename decltype(opts)::value_type>
+{
+    using FieldOpts = decltype(opts);
+
+public:
+    using physical_quantity_type     = FieldOpts::physical_quantity_type;
+    using value_type                 = typename FieldOpts::value_type;
+    using Super                      = NdArrayView<opts.dim, value_type>;
+    auto constexpr static alloc_mode = opts.alloc_mode;
+    auto constexpr static dimension  = opts.dim;
+
+    Field(physical_quantity_type qty, value_type* data = nullptr,
+          std::array<std::uint32_t, opts.dim> const& dims = ConstArray<std::uint32_t, opts.dim>())
+        : Super{data, dims}
+        , qty_{qty}
+    {
+    }
+
+    NO_DISCARD auto& physicalQuantity() const _PHARE_ALL_FN_ { return qty_; }
+
+    bool isUsable() const { return Super::data() != nullptr; }
+    bool isSettable() const { return !isUsable(); }
+
+    auto& operator*() { return super(); }
+    auto& operator*() const { return super(); }
+
+    Super& super() _PHARE_ALL_FN_ { return *this; }
+    Super const& super() const _PHARE_ALL_FN_ { return *this; }
+
+protected:
+    physical_quantity_type qty_;
+};
+
+} // namespace PHARE::core::basic
 
 namespace PHARE::core
 {
@@ -22,22 +73,24 @@ namespace PHARE::core
  *  Users may also give a string name to a field object and get a name by calling
  *  name().
  */
-template<std::size_t dim, typename PhysicalQuantity, typename Data_t = double>
-class Field : public NdArrayView<dim, Data_t>
+template<std::size_t dim, typename PhysicalQuantity, typename Data_t = double,
+         auto alloc_mode_ = AllocatorMode::CPU>
+class Field : public basic::Field<FieldOpts<PhysicalQuantity, Data_t>{dim, alloc_mode_}>
 {
-    using Super = NdArrayView<dim, Data_t>;
+    static_assert(std::is_same_v<decltype(alloc_mode_), AllocatorMode>);
 
 public:
-    auto constexpr static dimension = dim;
-    using value_type                = Data_t;
-    using physical_quantity_type    = PhysicalQuantity;
+    using Super = basic::Field<FieldOpts<PhysicalQuantity, Data_t>{dim, alloc_mode_}>;
+    auto constexpr static dimension  = dim;
+    auto constexpr static alloc_mode = alloc_mode_;
+    using value_type                 = Data_t;
+    using physical_quantity_type     = PhysicalQuantity;
 
 
     Field(std::string const& name, PhysicalQuantity qty, value_type* data = nullptr,
           std::array<std::uint32_t, dim> const& dims = ConstArray<std::uint32_t, dim>())
-        : Super{data, dims}
+        : Super{qty, data, dims}
         , name_{name}
-        , qty_{qty}
     {
     }
 
@@ -54,11 +107,13 @@ public:
 
 
     NO_DISCARD auto& name() const { return name_; }
-    NO_DISCARD auto& physicalQuantity() const { return qty_; }
 
     void copyData(Field const& source) { Super::fill_from(source); }
 
-    void setBuffer(Field* const field)
+    void setBuffer(std::nullptr_t ptr) _PHARE_ALL_FN_ { setBuffer(static_cast<Field*>(nullptr)); }
+
+    template<typename FieldLike>
+    void setBuffer(FieldLike* const field) _PHARE_ALL_FN_
     {
         auto data = field ? field->data() : nullptr;
         if (data)
@@ -69,47 +124,69 @@ public:
         Super::setBuffer(data);
     }
 
+    void setData(Data_t* const data) _PHARE_ALL_FN_ { Super::setBuffer(data); }
+
     bool isUsable() const { return Super::data() != nullptr; }
     bool isSettable() const { return !isUsable(); }
-    
+
 
     template<typename... Args>
-    NO_DISCARD auto& operator()(Args&&... args)
+    NO_DISCARD auto& operator()(Args&&... args) _PHARE_ALL_FN_
     {
-        PHARE_DEBUG_DO(                                                                 //
-            if (!isUsable()) throw std::runtime_error("Field is not usable: " + name_); //
-        )
-        return super()(std::forward<Args>(args)...);
+        if constexpr (alloc_mode == AllocatorMode::CPU)
+        {
+            PHARE_DEBUG_DO(                                                                 //
+                if (!isUsable()) throw std::runtime_error("Field is not usable: " + name_); //
+            )
+        }
+
+        return super()(args...);
     }
     template<typename... Args>
-    NO_DISCARD auto& operator()(Args&&... args) const
+    NO_DISCARD auto const& operator()(Args&&... args) const _PHARE_ALL_FN_
     {
-        return const_cast<Field&>(*this)(std::forward<Args>(args)...);
+        return super()(args...);
     }
 
+    auto& operator*() { return super(); }
+    auto& operator*() const { return super(); }
 
 private:
     std::string name_{"No Name"};
-    PhysicalQuantity qty_;
 
-    Super& super() { return *this; }
-    Super const& super() const { return *this; }
+    Super& super() _PHARE_ALL_FN_ { return *this; }
+    Super const& super() const _PHARE_ALL_FN_ { return *this; }
 };
 
 
-
-template<std::size_t dim, typename PhysicalQuantity, typename Data_t>
-void average(Field<dim, PhysicalQuantity, Data_t> const& f1,
-             Field<dim, PhysicalQuantity, Data_t> const& f2,
-             Field<dim, PhysicalQuantity, Data_t>& avg)
+template<typename FieldLike_t, typename Data_t>
+auto make_field_from(FieldLike_t const& field, Data_t* data)
 {
-    std::transform(std::begin(f1), std::end(f1), std::begin(f2), std::begin(avg),
-                   std::plus<double>());
+    using Field_t
+        = Field<FieldLike_t::dimension, typename FieldLike_t::physical_quantity_type, Data_t>;
 
-    std::transform(std::begin(avg), std::end(avg), std::begin(avg),
-                   [](double x) { return x * 0.5; });
+    return Field_t{field.name(), field.physicalQuantity(), data, field.shape()};
 }
 
+
+template<typename T>
+struct is_field : std::false_type
+{
+};
+
+
+template<std::size_t dim, typename PQ, typename D, auto am>
+struct is_field<Field<dim, PQ, D, am>> : std::true_type
+{
+};
+template<auto opts>
+struct is_field<basic::Field<opts>> : std::true_type
+{
+};
+
+
+template<typename T>
+auto static constexpr is_field_v = is_field<T>::value;
 
 } // namespace PHARE::core
 

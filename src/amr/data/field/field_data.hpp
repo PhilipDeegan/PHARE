@@ -2,20 +2,28 @@
 #define PHARE_SRC_AMR_FIELD_FIELD_DATA_HPP
 
 
+#include "core/data/ndarray/ndarray_view.hpp"
 #include "core/logger.hpp"
 #include "core/def/phare_mpi.hpp"
 #include <core/utilities/types.hpp>
+#include "core/data/grid/grid_tiles.hpp"
 #include "core/data/field/field_box.hpp"
+
 
 #include <amr/utilities/box/amr_box.hpp>
 #include "amr/resources_manager/amr_utils.hpp"
 
+#include "core/utilities/box/box.hpp"
 #include "field_geometry.hpp"
+#include "initializer/data_provider.hpp"
+
 
 #include <SAMRAI/hier/PatchData.h>
 #include <SAMRAI/tbox/MemoryUtilities.h>
 
 #include <utility>
+#include <stdexcept>
+
 
 
 namespace PHARE
@@ -39,9 +47,12 @@ namespace amr
              typename PhysicalQuantity = decltype(std::declval<Grid_t>().physicalQuantity())>
     class FieldData : public SAMRAI::hier::PatchData
     {
+        static_assert(core::is_field_v<Grid_t> || core::is_field_tile_set_v<Grid_t>);
+
         using Super      = SAMRAI::hier::PatchData;
-        using value_type = Grid_t::value_type;
+        using value_type = Grid_t::type;
         using SetEqualOp = core::Equals<value_type>;
+
 
     public:
         static constexpr std::size_t dimension    = GridLayoutT::dimension;
@@ -59,23 +70,11 @@ namespace amr
                   std::string name, GridLayoutT const& layout, PhysicalQuantity qty)
             : SAMRAI::hier::PatchData(domain, ghost)
             , gridLayout{layout}
-            , field(name, qty, gridLayout.allocSize(qty))
-            , quantity_{qty}
-        {
-        } //
-
-        [[deprecated]] FieldData(SAMRAI::hier::Box const& domain,
-                                 SAMRAI::hier::IntVector const& ghost, std::string name,
-                                 std::array<double, dimension> const& dl,
-                                 std::array<std::uint32_t, dimension> const& nbrCells,
-                                 core::Point<double, dimension> const& origin, PhysicalQuantity qty)
-
-            : SAMRAI::hier::PatchData(domain, ghost)
-            , gridLayout{dl, nbrCells, origin}
-            , field(name, qty, gridLayout.allocSize(qty))
+            , field{name, layout, qty}
             , quantity_{qty}
         {
         }
+
 
         FieldData()                            = delete;
         FieldData(FieldData const&)            = delete;
@@ -88,16 +87,39 @@ namespace amr
         {
             Super::getFromRestart(restart_db);
 
-            assert(field.vector().size() > 0);
-            restart_db->getDoubleArray("field_" + field.name(), field.vector().data(),
-                                       field.vector().size()); // do not reallocate!
+            if constexpr (core::is_field_tile_set_v<Grid_t>)
+            {
+                throw std::runtime_error("finish");
+            }
+            else
+            {
+                assert(field.vector().size() > 0);
+                restart_db->getDoubleArray("field_" + field.name(), field.vector().data(),
+                                           field.vector().size()); // do not reallocate!
+            }
         }
 
         void putToRestart(std::shared_ptr<SAMRAI::tbox::Database> const& restart_db) const override
         {
-            Super::putToRestart(restart_db);
+            if constexpr (core::is_field_tile_set_v<Grid_t>)
+            {
+                throw std::runtime_error("finish");
+            }
+            else
+            {
+                Super::putToRestart(restart_db);
 
-            restart_db->putVector("field_" + field.name(), field.vector());
+                // if constexpr (std::decay_t<decltype(field)>::is_host_mem)
+
+                restart_db->putDoubleArray("field_" + field.name(), field.vector().data(),
+                                           field.vector().size());
+
+                // restart_db->putVector("field_" + field.name(), field.vector());
+                // else
+                // {
+                //     std::abort();
+                // }
+            }
         };
 
 
@@ -281,11 +303,18 @@ namespace amr
 
             // For unpackStream, there is no transformation needed, since all the box
             // are on the destination space
-            for (auto const& box : fieldOverlap.getDestinationBoxContainer())
+            for (auto const& sambox : fieldOverlap.getDestinationBoxContainer())
             {
-                core::FieldBox<Grid_t>{dst, gridLayout, phare_box_from<dimension>(box)}
-                    .template op<Operator>(buffer, seek);
-                seek += box.size();
+                auto const box = phare_box_from<dimension>(sambox);
+                auto const view
+                    = core::make_array_view(buffer.data() + seek, *box.shape().as_unsigned());
+                using NdArray = decltype(view);
+
+                core::FieldBox<Grid_t>{dst, gridLayout, box}.template op<Operator>(
+                    core::FieldBox<NdArray>{
+                        view, box,
+                        core::box_from_zero_to_upper_minus_one(*box.shape().as_unsigned())});
+                seek += sambox.size();
             }
         }
 
@@ -345,11 +374,14 @@ namespace amr
             // Then we represent the intersection into the local space of the destination
             // We can finally perform the copy of the element in the correct range
 
+            // auto const src_box = GridLayoutT::AMRBoxFor(phare_box_from<dimension>(sourceBox),
+            //                                             source.field.physicalQuantity());
+
             core::FieldBox<Grid_t>{
                 fieldDestination, gridLayout,
                 phare_lcl_box_from<dimension>(AMRToLocal(intersectBox, destinationBox))}
                 .template op<Operator>(core::FieldBox<Grid_t const>{
-                    source.field, source.gridLayout,
+                    source.field, source.gridLayout /*.copy_as(src_box)*/,
                     phare_lcl_box_from<dimension>(AMRToLocal(intersectBox, sourceBox))});
         }
 
@@ -395,9 +427,18 @@ namespace amr
                         SAMRAI::hier::Box const intersectionBox{box * transformedSource
                                                                 * destinationBox};
 
+                        auto const& offset  = as_point<dimension>(overlap.getTransformation());
+                        auto const& noffset = offset * -1;
+
                         if (!intersectionBox.empty())
-                            copy_<Operator>(intersectionBox, transformedSource, destinationBox,
-                                            source, dst);
+                            core::FieldBox<Grid_t>{dst, gridLayout,
+                                                   phare_lcl_box_from<dimension>(
+                                                       AMRToLocal(intersectionBox, destinationBox))}
+                                .template op<Operator>(core::FieldBox<Grid_t const>{
+                                    source.field, source.gridLayout,
+                                    phare_lcl_box_from<dimension>(
+                                        AMRToLocal(intersectionBox, transformedSource))}
+                                                           .offset(offset));
                     }
                 }
             }

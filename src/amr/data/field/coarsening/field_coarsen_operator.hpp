@@ -2,6 +2,7 @@
 #define PHARE_FIELD_DATA_COARSEN_HPP
 
 
+#include "core/data/grid/grid_tiles.hpp"
 #include "core/def/phare_mpi.hpp"
 
 #include "amr/data/field/field_data.hpp"
@@ -45,7 +46,7 @@ namespace amr
         FieldCoarsenOperator(FieldCoarsenOperator const&)            = delete;
         FieldCoarsenOperator(FieldCoarsenOperator&&)                 = delete;
         FieldCoarsenOperator& operator=(FieldCoarsenOperator const&) = delete;
-        FieldCoarsenOperator&& operator=(FieldCoarsenOperator&&)     = delete;
+        FieldCoarsenOperator& operator=(FieldCoarsenOperator&&)      = delete;
 
 
         virtual ~FieldCoarsenOperator() = default;
@@ -139,7 +140,6 @@ namespace amr
 
             startIndex[dirX] = intersectionBox.lower(dirX);
             endIndex[dirX]   = intersectionBox.upper(dirX);
-
             if constexpr (dimension > 1)
             {
                 startIndex[dirY] = intersectionBox.lower(dirY);
@@ -151,45 +151,50 @@ namespace amr
                 endIndex[dirZ]   = intersectionBox.upper(dirZ);
             }
 
-            if constexpr (dimension == 1)
+
+            if constexpr (core::is_field_tile_set_v<FieldT>) {}
+            else
             {
-                for (int ix = startIndex[dirX]; ix <= endIndex[dirX]; ++ix)
+                if constexpr (dimension == 1)
                 {
-                    coarsener(sourceField, destinationField, {{ix}});
-                }
-            }
-
-
-
-
-            else if constexpr (dimension == 2)
-            {
-                for (int ix = startIndex[dirX]; ix <= endIndex[dirX]; ++ix)
-                {
-                    for (int iy = startIndex[dirY]; iy <= endIndex[dirY]; ++iy)
+                    for (int ix = startIndex[dirX]; ix <= endIndex[dirX]; ++ix)
                     {
-                        coarsener(sourceField, destinationField, {{ix, iy}});
+                        coarsener(sourceField, destinationField, {{ix}});
                     }
                 }
-            }
 
 
 
 
-            else if constexpr (dimension == 3)
-            {
-                for (int ix = startIndex[dirX]; ix <= endIndex[dirX]; ++ix)
+                else if constexpr (dimension == 2)
                 {
-                    for (int iy = startIndex[dirY]; iy <= endIndex[dirY]; ++iy)
+                    for (int ix = startIndex[dirX]; ix <= endIndex[dirX]; ++ix)
                     {
-                        for (int iz = startIndex[dirZ]; iz <= endIndex[dirZ]; ++iz)
-
+                        for (int iy = startIndex[dirY]; iy <= endIndex[dirY]; ++iy)
                         {
-                            coarsener(sourceField, destinationField, {{ix, iy, iz}});
+                            coarsener(sourceField, destinationField, {{ix, iy}});
                         }
                     }
                 }
-            } // end 3D
+
+
+
+
+                else if constexpr (dimension == 3)
+                {
+                    for (int ix = startIndex[dirX]; ix <= endIndex[dirX]; ++ix)
+                    {
+                        for (int iy = startIndex[dirY]; iy <= endIndex[dirY]; ++iy)
+                        {
+                            for (int iz = startIndex[dirZ]; iz <= endIndex[dirZ]; ++iz)
+
+                            {
+                                coarsener(sourceField, destinationField, {{ix, iy, iz}});
+                            }
+                        }
+                    }
+                } // end 3D
+            }
         }
     };
 } // namespace amr

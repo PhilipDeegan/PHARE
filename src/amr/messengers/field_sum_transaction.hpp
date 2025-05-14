@@ -172,10 +172,13 @@ template<typename FieldData_t>
 void FieldBorderSumTransaction<FieldData_t>::copyLocalData()
 {
     PHARE_LOG_SCOPE(2, "FieldBorderSumTransaction::copyLocalData");
+    assert(this);
+
+    auto dst_data = d_dst_level->getPatch(d_dst_node.getGlobalId())
+                        ->getPatchData(d_refine_data[d_item_id]->d_scratch);
+    assert(dst_data);
     std::shared_ptr<FieldData_t> onode_dst_data(
-        SAMRAI_SHARED_PTR_CAST<FieldData_t, SAMRAI::hier::PatchData>(
-            d_dst_level->getPatch(d_dst_node.getGlobalId())
-                ->getPatchData(d_refine_data[d_item_id]->d_scratch)));
+        SAMRAI_SHARED_PTR_CAST<FieldData_t, SAMRAI::hier::PatchData>(dst_data));
     TBOX_ASSERT(onode_dst_data);
 
     std::shared_ptr<FieldData_t> onode_src_data(
@@ -213,6 +216,13 @@ public:
         TBOX_ASSERT(src_node.getLocalId() >= 0);
         TBOX_ASSERT(refine_data != 0);
         TBOX_ASSERT_OBJDIM_EQUALITY4(*dst_level, *src_level, dst_node, src_node);
+
+        auto dst_data = dst_level->getPatch(dst_node.getGlobalId())
+                            ->getPatchData(refine_data[item_id]->d_scratch);
+        assert(dst_data);
+        std::shared_ptr<FieldData_t> onode_dst_data(
+            SAMRAI_SHARED_PTR_CAST<FieldData_t, SAMRAI::hier::PatchData>(dst_data));
+        TBOX_ASSERT(onode_dst_data);
 
         PHARE_LOG_SCOPE(2, "FieldBorderSumTransactionFactory::allocate");
         return std::make_shared<FieldBorderSumTransaction<FieldData_t>>(

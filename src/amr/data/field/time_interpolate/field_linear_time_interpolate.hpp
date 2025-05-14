@@ -9,6 +9,7 @@
 #include "amr/data/field/field_data.hpp"
 #include "amr/data/field/field_geometry.hpp"
 
+#include "core/data/grid/grid_tiles.hpp"
 #include "core/def/phare_mpi.hpp"
 
 
@@ -81,58 +82,63 @@ public:
         auto const localDestBox = AMRToLocal(finalBox, ghostBox);
         auto const localSrcBox  = AMRToLocal(finalBox, srcGhostBox);
 
-        if constexpr (dim == 1)
+        if constexpr (core::is_field_tile_set_v<FieldT>) {}
+        else
         {
-            auto const iDestStartX = localDestBox.lower(dirX);
-            auto const iDestEndX   = localDestBox.upper(dirX);
-
-            auto const iSrcStartX = localSrcBox.lower(dirX);
-
-            for (auto ix = iDestStartX, ixSrc = iSrcStartX; ix <= iDestEndX; ++ix, ++ixSrc)
+            if constexpr (dim == 1)
             {
-                fieldDest(ix) = (1. - alpha) * fieldSrcOld(ixSrc) + alpha * fieldSrcNew(ixSrc);
-            }
-        }
-        else if constexpr (dim == 2)
-        {
-            auto const iDestStartX = localDestBox.lower(dirX);
-            auto const iDestEndX   = localDestBox.upper(dirX);
-            auto const iDestStartY = localDestBox.lower(dirY);
-            auto const iDestEndY   = localDestBox.upper(dirY);
+                auto const iDestStartX = localDestBox.lower(dirX);
+                auto const iDestEndX   = localDestBox.upper(dirX);
 
-            auto const iSrcStartX = localSrcBox.lower(dirX);
-            auto const iSrcStartY = localSrcBox.lower(dirY);
+                auto const iSrcStartX = localSrcBox.lower(dirX);
 
-            for (auto ix = iDestStartX, ixSrc = iSrcStartX; ix <= iDestEndX; ++ix, ++ixSrc)
-            {
-                for (auto iy = iDestStartY, iySrc = iSrcStartY; iy <= iDestEndY; ++iy, ++iySrc)
+                for (auto ix = iDestStartX, ixSrc = iSrcStartX; ix <= iDestEndX; ++ix, ++ixSrc)
                 {
-                    fieldDest(ix, iy) = (1. - alpha) * fieldSrcOld(ixSrc, iySrc)
-                                        + alpha * fieldSrcNew(ixSrc, iySrc);
+                    fieldDest(ix) = (1. - alpha) * fieldSrcOld(ixSrc) + alpha * fieldSrcNew(ixSrc);
                 }
             }
-        }
-        else if constexpr (dim == 3)
-        {
-            auto const iDestStartX = localDestBox.lower(dirX);
-            auto const iDestEndX   = localDestBox.upper(dirX);
-            auto const iDestStartY = localDestBox.lower(dirY);
-            auto const iDestEndY   = localDestBox.upper(dirY);
-            auto const iDestStartZ = localDestBox.lower(dirZ);
-            auto const iDestEndZ   = localDestBox.upper(dirZ);
-
-            auto const iSrcStartX = localSrcBox.lower(dirX);
-            auto const iSrcStartY = localSrcBox.lower(dirY);
-            auto const iSrcStartZ = localSrcBox.lower(dirZ);
-
-            for (auto ix = iDestStartX, ixSrc = iSrcStartX; ix <= iDestEndX; ++ix, ++ixSrc)
+            else if constexpr (dim == 2)
             {
-                for (auto iy = iDestStartY, iySrc = iSrcStartY; iy <= iDestEndY; ++iy, ++iySrc)
+                auto const iDestStartX = localDestBox.lower(dirX);
+                auto const iDestEndX   = localDestBox.upper(dirX);
+                auto const iDestStartY = localDestBox.lower(dirY);
+                auto const iDestEndY   = localDestBox.upper(dirY);
+
+                auto const iSrcStartX = localSrcBox.lower(dirX);
+                auto const iSrcStartY = localSrcBox.lower(dirY);
+
+                for (auto ix = iDestStartX, ixSrc = iSrcStartX; ix <= iDestEndX; ++ix, ++ixSrc)
                 {
-                    for (auto iz = iDestStartZ, izSrc = iSrcStartZ; iz <= iDestEndZ; ++iz, ++izSrc)
+                    for (auto iy = iDestStartY, iySrc = iSrcStartY; iy <= iDestEndY; ++iy, ++iySrc)
                     {
-                        fieldDest(ix, iy, iz) = (1. - alpha) * fieldSrcOld(ixSrc, iySrc, izSrc)
-                                                + alpha * fieldSrcNew(ixSrc, iySrc, izSrc);
+                        fieldDest(ix, iy) = (1. - alpha) * fieldSrcOld(ixSrc, iySrc)
+                                            + alpha * fieldSrcNew(ixSrc, iySrc);
+                    }
+                }
+            }
+            else if constexpr (dim == 3)
+            {
+                auto const iDestStartX = localDestBox.lower(dirX);
+                auto const iDestEndX   = localDestBox.upper(dirX);
+                auto const iDestStartY = localDestBox.lower(dirY);
+                auto const iDestEndY   = localDestBox.upper(dirY);
+                auto const iDestStartZ = localDestBox.lower(dirZ);
+                auto const iDestEndZ   = localDestBox.upper(dirZ);
+
+                auto const iSrcStartX = localSrcBox.lower(dirX);
+                auto const iSrcStartY = localSrcBox.lower(dirY);
+                auto const iSrcStartZ = localSrcBox.lower(dirZ);
+
+                for (auto ix = iDestStartX, ixSrc = iSrcStartX; ix <= iDestEndX; ++ix, ++ixSrc)
+                {
+                    for (auto iy = iDestStartY, iySrc = iSrcStartY; iy <= iDestEndY; ++iy, ++iySrc)
+                    {
+                        for (auto iz = iDestStartZ, izSrc = iSrcStartZ; iz <= iDestEndZ;
+                             ++iz, ++izSrc)
+                        {
+                            fieldDest(ix, iy, iz) = (1. - alpha) * fieldSrcOld(ixSrc, iySrc, izSrc)
+                                                    + alpha * fieldSrcNew(ixSrc, iySrc, izSrc);
+                        }
                     }
                 }
             }

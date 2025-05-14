@@ -3,6 +3,7 @@
 
 
 #include "core/def/phare_mpi.hpp"
+#include "core/data/grid/grid_tiles.hpp"
 
 #include <SAMRAI/hier/Box.h>
 
@@ -27,7 +28,7 @@ public:
     ElectricFieldRefiner(std::array<core::QtyCentering, dimension> const& centering,
                          SAMRAI::hier::Box const& destinationGhostBox,
                          SAMRAI::hier::Box const& sourceGhostBox,
-                         SAMRAI::hier::IntVector const& ratio)
+                         SAMRAI::hier::IntVector const& /*ratio*/)
         : fineBox_{destinationGhostBox}
         , coarseBox_{sourceGhostBox}
         , centerings_{centering}
@@ -40,6 +41,15 @@ public:
     template<typename FieldT>
     void operator()(FieldT const& coarseField, FieldT& fineField,
                     core::Point<int, dimension> fineIndex)
+    {
+        if constexpr (core::is_field_tile_set_v<FieldT>) {}
+        else
+            field_t(coarseField, fineField, fineIndex);
+    }
+
+    template<typename FieldT>
+    void field_t(FieldT const& coarseField, FieldT& fineField,
+                 core::Point<int, dimension> fineIndex)
     {
         TBOX_ASSERT(coarseField.physicalQuantity() == fineField.physicalQuantity());
 

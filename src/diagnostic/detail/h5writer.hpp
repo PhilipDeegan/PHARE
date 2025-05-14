@@ -2,16 +2,17 @@
 #define PHARE_DETAIL_DIAGNOSTIC_HIGHFIVE_HPP
 
 
-#include "core/data/vecfield/vecfield_component.hpp"
 #include "core/utilities/mpi_utils.hpp"
 #include "core/utilities/types.hpp"
-#include "core/utilities/meta/meta_utilities.hpp"
+// #include "core/utilities/meta/meta_utilities.hpp"
+#include "core/data/vecfield/vecfield_component.hpp"
 
 #include "hdf5/detail/h5/h5_file.hpp"
 
 #include "diagnostic/detail/h5typewriter.hpp"
-#include "diagnostic/diagnostic_manager.hpp"
+// #include "diagnostic/diagnostic_manager.hpp"
 #include "diagnostic/diagnostic_props.hpp"
+// #include "initializer/data_provider.hpp"
 
 
 #if !defined(PHARE_DIAG_DOUBLES)
@@ -47,6 +48,7 @@ public:
     using This       = H5Writer<ModelView>;
     using GridLayout = typename ModelView::GridLayout;
     using Attributes = typename ModelView::PatchProperties;
+    using Model_t    = typename ModelView::Model_t;
 
     static constexpr auto dimension   = GridLayout::dimension;
     static constexpr auto interpOrder = GridLayout::interp_order;
@@ -83,6 +85,7 @@ public:
     template<typename String>
     auto getDiagnosticWriterForType(String& type)
     {
+        assert(typeWriters_.count(type));
         return typeWriters_.at(type);
     }
 
@@ -250,6 +253,7 @@ void H5Writer<ModelView>::dump(std::vector<DiagnosticProperties*> const& diagnos
 
     for (auto* diagnostic : diagnostics)
     {
+        assert(typeWriters_.count(diagnostic->type));
         typeWriters_.at(diagnostic->type)->finalize(*diagnostic);
         // don't truncate past first dump
         file_flags[diagnostic->type + diagnostic->quantity] = READ_WRITE;

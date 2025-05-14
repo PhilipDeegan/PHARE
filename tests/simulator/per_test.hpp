@@ -1,12 +1,20 @@
 #ifndef PHARE_TEST_SIMULATOR_PER_TEST_HPP
 #define PHARE_TEST_SIMULATOR_PER_TEST_HPP
 
+#include "core/data/particles/particle_array_def.hpp"
+#include "core/def/phare_config.hpp"
+#include "core/vector.hpp"
 #include "phare/phare.hpp"
 #include "simulator/simulator.hpp"
 #include "initializer/python_data_provider.hpp"
 #include "tests/core/data/field/test_field.hpp"
 
 #include "gtest/gtest.h"
+
+
+using SimOpts = PHARE::SimOpts;
+using enum PHARE::core::LayoutMode;
+using AllocatorMode = PHARE::AllocatorMode;
 
 
 struct __attribute__((visibility("hidden"))) StaticIntepreter
@@ -22,11 +30,11 @@ struct __attribute__((visibility("hidden"))) StaticIntepreter
 std::shared_ptr<PHARE::initializer::PythonDataProvider> StaticIntepreter::input{nullptr};
 
 
-template<std::size_t _dim>
+template<std::size_t dim>
 struct HierarchyMaker
 {
     HierarchyMaker(PHARE::initializer::PHAREDict& dict)
-        : hierarchy{std::make_shared<PHARE::amr::DimHierarchy<_dim>>(dict)}
+        : hierarchy{std::make_shared<PHARE::amr::DimHierarchy<dim>>(dict)}
     {
     }
     std::shared_ptr<PHARE::amr::Hierarchy> hierarchy;
@@ -34,19 +42,17 @@ struct HierarchyMaker
 
 
 
-template<std::size_t _dim, std::size_t _interp, std::size_t _nbRefinePart>
-struct SimulatorTestParam : private HierarchyMaker<_dim>,
-                            public PHARE::Simulator<_dim, _interp, _nbRefinePart>
+template<auto opts>
+struct SimulatorTestParam : private HierarchyMaker<opts.dimension>, public PHARE::Simulator<opts>
 {
-    static constexpr std::size_t dim          = _dim;
-    static constexpr std::size_t interp       = _interp;
-    static constexpr std::size_t nbRefinePart = _nbRefinePart;
+    static constexpr std::size_t dim = opts.dimension;
 
-    using Simulator   = PHARE::Simulator<dim, interp, nbRefinePart>;
-    using PHARETypes  = PHARE::PHARE_Types<dim, interp, nbRefinePart>;
+
+    using Simulator   = PHARE::Simulator<opts>;
+    using PHARETypes  = PHARE::PHARE_Types<opts>;
     using Hierarchy   = PHARE::amr::Hierarchy;
-    using HybridModel = typename PHARETypes::HybridModel_t;
-    using MHDModel    = typename PHARETypes::MHDModel_t;
+    using HybridModel = PHARETypes::HybridModel_t;
+    using MHDModel    = PHARETypes::MHDModel_t;
     using HierarchyMaker<dim>::hierarchy;
 
     auto& dict(std::string job_py)
@@ -62,7 +68,7 @@ struct SimulatorTestParam : private HierarchyMaker<_dim>,
     }
 
     SimulatorTestParam(std::string job_py = "job")
-        : HierarchyMaker<_dim>{dict(job_py)}
+        : HierarchyMaker<dim>{dict(job_py)}
         , Simulator{dict(job_py), this->hierarchy}
     {
         Simulator::initialize();
@@ -76,7 +82,7 @@ struct SimulatorTest : public ::testing::Test
 {
 };
 
-using Simulators = testing::Types<SimulatorTestParam<1, 1, 2>>;
+using Simulators = testing::Types<SimulatorTestParam<SimOpts::make(1, 1, 2)>>;
 TYPED_TEST_SUITE(SimulatorTest, Simulators);
 
 
@@ -85,13 +91,19 @@ struct Simulator1dTest : public ::testing::Test
 {
 };
 
-
+// clang-format off
 using Simulators1d = testing::Types<
-    SimulatorTestParam<1, 1, 2>, SimulatorTestParam<1, 1, 3>, SimulatorTestParam<1, 2, 2>,
-    SimulatorTestParam<1, 2, 3>, SimulatorTestParam<1, 2, 4>, SimulatorTestParam<1, 3, 2>,
-    SimulatorTestParam<1, 3, 3>, SimulatorTestParam<1, 3, 4>, SimulatorTestParam<1, 3, 5>>;
-TYPED_TEST_SUITE(Simulator1dTest, Simulators1d);
+    SimulatorTestParam<SimOpts::make(1, 1, 2)>, SimulatorTestParam<SimOpts::make(1, 1, 3)>,
+    SimulatorTestParam<SimOpts::make(1, 2, 2)>, SimulatorTestParam<SimOpts::make(1, 2, 3)>,
+    SimulatorTestParam<SimOpts::make(1, 2, 4)>, SimulatorTestParam<SimOpts::make(1, 3, 2)>,
+    SimulatorTestParam<SimOpts::make(1, 3, 3)>, SimulatorTestParam<SimOpts::make(1, 3, 4)>,
+    SimulatorTestParam<SimOpts::make(1, 3, 5)>
 
+    // ,SimulatorTestParam<SimOpts{1, 1, AoSTS, AllocatorMode::CPU}>
+
+>;
+TYPED_TEST_SUITE(Simulator1dTest, Simulators1d);
+// clang-format on
 
 template<typename SimulatorParam>
 struct Simulator2dTest : public ::testing::Test
@@ -100,11 +112,13 @@ struct Simulator2dTest : public ::testing::Test
 
 
 using Simulators2d = testing::Types<
-    SimulatorTestParam<2, 1, 4>, SimulatorTestParam<2, 1, 5>, SimulatorTestParam<2, 1, 8>,
-    SimulatorTestParam<2, 1, 9>, SimulatorTestParam<2, 2, 4>, SimulatorTestParam<2, 2, 5>,
-    SimulatorTestParam<2, 2, 8>, SimulatorTestParam<2, 2, 9>, SimulatorTestParam<2, 2, 16>,
-    SimulatorTestParam<2, 3, 4>, SimulatorTestParam<2, 3, 5>, SimulatorTestParam<2, 3, 8>,
-    SimulatorTestParam<2, 3, 25>>;
+    SimulatorTestParam<SimOpts::make(2, 1, 4)>, SimulatorTestParam<SimOpts::make(2, 1, 5)>,
+    SimulatorTestParam<SimOpts::make(2, 1, 8)>, SimulatorTestParam<SimOpts::make(2, 1, 9)>,
+    SimulatorTestParam<SimOpts::make(2, 2, 4)>, SimulatorTestParam<SimOpts::make(2, 2, 5)>,
+    SimulatorTestParam<SimOpts::make(2, 2, 8)>, SimulatorTestParam<SimOpts::make(2, 2, 9)>,
+    SimulatorTestParam<SimOpts::make(2, 2, 16)>, SimulatorTestParam<SimOpts::make(2, 3, 4)>,
+    SimulatorTestParam<SimOpts::make(2, 3, 5)>, SimulatorTestParam<SimOpts::make(2, 3, 8)>,
+    SimulatorTestParam<SimOpts::make(2, 3, 25)>>;
 TYPED_TEST_SUITE(Simulator2dTest, Simulators2d);
 
 

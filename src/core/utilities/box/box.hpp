@@ -3,22 +3,42 @@
 
 
 #include "core/def.hpp"
+#include "core/logger.hpp"
 #include "core/utilities/types.hpp"
 #include "core/utilities/point/point.hpp"
 #include "core/utilities/meta/meta_utilities.hpp"
 
+
 #include <limits>
+#include <tuple>
+#include <utility>
+#include <vector>
 #include <cstddef>
-#include <optional>
 #include <iostream>
+#include <optional>
 #include <algorithm>
+#include <unordered_map>
+
 
 namespace PHARE::core
 {
 template<typename Type, std::size_t dim>
 class box_iterator;
 
-
+namespace
+{
+    template<std::size_t dim, typename Point>
+    void constexpr verify(Point const& lower, Point const& upper)
+    {
+        for (std::uint16_t i = 0; i < dim; ++i)
+            if (lower[i] > upper[i])
+            {
+                PHARE_LOG_LINE_STR("Invalid box " + std::to_string(lower) + "-"
+                                   + std::to_string(upper));
+                std::abort();
+            }
+    }
+} // namespace
 
 /** Represents a 1D, 2D or 3D box of integer or floating point
  * points.
@@ -26,27 +46,37 @@ class box_iterator;
 template<typename Type, std::size_t dim>
 struct Box
 {
-    static size_t const dimension = dim;
-    using Point_t                 = Point<Type, dim>;
+    auto static constexpr dimension = dim;
+    using Point_t                   = Point<Type, dim>;
+    using value_type                = Point<Type, dim>;
 
 
-    Point_t lower;
-    Point_t upper;
 
-    Box() = default;
+    Point_t lower{ConstArray<Type, dim>()};
+    Point_t upper{ConstArray<Type, dim>()};
+
+
+    Box()                      = default;
+    Box(Box const&)            = default;
+    Box(Box&&)                 = default;
+    Box& operator=(Box const&) = default;
+    Box& operator=(Box&&)      = default;
+
 
     constexpr Box(std::array<Type, dim> const& _lower, std::array<Type, dim> const& _upper)
         : lower{_lower}
         , upper{_upper}
     {
+        // PHARE_DEBUG_DO(verify<dim>(lower, upper));
     }
 
-    template<typename T, std::size_t s>
-    Box(Point<T, s> const& _lower, Point<T, s> const& _upper)
+    template<typename T>
+    Box(Point<T, dim> const& _lower, Point<T, dim> const& _upper)
         : lower{_lower}
         , upper{_upper}
     {
         assert(lower <= upper);
+        PHARE_DEBUG_DO(verify<dim>(lower, upper));
     }
 
     template<typename T2>
@@ -54,6 +84,7 @@ struct Box
     {
         return box.lower == lower && box.upper == upper;
     }
+    NO_DISCARD bool operator!=(Box const& other) const { return !(*this == other); }
 
     NO_DISCARD auto operator*(Box const& other) const
     {
@@ -67,32 +98,49 @@ struct Box
         }
         return std::optional<Box>{intersection};
     }
+    NO_DISCARD auto operator*(Type const& v) const { return Box{lower * v, upper * v}; }
+    NO_DISCARD auto operator/(Type const& v) const { return Box{lower / v, upper / v}; }
 
-    NO_DISCARD auto operator-(Box const& that) const
+    NO_DISCARD auto unsafe_intersection(Box const& other) const _PHARE_ALL_FN_ // no optional on gpu
     {
-        return Box{lower - that.lower, upper - that.upper};
+        Box intersection{other};
+        for (auto idim = 0u; idim < dim; ++idim)
+        {
+            intersection.lower[idim] = std::max(lower[idim], other.lower[idim]);
+            intersection.upper[idim] = std::min(upper[idim], other.upper[idim]);
+            assert(intersection.lower[idim] < intersection.upper[idim]);
+        }
+        return intersection;
     }
+
 
 
     NO_DISCARD bool isEmpty() const { return (*this) == Box{}; }
 
-    void grow(Type const& size)
-    {
-        assert(size >= 0);
-        lower -= size;
-        upper += size;
-    }
-
-
     template<typename Size>
     auto& grow(std::array<Size, dim> const& size)
     {
+        return grow(Point_t{size});
+    }
+
+
+    template<typename Modifier>
+    auto& grow(Modifier const& size) _PHARE_ALL_FN_
+    {
+        PHARE_ASSERT(size >= 0);
         lower -= size;
         upper += size;
         return *this;
     }
 
-    auto& shrink(Type const& size)
+    template<typename Size>
+    auto& shrink(std::array<Size, dim> const& size) _PHARE_ALL_FN_
+    {
+        return shrink(Point_t{size});
+    }
+
+    template<typename Modifier>
+    auto& shrink(Modifier const& size) _PHARE_ALL_FN_
     {
         assert(size >= 0);
         lower += size;
@@ -100,27 +148,19 @@ struct Box
         return *this;
     }
 
-    template<typename Size>
-    auto& shrink(std::array<Size, dim> const& size)
-    {
-        lower += size;
-        upper -= size;
-        return *this;
-    }
 
-
-    NO_DISCARD auto shape() const { return upper - lower + 1; }
-    NO_DISCARD auto size() const { return core::product(shape()); }
+    NO_DISCARD auto shape() const _PHARE_ALL_FN_ { return upper - lower + 1; }
+    NO_DISCARD std::size_t size() const _PHARE_ALL_FN_ { return core::product(shape()); }
 
 
     using iterator = box_iterator<Type, dim>;
-    NO_DISCARD auto begin() { return iterator{this, lower}; }
+    NO_DISCARD auto begin() _PHARE_ALL_FN_ { return iterator{this, lower}; }
 
     //   // since the 1D scan of the multidimensional box is done assuming C ordering
     //   // the end (in the sense of container.end()) is one beyond last for the last
     //   // direction only, previous dimensions have not reached the end.
-    NO_DISCARD auto begin() const { return iterator{this, lower}; }
-    NO_DISCARD auto end()
+    NO_DISCARD auto begin() const _PHARE_ALL_FN_ { return iterator{this, lower}; }
+    NO_DISCARD auto end() _PHARE_ALL_FN_
     {
         static_assert(dim <= 3 and dim > 0);
         // following could maybe be a one liner?
@@ -138,7 +178,7 @@ struct Box
         }
     }
 
-    NO_DISCARD auto end() const
+    NO_DISCARD auto end() const _PHARE_ALL_FN_
     {
         static_assert(dim <= 3 and dim > 0);
         if constexpr (dim == 1)
@@ -154,7 +194,6 @@ struct Box
             return iterator{this, {upper[0] + 1, upper[1] + 1, upper[2] + 1}};
         }
     }
-    using value_type = Type;
 
 
     NO_DISCARD constexpr static std::size_t nbrRemainBoxes()
@@ -173,25 +212,29 @@ struct Box
 
 
     std::vector<Box> remove(Box const& that) const;
+    std::vector<Box> remove_all(auto&&... them) const;
     Box merge(Box const& that) const;
     Box remove_edge(Box const& that) const;
 };
+
+
 
 template<typename Type, std::size_t dim>
 class box_iterator
 {
 public:
-    box_iterator(Box<Type, dim> const* box, Point<Type, dim> index = Point<Type, dim>{})
-        : box_{box}
-        , index_{index}
+    box_iterator(Box<Type, dim> const* box,
+                 Point<Type, dim> index = Point<Type, dim>{}) _PHARE_ALL_FN_ : box_{box},
+                                                                               index_{index}
     {
     }
 
 public:
-    auto& operator*() const { return index_; }
-    auto operator->() const { return &index_; }
+    NO_DISCARD auto& operator*() const _PHARE_ALL_FN_ { return index_; }
+    // NO_DISCARD auto operator->() const _PHARE_ALL_FN_ { return &index_; }
 
-    void increment(std::size_t idim)
+
+    void increment(std::size_t idim) _PHARE_ALL_FN_
     {
         index_[idim]++;
         if (idim == 0)
@@ -204,13 +247,35 @@ public:
         }
     }
 
-    box_iterator& operator++()
+    auto& operator++() _PHARE_ALL_FN_
     {
         increment(dim - 1);
         return *this;
     }
 
-    bool operator!=(box_iterator const& other) const
+    auto& operator+(std::uint32_t s) _PHARE_ALL_FN_
+    {
+        auto lo = box_->upper;
+        for (std::uint16_t d = 0; d < dim; ++d)
+            lo[d] += 1 - box_->lower[d];
+        if constexpr (dim == 3)
+        {
+            auto prod = lo[0] * lo[1];
+            auto div  = s / prod;
+            s -= div * prod;
+            index_[2] += div;
+        }
+        if constexpr (dim > 1)
+        {
+            auto div = s / lo[0];
+            s -= div * lo[0];
+            index_[1] += div;
+        }
+        index_[0] += s;
+        return *this;
+    }
+
+    bool operator!=(box_iterator const& other) const _PHARE_ALL_FN_
     {
         return box_ != other.box_ or index_ != other.index_;
     }
@@ -226,46 +291,11 @@ template<typename T, std::size_t s>
 Box(Point<T, s> lower, Point<T, s> upper) -> Box<T, s>;
 
 
-
-/** this overload of isIn takes a Point and a Container of boxes
- * and returns true if the Point is at least in one of the boxes.
- * Returns occurs at the first box the point is in.
- */
-template<typename Point, typename BoxContainer, is_iterable<BoxContainer> = dummy::value>
-bool isIn(Point const& point, BoxContainer const& boxes)
-{
-    if (boxes.size() == 0)
-        return false;
-
-
-    static_assert(std::is_same<typename Point::value_type,
-                               typename BoxContainer::value_type::value_type>::value,
-                  "Box and Point should have the same data type");
-
-
-    auto isIn1D = [](typename Point::value_type pos, typename Point::value_type lower,
-                     typename Point::value_type upper) { return pos >= lower && pos <= upper; };
-
-    for (auto const& box : boxes)
-    {
-        bool pointInBox = true;
-
-        for (auto iDim = 0u; iDim < Point::dimension; ++iDim)
-        {
-            pointInBox = pointInBox && isIn1D(point[iDim], box.lower[iDim], box.upper[iDim]);
-        }
-        if (pointInBox)
-            return pointInBox;
-    }
-
-    return false;
-}
-
-/** This overload of isIn does the same as the one above but takes only
+/** This overload of isIn does the same as the one below but takes only
  * one box.
  */
-template<template<typename, std::size_t> typename Point, typename Type, std::size_t SIZE>
-NO_DISCARD bool isIn(Point<Type, SIZE> const& point, Box<Type, SIZE> const& box)
+template<template<typename, std::size_t> typename Point_t, typename Type, std::size_t SIZE>
+NO_DISCARD bool isIn(Point_t<Type, SIZE> const& point, Box<Type, SIZE> const& box) _PHARE_ALL_FN_
 {
     auto isIn1D = [](auto const pos, auto const lower, auto const upper) {
         return pos >= lower && pos <= upper;
@@ -280,6 +310,46 @@ NO_DISCARD bool isIn(Point<Type, SIZE> const& point, Box<Type, SIZE> const& box)
 
     return false;
 }
+
+template<typename Particle, typename Type>
+NO_DISCARD bool isIn(Particle const& particle,
+                     Box<Type, Particle::dimension> const& box) _PHARE_ALL_FN_
+{
+    return isIn(particle.iCell(), box);
+}
+
+
+
+/** this overload of isIn takes a Point and a Container of boxes
+ * and returns true if the Point is at least in one of the boxes.
+ * Returns occurs at the first box the point is in.
+ */
+
+template<template<typename, std::size_t> typename ICell, typename T, std::size_t S,
+         typename BoxContainer, is_iterable<BoxContainer> = dummy::value>
+bool isIn(ICell<T, S> const& icell, BoxContainer const& boxes) _PHARE_ALL_FN_
+{
+    if (boxes.size() == 0)
+        return false;
+
+    auto isIn1D = [](auto const& pos, auto const& lower, auto const& upper) {
+        return pos >= lower && pos <= upper;
+    };
+
+    for (auto const& box : boxes)
+    {
+        bool pointInBox = true;
+
+        for (auto iDim = 0u; iDim < S; ++iDim)
+            pointInBox = pointInBox && isIn1D(icell[iDim], box.lower[iDim], box.upper[iDim]);
+        if (pointInBox)
+            return pointInBox;
+    }
+
+    return false;
+}
+
+
 
 template<typename Particle, typename Type>
 NO_DISCARD auto isIn(Particle const& particle, Box<Type, Particle::dimension> const& box)
@@ -304,8 +374,18 @@ struct InBox
 };
 
 
+
 template<typename Type, std::size_t dim, typename OType>
-NO_DISCARD Box<Type, dim> grow(Box<Type, dim> const& box, OType const& size)
+Box<Type, dim> grow(Box<Type, dim> const& box, std::array<Type, dim> const& by) _PHARE_ALL_FN_
+{
+    auto copy{box};
+    copy.grow(by);
+    return copy;
+}
+
+
+template<typename Type, std::size_t dim, typename OType>
+Box<Type, dim> grow(Box<Type, dim> const& box, OType const& size) _PHARE_ALL_FN_
 {
     auto copy{box};
     copy.grow(size);
@@ -313,12 +393,36 @@ NO_DISCARD Box<Type, dim> grow(Box<Type, dim> const& box, OType const& size)
 }
 
 template<typename Type, std::size_t dim, typename T2>
-NO_DISCARD Box<Type, dim> shrink(Box<Type, dim> const& box, T2 const& size)
+NO_DISCARD Box<Type, dim> shrink(Box<Type, dim> const& box, T2 const& size) _PHARE_ALL_FN_
 {
     auto copy{box};
     copy.shrink(size);
     return copy;
 }
+
+
+template<typename Type, std::size_t dim, typename Shifter>
+NO_DISCARD Box<Type, dim> shift(Box<Type, dim> const& box, Shifter const& offset)
+{
+    auto copy{box};
+    copy.lower += offset;
+    copy.upper += offset;
+    return copy;
+}
+
+
+
+template<std::uint8_t idx, typename Type, std::size_t dim>
+NO_DISCARD Box<Type, dim> shift_idx(Box<Type, dim> const& box, Type const& offset)
+{
+    auto copy{box};
+    copy.lower[idx] += offset;
+    copy.upper[idx] += offset;
+    return copy;
+}
+
+
+
 
 template<typename Type, std::size_t dim>
 NO_DISCARD Box<Type, dim> emptyBox()
@@ -347,12 +451,13 @@ std::vector<Box<Type, dim>> Box<Type, dim>::remove(Box<Type, dim> const& to_remo
     using box_t = Box<Type, dim>;
     using _m    = std::unordered_map<std::uint16_t, std::uint32_t>;
 
-    auto const box = *this;
 
-    auto overlap = box * to_remove;
+    auto const box = *this;
+    auto overlap   = box * to_remove;
 
     if (not overlap)
-        return std::vector{box};
+        return std::vector{*this};
+
 
     auto copy = [](auto cpy, auto const& replace) {
         for (auto const& [i, v] : replace)
@@ -361,6 +466,7 @@ std::vector<Box<Type, dim>> Box<Type, dim>::remove(Box<Type, dim> const& to_remo
     };
 
     auto intersection = *overlap;
+
 
     std::unordered_map<std::string, box_t> boxes;
 
@@ -405,6 +511,43 @@ std::vector<Box<Type, dim>> Box<Type, dim>::remove(Box<Type, dim> const& to_remo
 
 
 template<typename Type, std::size_t dim>
+std::vector<Box<Type, dim>> Box<Type, dim>::remove_all(auto&&... them) const
+{
+    auto const add_to_vec = [](auto& vec, auto&& res) {
+        for (auto const& r : res)
+            vec.emplace_back(r);
+    };
+
+    auto const&& arr = std::array{them...};
+
+    std::vector<Box<Type, dim>> remaining = this->remove(arr[0]);
+    for (std::uint16_t a = 1; a < arr.size(); ++a)
+    {
+        auto const& to_rm = arr[a];
+        std::vector<Box<Type, dim>> tmp;
+        std::vector<std::size_t> remove;
+
+        for (std::uint16_t r = 0; r < remaining.size(); ++r)
+        {
+            auto const& rem = remaining[r];
+            if (rem * to_rm)
+            {
+                remove.emplace_back(r);
+                add_to_vec(tmp, rem.remove(to_rm));
+            }
+        }
+
+        for (auto it = remove.rbegin(); it != remove.rend(); ++it)
+            remaining.erase(remaining.begin() + *it);
+
+        add_to_vec(remaining, tmp);
+    }
+
+    return remaining;
+}
+
+
+template<typename Type, std::size_t dim>
 Box<Type, dim> Box<Type, dim>::merge(Box<Type, dim> const& to_merge) const
 {
     Box<Type, dim> merged{*this};
@@ -435,6 +578,26 @@ Box<Type, dim> Box<Type, dim>::remove_edge(Box<Type, dim> const& to_remove) cons
     return leftover;
 }
 
+template<typename Boxes>
+bool any_overlaps(Boxes const& boxes)
+{
+    for (std::size_t i = 0; i < boxes.size() - 1; ++i)
+        for (std::size_t j = i + 1; j < boxes.size(); ++j)
+            if (auto overlap = boxes[i] * boxes[j])
+                return true;
+    return false;
+}
+
+template<typename Boxes>
+bool any_overlaps(Boxes const& boxes, typename Boxes::value_type const& box)
+{
+    for (std::size_t i = 0; i < boxes.size(); ++i)
+        if (auto overlap = boxes[i] * box)
+            return true;
+    return false;
+}
+
+
 template<typename BoxHavers, typename Accessor>
 bool any_overlaps_in(BoxHavers const& havers, Accessor&& fn)
 {
@@ -446,33 +609,91 @@ bool any_overlaps_in(BoxHavers const& havers, Accessor&& fn)
     return false;
 }
 
-template<typename Type, std::size_t dim>
-NO_DISCARD Box<Type, dim> shift(Box<Type, dim> const& box, Type const& offset)
+
+
+
+template<typename Boxes, typename Box>
+bool all_overlaps(Boxes const& boxes, Box const& box)
 {
-    auto copy{box};
-    copy.lower += offset;
-    copy.upper += offset;
-    return copy;
+    std::uint32_t overlaps = 0;
+    for (std::size_t i = 0; i < boxes.size(); ++i)
+        if (auto overlap = boxes[i] * box)
+            ++overlaps;
+    return overlaps == boxes.size();
 }
 
-template<template<typename, std::size_t> typename Point_t, typename Type, std::size_t dim>
-NO_DISCARD Box<Type, dim> shift(Box<Type, dim> const& box, Point_t<Type, dim> const& offset)
+template<typename Boxes>
+Boxes distinct_overlaps(Boxes& boxes)
 {
-    auto copy{box};
-    for (std::uint8_t i = 0; i < dim; ++i)
-        copy.lower[i] += offset[i], copy.upper[i] += offset[i];
-    return copy;
+    for (std::size_t i = 0; i < boxes.size() - 1; ++i)
+    {
+        auto const& a = boxes[i];
+
+        for (std::size_t j = i + 1; j < boxes.size(); ++j)
+        {
+            auto const& b = boxes[j];
+
+            if (auto overlap = a * b)
+            {
+                auto remaining0 = a.remove(b);
+                auto remaining1 = b.remove(a);
+
+                boxes.insert(boxes.end(), remaining0.begin(), remaining0.end());
+                boxes.insert(boxes.end(), remaining1.begin(), remaining1.end());
+
+                boxes[i] = *overlap;
+                boxes.erase(boxes.begin() + j);
+
+                return distinct_overlaps(boxes); // dragons
+            }
+        }
+    }
+
+    return boxes;
 }
 
-template<std::uint8_t idx, typename Type, std::size_t dim>
-NO_DISCARD Box<Type, dim> shift_idx(Box<Type, dim> const& box, Type const& offset)
+template<typename Boxes, typename Box>
+auto distinct_overlaps(Boxes const& boxes, Box const& box)
 {
-    auto copy{box};
-    copy.lower[idx] += offset;
-    copy.upper[idx] += offset;
-    return copy;
+    Boxes overlaps;
+
+    for (std::size_t i = 0; i < boxes.size(); ++i)
+        if (auto overlap = boxes[i] * box)
+            overlaps.emplace_back(*overlap);
+
+    return distinct_overlaps(overlaps);
+}
+
+
+template<std::size_t dim>
+auto box_from_zero_to_upper(std::array<std::uint32_t, dim> const& upper)
+{
+    return core::Box<std::uint32_t, dim>{core::Point{core::ConstArray<std::uint32_t, dim>()},
+                                         core::Point{upper}};
+}
+
+template<std::size_t dim>
+auto box_from_zero_to_upper_minus_one(std::array<std::uint32_t, dim> const& upper) _PHARE_ALL_FN_
+{
+    return core::Box<std::uint32_t, dim>{
+        core::Point{core::ConstArray<std::uint32_t, dim>()},
+        core::Point{core::generate_from([](auto& u) { return u - 1; }, upper)}};
+}
+
+template<std::size_t SIZE>
+NO_DISCARD auto as_unsigned(Box<int, SIZE> const& box) _PHARE_ALL_FN_
+{
+    return Box<std::uint32_t, SIZE>{box.lower.as_unsigned(), box.upper.as_unsigned()};
+}
+
+template<template<typename, std::size_t> typename Point_t, typename Type, std::size_t SIZE>
+NO_DISCARD auto asBox(Point_t<Type, SIZE> const& point) _PHARE_ALL_FN_
+{
+    return Box<Type, SIZE>{point, point};
 }
 
 } // namespace PHARE::core
+
+
 
 #endif

@@ -1,9 +1,12 @@
 
+
+#include "core/def/phare_config.hpp"
 #include "phare_core.hpp"
 #include "phare/phare.hpp"
 #include "core/utilities/types.hpp"
 #include "amr/data/particles/particles_data.hpp"
 
+#include "tests/amr/amr.hpp"
 #include "tests/core/data/gridlayout/test_gridlayout.hpp"
 #include "tests/core/data/particles/test_particles_fixtures.hpp"
 
@@ -12,11 +15,20 @@
 #include <SAMRAI/pdat/CellGeometry.h>
 
 
+namespace PHARE::amr
+{
+
 std::size_t constexpr static interp      = 1;
 std::size_t constexpr static cells       = 5;
 std::size_t constexpr static ppc         = 10;
 std::size_t constexpr static ghost_cells = 1;
 
+auto static particles_dict()
+{
+    initializer::PHAREDict dict;
+    dict["interp_order"] = interp;
+    return dict;
+}
 
 template<typename AParticlesData>
 struct Patch
@@ -26,15 +38,16 @@ struct Patch
     using ParticleArray_t              = AParticlesData::ParticleArray_t;
     using ParticlesData_t              = PHARE::amr::ParticlesData<ParticleArray_t>;
     auto constexpr static nbPartGhosts = GridLayout_t::nbrParticleGhosts();
+    static_assert(nbPartGhosts == ghost_cells);
 
-    Patch(auto const& box)
-        : layout{box}
+    Patch(GridLayout_t const& _layout)
+        : layout{_layout}
     {
     }
 
     auto static overlap(Patch const& src, Patch& dst)
     {
-        return overlap(src, dst, PHARE::core::ConstArray<int, dim>());
+        return overlap(src, dst, core::ConstArray<int, dim>());
     }
 
     auto static overlap(Patch const& src, Patch& dst, auto const shift)
@@ -53,16 +66,19 @@ struct Patch
                 *src.geom, srcMask, fillBox, overwriteInterior, transformation))};
     }
 
+
     SAMRAI::tbox::Dimension static inline const dimension{dim};
     SAMRAI::hier::BlockId static inline const blockId{0};
-    SAMRAI::hier::IntVector static inline const ghostVec{dimension, ghost_cells};
+    SAMRAI::hier::IntVector static inline const ghostVec{dimension, nbPartGhosts};
 
     GridLayout_t const layout;
-    SAMRAI::hier::Box const domain{PHARE::amr::samrai_box_from(layout.AMRBox())};
+    SAMRAI::hier::Box const domain{samrai_box_from(layout.AMRBox())};
     std::shared_ptr<SAMRAI::hier::BoxGeometry> const geom{
         std::make_shared<SAMRAI::pdat::CellGeometry>(domain, ghostVec)};
-    std::unique_ptr<ParticlesData_t> data{
-        std::make_unique<ParticlesData_t>(domain, ghostVec, "name")};
+    std::unique_ptr<ParticlesData<ParticleArray_t>> data{
+        std::make_unique<ParticlesData<ParticleArray_t>>(domain, ghostVec, "name", [&]() {
+            return make_particles<ParticleArray_t>(*layout, particles_dict());
+        })};
     SAMRAI::hier::Box const mask{data->getGhostBox()};
 };
 
@@ -114,14 +130,24 @@ auto static make_shift_for(PHARE::core::Box<T, D> const& box)
     }
 }
 
-template<std::size_t _dim>
+
+template<std::size_t _dim, auto lm = core::LayoutMode::AoS, auto am = AllocatorMode::CPU,
+         std::uint8_t _impl = 0>
 struct TestParam
 {
-    auto constexpr static dim = _dim;
-    using PhareTypes          = PHARE::core::PHARE_Types<dim, interp>;
-    using GridLayout_t        = TestGridLayout<typename PhareTypes::GridLayout_t>;
-    using Box_t               = PHARE::core::Box<int, dim>;
-    using ParticleArray_t     = PHARE::core::ParticleArray<dim>;
+    static_assert(core::all_are<core::LayoutMode>(lm));
+    static_assert(core::all_are<AllocatorMode>(am));
+
+    auto constexpr static dim         = _dim;
+    auto constexpr static layout_mode = lm;
+    auto constexpr static alloc_mode  = am;
+    auto constexpr static impl        = _impl;
+
+
+    using PhareTypes      = PHARE::core::PHARE_Types<SimOpts{dim, interp}>;
+    using GridLayout_t    = TestGridLayout<typename PhareTypes::GridLayout_t>;
+    using Box_t           = PHARE::core::Box<int, dim>;
+    using ParticleArray_t = PHARE::core::ParticleArray<dim>;
 };
 
 
@@ -185,8 +211,9 @@ struct AParticlesDataTest<3, TestParam>
 
     AParticlesDataTest()
     {
-        patches.reserve(3 * 3);
+        patches.reserve(3 * 3 * 3);
         auto const off = cells - 1;
+
         for (std::uint8_t i = 0; i < 3; ++i)
             for (std::uint8_t j = 0; j < 3; ++j)
                 for (std::uint8_t k = 0; k < 3; ++k)
@@ -237,15 +264,17 @@ struct ParticlesDataTest : public ::testing::Test,
 using ParticlesDatas = testing::Types<TestParam<1>, TestParam<2> /*,TestParam<3>*/>;
 
 
+
+
 TYPED_TEST_SUITE(ParticlesDataTest, ParticlesDatas);
 
-namespace PHARE::core
-{
+
 TYPED_TEST(ParticlesDataTest, copyWorks)
 {
     auto constexpr static dim = TestFixture::dim;
     std::size_t const pid     = this->mid_pid();
     auto& dst                 = this->patches[pid];
+
 
     for (std::size_t i = 0; i < pid; ++i)
         dst.data->copy(*this->patches[i].data);
@@ -264,12 +293,14 @@ TYPED_TEST(ParticlesDataTest, copyAtPeriodicBoundaryWorks)
     auto& dst                 = this->patches[pid];
     auto const dst_ghostbox   = grow(dst.layout.AMRBox(), 1);
 
+
     // non-periodic neighbours
     for (std::size_t i = pid + 1; i < this->patches.size(); ++i)
         if (auto const overlap = dst_ghostbox * this->patches[i].layout.AMRBox())
             dst.data->copy(*this->patches[i].data);
 
-    // // periodic neighbours
+
+    // periodic neighbours
     for (auto const& shifter : make_shift_for(dst.layout.AMRBox()))
     {
         auto const shift_box = shift(dst.layout.AMRBox(), shifter);
@@ -324,6 +355,7 @@ TYPED_TEST(ParticlesDataTest, packAtPeriodicBoundaryWorks)
     auto& dst                 = this->patches[pid];
     auto const dst_ghostbox   = grow(dst.layout.AMRBox(), 1);
 
+
     auto for_neighbour = [&](auto i, auto shift) {
         auto const cellOverlap = TestFixture::overlap(this->patches[i], dst, shift);
         auto const& src        = this->patches[i];
@@ -339,7 +371,7 @@ TYPED_TEST(ParticlesDataTest, packAtPeriodicBoundaryWorks)
     // non-periodic neighbours
     for (std::size_t i = pid + 1; i < this->patches.size(); ++i)
         if (auto const overlap = dst_ghostbox * this->patches[i].layout.AMRBox())
-            for_neighbour(i, PHARE::core::ConstArray<int, dim>());
+            for_neighbour(i, core::ConstArray<int, dim>());
 
     // periodic neighbours
     for (auto const& shifter : make_shift_for(dst.layout.AMRBox()))
@@ -357,12 +389,12 @@ TYPED_TEST(ParticlesDataTest, packAtPeriodicBoundaryWorks)
     EXPECT_EQ(expected, dst.data->patchGhostParticles.size());
 }
 
-} // namespace PHARE::core
+} // namespace PHARE::amr
 
 
 int main(int argc, char** argv)
 {
-    PHARE::SamraiLifeCycle samsam{argc, argv};
+    PHARE::test::amr::SamraiLifeCycle samsam{argc, argv};
     ::testing::InitGoogleTest(&argc, argv);
     return RUN_ALL_TESTS();
 }

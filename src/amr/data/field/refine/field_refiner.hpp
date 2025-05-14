@@ -3,13 +3,15 @@
 
 
 #include "core/def/phare_mpi.hpp"
+#include "core/data/grid/grid_tiles.hpp"
 
-
-#include "core/data/grid/gridlayoutdefs.hpp"
-#include "core/data/field/field.hpp"
 #include "field_linear_refine.hpp"
-#include "core/utilities/constants.hpp"
+// #include "core/data/field/field.hpp"
+// #include "core/utilities/constants.hpp"
 #include "core/utilities/point/point.hpp"
+#include "core/data/grid/gridlayoutdefs.hpp"
+
+#include "amr/resources_manager/amr_utils.hpp"
 
 #include <SAMRAI/hier/Box.h>
 
@@ -58,6 +60,15 @@ namespace amr
         template<typename FieldT>
         void operator()(FieldT const& sourceField, FieldT& destinationField,
                         core::Point<int, dimension> fineIndex)
+        {
+            if constexpr (core::is_field_tile_set_v<FieldT>) {}
+            else
+                field_t(sourceField, destinationField, fineIndex);
+        }
+
+        template<typename FieldT>
+        void field_t(FieldT const& sourceField, FieldT& destinationField,
+                     core::Point<int, dimension> fineIndex)
         {
             TBOX_ASSERT(sourceField.physicalQuantity() == destinationField.physicalQuantity());
 
