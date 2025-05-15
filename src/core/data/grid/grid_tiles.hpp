@@ -54,6 +54,12 @@ public:
         return layout_;
     }
 
+    auto ghost_box() const { return layout_.AMRGhostBoxFor(physicalQuantity()); }
+    auto field_box() const
+    {
+        return shrink(layout_.AMRGhostBoxFor(physicalQuantity()), GridLayout_t::nbrGhosts());
+    }
+
 
     template<template<typename, std::size_t> typename Point_t>
     auto& operator()(Point_t<std::uint32_t, dimension> const& point) _PHARE_ALL_FN_
@@ -315,15 +321,27 @@ public:
     NO_DISCARD auto at(auto const&... args) const { return super().at(args...); }
     // NO_DISCARD auto size() const _PHARE_ALL_FN_ { return layout_.allocSize(qty_); }
 
-private:
     void check() const
     {
         for (auto& tile : super())
         {
             assert(tile().size() < static_cast<std::size_t>(1e6));
+            for (auto const& e : tile())
+                if (std::isnan(e))
+                    throw std::runtime_error("NAN");
         }
     }
 
+
+    void notZero() const
+    {
+        for (auto& tile : super())
+            for (auto const& e : tile())
+                if (e == 0)
+                    throw std::runtime_error("ZERO");
+    }
+
+private:
     Super& super() { return *this; }
     Super const& super() const { return *this; }
 
@@ -434,11 +452,18 @@ private:
 };
 
 
-template<typename Grid_t, typename GridTiles_t>
-auto& reduce_into(GridTiles_t const& tiles, Grid_t& grid)
+template<typename Operator, typename Grid_t, typename GridTiles_t>
+auto& reduce_into_(GridTiles_t const& tiles, Grid_t& grid)
 {
-    // if (tiles.size() > grid.vector().capacity())
-    //     throw std::runtime_error("Cannot reduce into grid of smaller size");
+    auto const pq = tiles.physicalQuantity();
+
+    auto get_box = [&](auto const& tile) {
+        if constexpr (std::is_same_v<Operator, PlusEquals<typename Operator::value_type>>)
+            return tile.layout().AMRGhostBoxFor(pq);
+        else
+            return shrink(tile.layout().AMRGhostBoxFor(pq), tile.layout().nbrGhosts());
+    };
+
 
     grid.reshape(tiles.shape());
     grid.zero();
@@ -449,13 +474,26 @@ auto& reduce_into(GridTiles_t const& tiles, Grid_t& grid)
     {
         using Tile_vt           = std::decay_t<decltype(tile)>::Super;
         auto const& tile_layout = tile.layout();
-        auto const& tile_box    = shrink(tile_layout.AMRGhostBoxFor(tiles.physicalQuantity()),
-                                         patch_layout.nbrGhosts());
+        auto const& tile_box    = get_box(tile);
 
-        FieldBox<Grid_t>{grid, patch_layout, tile_box}.template op</*Plus*/ Equals<double>>(
-            core::FieldBox<Tile_vt const>{*tile, tile_layout, tile_box});
+        FieldBox<Grid_t>{grid, patch_layout, patch_layout.AMRToLocal(tile_box)}
+            .template op<Operator>(core::FieldBox<Tile_vt const>{*tile, tile_layout, tile_box});
     }
 
+    return grid;
+}
+
+template<typename Grid_t, typename GridTiles_t>
+auto& reduce_into(GridTiles_t const& tiles, Grid_t& grid)
+{
+    reduce_into_<Equals<typename Grid_t::value_type>>(tiles, grid);
+    return grid;
+}
+
+template<typename Grid_t, typename GridTiles_t>
+auto& reduce_into_plus(GridTiles_t const& tiles, Grid_t& grid)
+{
+    reduce_into_<PlusEquals<typename Grid_t::value_type>>(tiles, grid);
     return grid;
 }
 
@@ -490,9 +528,22 @@ auto reduce(Tiles const& input)
     else
     {
         using Grid_t = Tiles::grid_type;
-        // using PhysicalQuantity = Tiles::physical_quantity_type;
         Grid_t grid{input.name(), input.physicalQuantity(), input.shape()};
         reduce_into(input, grid);
+        return grid;
+    }
+}
+
+template<typename Tiles>
+auto reduce_plus_equals(Tiles const& input)
+{
+    if constexpr (!is_field_tile_set_v<Tiles>)
+        return input;
+    else
+    {
+        using Grid_t = Tiles::grid_type;
+        Grid_t grid{input.name(), input.physicalQuantity(), input.shape()};
+        reduce_into_plus(input, grid);
         return grid;
     }
 }

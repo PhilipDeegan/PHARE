@@ -473,22 +473,17 @@ namespace core
          * @brief fieldNodeCoordinates returns the coordinate of a multidimensional index
          * associated with a given Field, in physical coordinates.
          */
-        template<typename Field_t, typename... Indexes>
-        NO_DISCARD Point<double, dimension>
-        fieldNodeCoordinates(Field_t const& field, Point<double, dimension> const& origin,
-                             Indexes... index) const
+        template<typename Field_t>
+        NO_DISCARD auto fieldNodeCoordinates(Field_t const& field,
+                                             Point<double, dimension> const& origin,
+                                             Point<std::int32_t, dimension> const coord) const
         {
-            static_assert(sizeof...(Indexes) == dimension,
-                          "Error dimension does not match number of arguments");
-
-
             std::uint32_t iQuantity       = static_cast<std::uint32_t>(field.physicalQuantity());
             constexpr std::uint32_t iDual = static_cast<std::uint32_t>(QtyCentering::dual);
 
 
             constexpr auto& hybridQtyCentering = GridLayoutImpl::hybridQtyCentering_;
 
-            Point<std::int32_t, dimension> coord{static_cast<std::int32_t>(index)...};
 
             Point<double, dimension> position;
 
@@ -520,6 +515,18 @@ namespace core
             }
 
             return position;
+        }
+
+        template<typename Field_t, typename... Indexes>
+        NO_DISCARD auto fieldNodeCoordinates(Field_t const& field,
+                                             Point<double, dimension> const& origin,
+                                             Indexes... index) const
+        {
+            static_assert(sizeof...(Indexes) == dimension,
+                          "Error dimension does not match number of arguments");
+
+            return fieldNodeCoordinates(
+                field, origin, Point<std::int32_t, dimension>{static_cast<std::int32_t>(index)...});
         }
 
 

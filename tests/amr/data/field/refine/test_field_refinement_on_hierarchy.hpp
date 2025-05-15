@@ -43,7 +43,8 @@ using namespace PHARE::amr;
  * and the level 1
  */
 template<typename GridLayoutT, typename FieldT,
-         typename PhysicalQuantity = decltype(std::declval<FieldT>().physicalQuantity())>
+         typename PhysicalQuantity
+         = std::decay_t<decltype(std::declval<FieldT>().physicalQuantity())>>
 class BasicHierarchy
 {
 public:

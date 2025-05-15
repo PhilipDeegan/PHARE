@@ -159,6 +159,7 @@ protected:
             auto&& [a, field, c, d] = this->h5Writer_.modelView()();
             if (reduce)
                 core::reduce_into(f, field);
+            assert(core::array_equals(field.shape(), f.shape()));
             return field;
         }
         else
@@ -174,7 +175,7 @@ protected:
         {
             auto&& [a, b, vf, d] = this->h5Writer_.modelView()();
             if (reduce)
-                for (std::size_t i = 0; i < 3; i++)
+                for (std::size_t i = 0; i < 3; ++i)
                     core::reduce_into(f[i], vf[i]);
             return vf;
         }
@@ -191,7 +192,7 @@ protected:
         {
             auto&& [a, b, c, tf] = this->h5Writer_.modelView()();
             if (reduce)
-                for (std::size_t i = 0; i < 6; i++)
+                for (std::size_t i = 0; i < 6; ++i)
                     core::reduce_into(f[i], tf[i]);
             return tf;
         }

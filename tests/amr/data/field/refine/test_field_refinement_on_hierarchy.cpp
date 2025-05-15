@@ -1,9 +1,12 @@
 
 
 // #include "core/data/field/field.hpp"
-#include "core/data/grid/gridlayout_impl.hpp"
+// #include "core/data/grid/gridlayout_impl.hpp"
 // #include "core/data/grid/gridlayoutdefs.hpp"
-#include "core/data/ndarray/ndarray_vector.hpp"
+// #include "core/data/ndarray/ndarray_vector.hpp"
+#include "core/data/particles/particle_array_def.hpp"
+#include "phare_core.hpp"
+// #include "phare_simulator_options.hpp"
 
 // #include "amr/data/field/field_geometry.hpp"
 // #include "amr/data/field/field_geometry.hpp"
@@ -14,15 +17,26 @@
 // #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-template<typename TypeInfo /*= std::pair<DimConst<1>, InterpConst<1>>*/>
+using SimOpts = PHARE::SimOpts;
+
+template<auto opts_>
+struct TestParam
+{
+    auto static constexpr opts = opts_;
+};
+
+template<typename TestParam_t>
 struct ALinearFieldRefineTest : public ::testing::Test
 {
-    static constexpr auto dim    = typename TypeInfo::first_type{}();
-    static constexpr auto interp = typename TypeInfo::second_type{}();
+    auto static constexpr opts = TestParam_t::opts;
+
+    static constexpr auto dim    = opts.dimension;
+    static constexpr auto interp = opts.interp_order;
     static constexpr auto refine = 2;
 
-    using GridYee = GridLayout<GridLayoutImplYee<dim, interp>>;
-    using GridND  = Grid<NdArrayVector<dim>, HybridQuantity::Scalar>;
+    using PHARE_Types = PHARE::core::PHARE_Types<opts>;
+    using GridYee     = PHARE_Types::GridLayout_t;
+    using GridND      = PHARE_Types::Grid_t;
 
 public:
     void SetUp() override
@@ -38,22 +52,25 @@ protected:
 };
 
 
+// clang-format off
 using LinearFieldRefineTupleInfos
-    = testing::Types<std::pair<DimConst<1>, InterpConst<1>>, std::pair<DimConst<2>, InterpConst<1>>,
-                     std::pair<DimConst<3>, InterpConst<1>>>;
-
+    = testing::Types<
+        TestParam<SimOpts{1}>,
+        TestParam<SimOpts{1, 1, LayoutMode::AoSTS}>,
+        TestParam<SimOpts{2}>, TestParam<SimOpts{3}>
+>;
+// clang-format on
 
 TYPED_TEST_SUITE(ALinearFieldRefineTest, LinearFieldRefineTupleInfos);
 
 
 TYPED_TEST(ALinearFieldRefineTest, ConserveLinearFunction)
 {
-    TypeParam pair;
-    auto constexpr dim    = pair.first();
-    auto constexpr interp = pair.second();
+    auto constexpr dim    = TestFixture::dim;
+    auto constexpr interp = TestFixture::interp;
 
-    using GridYee = typename TestFixture::GridYee;
-    using GridND  = typename TestFixture::GridND;
+    using GridYee = TestFixture::GridYee;
+    using GridND  = TestFixture::GridND;
 
     auto& basicHierarchy = this->basicHierarchy_;
     auto& hierarchy      = basicHierarchy->getHierarchy();
@@ -77,15 +94,34 @@ TYPED_TEST(ALinearFieldRefineTest, ConserveLinearFunction)
 
             if constexpr (dim == 1)
             {
-                std::uint32_t gsi_X = layout.ghostStartIndex(field, Direction::X);
-                std::uint32_t gei_X = layout.ghostEndIndex(field, Direction::X);
-
-                for (std::uint32_t ix = gsi_X; ix <= gei_X; ++ix)
+                if constexpr (PHARE::core::is_field_tile_set_v<GridND>)
                 {
-                    auto position = layout.fieldNodeCoordinates(field, layout.origin(), ix);
-
-                    EXPECT_DOUBLE_EQ(field(ix), affineFill(position, dataId));
+                    // for (auto& tile : field())
+                    //     for (auto const& bix :
+                    //     tile.layout().ghostBoxFor(field.physicalQuantity()))
+                    //     {
+                    //         auto position = tile.layout().fieldNodeCoordinates(
+                    //             tile(), tile.layout().origin(), bix.as_signed());
+                    //         tile()(*bix) = affineFill(position, dataId);
+                    //     }
                 }
+                else
+                {
+                    for (auto const& bix : layout.ghostBoxFor(field.physicalQuantity()))
+                    {
+                        auto position
+                            = layout.fieldNodeCoordinates(field, layout.origin(), bix.as_signed());
+                        EXPECT_DOUBLE_EQ(field(bix), affineFill(position, dataId));
+                    }
+                }
+
+
+
+
+                // std::uint32_t gsi_X = layout.ghostStartIndex(field, Direction::X);
+                // std::uint32_t gei_X = layout.ghostEndIndex(field, Direction::X);
+
+                // for (std::uint32_t ix = gsi_X; ix <= gei_X; ++ix) {}
             }
             if constexpr (dim == 2)
             {

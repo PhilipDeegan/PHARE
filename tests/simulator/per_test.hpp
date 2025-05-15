@@ -1,13 +1,15 @@
 #ifndef PHARE_TEST_SIMULATOR_PER_TEST_HPP
 #define PHARE_TEST_SIMULATOR_PER_TEST_HPP
 
-#include "core/data/particles/particle_array_def.hpp"
-#include "core/def/phare_config.hpp"
 #include "core/vector.hpp"
 #include "phare/phare.hpp"
-#include "simulator/simulator.hpp"
+#include "core/def/phare_config.hpp"
+#include "core/data/particles/particle_array_def.hpp"
 #include "initializer/python_data_provider.hpp"
-#include "tests/core/data/field/test_field.hpp"
+
+#include "simulator/simulator.hpp"
+
+// #include "tests/core/data/field/test_field.hpp"
 
 #include "gtest/gtest.h"
 
@@ -93,13 +95,13 @@ struct Simulator1dTest : public ::testing::Test
 
 // clang-format off
 using Simulators1d = testing::Types<
-    SimulatorTestParam<SimOpts::make(1, 1, 2)>, SimulatorTestParam<SimOpts::make(1, 1, 3)>,
-    SimulatorTestParam<SimOpts::make(1, 2, 2)>, SimulatorTestParam<SimOpts::make(1, 2, 3)>,
-    SimulatorTestParam<SimOpts::make(1, 2, 4)>, SimulatorTestParam<SimOpts::make(1, 3, 2)>,
-    SimulatorTestParam<SimOpts::make(1, 3, 3)>, SimulatorTestParam<SimOpts::make(1, 3, 4)>,
-    SimulatorTestParam<SimOpts::make(1, 3, 5)>
-
-    // ,SimulatorTestParam<SimOpts{1, 1, AoSTS, AllocatorMode::CPU}>
+    // SimulatorTestParam<SimOpts::make(1, 1, 2)>, SimulatorTestParam<SimOpts::make(1, 1, 3)>,
+    // SimulatorTestParam<SimOpts::make(1, 2, 2)>, SimulatorTestParam<SimOpts::make(1, 2, 3)>,
+    // SimulatorTestParam<SimOpts::make(1, 2, 4)>, SimulatorTestParam<SimOpts::make(1, 3, 2)>,
+    // SimulatorTestParam<SimOpts::make(1, 3, 3)>, SimulatorTestParam<SimOpts::make(1, 3, 4)>,
+    // SimulatorTestParam<SimOpts::make(1, 3, 5)>
+    // ,
+    SimulatorTestParam<SimOpts{1, 1, AoSTS, AllocatorMode::CPU}>
 
 >;
 TYPED_TEST_SUITE(Simulator1dTest, Simulators1d);

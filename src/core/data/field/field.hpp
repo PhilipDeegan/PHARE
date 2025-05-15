@@ -7,6 +7,8 @@
 
 
 #include <array>
+#include <cmath>
+#include <stdexcept>
 #include <string>
 #include <cstddef>
 
@@ -58,6 +60,22 @@ public:
 
     Super& super() _PHARE_ALL_FN_ { return *this; }
     Super const& super() const _PHARE_ALL_FN_ { return *this; }
+
+
+    void check() const
+    {
+        for (auto const& e : **this)
+            if (std::isnan(e))
+                throw std::runtime_error("NAN");
+    }
+
+
+    void notZero() const
+    {
+        for (auto const& e : **this)
+            if (e == 0)
+                throw std::runtime_error("ZERO");
+    }
 
 protected:
     physical_quantity_type qty_;
@@ -150,6 +168,8 @@ public:
 
     auto& operator*() { return super(); }
     auto& operator*() const { return super(); }
+
+
 
 private:
     std::string name_{"No Name"};

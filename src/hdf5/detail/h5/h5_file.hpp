@@ -3,12 +3,13 @@
 
 #include "core/def.hpp"
 #include "core/def/phare_mpi.hpp"
-#include "highfive/H5File.hpp"
-#include "highfive/H5Easy.hpp"
 
 #include "core/utilities/types.hpp"
 #include "core/utilities/mpi_utils.hpp"
 #include "core/utilities/meta/meta_utilities.hpp"
+
+#include "highfive/H5File.hpp"
+#include "highfive/H5Easy.hpp"
 
 namespace PHARE::hdf5::h5
 {
@@ -243,10 +244,10 @@ public:
     }
 
 
-    HighFiveFile(const HighFiveFile&)             = delete;
-    HighFiveFile(const HighFiveFile&&)            = delete;
-    HighFiveFile& operator=(const HighFiveFile&)  = delete;
-    HighFiveFile& operator=(const HighFiveFile&&) = delete;
+    HighFiveFile(HighFiveFile const&)             = delete;
+    HighFiveFile(HighFiveFile const&&)            = delete;
+    HighFiveFile& operator=(HighFiveFile const&)  = delete;
+    HighFiveFile& operator=(HighFiveFile const&&) = delete;
 
 private:
     HighFive::FileAccessProps fapl_;

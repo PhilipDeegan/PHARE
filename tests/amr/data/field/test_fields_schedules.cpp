@@ -83,6 +83,7 @@ TYPED_TEST(FieldScheduleHierarchyTest, testing_hyhy_schedules)
 
     for (auto& patch : *lvl0)
     {
+        PHARE_LOG_LINE_SS(patch->getGlobalId());
         auto const layout = PHARE::amr::layoutFromPatch<GridLayout_t>(*patch);
         auto dataOnPatch  = rm.setOnPatch(*patch, ions);
         for (auto& pop : ions)
@@ -103,6 +104,7 @@ TYPED_TEST(FieldScheduleHierarchyTest, testing_hyhy_schedules)
 
     for (auto& patch : *lvl0)
     {
+        PHARE_LOG_LINE_SS(patch->getGlobalId());
         auto dataOnPatch = rm.setOnPatch(*patch, ions);
 
         auto const field_data = SAMRAI_SHARED_PTR_CAST<FieldData_t, SAMRAI::hier::PatchData>(
@@ -123,8 +125,12 @@ TYPED_TEST(FieldScheduleHierarchyTest, testing_hyhy_schedules)
                         for (auto const& e : pop.flux()[0])
                             EXPECT_NE(e, 0);
                     else
-                        for (auto const& e : reduce(field_data->field))
+                    {
+                        for (auto const& e : reduce_plus_equals(field_data->field))
+                        {
                             EXPECT_NE(e, 0);
+                        }
+                    }
                 }
     }
 }

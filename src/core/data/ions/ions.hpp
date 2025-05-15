@@ -94,6 +94,7 @@ namespace core
                 auto& popDensity = pop.density();
                 core::transform(rho_, popDensity, rho_, std::plus<Float>{});
             }
+            rho_.notZero();
         }
         void computeMassDensity()
         {
@@ -145,10 +146,13 @@ namespace core
                 core::transform(vz, fz, vz, sameMasses_ ? plus : plusMass);
             }
 
-
+            vx.check();
+            density.notZero();
             core::transform(vx, density, vx, std::divides<Float>{});
             core::transform(vy, density, vy, std::divides<Float>{});
             core::transform(vz, density, vz, std::divides<Float>{});
+
+            vx.check();
         }
 
 

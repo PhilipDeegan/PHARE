@@ -2,26 +2,25 @@
 #define PHARE_PARTICLES_DATA_SPLIT_HPP
 
 #include "core/def.hpp"
-#include "core/def/phare_mpi.hpp"
+#include "core/def/phare_mpi.hpp" // IWYU pragma: keep
 
-#include "core/data/particles/particle_array.hpp"
+#include "core/data/grid/gridlayout.hpp"
 #include "core/data/particles/particle_array_def.hpp"
 #include "core/data/particles/particle_array_service.hpp"
-#include "core/data/particles/particle_array_exporter.hpp"
 #include "core/data/particles/particle_array_partitioner.hpp"
-#include "core/data/particles/selecting/detail/def_selecting.hpp"
 
 
-#include "amr/data/particles/particles_data.hpp"
-#include "amr/resources_manager/amr_utils.hpp"
 #include "amr/amr_constants.hpp"
+#include "amr/utilities/box/amr_box.hpp"
+#include "amr/data/particles/particles_data.hpp"
+#include "amr/data/particles/particle_array_exporter.hpp"
 
-#include "split.hpp"
+#include "split.hpp" // IWYU pragma: keep
 
-#include <SAMRAI/geom/CartesianPatchGeometry.h>
 #include <SAMRAI/hier/Box.h>
-#include <SAMRAI/hier/RefineOperator.h>
 #include <SAMRAI/pdat/CellOverlap.h>
+#include <SAMRAI/hier/RefineOperator.h>
+#include <SAMRAI/geom/CartesianPatchGeometry.h>
 
 #include <tuple>
 
@@ -73,8 +72,8 @@ struct ParticlesRefining
     static constexpr auto interpOrder    = Splitter::interp_order;
     static constexpr auto nbRefinedPart  = Splitter::nbRefinedPart;
     static constexpr auto ParticleType_v = splitType == ParticlesDataSplitType::interior
-                                               ? ParticleType::Domain
-                                               : ParticleType::Ghost;
+                                               ? core::ParticleType::Domain
+                                               : core::ParticleType::Ghost;
 
     ParticlesData<ParticleArray>& srcParticlesData;
     ParticlesData<ParticleArray>& destParticlesData;
@@ -127,12 +126,12 @@ struct ParticlesRefining
         using ArrayParticleArray = typename ParticleArray::template array_type<nbRefinedPart>;
         auto const splitBox      = getSplitBox(destinationBox);
 
-        auto const per_particle = [&](auto const& particle) {
+        auto const per_particle = [&](auto const& particle, auto const& dst_box) {
             auto refined_info = std::tuple<std::uint16_t, ArrayParticleArray>{0, {}};
             auto& [p_count, refinedParticles] = refined_info;
             auto const particleRefinedPos     = toFineGrid(particle);
             split(particleRefinedPos, particle, refinedParticles);
-            p_count = ParticleArrayPartitioner<ArrayParticleArray>{refinedParticles}(destinationBox)
+            p_count = core::ParticleArrayPartitioner<ArrayParticleArray>{refinedParticles}(dst_box)
                           .size();
             return refined_info;
         };
@@ -218,7 +217,7 @@ namespace amr
         virtual SAMRAI::hier::IntVector
         getStencilWidth(SAMRAI::tbox::Dimension const& dimension) const override
         {
-            return SAMRAI::hier::IntVector{dimension, ghostWidthForParticles<interpOrder>()};
+            return SAMRAI::hier::IntVector{dimension, core::ghostWidthForParticles<interpOrder>()};
         }
 
         /** @brief perform a split and keep those that are inside a fineOverlap

@@ -23,8 +23,8 @@ struct ParticlesExporter
     template<typename Src, typename Dst, typename Box_t, typename Fn0>
     void move_particles(Src& src, Dst& dst, Box_t const& box, Fn0 fn0);
 
-    template<typename Src, typename Dst, typename Box_t, typename Refiner, typename Transformer>
-    void operator()(Src const&, Dst&, Box_t const&, Refiner, Transformer);
+    // template<typename Src, typename Dst, typename Box_t, typename Refiner, typename Transformer>
+    // void operator()(Src const&, Dst&, Box_t const&, Refiner, Transformer);
 };
 
 

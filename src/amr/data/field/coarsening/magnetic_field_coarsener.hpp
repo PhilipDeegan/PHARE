@@ -4,9 +4,8 @@
 
 #include "core/def/phare_mpi.hpp"
 
-#include "core/data/grid/gridlayoutdefs.hpp"
-#include "core/hybrid/hybrid_quantities.hpp"
 #include "core/utilities/constants.hpp"
+#include "core/data/grid/gridlayoutdefs.hpp"
 
 
 #include <SAMRAI/hier/Box.h>

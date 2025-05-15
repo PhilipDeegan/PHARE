@@ -98,8 +98,9 @@ struct Box
         }
         return std::optional<Box>{intersection};
     }
-    NO_DISCARD auto operator*(Type const& v) const { return Box{lower * v, upper * v}; }
-    NO_DISCARD auto operator/(Type const& v) const { return Box{lower / v, upper / v}; }
+
+    // NO_DISCARD auto operator*(Type const& v) const { return Box{lower * v, upper * v}; }
+    // NO_DISCARD auto operator/(Type const& v) const { return Box{lower / v, upper / v}; }
 
     NO_DISCARD auto unsafe_intersection(Box const& other) const _PHARE_ALL_FN_ // no optional on gpu
     {
@@ -311,13 +312,14 @@ NO_DISCARD bool isIn(Point_t<Type, SIZE> const& point, Box<Type, SIZE> const& bo
     return false;
 }
 
+
+
 template<typename Particle, typename Type>
-NO_DISCARD bool isIn(Particle const& particle,
-                     Box<Type, Particle::dimension> const& box) _PHARE_ALL_FN_
+NO_DISCARD auto isIn(Particle const& particle, Box<Type, Particle::dimension> const& box)
+    -> decltype(isIn(particle.iCell(), box), bool())
 {
     return isIn(particle.iCell(), box);
 }
-
 
 
 /** this overload of isIn takes a Point and a Container of boxes
@@ -350,13 +352,6 @@ bool isIn(ICell<T, S> const& icell, BoxContainer const& boxes) _PHARE_ALL_FN_
 }
 
 
-
-template<typename Particle, typename Type>
-NO_DISCARD auto isIn(Particle const& particle, Box<Type, Particle::dimension> const& box)
-    -> decltype(isIn(particle.iCell, box), bool())
-{
-    return isIn(particle.iCell, box);
-}
 
 template<typename... Args>
 NO_DISCARD auto isIn(Args const&&... args)

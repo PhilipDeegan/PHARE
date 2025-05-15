@@ -4,17 +4,21 @@
 #include "core/data/grid/grid_tiles.hpp"
 // #include "tests/simulator/per_test.hpp"
 
-#include "core/data/ndarray/ndarray_view.hpp"
-#include "core/hybrid/hybrid_quantities.hpp"
-#include "diagnostic/diagnostic_model_view.hpp"
+// #include "core/data/ndarray/ndarray_view.hpp"
+// #include "core/hybrid/hybrid_quantities.hpp"
 #include "diagnostic/detail/h5writer.hpp"
+#include "diagnostic/diagnostic_manager.hpp"
+#include "diagnostic/diagnostic_model_view.hpp"
 // #include "diagnostic/detail/types/electromag.hpp"
 // #include "diagnostic/detail/types/particle.hpp"
 // #include "diagnostic/detail/types/fluid.hpp"
 
 // #include <functional>
-#include "tests/core/data/field/test_field.hpp"
+// #include "tests/core/data/field/test_field.hpp"
 #include "tests/core/data/field/test_field_fixtures.hpp"
+
+
+#include "gtest/gtest.h"
 
 
 using namespace PHARE;
@@ -22,6 +26,8 @@ using namespace PHARE::diagnostic;
 using namespace PHARE::diagnostic::h5;
 
 constexpr auto NEW_HI5_FILE = HighFive::File::AccessMode::Overwrite;
+
+using FloatType = std::conditional_t<PHARE_DIAG_DOUBLES, double, float>;
 
 
 template<typename GridLayout, typename Field>
@@ -31,13 +37,17 @@ void checkField(HighFiveFile const& hifile, GridLayout const& layout, Field cons
     constexpr auto dim = GridLayout::dimension;
     static_assert(dim >= 1 and dim <= 3, "Invalid dimension.");
 
-    auto const fieldV = hifile.read_data_set_flat<float, dim>(path);
+    auto const fieldV = hifile.read_data_set_flat<FloatType, dim>(path);
 
     auto const& field1 = core::make_field_from(field, fieldV.data());
 
     auto compare = [&](auto& a, auto& b) {
         auto const eq = core::compare_fields(a, b, 1e-12);
         EXPECT_TRUE(eq) << "Failure for " << path << " " << eq.why();
+        if (eq)
+        {
+            PHARE_LOG_LINE_SS(path << " " << eq.why());
+        }
     };
 
     if constexpr (core::is_field_tile_set_v<Field>)
@@ -191,11 +201,11 @@ void validateParticleDump(Simulator& sim, Hi5Diagnostic& hi5)
         if (!particles.size())
             return;
 
-        auto weightV = hifile.template read_data_set_flat<float, 2>(path + "weight");
-        auto chargeV = hifile.template read_data_set_flat<float, 2>(path + "charge");
-        auto vV      = hifile.template read_data_set<float, 2>(path + "v");
+        auto weightV = hifile.template read_data_set_flat<FloatType, 2>(path + "weight");
+        auto chargeV = hifile.template read_data_set_flat<FloatType, 2>(path + "charge");
+        auto vV      = hifile.template read_data_set<FloatType, 2>(path + "v");
         auto iCellV  = hifile.template read_data_set<int, 2>(path + "iCell");
-        auto deltaV  = hifile.template read_data_set<float, 2>(path + "delta");
+        auto deltaV  = hifile.template read_data_set<FloatType, 2>(path + "delta");
 
         auto check = [&](auto const pi, auto iCell, auto delta, auto v) {
             for (std::size_t i = 0; i < dim; i++)

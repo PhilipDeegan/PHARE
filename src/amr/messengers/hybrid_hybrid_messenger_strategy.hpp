@@ -1,6 +1,7 @@
 #ifndef PHARE_HYBRID_HYBRID_MESSENGER_STRATEGY_HPP
 #define PHARE_HYBRID_HYBRID_MESSENGER_STRATEGY_HPP
 
+#include "core/data/grid/grid_tiles.hpp"
 #include "core/data/particles/particle_array_def.hpp"
 #include "core/logger.hpp"
 #include "core/def/phare_mpi.hpp"
@@ -403,6 +404,16 @@ namespace amr
                     level, *resourcesManager_,
                     [&]() {
                         auto& pop = *(ions.begin() + i);
+
+                        if constexpr (core::is_field_tile_set_v<FieldT>)
+                        {
+                            for (auto const& tile : pop.density())
+                                for (auto const& e : tile())
+                                {
+                                    PHARE_LOG_LINE_SS(e);
+                                }
+                        }
+
                         copy_fields(sumField, pop.density());
                     },
                     ions, sumField);
@@ -412,8 +423,19 @@ namespace amr
                 visitLevel( // copy tmp sum field back to ion pop density
                     level, *resourcesManager_,
                     [&]() {
+                        if constexpr (core::is_field_tile_set_v<FieldT>)
+                        {
+                            for (auto const& tile : sumField)
+                                for (auto const& e : tile())
+                                {
+                                    PHARE_LOG_LINE_SS(e);
+                                }
+                        }
+
                         auto& pop = *(ions.begin() + i);
                         copy_fields(pop.density(), sumField);
+                        sumField.notZero();
+                        pop.density().notZero();
                     },
                     ions, sumField);
             }

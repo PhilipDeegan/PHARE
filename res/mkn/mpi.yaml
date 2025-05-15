@@ -1,6 +1,6 @@
 property:
   cxx_flags: >-
-    -std=c++20 -DPHARE_DIAG_DOUBLES=1
+    -fPIC -std=c++20 -DPHARE_DIAG_DOUBLES=1
 #-DPHARE_LOG_SCOPE_PRINT=1 -DPHARE_LOG_LEVEL=2 -fsanitize=address -fno-omit-frame-pointer
 # -fsanitize-memory-track-origins -fsanitize=memory
 

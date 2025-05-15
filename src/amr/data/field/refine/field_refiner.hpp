@@ -41,6 +41,8 @@ namespace amr
             : indexesAndWeights_{centering, ratio}
             , fineBox_{destinationGhostBox}
             , coarseBox_{sourceGhostBox}
+            , ratio_{ratio}
+            , centerings_{centering}
         {
         }
 
@@ -61,7 +63,21 @@ namespace amr
         void operator()(FieldT const& sourceField, FieldT& destinationField,
                         core::Point<int, dimension> fineIndex)
         {
-            if constexpr (core::is_field_tile_set_v<FieldT>) {}
+            if constexpr (core::is_field_tile_set_v<FieldT>)
+            {
+                auto coarseIdx{fineIndex};
+                for (auto& idx : coarseIdx)
+                    idx = idx / refinementRatio;
+                auto const locCoarseIdx = AMRToLocal(coarseIdx, coarseBox_);
+                for (auto const& src_tile : sourceField())
+                    if (auto const src_box = src_tile.field_box(); isIn(coarseIdx, src_box))
+                        for (auto& dst_tile : destinationField())
+                            if (auto const dst_box = dst_tile.field_box(); isIn(fineIndex, dst_box))
+                                DefaultFieldRefiner{centerings_,
+                                                    samrai_box_from(dst_tile.ghost_box()),
+                                                    samrai_box_from(src_tile.ghost_box()),
+                                                    ratio_}(src_tile(), dst_tile(), fineIndex);
+            }
             else
                 field_t(sourceField, destinationField, fineIndex);
         }
@@ -176,6 +192,8 @@ namespace amr
         FieldRefineIndexesAndWeights<dimension> const indexesAndWeights_;
         SAMRAI::hier::Box const fineBox_;
         SAMRAI::hier::Box const coarseBox_;
+        SAMRAI::hier::IntVector const& ratio_;
+        std::array<core::QtyCentering, dimension> const centerings_;
     };
 } // namespace amr
 } // namespace PHARE

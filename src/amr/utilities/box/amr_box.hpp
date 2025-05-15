@@ -2,6 +2,7 @@
 #define PHARE_AMR_UTILITIES_BOX_BOX_HPP
 
 
+#include "amr/amr_constants.hpp"
 #include "core/def.hpp"
 #include "core/def/phare_mpi.hpp"
 #include "core/utilities/box/box.hpp"
@@ -152,6 +153,20 @@ template<std::size_t dim>
 auto as_point(SAMRAI::hier::Transformation const& tform)
 {
     return as_point<dim>(tform.getOffset());
+}
+
+
+template<typename Box_t>
+Box_t refine_box(Box_t const& box)
+{
+    return Box_t{(box.lower * refinementRatio) - 1, (box.upper * refinementRatio) - 1};
+}
+
+
+template<typename Box_t>
+Box_t coarsen_box(Box_t const& box)
+{
+    return Box_t{(box.lower + 1) / refinementRatio, (box.upper + 1) / refinementRatio};
 }
 
 

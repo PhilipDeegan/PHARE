@@ -8,10 +8,10 @@ version: mkn
 inc: src
 
 property:
-  HDF5_INC: /opt/mpi/hdf5/include
-  HDF5_PTH: /opt/mpi/hdf5/lib
-  # HDF5_INC: /opt/mpi/rocm_hdf5/include
-  # HDF5_PTH: /opt/mpi/rocm_hdf5/lib
+  # HDF5_INC: /opt/mpi/hdf5/include
+  # HDF5_PTH: /opt/mpi/hdf5/lib
+  HDF5_INC: /opt/mpi/rocm_hdf5/include
+  HDF5_PTH: /opt/mpi/rocm_hdf5/lib
   # HDF5_LIB: hdf5_debug
   mkn.base: base_
   mkn.args: -DPHARE_HAS_HIGHFIVE=1 -DPHARE_DIAG_DOUBLES=1
