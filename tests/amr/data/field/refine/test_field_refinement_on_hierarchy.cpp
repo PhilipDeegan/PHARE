@@ -56,8 +56,11 @@ protected:
 using LinearFieldRefineTupleInfos
     = testing::Types<
         TestParam<SimOpts{1}>,
-        TestParam<SimOpts{1, 1, LayoutMode::AoSTS}>,
         TestParam<SimOpts{2}>, TestParam<SimOpts{3}>
+PHARE_WITH_MKN_GPU(
+        ,TestParam<SimOpts{1, 1, LayoutMode::AoSTS}>
+)
+
 >;
 // clang-format on
 

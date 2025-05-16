@@ -56,6 +56,10 @@ struct hybrid_model_storage
 {
     using gridlayout_type        = Ions::gridlayout_type;
     using resources_manager_type = amr::ResourcesManager<gridlayout_type, Grid_t>;
+    using grid_type              = Grid_t;           // normal non-tiled grid
+    using field_type             = Ions::field_type; // normal non-tiled field
+    using vecfield_type          = Ions::vecfield_type;
+    using tensorfield_type       = Ions::tensorfield_type;
 
 
     NO_DISCARD auto getCompileTimeResourcesViewList() const { return std::forward_as_tuple(); }

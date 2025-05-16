@@ -9,6 +9,7 @@
 #include "amr/resources_manager/amr_utils.hpp"
 #include "core/data/grid/gridlayout_utils.hpp"
 #include "core/data/ions/ions.hpp"
+#include "core/data/particles/particle_array.hpp"
 #include "core/numerics/ampere/ampere.hpp"
 #include "core/numerics/interpolator/interpolator.hpp"
 #include "core/numerics/interpolator/interpolating.hpp"
@@ -97,24 +98,32 @@ namespace solver
 
                 core::resetMoments(ions);
                 core::depositParticles(ions, layout, interpolate_, core::DomainDeposit{});
+
+                for (auto const& pop : ions)
+                    core::check_particles(pop.domainParticles());
             }
 
-            hybMessenger.fillFluxBorders(hybridModel.state.ions, level, initDataTime);
-            hybMessenger.fillDensityBorders(hybridModel.state.ions, level, initDataTime);
 
+            if (!isRootLevel(levelNumber))
+                for (auto& patch : level)
+                {
+                    auto& ions             = hybridModel.state.ions;
+                    auto& resourcesManager = hybridModel.resourcesManager;
+                    auto const dataOnPatch = resourcesManager->setOnPatch(*patch, ions);
+                    auto const layout      = amr::layoutFromPatch<GridLayoutT>(*patch);
+
+                    core::depositParticles(ions, layout, interpolate_, core::LevelGhostDeposit{});
+                }
+
+
+            hybMessenger.fillDensityBorders(hybridModel.state.ions, level, initDataTime);
+            hybMessenger.fillFluxBorders(hybridModel.state.ions, level, initDataTime);
 
             for (auto& patch : level)
             {
                 auto& ions             = hybridModel.state.ions;
                 auto& resourcesManager = hybridModel.resourcesManager;
                 auto dataOnPatch       = resourcesManager->setOnPatch(*patch, ions);
-                auto layout            = amr::layoutFromPatch<GridLayoutT>(*patch);
-
-                if (!isRootLevel(levelNumber))
-                {
-                    core::depositParticles(ions, layout, interpolate_, core::LevelGhostDeposit{});
-                }
-
                 ions.computeDensity();
                 ions.computeBulkVelocity();
             }

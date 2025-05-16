@@ -1,6 +1,7 @@
 #ifndef PHARE_PARTICLES_DATA_SPLIT_HPP
 #define PHARE_PARTICLES_DATA_SPLIT_HPP
 
+#include "core/data/particles/particle_array.hpp"
 #include "core/def.hpp"
 #include "core/def/phare_mpi.hpp" // IWYU pragma: keep
 
@@ -124,7 +125,7 @@ struct ParticlesRefining
     void _forBox(core::Box<int, dim> const& destinationBox)
     {
         using ArrayParticleArray = typename ParticleArray::template array_type<nbRefinedPart>;
-        auto const splitBox      = getSplitBox(destinationBox);
+        // auto const splitBox      = getSplitBox(destinationBox);
 
         auto const per_particle = [&](auto const& particle, auto const& dst_box) {
             auto refined_info = std::tuple<std::uint16_t, ArrayParticleArray>{0, {}};
@@ -139,8 +140,8 @@ struct ParticlesRefining
         auto const refiner = [&](auto const& particle) { return toFineGrid(particle); };
 
         for (auto const& sourceParticlesArray : particlesArrays)
-            export_refined_particles( //
-                *sourceParticlesArray, destParticles, splitBox, refiner, per_particle);
+            export_refined_particles<ParticleType_v>( //
+                *sourceParticlesArray, destParticles, destinationBox, refiner, per_particle);
     }
 
     void forBoxes(SAMRAI::hier::BoxContainer const& boxes)
@@ -166,6 +167,8 @@ struct ParticlesRefining
         //     destParticles.map_particles(old_size);
 
         core::ParticleArrayService::sync<2, ParticleType_v>(destParticles);
+        PHARE_LOG_LINE_SS(destParticles.size());
+        // check_particles(destParticles);
     }
 
     void operator()(SAMRAI::pdat::CellOverlap const& destFieldOverlap)

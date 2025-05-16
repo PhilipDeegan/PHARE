@@ -173,8 +173,6 @@ void IonUpdaterMultiTS<Ions, Electromag, GridLayout>::updateAndDepositAll_(Model
 {
     PHARE_LOG_SCOPE(1, "IonUpdaterMultiTS::updateAndDepositAll_");
 
-    // constexpr static std::uint8_t N_ARRAYS  = 3;
-    // constexpr static std::uint8_t DOMAIN_ID = 0;
 
     if (views.size() == 0)
         return;
@@ -240,13 +238,13 @@ void IonUpdaterMultiTS<Ions, Electromag, GridLayout>::updateAndDepositAll_(Model
                                       pop.flux());
                 interp.particleToMesh(pop.patchGhostParticles(), view.layout, pop.density(),
                                       pop.flux());
+                // interp.particleToMesh(pop.levelGhostParticles(), view.layout, pop.density(),
+                //                       pop.flux());
             }
         });
     }
 
     in.streamer().sync();
-    // in.streamer.dump_times(detail::timings_dir_str + "/updateAndDepositAll_"
-    //                        + std::string{Particles::type_id} + ".txt");
 
     if constexpr (any_in(Particles::alloc_mode, AllocatorMode::GPU_UNIFIED))
     {

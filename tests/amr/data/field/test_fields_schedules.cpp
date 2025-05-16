@@ -90,16 +90,29 @@ TYPED_TEST(FieldScheduleHierarchyTest, testing_hyhy_schedules)
         {
             auto const domGhostBox = layout.AMRGhostBoxFor(pop.flux()[0].physicalQuantity());
             auto const primal_box  = shrink(domGhostBox, ghost_cells);
-            for (auto& f : pop.flux())
-                FieldBox<Field_t>{f, layout, primal_box}.op(.2);
-            FieldBox<Field_t>{pop.density(), layout, primal_box}.op(.2);
+            if constexpr (core::is_field_v<Field_t>)
+            {
+                for (auto& f : pop.flux())
+                    FieldBox<Field_t>{f, layout, primal_box}.op(.2);
+                FieldBox<Field_t>{pop.density(), layout, primal_box}.op(.2);
+            }
+            else
+            {
+                for (auto& f : pop.flux())
+                    for (auto& tile : f)
+                        FieldBox{tile(), tile.layout(), tile.field_box()}.op(.2);
+
+                for (auto& tile : pop.density())
+                    FieldBox{tile(), tile.layout(), tile.field_box()}.op(.2);
+            }
+
 
             assert(pop.momentumTensor().isUsable());
         }
     }
 
-    this->hierarchy.messenger->fillFluxBorders(ions, *lvl0, 0);
     this->hierarchy.messenger->fillDensityBorders(ions, *lvl0, 0);
+    this->hierarchy.messenger->fillFluxBorders(ions, *lvl0, 0);
 
 
     for (auto& patch : *lvl0)
@@ -126,7 +139,7 @@ TYPED_TEST(FieldScheduleHierarchyTest, testing_hyhy_schedules)
                             EXPECT_NE(e, 0);
                     else
                     {
-                        for (auto const& e : reduce_plus_equals(field_data->field))
+                        for (auto const& e : reduce(field_data->field))
                         {
                             EXPECT_NE(e, 0);
                         }

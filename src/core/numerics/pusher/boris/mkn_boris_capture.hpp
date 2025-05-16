@@ -207,7 +207,7 @@ public:
                 };
 
                 per_particles(pop.domainParticles());
-                per_particles(pop.patchGhostParticles());
+                // per_particles(pop.patchGhostParticles());
                 per_particles(pop.levelGhostParticles());
             };
 

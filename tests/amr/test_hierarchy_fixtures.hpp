@@ -1,8 +1,8 @@
 #ifndef PHARE_TEST_AMR_HIERARCHY_FIXTURES_HPP
 #define PHARE_TEST_AMR_HIERARCHY_FIXTURES_HPP
 
-#include "phare_simulator_options.hpp"
 #include "phare_solver.hpp"
+// #include "phare_simulator_options.hpp"
 #include "amr/types/amr_types.hpp"
 
 #include "tests/initializer/init_functions.hpp"

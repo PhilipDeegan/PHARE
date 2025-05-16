@@ -1,6 +1,7 @@
 #ifndef PHARE_HYBRID_HYBRID_MESSENGER_STRATEGY_HPP
 #define PHARE_HYBRID_HYBRID_MESSENGER_STRATEGY_HPP
 
+#include "amr/data/field/field_data.hpp"
 #include "core/data/grid/grid_tiles.hpp"
 #include "core/data/particles/particle_array_def.hpp"
 #include "core/logger.hpp"
@@ -85,6 +86,16 @@ namespace amr
         using MagneticCoarsenOp = BaseCoarsenOp<MagneticFieldCoarsener<dimension>>;
         using DefaultCoarsenOp  = BaseCoarsenOp<DefaultFieldCoarsener<dimension>>;
 
+        // if FieldT is tiled, Field_t is not! always not tiled!
+
+        using Grid_t     = HybridModel::Super::storage_t::grid_type;
+        using Field_t    = HybridModel::Super::storage_t::field_type;
+        using VecField_t = HybridModel::Super::storage_t::vecfield_type;
+        using FieldBorderSumTransactionFactory_t
+            = FieldBorderSumTransactionFactory<FieldData<GridLayoutT, GridT>,
+                                               FieldData<GridLayoutT, Grid_t>>;
+        static_assert(core::is_field_v<Grid_t> and !core::is_field_tile_set_v<Grid_t>);
+
     public:
         static inline std::string const stratName    = "HybridModel-HybridModel";
         static constexpr std::size_t rootLevelNumber = 0;
@@ -99,7 +110,7 @@ namespace amr
             auto const reg
                 = [&](auto&... args) { (resourcesManager_->registerResources(args), ...); };
 
-            reg(Jold_, NiOld_, ViOld_, sumVec, sumField);
+            reg(Jold_, NiOld_, ViOld_, sumVec, sumField, scratch_field, scratch_vecfield);
         }
 
         virtual ~HybridHybridMessengerStrategy() = default;
@@ -121,7 +132,7 @@ namespace amr
                 (resourcesManager_->allocate(args, patch, allocateTime), ...);
             };
 
-            alloc(Jold_, NiOld_, ViOld_, sumVec, sumField);
+            alloc(Jold_, NiOld_, ViOld_, sumVec, sumField, scratch_field, scratch_vecfield);
         }
 
 
@@ -159,11 +170,6 @@ namespace amr
             auto const register_refiners
                 = [&](auto&... refiners) { (refiners.registerLevel(hierarchy, level), ...); };
 
-            auto const register_vec
-                = [&](auto& vec) { std::for_each(vec.begin(), vec.end(), register_refiners); };
-
-            auto const register_vecs = [&](auto&... vecs) { (register_vec(vecs), ...); };
-
             register_refiners(               //
                 magSharedNodesRefiners_,     //
                 elecSharedNodesRefiners_,    //
@@ -177,7 +183,15 @@ namespace amr
                 domainGhostPartRefiners_     //
             );
 
-            register_vecs(popFluxBorderSumRefiners_, popDensityBorderSumRefiners_);
+
+            auto border_sum_factory  = std::make_shared<FieldBorderSumTransactionFactory_t>();
+            auto register_border_vec = [&](auto& vec) {
+                for (auto& refiners : vec)
+                    refiners.registerLevel(hierarchy, level, border_sum_factory);
+            };
+            register_border_vec(popDensityBorderSumRefiners_);
+            register_border_vec(popFluxBorderSumRefiners_);
+
 
             // root level is not initialized with a schedule using coarser level data
             // so we don't create these schedules if root level
@@ -378,9 +392,10 @@ namespace amr
                     [&]() {
                         auto& pop = *(ions.begin() + i);
                         for (std::uint8_t c = 0; c < N; ++c)
-                            copy_fields(sumVec[c], pop.flux()[c]);
+                            core::reduce_into(pop.flux()[c], scratch_vecfield[c]);
+                        // copy_fields(scratch_vecfield[c], pop.flux()[c]);
                     },
-                    ions, sumVec);
+                    ions, scratch_vecfield);
 
                 popFluxBorderSumRefiners_[i].fill(level.getLevelNumber(), fillTime);
 
@@ -389,9 +404,9 @@ namespace amr
                     [&]() {
                         auto& pop = *(ions.begin() + i);
                         for (std::uint8_t c = 0; c < N; ++c)
-                            copy_fields(pop.flux()[c], sumVec[c]);
+                            copy_fields(pop.flux()[c], scratch_vecfield[c]);
                     },
-                    ions, sumVec);
+                    ions, scratch_vecfield);
             }
         }
 
@@ -400,23 +415,28 @@ namespace amr
         {
             for (std::size_t i = 0; i < ions.size(); ++i)
             {
+                PHARE_LOG_LINE_SS("");
                 visitLevel( // copy ion pop density to tmp sum field
                     level, *resourcesManager_,
                     [&]() {
                         auto& pop = *(ions.begin() + i);
 
                         if constexpr (core::is_field_tile_set_v<FieldT>)
-                        {
                             for (auto const& tile : pop.density())
                                 for (auto const& e : tile())
                                 {
                                     PHARE_LOG_LINE_SS(e);
                                 }
-                        }
 
-                        copy_fields(sumField, pop.density());
+                        core::reduce_into(pop.density(), scratch_field);
+
+                        if constexpr (core::is_field_tile_set_v<FieldT>)
+                            for (auto const& e : scratch_field)
+                            {
+                                PHARE_LOG_LINE_SS(e);
+                            }
                     },
-                    ions, sumField);
+                    ions, scratch_field);
 
                 popDensityBorderSumRefiners_[i].fill(level.getLevelNumber(), fillTime);
 
@@ -424,20 +444,24 @@ namespace amr
                     level, *resourcesManager_,
                     [&]() {
                         if constexpr (core::is_field_tile_set_v<FieldT>)
-                        {
-                            for (auto const& tile : sumField)
+                            for (auto const& e : scratch_field)
+                            {
+                                PHARE_LOG_LINE_SS(e);
+                            }
+
+                        auto& pop = *(ions.begin() + i);
+                        copy_fields(pop.density(), scratch_field);
+
+                        if constexpr (core::is_field_tile_set_v<FieldT>)
+                            for (auto const& tile : pop.density())
                                 for (auto const& e : tile())
                                 {
                                     PHARE_LOG_LINE_SS(e);
                                 }
-                        }
-
-                        auto& pop = *(ions.begin() + i);
-                        copy_fields(pop.density(), sumField);
-                        sumField.notZero();
-                        pop.density().notZero();
+                        // sumField.notZero();
+                        // pop.density().notZero();
                     },
-                    ions, sumField);
+                    ions, scratch_field);
             }
         }
 
@@ -771,14 +795,15 @@ namespace amr
                 auto pop_flux_vec = std::vector<core::VecFieldNames>{vecfield};
                 popFluxBorderSumRefiners_.emplace_back(resourcesManager_)
                     .addStaticRefiner(
-                        core::VecFieldNames{sumVec}, vecfield, nullptr, sumVec.name(),
+                        core::VecFieldNames{scratch_vecfield}, vecfield, nullptr,
+                        scratch_vecfield.name(),
                         std::make_shared<FieldGhostInterpOverlapFillPattern<GridLayoutT>>());
             }
 
             for (auto const& field : info->sumBorderFields)
                 popDensityBorderSumRefiners_.emplace_back(resourcesManager_)
                     .addStaticRefiner(
-                        sumField.name(), field, nullptr, sumField.name(),
+                        scratch_field.name(), field, nullptr, scratch_field.name(),
                         std::make_shared<FieldGhostInterpOverlapFillPattern<GridLayoutT>>());
         }
 
@@ -1053,6 +1078,11 @@ namespace amr
         VecFieldT sumVec{stratName + "_sumVec", core::HybridQuantity::Vector::V};
         FieldT sumField{stratName + "_sumField", core::HybridQuantity::Scalar::rho};
 
+        // static_assert(core::is_field_tile_set_v<FieldT>);
+        // static_assert(core::is_field_v<Field_t>);
+
+        Field_t scratch_field{"phare_scratch_field", core::HybridQuantity::Scalar::rho};
+        VecField_t scratch_vecfield{"phare_scratch_field", core::HybridQuantity::Vector::V};
 
 
         //! ResourceManager shared with other objects (like the HybridModel)

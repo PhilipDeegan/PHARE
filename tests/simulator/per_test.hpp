@@ -95,15 +95,17 @@ struct Simulator1dTest : public ::testing::Test
 
 // clang-format off
 using Simulators1d = testing::Types<
-    // SimulatorTestParam<SimOpts::make(1, 1, 2)>, SimulatorTestParam<SimOpts::make(1, 1, 3)>,
-    // SimulatorTestParam<SimOpts::make(1, 2, 2)>, SimulatorTestParam<SimOpts::make(1, 2, 3)>,
-    // SimulatorTestParam<SimOpts::make(1, 2, 4)>, SimulatorTestParam<SimOpts::make(1, 3, 2)>,
-    // SimulatorTestParam<SimOpts::make(1, 3, 3)>, SimulatorTestParam<SimOpts::make(1, 3, 4)>,
-    // SimulatorTestParam<SimOpts::make(1, 3, 5)>
-    // ,
-    SimulatorTestParam<SimOpts{1, 1, AoSTS, AllocatorMode::CPU}>
+    SimulatorTestParam<SimOpts::make(1, 1, 2)>, SimulatorTestParam<SimOpts::make(1, 1, 3)>,
+    SimulatorTestParam<SimOpts::make(1, 2, 2)>, SimulatorTestParam<SimOpts::make(1, 2, 3)>,
+    SimulatorTestParam<SimOpts::make(1, 2, 4)>, SimulatorTestParam<SimOpts::make(1, 3, 2)>,
+    SimulatorTestParam<SimOpts::make(1, 3, 3)>, SimulatorTestParam<SimOpts::make(1, 3, 4)>,
+    SimulatorTestParam<SimOpts::make(1, 3, 5)>
 
+PHARE_WITH_MKN_GPU(
+   ,SimulatorTestParam<SimOpts{1, 1, AoSTS, AllocatorMode::CPU}>
+)
 >;
+
 TYPED_TEST_SUITE(Simulator1dTest, Simulators1d);
 // clang-format on
 

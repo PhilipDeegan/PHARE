@@ -6,9 +6,8 @@
 #include "core/logger.hpp"
 
 #include "core/utilities/types.hpp"
-
-#include "core/data/grid/grid_tiles.hpp"
 #include "core/utilities/box/box.hpp"
+#include "core/data/grid/grid_tiles.hpp"
 
 
 #include <vector>
@@ -18,6 +17,13 @@
 
 namespace PHARE::core
 {
+template<typename D>
+struct FieldBorderSumOp : public PlusEquals<D>
+{
+    // only work on tiles which are on the patch border
+    // prevents duplicates on ghost of inner tiles
+};
+
 
 template<typename Field_t>
 class FieldBox
@@ -59,7 +65,7 @@ public:
     }
 
 
-    template<typename Operator, typename Field_t0>
+    template<typename Operator = SetEqualOp, typename Field_t0>
     void op(FieldBox<Field_t0> const& that);
 
 
@@ -83,17 +89,76 @@ public:
 };
 
 
+template<typename Operator, typename GridLayout_t, typename... Args>
+void operate_on_fields(FieldBox<GridTileSet<GridLayout_t, Args...>>& dst,
+                       FieldBox<GridTileSet<GridLayout_t, Args...> const> const& src);
+
+
+template<typename Operator, typename GridLayout_t, typename... Args>
+void operate_on_fields(FieldBox<GridTileSet<GridLayout_t, Args...>>& dst,
+                       FieldBox<GridTileSet<GridLayout_t, Args...> const> const& src)
+    requires(std::is_same_v<FieldBorderSumOp<double>, Operator>)
+{
+    auto const pq = dst.field.physicalQuantity();
+    assert(src.field.physicalQuantity() == pq);
+
+    auto const skip = [](auto const& field, auto const& tile) {
+        auto const tbox = grow(tile, 1);
+        return *(tbox * field.layout().AMRBox()) == tbox;
+    };
+    auto const get_box = [&](auto const& tile) { return tile.layout().AMRGhostBoxFor(pq); };
+    auto const src_selection_box = src.field.layout().localToAMR(src.lcl_box);
+    auto const dst_selection_box
+        = shift(dst.field.layout().localToAMR(dst.lcl_box), src.offset_ * -1);
+
+    for (std::size_t sidx = 0; sidx < src.field().size(); ++sidx)
+    {
+        auto const& src_tile = src.field()[sidx];
+        if (skip(src.field, src_tile))
+            continue; // skip not border tile
+
+        auto const src_tile_ghost_box = get_box(src_tile);
+        if (auto const src_overlap = src_selection_box * src_tile_ghost_box)
+            for (std::size_t didx = 0; didx < dst.field().size(); ++didx)
+            {
+                auto& dst_tile = dst.field()[didx];
+                if (skip(dst.field, dst_tile))
+                    continue; // skip not border tile
+
+                auto const dst_tile_ghost_box = shift(get_box(dst_tile), src.offset_ * -1);
+
+                if (auto const dst_overlap = dst_selection_box * dst_tile_ghost_box)
+                {
+                    auto const lcl_src_box = src_tile.layout().AMRToLocal(*src_overlap);
+                    auto const lcl_dst_box
+                        = dst_tile.layout().AMRToLocal(shift(*dst_overlap, src.offset_));
+
+                    assert(lcl_src_box.size() <= src_tile().size());
+                    assert(lcl_dst_box.size() <= dst_tile().size());
+
+                    auto src_it = lcl_src_box.begin();
+                    auto dst_it = lcl_dst_box.begin();
+                    for (; dst_it != lcl_dst_box.end() and src_it != lcl_src_box.end();
+                         ++src_it, ++dst_it)
+                        Operator{dst_tile()(*dst_it)}(src_tile()(*src_it));
+                }
+            }
+    }
+}
 
 
 template<typename Operator, typename GridLayout_t, typename... Args>
 void operate_on_fields(FieldBox<GridTileSet<GridLayout_t, Args...>>& dst,
                        FieldBox<GridTileSet<GridLayout_t, Args...> const> const& src)
 {
+    auto constexpr plus_equals
+        = std::is_same_v<Operator, PlusEquals<typename Operator::value_type>>;
+
     auto const pq = dst.field.physicalQuantity();
     assert(src.field.physicalQuantity() == pq);
 
     auto get_box = [&](auto const& tile) {
-        if constexpr (std::is_same_v<Operator, PlusEquals<typename Operator::value_type>>)
+        if constexpr (plus_equals)
             return tile.layout().AMRGhostBoxFor(pq);
         else
             return shrink(tile.layout().AMRGhostBoxFor(pq), GridLayout_t::nbrGhosts());
@@ -120,6 +185,14 @@ void operate_on_fields(FieldBox<GridTileSet<GridLayout_t, Args...>>& dst,
                     auto const lcl_src_box = src_tile.layout().AMRToLocal(*src_overlap);
                     auto const lcl_dst_box
                         = dst_tile.layout().AMRToLocal(shift(*dst_overlap, src.offset_));
+
+                    if constexpr (plus_equals)
+                    {
+                        if (lcl_src_box.size() == 1 or lcl_dst_box.size() == 1)
+                        {
+                            PHARE_LOG_LINE_SS(src_tile()(*lcl_src_box.begin()));
+                        }
+                    }
 
                     assert(lcl_src_box.size() <= src_tile().size());
                     assert(lcl_dst_box.size() <= dst_tile().size());
@@ -162,6 +235,60 @@ void operate_on_fields(FieldBox<GridTileSet<T0s...>>& dst, FieldBox<T1s...> cons
     }
 }
 
+template<typename Field_t>
+template<typename Operator, typename Field_t0>
+void FieldBox<Field_t>::op(FieldBox<Field_t0> const& that)
+{
+    operate_on_fields<Operator>(*this, that);
+}
+
+
+template<typename Operator, typename... T0s, typename... T1s>
+void operate_on_fields(FieldBox<Grid<T0s...>>& dst, FieldBox<GridTileSet<T1s...> const> const& src)
+    requires(std::is_same_v<FieldBorderSumOp<double>, Operator>)
+{
+    auto& dst_field = dst.field;
+    auto const pq   = dst.field.physicalQuantity();
+    // assert(src.field.physicalQuantity() == pq);
+
+    auto const skip = [](auto const& field, auto const& tile) {
+        auto const tbox = grow(tile, 1);
+        return *(tbox * field.layout().AMRBox()) == tbox;
+    };
+    auto const get_box = [&](auto const& tile) { return tile.layout().AMRGhostBoxFor(pq); };
+    auto const src_selection_box = src.field.layout().localToAMR(src.lcl_box);
+    auto const dst_selection_box
+        = shift(src.field.layout().localToAMR(dst.lcl_box), src.offset_ * -1);
+
+    for (std::size_t sidx = 0; sidx < src.field().size(); ++sidx)
+    {
+        auto const& src_tile = src.field()[sidx];
+        if (skip(src.field, src_tile))
+            continue; // skip not border tile
+
+        auto const src_tile_ghost_box = get_box(src_tile);
+        if (auto const src_overlap = src_selection_box * src_tile_ghost_box)
+        {
+            auto const lcl_src_box = src_tile.layout().AMRToLocal(*src_overlap);
+            auto const lcl_dst_box = dst.lcl_box;
+            // = dst_tile.layout().AMRToLocal(shift(*dst_overlap, src.offset_));
+
+            assert(lcl_src_box.size() <= src_tile().size());
+
+            auto src_it = lcl_src_box.begin();
+            auto dst_it = lcl_dst_box.begin();
+            for (; dst_it != lcl_dst_box.end() and src_it != lcl_src_box.end(); ++src_it, ++dst_it)
+                Operator{dst_field(*dst_it)}(src_tile()(*src_it));
+        }
+    }
+}
+
+template<typename Operator, typename... T0s, typename... T1s>
+void operate_on_fields(FieldBox<Grid<T0s...>>& dst, FieldBox<GridTileSet<T1s...> const> const& src)
+{
+    // PHARE_LOG_LINE_SS(e);
+    static_assert(false); // never called
+}
 
 
 
@@ -172,13 +299,6 @@ void operate_on_fields(FieldBox<T0s...>& dst, FieldBox<T1s...> const& src)
     auto dst_it = dst.lcl_box.begin();
     for (; dst_it != dst.lcl_box.end(); ++src_it, ++dst_it)
         Operator{dst.field(*dst_it)}(src.field(*src_it));
-}
-
-template<typename Field_t>
-template<typename Operator, typename Field_t0>
-void FieldBox<Field_t>::op(FieldBox<Field_t0> const& that)
-{
-    operate_on_fields<Operator>(*this, that);
 }
 
 
@@ -283,6 +403,8 @@ void FieldBox<Field_t>::append_to(std::vector<value_type>& vec) const
 }
 
 
+
+
 template<typename... T0s, typename... T1s>
 void copy_fields(FieldTileSet<T0s...>& dst, FieldTileSet<T1s...> const& src)
 {
@@ -291,12 +413,94 @@ void copy_fields(FieldTileSet<T0s...>& dst, FieldTileSet<T1s...> const& src)
 }
 
 
-
-template<typename Field_t0, typename Field_t1>
-void copy_fields(Field_t0& dst, Field_t1 const& src)
+template<typename... T0s, auto opts>
+void copy_fields(FieldTileSet<T0s...>& dst, basic::Field<opts> const& src)
 {
-    std::memcpy(dst.data(), src.data(), src.size() * sizeof(typename Field_t1::value_type));
+    assert(dst().size());
+    auto const layout = dst()[0].layout().copy_as(dst.box());
+
+    for (auto& tile : dst)
+        FieldBox{tile(), tile.layout(), tile.ghost_box()}.op(
+            FieldBox{src, layout, tile.ghost_box()});
+    // FieldBox{dst, layout}.op(FieldBox{src, layout});
 }
+
+
+template<typename... T0s, auto opts>
+void copy_fields(basic::Field<opts>& dst, FieldTileSet<T0s...> const& src)
+{
+    reduce_into(src, dst);
+}
+
+
+template<auto opts0, auto opts1>
+void copy_fields(basic::Field<opts0>& dst, basic::Field<opts1> const& src)
+{
+    std::memcpy(dst.data(), src.data(),
+                src.size() * sizeof(typename basic::Field<opts0>::value_type));
+}
+
+
+template<typename Operator, typename Grid_t, typename GridTiles_t>
+auto& reduce_into_(GridTiles_t const& tiles, Grid_t& grid)
+{
+    auto const pq = tiles.physicalQuantity();
+
+    auto get_box = [&](auto const& tile) {
+        // if constexpr (std::is_same_v<Operator, PlusEquals<typename Operator::value_type>>)
+        return tile.layout().AMRGhostBoxFor(pq);
+        // else
+        //     return shrink(tile.layout().AMRGhostBoxFor(pq), tile.layout().nbrGhosts());
+    };
+
+
+    grid.reshape(tiles.shape());
+    grid.zero();
+
+    auto const& patch_layout = tiles[0].layout().copy_as(tiles.box());
+
+    for (auto const& tile : tiles())
+    {
+        using Tile_vt           = std::decay_t<decltype(tile)>::Super;
+        auto const& tile_layout = tile.layout();
+        auto const& tile_box    = get_box(tile);
+
+        FieldBox<Grid_t>{grid, patch_layout, patch_layout.AMRToLocal(tile_box)}
+            .template op<Operator>(core::FieldBox<Tile_vt const>{*tile, tile_layout, tile_box});
+    }
+
+    return grid;
+}
+
+
+
+template<typename Grid_t, typename GridTiles_t>
+auto& reduce_into(GridTiles_t const& tiles, Grid_t& grid)
+{
+    if constexpr (is_field_tile_set_v<GridTiles_t>)
+        reduce_into_<PlusEquals<typename Grid_t::value_type>>(tiles, grid);
+    else
+        copy_fields(grid, tiles);
+    return grid;
+}
+
+
+
+template<typename Tiles>
+auto reduce(Tiles const& input)
+{
+    if constexpr (!is_field_tile_set_v<Tiles>)
+        return input;
+    else
+    {
+        using Grid_t = Tiles::grid_type;
+        Grid_t grid{input.name(), input.physicalQuantity(), input.shape()};
+        reduce_into(input, grid);
+        return grid;
+    }
+}
+
+
 
 } // namespace PHARE::core
 

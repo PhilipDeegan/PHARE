@@ -242,7 +242,7 @@ public:
 
         using vec_helper = PHARE::Vector<type, alloc_mode>;
         for (auto& tile : *this)
-            vec_helper::fill(tile().data(), tile().size(), 0);
+            vec_helper::fill(tile().data(), tile().size(), 1e-15); // NAN!
     }
 
     // auto& operator()(Point<std::uint32_t, dimension> const& lCell)
@@ -297,8 +297,8 @@ public:
     bool isUsable() const
     {
         auto const b = Super::data() != nullptr;
-        if (b)
-            check();
+        // if (b)
+        //     check();
         return b;
     }
     bool isSettable() const { return !isUsable(); }
@@ -321,14 +321,15 @@ public:
     NO_DISCARD auto at(auto const&... args) const { return super().at(args...); }
     // NO_DISCARD auto size() const _PHARE_ALL_FN_ { return layout_.allocSize(qty_); }
 
-    void check() const
+    void check(bool const nan = false) const
     {
         for (auto& tile : super())
         {
             assert(tile().size() < static_cast<std::size_t>(1e6));
-            for (auto const& e : tile())
-                if (std::isnan(e))
-                    throw std::runtime_error("NAN");
+            if (nan)
+                for (auto const& e : tile())
+                    if (std::isnan(e))
+                        throw std::runtime_error("NAN");
         }
     }
 
@@ -452,51 +453,6 @@ private:
 };
 
 
-template<typename Operator, typename Grid_t, typename GridTiles_t>
-auto& reduce_into_(GridTiles_t const& tiles, Grid_t& grid)
-{
-    auto const pq = tiles.physicalQuantity();
-
-    auto get_box = [&](auto const& tile) {
-        if constexpr (std::is_same_v<Operator, PlusEquals<typename Operator::value_type>>)
-            return tile.layout().AMRGhostBoxFor(pq);
-        else
-            return shrink(tile.layout().AMRGhostBoxFor(pq), tile.layout().nbrGhosts());
-    };
-
-
-    grid.reshape(tiles.shape());
-    grid.zero();
-
-    auto const& patch_layout = tiles[0].layout().copy_as(tiles.box());
-
-    for (auto const& tile : tiles())
-    {
-        using Tile_vt           = std::decay_t<decltype(tile)>::Super;
-        auto const& tile_layout = tile.layout();
-        auto const& tile_box    = get_box(tile);
-
-        FieldBox<Grid_t>{grid, patch_layout, patch_layout.AMRToLocal(tile_box)}
-            .template op<Operator>(core::FieldBox<Tile_vt const>{*tile, tile_layout, tile_box});
-    }
-
-    return grid;
-}
-
-template<typename Grid_t, typename GridTiles_t>
-auto& reduce_into(GridTiles_t const& tiles, Grid_t& grid)
-{
-    reduce_into_<Equals<typename Grid_t::value_type>>(tiles, grid);
-    return grid;
-}
-
-template<typename Grid_t, typename GridTiles_t>
-auto& reduce_into_plus(GridTiles_t const& tiles, Grid_t& grid)
-{
-    reduce_into_<PlusEquals<typename Grid_t::value_type>>(tiles, grid);
-    return grid;
-}
-
 
 template<typename T>
 struct is_field_tile_set : std::false_type
@@ -518,35 +474,6 @@ template<typename T>
 auto static constexpr is_field_tile_set_v = is_field_tile_set<T>::value;
 
 
-
-
-template<typename Tiles>
-auto reduce(Tiles const& input)
-{
-    if constexpr (!is_field_tile_set_v<Tiles>)
-        return input;
-    else
-    {
-        using Grid_t = Tiles::grid_type;
-        Grid_t grid{input.name(), input.physicalQuantity(), input.shape()};
-        reduce_into(input, grid);
-        return grid;
-    }
-}
-
-template<typename Tiles>
-auto reduce_plus_equals(Tiles const& input)
-{
-    if constexpr (!is_field_tile_set_v<Tiles>)
-        return input;
-    else
-    {
-        using Grid_t = Tiles::grid_type;
-        Grid_t grid{input.name(), input.physicalQuantity(), input.shape()};
-        reduce_into_plus(input, grid);
-        return grid;
-    }
-}
 
 
 } // namespace PHARE::core

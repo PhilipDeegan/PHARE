@@ -35,7 +35,9 @@ class Refiner : private Communicator<RefinerTypes, ResourcesManager::dimension>
 
 public:
     void registerLevel(std::shared_ptr<SAMRAI::hier::PatchHierarchy> const& hierarchy,
-                       std::shared_ptr<SAMRAI::hier::PatchLevel> const& level)
+                       std::shared_ptr<SAMRAI::hier::PatchLevel> const& level,
+                       std::shared_ptr<SAMRAI::xfer::RefineTransactionFactory> const& refac
+                       = nullptr)
     {
         auto levelNumber = level->getLevelNumber();
 
@@ -78,8 +80,9 @@ public:
             {
                 this->add(algo,
                           algo->createSchedule(
-                              level, 0,
-                              std::make_shared<FieldBorderSumTransactionFactory<FieldData_t>>()),
+                              level, 0, refac
+                              // std::make_shared<FieldBorderSumTransactionFactory<FieldData_t>>()
+                              ),
                           levelNumber);
             }
 

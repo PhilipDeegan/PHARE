@@ -240,6 +240,42 @@ auto count_particles_per_cell(ParticleArray_t const& ps)
 }
 
 
+
+
+template<std::size_t D, typename I0>
+void per_particle(ParticleArray<D, I0> const& particles, auto const fn)
+{
+    using enum LayoutMode;
+    if constexpr (any_in(I0::layout_mode, AoSTS))
+        for (auto const& tile : particles())
+            for (auto const& p : tile())
+                fn(p);
+    else
+        for (auto const& p : particles)
+            fn(p);
+}
+
+template<std::size_t D, typename I0>
+void check_particles(ParticleArray<D, I0> const& particles)
+{
+    using enum LayoutMode;
+
+    if constexpr (any_in(I0::layout_mode, AoSTS))
+        for (auto const& tile : particles())
+            for (auto const& bix : *tile)
+            {
+                auto const ppc = sum_from(
+                    tile(), [&](auto const& p) { return array_equals(p.iCell(), *bix) ? 1 : 0; });
+                PHARE_LOG_LINE_SS(bix << " " << ppc);
+                if (ppc == 0 and tile().size())
+                {
+                    PHARE_LOG_LINE_SS(tile()[0]);
+                }
+                assert(ppc);
+            }
+}
+
+
 } // namespace PHARE::core
 
 

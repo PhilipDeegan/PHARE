@@ -348,6 +348,11 @@ namespace amr
 
 
         void sum(SAMRAI::hier::PatchData const& src, SAMRAI::hier::BoxOverlap const& overlap);
+
+
+        template<typename... T0>
+        void sum_border(FieldData<T0...> const& src, SAMRAI::hier::BoxOverlap const& overlap);
+
         void unpackStreamAndSum(SAMRAI::tbox::MessageStream& stream,
                                 SAMRAI::hier::BoxOverlap const& overlap);
 
@@ -391,8 +396,8 @@ namespace amr
             copy_(source, overlap, field);
         }
 
-        template<typename Operator = SetEqualOp>
-        void copy_(FieldData const& source, FieldOverlap const& overlap, Grid_t& dst)
+        template<typename Operator = SetEqualOp, typename... T0>
+        void copy_(FieldData<T0...> const& source, FieldOverlap const& overlap, Grid_t& dst)
         {
             // Here the first step is to get the transformation from the overlap
             // we transform the box from the source, and from the destination
@@ -431,14 +436,14 @@ namespace amr
                         auto const& noffset = offset * -1;
 
                         if (!intersectionBox.empty())
-                            core::FieldBox<Grid_t>{dst, gridLayout,
-                                                   phare_lcl_box_from<dimension>(
-                                                       AMRToLocal(intersectionBox, destinationBox))}
-                                .template op<Operator>(core::FieldBox<Grid_t const>{
-                                    source.field, source.gridLayout,
-                                    phare_lcl_box_from<dimension>(
-                                        AMRToLocal(intersectionBox, transformedSource))}
-                                                           .offset(offset));
+                            core::FieldBox{dst, gridLayout,
+                                           phare_lcl_box_from<dimension>(
+                                               AMRToLocal(intersectionBox, destinationBox))}
+                                .template op<Operator>(
+                                    core::FieldBox{source.field, source.gridLayout,
+                                                   phare_lcl_box_from<dimension>(AMRToLocal(
+                                                       intersectionBox, transformedSource))}
+                                        .offset(offset));
                     }
                 }
             }
@@ -500,7 +505,7 @@ template<typename GridLayoutT, typename Grid_t, typename PhysicalQuantity>
 void FieldData<GridLayoutT, Grid_t, PhysicalQuantity>::sum(SAMRAI::hier::PatchData const& src,
                                                            SAMRAI::hier::BoxOverlap const& overlap)
 {
-    using PlusEqualOp = core::PlusEquals<value_type>;
+    using PlusEqualOp = core::FieldBorderSumOp<value_type>;
 
     TBOX_ASSERT_OBJDIM_EQUALITY2(*this, src);
 
@@ -508,6 +513,23 @@ void FieldData<GridLayoutT, Grid_t, PhysicalQuantity>::sum(SAMRAI::hier::PatchDa
     auto& fieldSource  = dynamic_cast<FieldData const&>(src);
 
     copy_<PlusEqualOp>(fieldSource, fieldOverlap, field);
+}
+
+
+
+template<typename GridLayoutT, typename Grid_t, typename PhysicalQuantity>
+template<typename... T0>
+void FieldData<GridLayoutT, Grid_t, PhysicalQuantity>::sum_border(
+    FieldData<T0...> const& src, SAMRAI::hier::BoxOverlap const& overlap)
+{
+    using PlusEqualOp = core::FieldBorderSumOp<value_type>;
+
+    TBOX_ASSERT_OBJDIM_EQUALITY2(*this, src);
+
+    auto& fieldOverlap = dynamic_cast<FieldOverlap const&>(overlap);
+    // auto& fieldSource  = dynamic_cast<FieldData const&>(src);
+
+    copy_<PlusEqualOp>(src, fieldOverlap, field);
 }
 
 

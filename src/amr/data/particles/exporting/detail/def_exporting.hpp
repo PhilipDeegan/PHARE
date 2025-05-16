@@ -17,7 +17,8 @@ struct ParticlesExporter
     auto constexpr static layout_mode = layout_mde;
     auto constexpr static alloc_mode  = alloc_mde;
 
-    template<typename Src, typename Dst, typename Box_t, typename Refiner, typename Transformer>
+    template<auto type, typename Src, typename Dst, typename Box_t, typename Refiner,
+             typename Transformer>
     void operator()(Src const&, Dst&, Box_t const&, Refiner, Transformer);
 };
 

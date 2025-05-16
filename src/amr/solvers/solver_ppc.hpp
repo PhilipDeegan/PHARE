@@ -497,10 +497,10 @@ void SolverPPC<HybridModel, AMR_Types>::moveIons_(level_t& level, ModelViews_t& 
     setTime([](auto& state) -> auto& { return state.ions; });
 
 
+    fromCoarser.fillIonPopMomentGhosts(views.model().state.ions, level, newTime);
     fromCoarser.fillFluxBorders(views.model().state.ions, level, newTime);
     fromCoarser.fillDensityBorders(views.model().state.ions, level, newTime);
     fromCoarser.fillIonGhostParticles(views.model().state.ions, level, newTime);
-    fromCoarser.fillIonPopMomentGhosts(views.model().state.ions, level, newTime);
 
     for (auto& state : views)
         IonUpdater_t::updateIons(state.ions);

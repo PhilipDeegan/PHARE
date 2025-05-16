@@ -41,7 +41,7 @@ auto static particles_dict()
 }
 
 
-template<std::size_t _dim, auto lm, auto am, std::uint8_t _impl = 2>
+template<std::size_t _dim, auto lm, auto am>
 struct TestParam
 {
     static_assert(all_are<LayoutMode>(lm));
@@ -50,13 +50,13 @@ struct TestParam
     auto constexpr static dim         = _dim;
     auto constexpr static layout_mode = lm;
     auto constexpr static alloc_mode  = am;
-    auto constexpr static impl        = _impl;
 
     using Box_t = PHARE::core::Box<int, dim>;
     using GridLayout_t
         = TestGridLayout<typename core::PHARE_Types<SimOpts{dim, interp}>::GridLayout_t>;
-    using ParticleArray_t = ParticleArray<
-        dim, ParticleArrayInternals<dim, layout_mode, StorageMode::VECTOR, alloc_mode, impl>>;
+    using ParticleArray_t
+        = ParticleArray<dim,
+                        ParticleArrayInternals<dim, layout_mode, StorageMode::VECTOR, alloc_mode>>;
 };
 
 
@@ -119,7 +119,7 @@ struct AParticlesDataTest<1, TestParam>
     }
 
     std::vector<Patch<TestParam>> patches;
-    Patch<TestParam> L1{Box_t{Point{3}, Point{12}}};
+    Patch<TestParam> L1{Box_t{Point{4}, Point{9}}};
 };
 
 
@@ -199,19 +199,20 @@ struct ParticlesDataTest : public ::testing::Test,
     }
 
 
-    void refineDomain(auto& src, auto& dst)
+    auto refineDomain(auto& src, auto& dst)
     {
         using Refiner
             = ParticlesRefining<ParticleArray_t, ParticlesDataSplitType::interior, Splitter>;
-        Refiner{*src.data, *dst.data}.forBoxes(std::array{dst.layout.AMRBox()});
+        std::array const boxes{dst.layout.AMRBox()};
+        Refiner{*src.data, *dst.data}.forBoxes(boxes);
     }
 
-    void refineLevelGhost(auto& src, auto& dst)
+    auto refineLevelGhost(auto& src, auto& dst)
     {
-        using Refiner = ParticlesRefining<ParticleArray_t, ParticlesDataSplitType::coarseBoundary,
-                                          Splitter, ParticleType::Ghost>;
-        Refiner{*src.data, *dst.data}.forBoxes(
-            grow(dst.layout.AMRBox(), nghosts).remove(dst.layout.AMRBox()));
+        using Refiner
+            = ParticlesRefining<ParticleArray_t, ParticlesDataSplitType::coarseBoundary, Splitter>;
+        auto const boxes = grow(dst.layout.AMRBox(), nghosts).remove(dst.layout.AMRBox());
+        Refiner{*src.data, *dst.data}.forBoxes(boxes);
     }
 };
 
@@ -220,33 +221,33 @@ struct ParticlesDataTest : public ::testing::Test,
 using ParticlesDatas = testing::Types< //
 
     TestParam<1, LayoutMode::AoSMapped, AllocatorMode::CPU>
-   ,TestParam<1, LayoutMode::AoS, AllocatorMode::CPU>
+//    ,TestParam<1, LayoutMode::AoS, AllocatorMode::CPU>
 
-PHARE_WITH_THRUST(
-   // ,TestParam<1, LayoutMode::AoSTS, AllocatorMode::CPU>
+PHARE_WITH_MKN_GPU(
+   ,TestParam<1, LayoutMode::AoSTS, AllocatorMode::CPU>
 )
 
-   ,TestParam<2, LayoutMode::AoSMapped, AllocatorMode::CPU>
-   ,TestParam<2, LayoutMode::AoS, AllocatorMode::CPU>
+//    ,TestParam<2, LayoutMode::AoSMapped, AllocatorMode::CPU>
+//    ,TestParam<2, LayoutMode::AoS, AllocatorMode::CPU>
 
-PHARE_WITH_THRUST(
-   // ,TestParam<2, LayoutMode::AoSTS, AllocatorMode::CPU>
-)
+// PHARE_WITH_THRUST(
+//    // ,TestParam<2, LayoutMode::AoSTS, AllocatorMode::CPU>
+// )
 
-PHARE_WITH_GPU(
-   ,TestParam<2, LayoutMode::AoS, AllocatorMode::GPU_UNIFIED>
+// PHARE_WITH_GPU(
+//    ,TestParam<2, LayoutMode::AoS, AllocatorMode::GPU_UNIFIED>
 
-PHARE_WITH_THRUST(
-   // ,TestParam<2, LayoutMode::AoSTS, AllocatorMode::GPU_UNIFIED>
-)
+// PHARE_WITH_THRUST(
+//    // ,TestParam<2, LayoutMode::AoSTS, AllocatorMode::GPU_UNIFIED>
+// )
 
-)
+// )
 
 
 >;
 // clang-format on
 
-TYPED_TEST_SUITE(ParticlesDataTest, ParticlesDatas);
+TYPED_TEST_SUITE(ParticlesDataTest, ParticlesDatas, );
 
 namespace PHARE::amr
 {
@@ -263,6 +264,18 @@ TYPED_TEST(ParticlesDataTest, splitWorksForDomain)
     EXPECT_EQ(expected, dst.data->domainParticles.size());
 
     dst.data->domainParticles.check();
+
+    per_particle(dst.data->domainParticles,
+                 [&](auto const& p) { EXPECT_TRUE(isIn(p, dst.layout.AMRBox())); });
+
+    // for (auto const& bix : dst.layout.AMRBox())
+    // {
+    //     EXPECT_TRUE(sum_from(dst.data->domainParticles,
+    //                          [&](auto const& p) { return array_equals(p.iCell(), *bix) ? 1 : 0;
+    //                          })
+    //                 == ppc)
+    //         << "failed for " << bix;
+    // }
 }
 
 

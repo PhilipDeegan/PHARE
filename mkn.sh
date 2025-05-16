@@ -25,17 +25,17 @@ clargs(){
 # FILE="tests/amr/data/particles/copy_overlap/test_particledata_copy_periodicNd.cpp"
 # FILE="tests/amr/data/particles/test_particles_data.cpp"
 FILE="tests/amr/data/particles/test_particles_schedules.cpp"
-FILE="tests/amr/data/particles/refine/test_particles_data_split.cpp"
 
 FILE="tests/core/data/grid/test_grid_tile_set.cpp"
 FILE="tests/core/numerics/ion_updater/test_updater_pp_main.cpp"
 FILE="tests/core/numerics/ion_updater/test_multi_updater.cpp"
-FILE="tests/core/data/tiles/test_tile_set_mapper.cpp"
 
 FILE="tests/amr/data/field/refine/test_field_refinement_on_hierarchy.cpp"
-
 FILE="tests/amr/data/field/test_fields_schedules.cpp"
 FILE="tests/diagnostic/test-diagnostics_1d.cpp"
+
+FILE="tests/amr/data/particles/refine/test_particles_data_split.cpp"
+FILE="tests/core/data/tiles/test_tile_set_mapper.cpp"
 
 
 TEST=" -M ${FILE} "

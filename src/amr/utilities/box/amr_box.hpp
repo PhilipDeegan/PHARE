@@ -159,7 +159,7 @@ auto as_point(SAMRAI::hier::Transformation const& tform)
 template<typename Box_t>
 Box_t refine_box(Box_t const& box)
 {
-    return Box_t{(box.lower * refinementRatio) - 1, (box.upper * refinementRatio) - 1};
+    return Box_t{((box.lower + 1) * refinementRatio) - 1, ((box.upper + 1) * refinementRatio) - 1};
 }
 
 

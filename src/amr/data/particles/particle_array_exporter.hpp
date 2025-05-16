@@ -10,7 +10,8 @@ namespace PHARE::amr
 {
 
 
-template<typename Src, typename Dst, typename Box_t, typename Refiner, typename Transformer>
+template<auto type, typename Src, typename Dst, typename Box_t, typename Refiner,
+         typename Transformer>
 void export_refined_particles( //
     Src const& src, Dst& dst, Box_t const& box, Refiner refiner, Transformer fn0)
 {
@@ -20,7 +21,7 @@ void export_refined_particles( //
     auto constexpr function_id              = core::join_string_views_v<FN_ID, Src::type_id>;
     PHARE_LOG_SCOPE(1, function_id);
 
-    Exporter{}.operator()(src, dst, box, refiner, fn0);
+    Exporter{}.template operator()<type>(src, dst, box, refiner, fn0);
 }
 
 } // namespace PHARE::amr
