@@ -1,11 +1,14 @@
 #ifndef PHARE_SOLVER_SOLVER_PPC_MODEL_VIEW_HPP
 #define PHARE_SOLVER_SOLVER_PPC_MODEL_VIEW_HPP
 
+#include "core/data/grid/grid_tiles.hpp"
+#include "core/numerics/ohm/ohm.hpp"
 #include "core/numerics/ampere/ampere.hpp"
 #include "core/numerics/faraday/faraday.hpp"
-#include "core/numerics/ohm/ohm.hpp"
 
 #include "amr/solvers/solver.hpp"
+#include <amr/resources_manager/amr_utils.hpp>
+#include <type_traits>
 
 namespace PHARE::solver
 {
@@ -18,6 +21,7 @@ void assert_equal_sizes([[maybe_unused]] Vectors const&... vectors)
             [&](auto i) { return std::get<i>(tup).size() == std::get<0>(tup).size(); })); //
     )
 }
+
 
 /*Faraday, Ampere, Ohm Transformers are abstraction that, from the solver viewpoint, act as Faraday,
  * Ampere and Ohm algorithms, but take all patch views and hide the way these are processed, for
@@ -32,11 +36,16 @@ public:
     void operator()(GridLayouts const& layouts, VecFields const& B, VecFields const& E,
                     VecFields& Bnew, double dt)
     {
-        assert_equal_sizes(B, E, Bnew);
-        for (std::size_t i = 0; i < B.size(); ++i)
+        using field_type = std::remove_pointer_t<typename VecFields::value_type>::field_type;
+        if constexpr (core::is_field_tile_set_v<field_type>) {}
+        else
         {
-            auto _ = core::SetLayout(layouts[i], faraday_);
-            faraday_(*B[i], *E[i], *Bnew[i], dt);
+            assert_equal_sizes(B, E, Bnew);
+            for (std::size_t i = 0; i < B.size(); ++i)
+            {
+                auto _ = core::SetLayout(layouts[i], faraday_);
+                faraday_(*B[i], *E[i], *Bnew[i], dt);
+            }
         }
     }
 
@@ -52,11 +61,16 @@ public:
     template<typename GridLayouts, typename VecFields>
     void operator()(GridLayouts const& layouts, VecFields const& B, VecFields& J)
     {
-        assert_equal_sizes(B, J);
-        for (std::size_t i = 0; i < B.size(); ++i)
+        using field_type = std::remove_pointer_t<typename VecFields::value_type>::field_type;
+        if constexpr (core::is_field_tile_set_v<field_type>) {}
+        else
         {
-            auto _ = core::SetLayout(layouts[i], ampere_);
-            ampere_(*B[i], *J[i]);
+            assert_equal_sizes(B, J);
+            for (std::size_t i = 0; i < B.size(); ++i)
+            {
+                auto _ = core::SetLayout(layouts[i], ampere_);
+                ampere_(*B[i], *J[i]);
+            }
         }
     }
     core_type ampere_;
@@ -77,11 +91,16 @@ public:
     void operator()(GridLayouts const& layouts, Fields const& n, VecFields const& Ve,
                     Fields const& Pe, VecFields const& B, VecFields const& J, VecFields& Enew)
     {
-        assert_equal_sizes(n, Ve, Pe, B, J, Enew);
-        for (std::size_t i = 0; i < B.size(); ++i)
+        using field_type = std::remove_pointer_t<typename VecFields::value_type>::field_type;
+        if constexpr (core::is_field_tile_set_v<field_type>) {}
+        else
         {
-            auto _ = core::SetLayout(layouts[i], ohm_);
-            ohm_(*n[i], *Ve[i], *Pe[i], *B[i], *J[i], *Enew[i]);
+            assert_equal_sizes(n, Ve, Pe, B, J, Enew);
+            for (std::size_t i = 0; i < B.size(); ++i)
+            {
+                auto _ = core::SetLayout(layouts[i], ohm_);
+                ohm_(*n[i], *Ve[i], *Pe[i], *B[i], *J[i], *Enew[i]);
+            }
         }
     }
 
@@ -94,23 +113,26 @@ template<typename HybridModel_>
 class HybridPPCModelView : public ISolverModelView
 {
 public:
-    using This             = HybridPPCModelView<HybridModel_>;
-    using HybridModel_t    = HybridModel_;
-    using HybridModel_args = typename HybridModel_t::type_list::Tuple;
-    using IPhysicalModel_t = typename HybridModel_t::Interface;
-    using patch_t          = typename HybridModel_t::patch_t;
-    using Electrons        = typename HybridModel_t::electrons_t;
-    using level_t          = typename HybridModel_t::amr_types::level_t;
-    using Electromag       = typename HybridModel_t::electromag_type;
-    using Ions             = typename HybridModel_t::ions_type;
-    using ParticleArray_t  = typename Ions::particle_array_type;
-    using Particle_t       = typename ParticleArray_t::value_type;
-    using VecFieldT        = typename HybridModel_t::vecfield_type;
-    using FieldT           = typename HybridModel_t::field_type;
-    using GridLayout       = typename HybridModel_t::gridlayout_type;
-    using Faraday_t        = FaradayTransformer<GridLayout>;
-    using Ampere_t         = AmpereTransformer<GridLayout>;
-    using Ohm_t            = OhmTransformer<GridLayout>;
+    using This          = HybridPPCModelView<HybridModel_>;
+    using HybridModel_t = HybridModel_;
+
+    using HybridModel_args = HybridModel_t::type_list::Tuple;
+    using IPhysicalModel_t = HybridModel_t::Interface;
+    using patch_t          = HybridModel_t::patch_t;
+    using Electrons        = HybridModel_t::electrons_t;
+    using hierarchy_t      = HybridModel_t::amr_types::hierarchy_t;
+    using level_t          = HybridModel_t::amr_types::level_t;
+    using Electromag       = HybridModel_t::electromag_type;
+    using Ions             = HybridModel_t::ions_type;
+    using ParticleArray_t  = Ions::particle_array_type;
+    using Particle_t       = ParticleArray_t::value_type;
+    using VecFieldT        = HybridModel_t::vecfield_type;
+    using FieldT           = HybridModel_t::field_type;
+    using GridLayout_t     = HybridModel_t::gridlayout_type;
+    using Faraday_t        = FaradayTransformer<GridLayout_t>;
+    using Ampere_t         = AmpereTransformer<GridLayout_t>;
+    using Ohm_t            = OhmTransformer<GridLayout_t>;
+
 
     struct PatchState_t;
 
@@ -119,19 +141,24 @@ public:
     template<bool isConst = false>
     struct iterator;
 
-    HybridPPCModelView(level_t& level, IPhysicalModel_t& model)
+    HybridPPCModelView(hierarchy_t const& hierarchy, level_t& level, IPhysicalModel_t& model)
         : model_{dynamic_cast<HybridModel_t&>(model)}
     {
-        onRegrid(level, model_);
+        onRegrid(hierarchy, level, model_);
     }
 
-    void onRegrid(level_t& level, HybridModel_t& hybridModel);
+    void onRegrid(hierarchy_t const& hierarchy, level_t& level, HybridModel_t& hybridModel);
 
     auto begin() { return iterator</*const=*/false>{*this}; }
     auto begin() const { return iterator</*const=*/true>{*this}; }
 
     auto end() { return iterator</*const=*/false>{*this, states.size()}; }
     auto end() const { return iterator</*const=*/true>{*this, states.size()}; }
+
+    auto& operator[](std::size_t const idx) { return states[idx]; }
+    auto& operator[](std::size_t const idx) const { return states[idx]; }
+
+    auto size() const { return states.size(); }
 
     auto& model() { return model_; }
     auto& model() const { return model_; }
@@ -151,7 +178,7 @@ public:
     std::vector<VecFieldT*> electromagAvg_B;
     std::vector<VecFieldT*> J;
     std::vector<Ions*> ions;
-    std::vector<GridLayout*> layouts;
+    std::vector<GridLayout_t*> layouts;
     std::vector<FieldT*> Pe;
     std::vector<FieldT*> N;
     std::vector<VecFieldT*> Ve;
@@ -169,7 +196,8 @@ private:
 
 
 template<typename HybridModel>
-void HybridPPCModelView<HybridModel>::onRegrid(level_t& level, HybridModel_t& hybridModel)
+void HybridPPCModelView<HybridModel>::onRegrid(hierarchy_t const& hierarchy, level_t& level,
+                                               HybridModel_t& hybridModel)
 {
     auto& hybridState = hybridModel.state;
     auto& rm          = *hybridModel.resourcesManager;
@@ -180,15 +208,15 @@ void HybridPPCModelView<HybridModel>::onRegrid(level_t& level, HybridModel_t& hy
     {
         {
             auto _ = rm.setOnPatch(*patch, hybridState, electromagPred_, electromagAvg_);
-            states.emplace_back(                                 //
-                PHARE::amr::layoutFromPatch<GridLayout>(*patch), //
-                hybridState.ions,                                //
-                hybridState.J,                                   //
-                hybridState.electromag,                          //
-                electromagPred_,                                 //
-                electromagAvg_,                                  //
-                hybridState.electrons,                           //
-                patch                                            //
+            states.emplace_back(                                   //
+                PHARE::amr::layoutFromPatch<GridLayout_t>(*patch), //
+                hybridState.ions,                                  //
+                hybridState.J,                                     //
+                hybridState.electromag,                            //
+                electromagPred_,                                   //
+                electromagAvg_,                                    //
+                hybridState.electrons,                             //
+                patch                                              //
             );
         }
         assert(states.back().isUsable());
@@ -252,7 +280,11 @@ struct HybridPPCModelView<HybridModel>::iterator
 template<typename HybridModel>
 struct HybridPPCModelView<HybridModel>::PatchState_t
 {
-    GridLayout layout;
+    using ParticleArray_t = HybridPPCModelView<HybridModel>::ParticleArray_t;
+    using GridLayout_t    = HybridPPCModelView<HybridModel>::GridLayout_t;
+    using Electromag_t    = HybridPPCModelView<HybridModel>::Electromag;
+
+    GridLayout_t layout;
     Ions ions;
     VecFieldT J;
     Electromag electromag, electromagPred, electromagAvg;

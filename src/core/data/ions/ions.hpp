@@ -1,6 +1,16 @@
 #ifndef PHARE_IONS_HPP
 #define PHARE_IONS_HPP
 
+
+#include "core/def.hpp"
+#include "core/utilities/algorithm.hpp"
+#include "initializer/data_provider.hpp"
+#include "core/hybrid/hybrid_quantities.hpp"
+#include "core/data/vecfield/vecfield_component.hpp"
+#include "particle_initializers/particle_initializer_factory.hpp"
+
+
+
 #include <algorithm>
 #include <functional>
 #include <iterator>
@@ -11,13 +21,6 @@
 #include <array>
 
 
-#include "core/def.hpp"
-#include "core/hybrid/hybrid_quantities.hpp"
-#include "core/data/vecfield/vecfield_component.hpp"
-#include "initializer/data_provider.hpp"
-#include "particle_initializers/particle_initializer_factory.hpp"
-#include "core/utilities/algorithm.hpp"
-
 namespace PHARE
 {
 namespace core
@@ -27,11 +30,11 @@ namespace core
     {
     public:
         using value_type                = IonPopulation;
-        using field_type                = typename IonPopulation::field_type;
-        using vecfield_type             = typename IonPopulation::vecfield_type;
-        using Float                     = typename field_type::type;
-        using tensorfield_type          = typename IonPopulation::tensorfield_type;
-        using particle_array_type       = typename IonPopulation::particle_array_type;
+        using field_type                = IonPopulation::field_type;
+        using vecfield_type             = IonPopulation::vecfield_type;
+        using Float                     = field_type::type;
+        using tensorfield_type          = IonPopulation::tensorfield_type;
+        using particle_array_type       = IonPopulation::particle_array_type;
         using gridlayout_type           = GridLayout;
         static constexpr auto dimension = GridLayout::dimension;
 
@@ -44,7 +47,7 @@ namespace core
             : rho_{densityName(), HybridQuantity::Scalar::rho}
             , massDensity_{massDensityName(), HybridQuantity::Scalar::rho}
             , bulkVelocity_{"bulkVel", HybridQuantity::Vector::V}
-            , populations_{generate(
+            , populations_{generate_from(
                   [&dict](auto ipop) { //
                       return IonPopulation{dict["pop" + std::to_string(ipop)]};
                   },
@@ -89,8 +92,7 @@ namespace core
                 // have to account for the field dimensionality.
 
                 auto& popDensity = pop.density();
-                std::transform(std::begin(rho_), std::end(rho_), std::begin(popDensity),
-                               std::begin(rho_), std::plus<Float>{});
+                core::transform(rho_, popDensity, rho_, std::plus<Float>{});
             }
         }
         void computeMassDensity()
@@ -104,9 +106,8 @@ namespace core
                 // have to account for the field dimensionality.
 
                 auto& popDensity = pop.density();
-                std::transform(
-                    std::begin(massDensity_), std::end(massDensity_), std::begin(popDensity),
-                    std::begin(massDensity_),
+                core::transform(
+                    massDensity_, popDensity, massDensity_,
                     [&pop](auto const& n, auto const& pop_n) { return n + pop_n * pop.mass(); });
             }
         }
@@ -139,38 +140,35 @@ namespace core
                 auto&& [fx, fy, fz] = flux();
 
 
-                std::transform(std::begin(vx), std::end(vx), std::begin(fx), std::begin(vx),
-                               sameMasses_ ? plus : plusMass);
-                std::transform(std::begin(vy), std::end(vy), std::begin(fy), std::begin(vy),
-                               sameMasses_ ? plus : plusMass);
-                std::transform(std::begin(vz), std::end(vz), std::begin(fz), std::begin(vz),
-                               sameMasses_ ? plus : plusMass);
+                core::transform(vx, fx, vx, sameMasses_ ? plus : plusMass);
+                core::transform(vy, fy, vy, sameMasses_ ? plus : plusMass);
+                core::transform(vz, fz, vz, sameMasses_ ? plus : plusMass);
             }
 
+            vx.check();
+            // density.notZero();
+            core::transform(vx, density, vx, std::divides<Float>{});
+            core::transform(vy, density, vy, std::divides<Float>{});
+            core::transform(vz, density, vz, std::divides<Float>{});
 
-            std::transform(std::begin(vx), std::end(vx), std::begin(density), std::begin(vx),
-                           std::divides<Float>{});
-            std::transform(std::begin(vy), std::end(vy), std::begin(density), std::begin(vy),
-                           std::divides<Float>{});
-            std::transform(std::begin(vz), std::end(vz), std::begin(density), std::begin(vz),
-                           std::divides<Float>{});
+            // vx.check();
         }
 
 
         void computeFullMomentumTensor()
         {
+            assert(momentumTensor_.isUsable());
             momentumTensor_.zero();
             auto& mom = momentumTensor_;
 
             for (auto& pop : populations_)
             {
+                assert(pop.momentumTensor().isUsable());
                 auto& p_mom = pop.momentumTensor();
-                for (auto p_mij = p_mom.begin(), mij = mom.begin(); p_mij != p_mom.end();
-                     ++p_mij, ++mij)
-                {
-                    std::transform(std::begin(*mij), std::end(*mij), std::begin(*p_mij),
-                                   std::begin(*mij), std::plus<typename field_type::type>{});
-                }
+                auto p_mij  = p_mom.begin();
+                auto mij    = mom.begin();
+                for (; p_mij != p_mom.end(); ++p_mij, ++mij)
+                    core::transform(*mij, *p_mij, *mij, std::plus<typename field_type::type>{});
             }
         }
 
@@ -251,8 +249,10 @@ namespace core
             return ss.str();
         }
 
+
         NO_DISCARD bool sameMasses() const { return sameMasses_; }
 
+        auto& operator[](std::size_t const i) const { return populations_[i]; }
 
     private:
         bool allSameMass_() const
@@ -278,5 +278,7 @@ namespace core
     };
 } // namespace core
 } // namespace PHARE
+
+
 
 #endif

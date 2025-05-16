@@ -1,19 +1,24 @@
 #ifndef PHARE_CORE_DATA_GRID_GRID_BASE_HPP
 #define PHARE_CORE_DATA_GRID_GRID_BASE_HPP
 
-#include <array>
-#include <cstddef>
-#include <cassert>
-#include <string>
-#include <utility>
-#include <vector>
-#include <algorithm>
 
 #include "core/def.hpp"
 #include "core/data/field/field.hpp"
+#include "core/def/phare_config.hpp"
+
+#include <array>
+#include <string>
+#include <vector>
+#include <cassert>
+#include <cstddef>
+#include <algorithm>
+
+
+
 
 namespace PHARE::core
 {
+
 
 /* Grid is the structure owning the field type memory via its inheritance from NdArrayImpl
 Grid exists to decouple the usage of memory by computing routines from the allocation of
@@ -25,17 +30,17 @@ convenience, Grid can spawn its own Field view.
 template<typename NdArrayImpl, typename PhysicalQuantity>
 class Grid : public NdArrayImpl
 {
-    using Super = NdArrayImpl;
-
 public:
+    using Super                      = NdArrayImpl;
+    auto constexpr static dimension  = NdArrayImpl::dimension;
+    auto constexpr static alloc_mode = NdArrayImpl::allocator_mode;
+    // using NdArrayImpl::dimension;
     using value_type             = typename NdArrayImpl::type;
     using physical_quantity_type = PhysicalQuantity;
-    using NdArrayImpl::dimension;
-    using field_type = Field<dimension, PhysicalQuantity, value_type>;
+    using field_type             = Field<dimension, PhysicalQuantity, value_type, alloc_mode>;
 
 
     Grid()                              = delete;
-    Grid(Grid const& source)            = delete;
     Grid(Grid&& source)                 = default;
     Grid& operator=(Grid&& source)      = delete;
     Grid& operator=(Grid const& source) = delete;
@@ -45,7 +50,6 @@ public:
         : Super{dims...}
         , name_{name}
         , qty_{qty}
-        , field_{name, qty, Super::data(), Super::shape()}
     {
         static_assert(sizeof...(Dims) == dimension, "Invalid dimension");
     }
@@ -55,18 +59,28 @@ public:
         : Super{dims}
         , name_{name}
         , qty_{qty}
-        , field_{name, qty, Super::data(), Super::shape()}
     {
     }
 
     template<typename GridLayout_t>
-    Grid(std::string const& name, GridLayout_t const& layout, PhysicalQuantity qty)
+    Grid(std::string const& name, GridLayout_t const& layout, PhysicalQuantity qty,
+         value_type const v = 0)
         : Super{layout.allocSize(qty)}
         , name_{name}
         , qty_{qty}
-        , field_{name, qty, Super::data(), Super::shape()}
+    {
+        if (v)
+            Super::fill(v);
+    }
+
+    Grid(Grid const& source) // let field_ default
+        : Super{source.shape()}
+        , name_{source.name()}
+        , qty_{source.physicalQuantity()}
     {
     }
+
+
 
     NO_DISCARD std::string name() const { return name_; }
 
@@ -84,10 +98,14 @@ public:
     NO_DISCARD auto operator&() { return &field_; }
     NO_DISCARD auto operator&() const { return &field_; }
 
+    NO_DISCARD operator field_type&() { return field_; }
+    NO_DISCARD auto& operator*() { return field_; }
+    NO_DISCARD auto& operator*() const { return field_; }
+
 private:
     std::string name_{"No Name"};
     PhysicalQuantity qty_;
-    field_type field_;
+    field_type field_{name_, qty_, Super::data(), Super::shape()};
 };
 
 
@@ -105,6 +123,10 @@ void average(Grid<NdArrayImpl, PhysicalQuantity> const& f1,
                    [](double x) { return x * 0.5; });
 }
 
+template<typename Arr, typename PQ>
+struct is_field<Grid<Arr, PQ>> : std::true_type
+{
+};
 
 
 } // namespace PHARE::core

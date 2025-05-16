@@ -1,10 +1,14 @@
 #ifndef PHARE_CORE_UTILITIES_META_META_UTILITIES_HPP
 #define PHARE_CORE_UTILITIES_META_META_UTILITIES_HPP
 
+#include "core/utilities/types.hpp"
+
+
+#include <tuple>
+#include <cassert>
 #include <iterator>
 #include <type_traits>
 
-#include "core/utilities/types.hpp"
 
 namespace PHARE
 {
@@ -17,7 +21,7 @@ namespace core
     struct dummy
     {
         using type              = int;
-        static const type value = 0;
+        static type const value = 0;
     };
 
 
@@ -78,8 +82,37 @@ namespace core
 
                           SimulatorOption<DimConst<2>, InterpConst<1>, 4, 5, 8, 9>,
                           SimulatorOption<DimConst<2>, InterpConst<2>, 4, 5, 8, 9, 16>,
-                          SimulatorOption<DimConst<2>, InterpConst<3>, 4, 5, 8, 9, 25>>{};
+                          SimulatorOption<DimConst<2>, InterpConst<3>, 4, 5, 8, 9, 25>,
+
+                          SimulatorOption<DimConst<3>, InterpConst<1>, 6, 12 /*, 27*/>,
+                          SimulatorOption<DimConst<3>, InterpConst<2>, 6, 12>,
+                          SimulatorOption<DimConst<3>, InterpConst<3>, 6, 12>>{};
     }
+
+
+    constexpr std::size_t defaultNbrRefinedParts(std::size_t dim, std::size_t interp)
+    {
+        auto sims            = possibleSimulators();
+        using SimsTuple_t    = decltype(sims);
+        auto constexpr nsims = std::tuple_size_v<SimsTuple_t>;
+
+        std::size_t nbRefinedPart = 0;
+
+        for_N<nsims>([&](auto i) {
+            using SimOption = std::tuple_element_t<i, SimsTuple_t>;
+
+            if (std::tuple_element_t<0, SimOption>{}() == dim
+                and std::tuple_element_t<1, SimOption>{}() == interp)
+            {
+                nbRefinedPart = std::tuple_element_t<2, SimOption>{};
+            }
+        });
+
+        assert(nbRefinedPart != 0); // is static_assert in constexpr call
+
+        return nbRefinedPart;
+    }
+
 
 
     template<typename Maker> // used from PHARE::amr::Hierarchy
