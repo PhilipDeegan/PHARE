@@ -2,12 +2,13 @@
 #define PHARE_AMR_UTILITIES_BOX_BOX_HPP
 
 
+#include "amr/amr_constants.hpp"
+#include "core/def.hpp"
 #include "core/def/phare_mpi.hpp"
+#include "core/utilities/box/box.hpp"
 
 
 #include "SAMRAI/hier/Box.h"
-#include "core/utilities/box/box.hpp"
-#include "core/def.hpp"
 
 
 namespace PHARE::amr
@@ -17,8 +18,8 @@ NO_DISCARD auto samrai_box_from(PHARE::core::Box<Type, dim> const& box, int samr
 {
     SAMRAI::tbox::Dimension dimension{dim};
     SAMRAI::hier::BlockId blockId{samrai_blockId};
-    return SAMRAI::hier::Box{SAMRAI::hier::Index{dimension, (*box.lower).data()},
-                             SAMRAI::hier::Index{dimension, (*box.upper).data()}, blockId};
+    return SAMRAI::hier::Box{SAMRAI::hier::Index{dimension, &box.lower[0]},
+                             SAMRAI::hier::Index{dimension, &box.upper[0]}, blockId};
 }
 
 template<std::size_t dim, typename Type = int>
@@ -30,10 +31,21 @@ NO_DISCARD auto phare_box_from(SAMRAI::hier::Box const& box)
     return PHARE::core::Box<Type, dim>{core::Point{lower}, core::Point{upper}};
 }
 
+template<std::size_t dim>
+NO_DISCARD auto phare_lcl_box_from(SAMRAI::hier::Box const& box)
+{
+    auto const& amr_box = phare_box_from<dim>(box);
+    return PHARE::core::Box<std::uint32_t, dim>{core::Point{amr_box.lower}.as_unsigned(),
+                                                core::Point{amr_box.upper}.as_unsigned()};
+}
+
 NO_DISCARD inline bool operator==(SAMRAI::hier::Box const& b1, SAMRAI::hier::Box const& b2)
 {
     auto dim1 = b1.getDim().getValue();
     auto dim2 = b2.getDim().getValue();
+
+    if (dim1 != dim2)
+        return false;
 
     bool boxesAreEqual = true;
     for (auto i = 0u; i < dim1; ++i)
@@ -84,6 +96,79 @@ struct Box : public PHARE::core::Box<Type, dim>
         return eq;
     }
 };
+
+
+
+
+template<typename T, std::size_t dim>
+inline bool isInBox(SAMRAI::hier::Box const& box, std::array<T, dim> const& iCell)
+{
+    auto const& lower = box.lower();
+    auto const& upper = box.upper();
+
+    if (iCell[0] >= lower(0) && iCell[0] <= upper(0))
+    {
+        if constexpr (dim > 1)
+        {
+            if (iCell[1] >= lower(1) && iCell[1] <= upper(1))
+            {
+                if constexpr (dim > 2)
+                {
+                    if (iCell[2] >= lower(2) && iCell[2] <= upper(2))
+                    {
+                        return true;
+                    }
+                }
+                else
+                {
+                    return true;
+                }
+            }
+        }
+        else
+        {
+            return true;
+        }
+    }
+    return false;
+}
+
+
+template<typename Particle>
+inline bool isInBox(SAMRAI::hier::Box const& box, Particle const& particle)
+{
+    return isInBox(box, particle.iCell());
+}
+
+
+template<std::size_t dim>
+auto as_point(SAMRAI::hier::IntVector const& vec)
+{
+    return core::Point{
+        core::for_N<dim, core::for_N_R_mode::make_array>([&](auto i) { return vec[i]; })};
+}
+
+
+template<std::size_t dim>
+auto as_point(SAMRAI::hier::Transformation const& tform)
+{
+    return as_point<dim>(tform.getOffset());
+}
+
+
+template<typename Box_t>
+Box_t refine_box(Box_t const& box)
+{
+    return Box_t{((box.lower + 1) * refinementRatio) - 1, ((box.upper + 1) * refinementRatio) - 1};
+}
+
+
+template<typename Box_t>
+Box_t coarsen_box(Box_t const& box)
+{
+    return Box_t{(box.lower + 1) / refinementRatio, (box.upper + 1) / refinementRatio};
+}
+
 
 } // namespace PHARE::amr
 

@@ -1,6 +1,9 @@
 #ifndef DEFAULT_HYBRID_TAGGER_STRATEGY_H
 #define DEFAULT_HYBRID_TAGGER_STRATEGY_H
 
+#include "core/data/particles/particle_array_def.hpp"
+#include "core/data/tensorfield/tensorfield.hpp"
+#include "core/utilities/types.hpp"
 #include "hybrid_tagger_strategy.hpp"
 #include "core/data/grid/gridlayoutdefs.hpp"
 #include "core/data/vecfield/vecfield_component.hpp"
@@ -10,9 +13,23 @@
 
 namespace PHARE::amr
 {
+
+template<typename HybridModel>
+struct DefaultHybridFieldTagger
+{
+    using gridlayout_type           = typename HybridModel::gridlayout_type;
+    static auto constexpr dimension = HybridModel::dimension;
+
+    void tag(auto const& layout, int* tags, auto const& B) const;
+
+    double const threshold_ = 0.1;
+};
+
+
 template<typename HybridModel>
 class DefaultHybridTaggerStrategy : public HybridTaggerStrategy<HybridModel>
 {
+    using ParticleArray_t           = typename HybridModel::particle_array_type;
     using gridlayout_type           = typename HybridModel::gridlayout_type;
     static auto constexpr dimension = HybridModel::dimension;
 
@@ -28,15 +45,40 @@ private:
     double threshold_ = 0.1;
 };
 
+
 template<typename HybridModel>
 void DefaultHybridTaggerStrategy<HybridModel>::tag(HybridModel& model,
                                                    gridlayout_type const& layout, int* tags) const
 {
-    auto& Bx = model.state.electromag.B.getComponent(PHARE::core::Component::X);
-    auto& By = model.state.electromag.B.getComponent(PHARE::core::Component::Y);
-    auto& Bz = model.state.electromag.B.getComponent(PHARE::core::Component::Z);
+    DefaultHybridFieldTagger<HybridModel> tagger{threshold_};
 
-    auto& N = model.state.ions.density();
+    auto& B = model.state.electromag.B;
+    using enum core::LayoutMode;
+    if constexpr (core::any_in(ParticleArray_t::layout_mode, AoSTS))
+    {
+        //
+
+        using Field_vt       = HybridModel::field_type::value_type;
+        using TensorField_vt = core::basic::TensorField<Field_vt, 1>;
+
+        for (std::size_t tidx = 0; tidx < B().size(); ++tidx)
+        {
+            auto Btile = B.template as<TensorField_vt>([&](auto& c) { return c()[tidx]; });
+            tagger.tag(B[0]()[tidx].layout(), tags, Btile);
+        }
+    }
+    else
+    {
+        tagger.tag(layout, tags, B);
+    }
+}
+
+template<typename HybridModel>
+void DefaultHybridFieldTagger<HybridModel>::tag(auto const& layout, int* tags, auto const& B) const
+{
+    auto& [Bx, By, Bz] = B();
+
+    // auto& N = model.state.ions.density();
 
     // we loop on cell indexes for all qties regardless of their centering
     auto const& [start_x, _]
@@ -136,6 +178,7 @@ void DefaultHybridTaggerStrategy<HybridModel>::tag(HybridModel& model,
         }
     }
 }
+
 } // namespace PHARE::amr
 
 #endif // DEFAULT_HYBRID_TAGGER_STRATEGY_H
