@@ -1234,28 +1234,24 @@ namespace core
 
     private:
         template<typename Field, typename Box_t, typename Fn, typename... Args>
-        void evalOnAnyBox(Field const&, Box_t const& box, Fn& fn, Args&... args) const
+        void evalOnAnyBox([[maybe_unused]] Field const& feeld, Box_t const& box, Fn& fn,
+                          Args&... args) const
         {
-            if constexpr (is_field_tile_set_v<Field>)
+            static_assert(!is_field_tile_set_v<Field>);
+
+            if constexpr (Field::alloc_mode == AllocatorMode::CPU)
             {
-                //
+                for (auto const& bix : box)
+                    fn(bix, args...);
             }
             else
             {
-                if constexpr (Field::alloc_mode == AllocatorMode::CPU)
-                {
-                    for (auto const& bix : box)
-                        fn(bix, args...);
-                }
-                else
-                {
-                    PHARE_WITH_RAJA(                                            //
-                        grid_gpu_impl::GridLayout::evalOnBox(fn, box, args...); //
-                    )
-                    PHARE_WITH_MKN_GPU(                                   //
-                        mkn_gpu::GridLayout::evalOnBox(fn, box, args...); //
-                    )
-                }
+                PHARE_WITH_RAJA(                                            //
+                    grid_gpu_impl::GridLayout::evalOnBox(fn, box, args...); //
+                )
+                PHARE_WITH_MKN_GPU(                                   //
+                    mkn_gpu::GridLayout::evalOnBox(fn, box, args...); //
+                )
             }
         }
 

@@ -1,6 +1,7 @@
 #ifndef PHARE_ELECTRONS_HPP
 #define PHARE_ELECTRONS_HPP
 
+#include "core/data/grid/grid_tiles.hpp"
 #include "core/hybrid/hybrid_quantities.hpp"
 #include "core/data/vecfield/vecfield_component.hpp"
 #include "core/data/grid/gridlayout_utils.hpp"
@@ -11,6 +12,7 @@
 
 #include "initializer/data_provider.hpp"
 #include <memory>
+#include <tuple>
 
 
 namespace PHARE::core
@@ -104,21 +106,19 @@ public:
 
     void computeDensity() {}
 
-    void computeBulkVelocity(GridLayout const& layout)
+    void static Vxyz(auto const& layout, auto&&... args)
     {
-        auto const& Jx  = J_(Component::X);
-        auto const& Jy  = J_(Component::Y);
-        auto const& Jz  = J_(Component::Z);
-        auto const& Vix = ions_.velocity()(Component::X);
-        auto const& Viy = ions_.velocity()(Component::Y);
-        auto const& Viz = ions_.velocity()(Component::Z);
-        auto const& Ni  = ions_.density();
+        auto&& [Ni, J, Vi, Ve] = std::forward_as_tuple(args...);
+        auto const& Jx         = J(Component::X);
+        auto const& Jy         = J(Component::Y);
+        auto const& Jz         = J(Component::Z);
+        auto const& Vix        = Vi(Component::X);
+        auto const& Viy        = Vi()(Component::Y);
+        auto const& Viz        = Vi(Component::Z);
+        auto& Vex              = Ve(Component::X);
+        auto& Vey              = Ve(Component::Y);
+        auto& Vez              = Ve(Component::Z);
 
-        auto& Vex = Ve_(Component::X);
-        auto& Vey = Ve_(Component::Y);
-        auto& Vez = Ve_(Component::Z);
-
-        // from Ni because all components defined on primal
         layout.evalOnBox(Ni, [=] _PHARE_ALL_FN_(auto const& ijk) mutable {
             auto const JxOnVx = GridLayout::project(Jx, ijk, GridLayout::JxToMoments());
             auto const JyOnVy = GridLayout::project(Jy, ijk, GridLayout::JyToMoments());
@@ -128,6 +128,44 @@ public:
             Vey(ijk) = Viy(ijk) - JyOnVy / Ni(ijk);
             Vez(ijk) = Viz(ijk) - JzOnVz / Ni(ijk);
         });
+    }
+
+    template<typename V_t>
+    V_t static tt(auto& vf, auto i)
+    {
+        return vf.template as<V_t>([&](auto& c) { return c()[i]; });
+    }
+
+    void computeBulkVelocity(GridLayout const& layout)
+    {
+        // auto const& Jx  = J_(Component::X);
+        // auto const& Jy  = J_(Component::Y);
+        // auto const& Jz  = J_(Component::Z);
+        // auto const& Vix = ions_.velocity()(Component::X);
+        // auto const& Viy = ions_.velocity()(Component::Y);
+        // auto const& Viz = ions_.velocity()(Component::Z);
+        // auto const& Ni  = ions_.density();
+
+        // auto& Vex = Ve_(Component::X);
+        // auto& Vey = Ve_(Component::Y);
+        // auto& Vez = Ve_(Component::Z);
+
+        // from Ni because all components defined on primal
+        if constexpr (is_field_tile_set_v<Field>)
+        {
+            using Tile_vt = Field::value_type;
+            using V_t     = basic::TensorField<Tile_vt, 1>;
+            for (std::size_t tidx = 0; tidx < J_[0]().size(); ++tidx)
+            {
+                auto Ve = Ve_.template as<V_t>([&](auto& c) { return c()[tidx]; });
+                Vxyz(J_[0]()[tidx].layout(), ions_.density()()[tidx](), tt<V_t>(J_, tidx),
+                     tt<V_t>(ions_.velocity(), tidx), Ve);
+            }
+        }
+        else
+        {
+            Vxyz(layout, ions_.density(), J_, ions_.velocity(), Ve_);
+        }
     }
 
 

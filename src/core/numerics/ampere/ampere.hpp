@@ -1,14 +1,13 @@
 #ifndef PHARE_CORE_NUMERICS_AMPERE_AMPERE_HPP
 #define PHARE_CORE_NUMERICS_AMPERE_AMPERE_HPP
 
-#include <cstddef>
-#include <iostream>
 
 #include "core/def.hpp"
 #include "core/data/grid/gridlayoutdefs.hpp"
 #include "core/data/grid/gridlayout_utils.hpp"
 #include "core/data/vecfield/vecfield_component.hpp"
 #include "core/utilities/index/index.hpp"
+
 
 
 namespace PHARE::core
