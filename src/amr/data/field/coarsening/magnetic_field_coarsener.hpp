@@ -4,9 +4,8 @@
 
 #include "core/def/phare_mpi.hpp"
 
-#include "core/data/grid/gridlayoutdefs.hpp"
-#include "core/hybrid/hybrid_quantities.hpp"
 #include "core/utilities/constants.hpp"
+#include "core/data/grid/gridlayoutdefs.hpp"
 
 
 #include <SAMRAI/hier/Box.h>
@@ -38,7 +37,7 @@ public:
     MagneticFieldCoarsener(std::array<core::QtyCentering, dimension> const centering,
                            SAMRAI::hier::Box const& sourceBox,
                            SAMRAI::hier::Box const& destinationBox,
-                           SAMRAI::hier::IntVector const& ratio)
+                           SAMRAI::hier::IntVector const& /*ratio*/)
         : centering_{centering}
         , sourceBox_{sourceBox}
         , destinationBox_{destinationBox}

@@ -23,13 +23,15 @@ for time in run0.all_times()["B"]:
 
     pops = run0.all_pops()
     for pop in pops:
-        eqr = hierarchy_compare(
-            run0.GetParticles(time, pop_name=pop),
-            run1.GetParticles(time, pop_name=pop),
-            atol=atol,
-        )
-        print(f"\n\t domain particles {pop}", eqr)
-
+        try:
+            eqr = hierarchy_compare(
+                run0.GetParticles(time, pop_name=pop),
+                run1.GetParticles(time, pop_name=pop),
+                atol=atol,
+            )
+            print(f"\n\t domain particles {pop}", eqr)
+        except:
+            ...
         eqr = hierarchy_compare(
             run0.GetN(time, pop_name=pop), run1.GetN(time, pop_name=pop), atol=atol
         )

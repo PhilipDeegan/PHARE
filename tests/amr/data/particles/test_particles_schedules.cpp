@@ -1,60 +1,68 @@
 
 #include "phare_core.hpp"
 #include "phare/phare.hpp"
-#include "core/utilities/meta/meta_utilities.hpp"
+
+#include <core/utilities/types.hpp>
+#include <core/utilities/box/box.hpp>
 #include <amr/utilities/box/amr_box.hpp>
 
 #include "tests/core/data/gridlayout/test_gridlayout.hpp"
 #include "tests/core/data/particles/test_particles_fixtures.hpp"
+
 #include "tests/amr/test_hierarchy_fixtures.hpp"
 
-#include "gtest/gtest.h"
+
 
 #include <SAMRAI/pdat/CellGeometry.h>
 #include <SAMRAI/hier/HierarchyNeighbors.h>
-#include <core/utilities/box/box.hpp>
-#include <core/utilities/types.hpp>
 
-static constexpr std::size_t interp = 1;
-static constexpr std::size_t ppc    = 100;
+#include "gtest/gtest.h"
 
-template<std::size_t _dim>
+namespace PHARE::amr
+{
+
+static constexpr std::size_t ppc = 100;
+
+template<auto opts>
 struct TestParam
 {
-    auto constexpr static dim = _dim;
-    using PhareTypes          = PHARE::core::PHARE_Types<dim, interp>;
+    auto constexpr static dim = opts.dimension;
+    using PhareTypes          = PHARE::core::PHARE_Types<opts>;
     using GridLayout_t        = TestGridLayout<typename PhareTypes::GridLayout_t>;
-    using Box_t               = PHARE::core::Box<int, dim>;
-    using ParticleArray_t     = PHARE::core::ParticleArray<dim>;
-
-    using Hierarchy_t
-        = AfullHybridBasicHierarchy<dim, interp, defaultNbrRefinedParts<dim, interp>()>;
+    using Hierarchy_t         = AfullHybridBasicHierarchy<opts>;
 };
 
-template<typename TestParam>
+template<typename TestParam_>
 struct ParticleScheduleHierarchyTest : public ::testing::Test
 {
+    using TestParam           = TestParam_;
     auto constexpr static dim = TestParam::dim;
     using Hierarchy_t         = TestParam::Hierarchy_t;
     using GridLayout_t        = TestParam::GridLayout_t;
     using ResourceManager_t   = Hierarchy_t::ResourcesManagerT;
-    using DomainGhostPartRefinerPool
-        = RefinerPool<ResourceManager_t, RefinerType::ExteriorGhostParticles>;
 
     std::string configFile = "test_particles_schedules_inputs/" + std::to_string(dim) + "d_L0.txt";
     Hierarchy_t hierarchy{configFile};
 };
 
-using ParticlesDatas = testing::Types<TestParam<1>, TestParam<2> /*,TestParam<3>*/>;
+// clang-format off
+using ParticlesDatas = testing::Types<
+   TestParam<SimOpts{}>
+
+PHARE_WITH_MKN_GPU(
+  ,TestParam<SimOpts{.layout_mode=LayoutMode::AoSTS}>
+)
+
+>;
+// clang-format on
 
 
 TYPED_TEST_SUITE(ParticleScheduleHierarchyTest, ParticlesDatas);
-namespace PHARE::core
-{
 
 
 TYPED_TEST(ParticleScheduleHierarchyTest, testing_inject_ghost_layer)
 {
+    using ParticleArray_t             = TypeParam::TestParam::PhareTypes::ParticleArray_t;
     using GridLayout_t                = TypeParam::GridLayout_t;
     auto constexpr static dim         = TypeParam::dim;
     auto constexpr static ghost_cells = GridLayout_t::nbrParticleGhosts();
@@ -70,51 +78,60 @@ TYPED_TEST(ParticleScheduleHierarchyTest, testing_inject_ghost_layer)
         {
             pop.domainParticles().clear();
             EXPECT_EQ(pop.domainParticles().size(), 0);
+            if constexpr (any_in(ParticleArray_t::layout_mode, AoSTS))
+                for (auto const& tile : pop.domainParticles()())
+                {
+                    EXPECT_EQ(tile().size(), 0);
+                }
 
             GridLayout_t const layout{phare_box_from<dim>(patch->getBox())};
             auto const ghostBox = grow(layout.AMRBox(), ghost_cells);
             for (auto const& box : ghostBox.remove(layout.AMRBox()))
-                core::add_particles_in(pop.patchGhostParticles(), box, ppc);
+                core::add_ghost_particles(pop.patchGhostParticles(), layout, box, ppc);
         }
         rm.setTime(ions, *patch, 1);
     }
 
-    // domainGhostPartRefiners.fill(0, 0);
-
     this->hierarchy.messenger->fillIonGhostParticles(ions, *lvl0, 0);
+
+    auto n_ghost_cells_for_neighbours = [&](auto& patch) {
+        auto domainSamBox    = patch->getBox();
+        auto const domainBox = phare_box_from<dim>(domainSamBox);
+        return core::sum_from(
+            core::generate_from(
+                [](auto const& el) { return phare_box_from<dim>(el); },
+                SAMRAI::hier::HierarchyNeighbors{*this->hierarchy.basicHierarchy->hierarchy(),
+                                                 patch->getPatchLevelNumber(),
+                                                 patch->getPatchLevelNumber()}
+                    .getSameLevelNeighbors(domainSamBox, patch->getPatchLevelNumber())),
+            [&](auto& el) { return (*(grow(el, ghost_cells) * domainBox)).size(); });
+    };
 
     for (auto& patch : *lvl0)
     {
-        auto dataOnPatch = rm.setOnPatch(*patch, ions);
-
-        SAMRAI::hier::HierarchyNeighbors const hier_nbrs{
-            *this->hierarchy.basicHierarchy->hierarchy(), patch->getPatchLevelNumber(),
-            patch->getPatchLevelNumber()};
-
-        auto domainSamBox    = patch->getBox();
-        auto const domainBox = phare_box_from<dim>(domainSamBox);
-
-        auto const neighbors = core::generate(
-            [](auto const& el) { return phare_box_from<dim>(el); },
-            hier_nbrs.getSameLevelNeighbors(domainSamBox, patch->getPatchLevelNumber()));
-        auto const ncells = core::sum_from(
-            neighbors, [&](auto& el) { return (*(grow(el, ghost_cells) * domainBox)).size(); });
-
+        auto dataOnPatch       = rm.setOnPatch(*patch, ions);
+        auto const domainBox   = phare_box_from<dim>(patch->getBox());
+        auto const check       = [&](auto const& p) { EXPECT_TRUE(isIn(p, domainBox)); };
+        auto const check_array = [&](auto const& array) {
+            for (auto const& p : array)
+                check(p);
+        };
+        auto const ncells = n_ghost_cells_for_neighbours(patch);
         for (auto& pop : ions)
         {
             EXPECT_EQ(pop.domainParticles().size(), ncells * ppc);
 
-            for (auto const& p : pop.domainParticles())
-            {
-                EXPECT_TRUE(isIn(p, domainBox));
-            }
+            if constexpr (any_in(ParticleArray_t::layout_mode, AoSTS))
+                for (auto const& tile : pop.domainParticles()())
+                    check_array(tile());
+            else
+                check_array(pop.domainParticles());
         }
     }
 }
 
+} // namespace PHARE::amr
 
-
-} // namespace PHARE::core
 
 
 int main(int argc, char** argv)

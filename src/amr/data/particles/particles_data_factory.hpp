@@ -1,6 +1,7 @@
 #ifndef PHARE_PARTICLES_DATA_FACTORY_HPP
 #define PHARE_PARTICLES_DATA_FACTORY_HPP
 
+#include "amr/utilities/box/amr_box.hpp"
 #include "particles_data.hpp"
 
 #include "core/def/phare_mpi.hpp"
@@ -45,9 +46,22 @@ namespace amr
         }
 
         std::shared_ptr<SAMRAI::hier::PatchData>
-        allocate(const SAMRAI::hier::Patch& patch) const final
+        allocate(SAMRAI::hier::Patch const& patch) const final
         {
-            return std::make_shared<ParticlesData<ParticleArray>>(patch.getBox(), d_ghosts, name_);
+            // return std::make_shared<ParticlesData<ParticleArray>>(patch.getBox(), d_ghosts,
+            // name_);
+
+            if (patch.inHierarchy())
+                return std::make_shared<ParticlesData<ParticleArray>>(patch.getBox(), d_ghosts,
+                                                                      name_);
+            else
+            {
+                // consider scratch space - no ghosts, but bigger box - maybe bad for regridding
+                auto box = patch.getBox();
+                box.grow(d_ghosts);
+                return std::make_shared<ParticlesData<ParticleArray>>(
+                    box, d_ghosts - d_ghosts /*0*/, name_);
+            }
         }
 
         std::shared_ptr<SAMRAI::hier::BoxGeometry>
