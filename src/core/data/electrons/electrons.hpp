@@ -346,7 +346,10 @@ private:
     template<typename Field, typename VecField>
     auto advection1D_(VecField const& Ve, Field const& Te, auto&... ijk) const
     {
-          return 0.0*Te(ijk...);
+          auto const& Vx = Ve(Component::X);
+          // auto gradTonMoment_X = GridLayout::template deriv<Direction::X>(Te, ijk...);
+          return Vx(ijk...); //*gradTonMoment_X;
+          // return 0.0*Te(ijk...);
     }
 
 };
