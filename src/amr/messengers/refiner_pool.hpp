@@ -27,6 +27,12 @@ namespace amr
         using RefineOperator = SAMRAI::hier::RefineOperator;
 
     public:
+
+        virtual ~RefinerPool() {}
+        RefinerPool(RefinerPool const&) = delete;
+        RefinerPool(RefinerPool&&)      = default;
+
+
         /*@brief add a static communication between sources and destinations.
          * This overload takes several sources/destinations/keys and add one refiner for each*/
         template<typename Names>
