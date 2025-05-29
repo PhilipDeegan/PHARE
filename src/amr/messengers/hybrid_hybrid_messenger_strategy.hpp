@@ -354,7 +354,7 @@ namespace amr
             {
                 for (auto patch : level)
                 {
-                    auto dataOnPatch = resourcesManager_->setOnPatch(*patch, ions);
+                    auto dataOnPatch = resourcesManager_->setOnPatch(*patch, ions, sumVec);
                     auto& pop        = *(ions.begin() + i);
                     for (std::uint8_t c = 0; c < N; ++c)
                         std::memcpy(sumVec[c].data(), pop.flux()[c].data(),
@@ -366,7 +366,7 @@ namespace amr
 
                 for (auto patch : level)
                 {
-                    auto dataOnPatch = resourcesManager_->setOnPatch(*patch, ions);
+                    auto dataOnPatch = resourcesManager_->setOnPatch(*patch, ions, sumVec);
                     auto& pop        = *(ions.begin() + i);
                     for (std::uint8_t c = 0; c < N; ++c)
                         std::memcpy(pop.flux()[c].data(), sumVec[c].data(),
@@ -384,7 +384,7 @@ namespace amr
             {
                 for (auto patch : level)
                 {
-                    auto dataOnPatch = resourcesManager_->setOnPatch(*patch, ions);
+                    auto dataOnPatch = resourcesManager_->setOnPatch(*patch, ions, sumField);
                     auto& pop        = *(ions.begin() + i);
                     std::memcpy(sumField.data(), pop.density().data(),
                                 pop.density().size() * sizeof(value_type));
@@ -394,7 +394,7 @@ namespace amr
 
                 for (auto patch : level)
                 {
-                    auto dataOnPatch = resourcesManager_->setOnPatch(*patch, ions);
+                    auto dataOnPatch = resourcesManager_->setOnPatch(*patch, ions, sumField);
                     auto& pop        = *(ions.begin() + i);
                     std::memcpy(pop.density().data(), sumField.data(),
                                 pop.density().size() * sizeof(value_type));
