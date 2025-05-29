@@ -4,7 +4,11 @@
 #include "communicator.hpp"
 #include "core/data/vecfield/vecfield.hpp"
 
-#include "amr/data/field/field_variable_fill_pattern.hpp"
+#include "amr/messengers/field_sum_transaction.hpp"
+
+#include <tuple>
+#include <stdexcept>
+
 
 namespace PHARE::amr
 {
@@ -16,7 +20,8 @@ enum class RefinerType {
     InitInteriorPart,
     LevelBorderParticles,
     InteriorGhostParticles,
-    SharedBorder
+    PatchFieldBorderSum,
+    ExteriorGhostParticles
 };
 
 
@@ -62,6 +67,15 @@ public:
             else if constexpr (Type == RefinerType::PatchGhostField)
             {
                 this->add(algo, algo->createSchedule(level), levelNumber);
+            }
+
+            else if constexpr (Type == RefinerType::PatchFieldBorderSum)
+            {
+                this->add(algo,
+                          algo->createSchedule(
+                              level, 0,
+                              std::make_shared<FieldBorderSumTransactionFactory<FieldData_t>>()),
+                          levelNumber);
             }
 
             // this createSchedule overload is used to initialize fields.
@@ -114,8 +128,7 @@ public:
                 this->add(algo, algo->createSchedule(level), levelNumber);
             }
 
-            // schedule to synchronize shared border values, and not include refinement
-            else if constexpr (Type == RefinerType::SharedBorder)
+            else if constexpr (Type == RefinerType::ExteriorGhostParticles)
             {
                 this->add(algo, algo->createSchedule(level), levelNumber);
             }
@@ -158,12 +171,7 @@ public:
             this->findSchedule(algo, levelNumber)->fillData(initDataTime);
     }
 
-    template<typename VecFieldT>
-    void fill(VecFieldT& vec, int const levelNumber, double const fillTime)
-    {
-        for (auto const& algo : this->algos)
-            this->findSchedule(algo, levelNumber)->fillData(fillTime);
-    }
+
 
 
     /**

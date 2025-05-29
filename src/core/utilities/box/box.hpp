@@ -25,7 +25,7 @@ class box_iterator;
 template<typename Type, std::size_t dim>
 struct Box
 {
-    static const size_t dimension = dim;
+    static size_t const dimension = dim;
 
 
     Point<Type, dim> lower;
@@ -260,6 +260,15 @@ Box<Type, dim> grow(Box<Type, dim> const& box, OType const& size)
 {
     auto copy{box};
     copy.grow(size);
+    return copy;
+}
+
+template<typename Type, std::size_t dim, typename Shifter>
+NO_DISCARD Box<Type, dim> shift(Box<Type, dim> const& box, Shifter const& offset)
+{
+    auto copy{box};
+    copy.lower += offset;
+    copy.upper += offset;
     return copy;
 }
 
