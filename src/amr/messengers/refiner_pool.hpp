@@ -32,26 +32,34 @@ namespace amr
         template<typename Names>
         void addStaticRefiners(Names const& destinations, Names const& sources,
                                std::shared_ptr<RefineOperator> refineOp,
-                               std::vector<std::string> keys);
+                               std::vector<std::string> keys,
+                               std::shared_ptr<SAMRAI::xfer::VariableFillPattern> const& fillPatt
+                               = nullptr);
 
 
         /*@brief convenience overload of the above when source = destination, for VecField*/
         template<typename Names>
         void addStaticRefiners(Names const& src_dest, std::shared_ptr<RefineOperator> refineOp,
-                               std::vector<std::string> key);
+                               std::vector<std::string> key,
+                               std::shared_ptr<SAMRAI::xfer::VariableFillPattern> const& fillPatt
+                               = nullptr);
 
         /* @brief add a static communication between a single source and destination.*/
         template<typename Name>
         void addStaticRefiner(Name const& ghostName, Name const& src,
                               std::shared_ptr<RefineOperator> const& refineOp,
-                              std::string const key);
+                              std::string const key,
+                              std::shared_ptr<SAMRAI::xfer::VariableFillPattern> const& fillPatt
+                              = nullptr);
 
         /**
          * @brief convenience overload of above addStaticRefiner taking only one name
          * used for communications from a quantity to the same quantity.*/
         template<typename Name>
         void addStaticRefiner(Name const& src_dest, std::shared_ptr<RefineOperator> const& refineOp,
-                              std::string const key);
+                              std::string const key,
+                              std::shared_ptr<SAMRAI::xfer::VariableFillPattern> const& fillPatt
+                              = nullptr);
 
 
         /**
@@ -123,10 +131,9 @@ namespace amr
         }
 
 
-
         /** @brief executes a regridding for all quantities in the pool.*/
         virtual void regrid(std::shared_ptr<SAMRAI::hier::PatchHierarchy> const& hierarchy,
-                            const int levelNumber,
+                            int const levelNumber,
                             std::shared_ptr<SAMRAI::hier::PatchLevel> const& oldLevel,
                             double const initDataTime)
         {
@@ -154,25 +161,26 @@ namespace amr
     template<typename Names>
     void RefinerPool<ResourcesManager, Type>::addStaticRefiners(
         Names const& destinations, Names const& sources, std::shared_ptr<RefineOperator> refineOp,
-        std::vector<std::string> keys)
+        std::vector<std::string> keys,
+        std::shared_ptr<SAMRAI::xfer::VariableFillPattern> const& fillPatt)
     {
         assert(destinations.size() == sources.size());
         auto key = std::begin(keys);
         for (std::size_t i = 0; i < destinations.size(); ++i)
         {
-            addStaticRefiner(destinations[i], sources[i], refineOp, *key++);
+            addStaticRefiner(destinations[i], sources[i], refineOp, *key++, fillPatt);
         }
     }
 
 
     template<typename ResourcesManager, RefinerType Type>
     template<typename Names>
-    void
-    RefinerPool<ResourcesManager, Type>::addStaticRefiners(Names const& src_dest,
-                                                           std::shared_ptr<RefineOperator> refineOp,
-                                                           std::vector<std::string> key)
+    void RefinerPool<ResourcesManager, Type>::addStaticRefiners(
+        Names const& src_dest, std::shared_ptr<RefineOperator> refineOp,
+        std::vector<std::string> key,
+        std::shared_ptr<SAMRAI::xfer::VariableFillPattern> const& fillPatt)
     {
-        addStaticRefiners(src_dest, src_dest, refineOp, key);
+        addStaticRefiners(src_dest, src_dest, refineOp, key, fillPatt);
     }
 
 
@@ -182,10 +190,10 @@ namespace amr
     template<typename Name>
     void RefinerPool<ResourcesManager, Type>::addStaticRefiner(
         Name const& ghostName, Name const& src, std::shared_ptr<RefineOperator> const& refineOp,
-        std::string const key)
+        std::string const key, std::shared_ptr<SAMRAI::xfer::VariableFillPattern> const& fillPatt)
     {
         auto const [it, success]
-            = refiners_.insert({key, Refiner_t(ghostName, src, rm_, refineOp)});
+            = refiners_.insert({key, Refiner_t(ghostName, src, rm_, refineOp, fillPatt)});
 
         if (!success)
             throw std::runtime_error(key + " is already registered");
@@ -197,9 +205,9 @@ namespace amr
     template<typename Name>
     void RefinerPool<ResourcesManager, Type>::addStaticRefiner(
         Name const& descriptor, std::shared_ptr<RefineOperator> const& refineOp,
-        std::string const key)
+        std::string const key, std::shared_ptr<SAMRAI::xfer::VariableFillPattern> const& fillPatt)
     {
-        addStaticRefiner(descriptor, descriptor, refineOp, key);
+        addStaticRefiner(descriptor, descriptor, refineOp, key, fillPatt);
     }
 
 

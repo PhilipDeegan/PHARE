@@ -148,26 +148,6 @@ private:
     };
 
 
-    // extend lifespan
-    std::unordered_map<std::string, ParticleArray> tmpDomain;
-    std::unordered_map<std::string, ParticleArray> patchGhost;
-
-    template<typename Map>
-    static void add_to(Map& map, std::string const& key, ParticleArray const& ps)
-    {
-        // vector copy drops the capacity (over allocation of the source)
-        // we want to keep the overallocation somewhat - how much to be assessed
-        ParticleArray empty{ps.box()};
-
-        if (!map.count(key))
-            map.emplace(key, empty);
-        else
-            map.at(key) = empty;
-
-        auto& v = map.at(key);
-        v.reserve(ps.capacity());
-        v.replace_from(ps);
-    }
 
 }; // end solverPPC
 
@@ -213,41 +193,6 @@ void SolverPPC<HybridModel, AMR_Types>::fillMessengerInfo(
 }
 
 
-template<typename HybridModel, typename AMR_Types>
-void SolverPPC<HybridModel, AMR_Types>::saveState_(level_t& level, ModelViews_t& views)
-{
-    PHARE_LOG_SCOPE(1, "SolverPPC::saveState_");
-
-    for (auto& state : views)
-    {
-        std::stringstream ss;
-        ss << state.patch->getGlobalId();
-        for (auto& pop : state.ions)
-        {
-            std::string const key = ss.str() + "_" + pop.name();
-            add_to(tmpDomain, key, pop.domainParticles());
-            add_to(patchGhost, key, pop.patchGhostParticles());
-        }
-    }
-}
-
-template<typename HybridModel, typename AMR_Types>
-void SolverPPC<HybridModel, AMR_Types>::restoreState_(level_t& level, ModelViews_t& views)
-{
-    PHARE_LOG_SCOPE(1, "SolverPPC::restoreState_");
-
-    for (auto& state : views)
-    {
-        std::stringstream ss;
-        ss << state.patch->getGlobalId();
-
-        for (auto& pop : state.ions)
-        {
-            pop.domainParticles()     = std::move(tmpDomain.at(ss.str() + "_" + pop.name()));
-            pop.patchGhostParticles() = std::move(patchGhost.at(ss.str() + "_" + pop.name()));
-        }
-    }
-}
 
 
 template<typename HybridModel, typename AMR_Types>
@@ -266,16 +211,12 @@ void SolverPPC<HybridModel, AMR_Types>::advanceLevel(hierarchy_t const& hierarch
 
     average_(*level, modelView, fromCoarser, newTime);
 
-    saveState_(*level, modelView);
-
     moveIons_(*level, modelView, fromCoarser, currentTime, newTime, core::UpdaterMode::domain_only);
 
     predictor2_(*level, modelView, fromCoarser, currentTime, newTime);
 
 
     average_(*level, modelView, fromCoarser, newTime);
-
-    restoreState_(*level, modelView);
 
     moveIons_(*level, modelView, fromCoarser, currentTime, newTime, core::UpdaterMode::all);
 
