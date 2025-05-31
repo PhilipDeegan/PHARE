@@ -1,11 +1,10 @@
 #ifndef PHARE_CORE_UTILITIES_RESOURCES_VARIANTS_HPP
 #define PHARE_CORE_UTILITIES_RESOURCES_VARIANTS_HPP
 
-#include "core/logger.hpp"
 #include "core/utilities/types.hpp"
 
-#include <vector>
 #include <variant>
+#include <stdexcept>
 
 namespace PHARE::core
 {
@@ -16,21 +15,21 @@ auto ptr_or_null_for_type()
 }
 
 template<typename... Ts>
-struct overloads : Ts...
+struct varient_visitor_overloads : Ts...
 {
     using Ts::operator()...;
 };
 
 template<typename... Ts>
-overloads(Ts&&...) -> overloads<std::decay_t<Ts>...>;
+varient_visitor_overloads(Ts&&...) -> varient_visitor_overloads<std::decay_t<Ts>...>;
 
 
 template<typename... Args>
 auto constexpr _visit_ptr_overloads(std::tuple<Args...>*)
 {
-    return overloads{ptr_or_null_for_type<Args>()...,
-                     [](auto&) mutable -> void* { return nullptr; },
-                     [](auto const&) mutable -> void* { return nullptr; }};
+    return varient_visitor_overloads{ptr_or_null_for_type<Args>()...,
+                                     [](auto&) mutable -> void* { return nullptr; },
+                                     [](auto const&) mutable -> void* { return nullptr; }};
 }
 
 
@@ -54,7 +53,7 @@ using unique_tuple = typename unique<std::tuple<>, Ts...>::type;
 template<typename... Args>
 auto constexpr visit_ptr_overloads()
 {
-    return _visit_ptr_overloads((unique_tuple<Args...>*){});
+    return _visit_ptr_overloads(static_cast<unique_tuple<Args...>*>(nullptr));
 }
 
 
@@ -88,7 +87,7 @@ auto get_as_tuple_or_throw(Variants& variants, std::size_t start = 0)
                 ++start;
                 return reinterpret_cast<Type*>(ptr);
             }
-        return (Type*){nullptr};
+        return static_cast<Type*>(nullptr);
     });
 
     for_N<tuple_size>([&](auto i) {

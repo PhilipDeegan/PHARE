@@ -40,12 +40,9 @@ public:
     //                  start the ResourcesUser interface
     //-------------------------------------------------------------------------
 
-    NO_DISCARD bool isUsable() const { return ions_.isUsable() && J_.isUsable() && Ve_.isUsable(); }
+    NO_DISCARD bool isUsable() const { return core::isUsable(ions_, J_, Ve_); }
 
-    NO_DISCARD bool isSettable() const
-    {
-        return Ve_.isSettable() && ions_.isSettable() && J_.isSettable();
-    }
+    NO_DISCARD bool isSettable() const { return core::isSettable(ions_, J_, Ve_); }
 
     NO_DISCARD auto getCompileTimeResourcesViewList() const
     {
@@ -199,6 +196,12 @@ public:
     NO_DISCARD auto& B() const { return get_as_ref_or_throw<VecField const>(resources); }
     NO_DISCARD auto& B() { return get_as_ref_or_throw<VecField>(resources); }
 
+    NO_DISCARD auto& Te() const
+    {
+        auto const& field = get_as_ref_or_throw<Field const>(resources);
+        assert(field.name() == "Te");
+        return field;
+    }
 
 protected:
     FluxComputer flux_;
@@ -298,34 +301,27 @@ public:
 
         Field Te_ = get_as_ref_or_throw<Field>(resources);
 
-        std::transform (this->Pe_.begin(), this->Pe_.end(), N_.begin(), Te_.begin(), [this](auto p, auto n) { return  p/n ; });
+        std::transform(this->Pe_.begin(), this->Pe_.end(), N_.begin(), Te_.begin(),
+                       [](auto p, auto n) { return p / n; });
 
 
 
-        layout.evalOnBox(Te_, [&](auto&... ijk) mutable { this->template P_Eq_(PressurePack{V_, Te_}, ijk...); });
-
+        layout.evalOnBox(Te_, [&](auto&... ijk) mutable { P_Eq_(V_, Te_, ijk...); });
 
 
         // std::transform(std::begin(Ne_), std::end(Ne_), std::begin(this->Pe_),
-        //                [this](auto n) { return n * 0.1; });  // TODO utiliser autre chose que transform et aller chercher Tnew
+        //                [this](auto n) { return n * 0.1; });  // TODO utiliser autre chose que
+        //                transform et aller chercher Tnew
     }
 
 private:
     double const gamma_ = 5. / 3.;
     initializer::InitFunction<dim> Pe_init_;
 
+
     template<typename Field, typename VecField>
-    struct PressurePack
+    void P_Eq_(VecField const& V, Field const& T, auto&... ijk) const
     {
-        VecField const &V;
-        Field &T;
-    };
-
-    template<typename PressurePack>
-    void P_Eq_(PressurePack&& pack, auto&... ijk) const
-    {
-        auto const& [V, T] = pack;
-
         // Tnew(ijk...) = T(ijk...);
         T(ijk...) = advection_(V, T, ijk...);
         //              + compression_(V, T, {ijk...});
@@ -346,12 +342,11 @@ private:
     template<typename Field, typename VecField>
     auto advection1D_(VecField const& Ve, Field const& Te, auto&... ijk) const
     {
-          auto const& Vx = Ve(Component::X);
-          // auto gradTonMoment_X = GridLayout::template deriv<Direction::X>(Te, ijk...);
-          return Vx(ijk...); //*gradTonMoment_X;
-          // return 0.0*Te(ijk...);
+        auto const& Vx = Ve(Component::X);
+        // auto gradTonMoment_X = GridLayout::template deriv<Direction::X>(Te, ijk...);
+        return Vx(ijk...); //*gradTonMoment_X;
+                           // return 0.0*Te(ijk...);
     }
-
 };
 
 
@@ -398,7 +393,7 @@ public:
 
         auto const& Ne_ = this->flux_.density();
         std::transform(std::begin(Ne_), std::end(Ne_), std::begin(this->Pe_),
-                       [this](auto n) { return n * 0.1; });
+                       [](auto n) { return n * 0.1; });
     }
 
 private:

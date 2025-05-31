@@ -153,7 +153,7 @@ struct ElectronsFixture
     UsableVecField<dim> B, J, F, Ve, Vi;
     UsableTensorField<dim> M, protons_M;
 
-    GridND Nibuffer, NiProtons, Pe;
+    GridND Nibuffer, NiProtons, Pe, Te;
 
     ParticleArray_t domainParticles{layout.AMRBox()};
     ParticleArray_t patchGhostParticles = domainParticles;
@@ -187,6 +187,26 @@ struct ElectronsFixture
         return ions;
     }
 
+    void initialize_variant_resources(auto& pressure_closure)
+    {
+        auto const visitors = varient_visitor_overloads{
+            [&](VecFieldND& vf) {
+                EXPECT_TRUE(vf.name() == "B");
+                B.set_on(vf);
+            },
+            [&](FieldND& f) {
+                EXPECT_TRUE(f.name() == "Te");
+                f.setBuffer(&Te);
+            },
+            [](auto&) {
+                // if this happens you are missing an overload
+                throw std::runtime_error("should not happen");
+            },
+        };
+        for (auto& var : pressure_closure.getRunTimeResourcesViewList())
+            std::visit(visitors, var);
+    }
+
 
     ElectronsFixture(PHARE::initializer::PHAREDict const& dict = createDict<dim>())
         : electromag{dict["electromag"]}
@@ -202,6 +222,7 @@ struct ElectronsFixture
         , NiProtons{"protons_rho", HybridQuantity::Scalar::rho,
                     layout.allocSize(HybridQuantity::Scalar::rho)}
         , Pe{"Pe", HybridQuantity::Scalar::P, layout.allocSize(HybridQuantity::Scalar::P)}
+        , Te{"Te", HybridQuantity::Scalar::P, layout.allocSize(HybridQuantity::Scalar::P)}
         , ions{_ions(dict, F, Nibuffer, NiProtons, Vi, M, protons_M, pack)}
         , fluxCompute{ions, J}
         , electrons{dict["electrons"], fluxCompute, B}
@@ -212,32 +233,16 @@ struct ElectronsFixture
         auto&& fc  = std::get<0>(emm.getCompileTimeResourcesViewList());
         auto&& pc  = std::get<1>(emm.getCompileTimeResourcesViewList());
         auto&& fc_ = std::get<0>(pc.getCompileTimeResourcesViewList());
+        auto&& pe  = std::get<1>(pc.getCompileTimeResourcesViewList());
 
         Ve.set_on(std::get<0>(fc.getCompileTimeResourcesViewList()));
-        // B.set_on(std::get<1>(emm.getCompileTimeResourcesViewList()));
         Ve.set_on(std::get<0>(fc_.getCompileTimeResourcesViewList()));
-
-        auto const& closure_name
-            = dict["electrons"]["pressure_closure"]["name"].template to<std::string>();
-
-        auto visitors = overloads{[&](VecFieldND& vf) { B.set_on(vf); },
-                                  [](auto&) { },
-                                  };
-
-        if (closure_name == "CGL")
-        {
-            auto& variants = pc.getRunTimeResourcesViewList();
-            EXPECT_EQ(variants.size(), 1);
-            for (auto& var : variants)
-                std::visit(visitors, var);
-        }
-
-        auto const& [_, P] = pc.getCompileTimeResourcesViewList();
-        P.setBuffer(&Pe);
+        initialize_variant_resources(pc);
+        pe.setBuffer(&Pe);
+        EXPECT_TRUE(pc.isUsable());
 
         auto const& [Jx, Jy, Jz]    = J();
         auto const& [Vix, Viy, Viz] = Vi();
-
 
         if constexpr (dim == 1)
         {
@@ -606,8 +611,24 @@ TEST(ElectronsFactoryTest, ThatConstThingsAreAsExpectedForCGL)
     auto const& pc = std::get<1>(emm.getCompileTimeResourcesViewList());
 
     auto& B = pc.B();
+    EXPECT_TRUE(B.isUsable());
 }
 
+
+TEST(ElectronsFactoryTest, ThatConstThingsAreAsExpectedForPolytropic)
+{
+    auto dict = createDict<1>();
+
+    dict["electrons"]["pressure_closure"]["name"] = std::string{"polytropic"};
+
+    ElectronsFixture<std::pair<DimConst<1>, InterpConst<1>>> fixture{dict};
+
+    auto&& emm     = std::get<0>(fixture.electrons.getCompileTimeResourcesViewList());
+    auto const& pc = std::get<1>(emm.getCompileTimeResourcesViewList());
+
+    auto& Te = pc.Te();
+    EXPECT_TRUE(Te.isUsable());
+}
 
 TEST(ElectronsFactoryTest, ThatThereIsNoB)
 {
