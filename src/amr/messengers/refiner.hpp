@@ -5,7 +5,6 @@
 #include "core/data/vecfield/vecfield.hpp"
 
 #include "amr/messengers/field_sum_transaction.hpp"
-#include "amr/data/field/field_variable_fill_pattern.hpp"
 
 #include <tuple>
 #include <stdexcept>
@@ -20,8 +19,6 @@ enum class RefinerType {
     InitField,
     InitInteriorPart,
     LevelBorderParticles,
-    InteriorGhostParticles,
-    SharedBorder,
     PatchFieldBorderSum,
     ExteriorGhostParticles
 };
@@ -35,7 +32,9 @@ class Refiner : private Communicator<RefinerTypes, ResourcesManager::dimension>
 
 public:
     void registerLevel(std::shared_ptr<SAMRAI::hier::PatchHierarchy> const& hierarchy,
-                       std::shared_ptr<SAMRAI::hier::PatchLevel> const& level)
+                       std::shared_ptr<SAMRAI::hier::PatchLevel> const& level,
+                       std::shared_ptr<SAMRAI::xfer::RefineTransactionFactory> const& refac
+                       = nullptr)
     {
         auto levelNumber = level->getLevelNumber();
 
@@ -76,11 +75,7 @@ public:
 
             else if constexpr (Type == RefinerType::PatchFieldBorderSum)
             {
-                this->add(algo,
-                          algo->createSchedule(
-                              level, 0,
-                              std::make_shared<FieldBorderSumTransactionFactory<FieldData_t>>()),
-                          levelNumber);
+                this->add(algo, algo->createSchedule(level, 0, refac), levelNumber);
             }
 
             // this createSchedule overload is used to initialize fields.
@@ -126,20 +121,9 @@ public:
                           levelNumber);
             }
 
-            // this branch is used to create a schedule that will transfer particles into
-            // the patches' ghost zones.
-            else if constexpr (Type == RefinerType::InteriorGhostParticles)
-            {
-                this->add(algo, algo->createSchedule(level), levelNumber);
-            }
+
 
             else if constexpr (Type == RefinerType::ExteriorGhostParticles)
-            {
-                this->add(algo, algo->createSchedule(level), levelNumber);
-            }
-
-            // schedule to synchronize shared border values, and not include refinement
-            else if constexpr (Type == RefinerType::SharedBorder)
             {
                 this->add(algo, algo->createSchedule(level), levelNumber);
             }
@@ -183,6 +167,12 @@ public:
     }
 
 
+    template<typename VecFieldT>
+    void fill(VecFieldT& vec, int const levelNumber, double const fillTime)
+    {
+        for (auto const& algo : this->algos)
+            this->findSchedule(algo, levelNumber)->fillData(fillTime);
+    }
 
 
     /**
@@ -210,9 +200,8 @@ public:
     {
         constexpr auto dimension = ResourcesManager::dimension;
 
-        register_time_interpolated_vector_field_refiner(
-            rm, ghost, ghost, oldModel, model, refineOp, timeOp,
-            try_make_field_variable_fill_pattern(refineOp, variableFillPattern));
+        register_time_interpolated_vector_field(rm, ghost, ghost, oldModel, model, refineOp, timeOp,
+                                                variableFillPattern);
     }
 
 
@@ -228,9 +217,8 @@ public:
     {
         constexpr auto dimension = ResourcesManager::dimension;
 
-        register_interpolated_resource(
-            rm, ghost, ghost, oldModel, model, refineOp, timeOp,
-            try_make_field_variable_fill_pattern(refineOp, variableFillPattern));
+        register_time_interpolated_resource(rm, ghost, ghost, oldModel, model, refineOp, timeOp,
+                                            variableFillPattern);
     }
 
 
@@ -253,11 +241,6 @@ public:
             std::shared_ptr<SAMRAI::hier::RefineOperator> refineOp,
             std::shared_ptr<SAMRAI::xfer::VariableFillPattern> variableFillPattern = nullptr)
     {
-        if constexpr (Type == RefinerType::GhostField or Type == RefinerType::PatchGhostField
-                      or Type == RefinerType::SharedBorder)
-            variableFillPattern
-                = try_make_field_variable_fill_pattern(refineOp, variableFillPattern);
-
         register_vector_field(rm, dst, src, refineOp, variableFillPattern);
     }
 
@@ -286,88 +269,42 @@ public:
     }
 
 
-    Refiner static make_vector_field(auto&&... args)
-    {
-        return Refiner{}.register_vector_field(args...);
-    }
-
-    Refiner static make_time_interpolated_vector_field_refiner(auto&&... args)
-    {
-        return Refiner{}.register_time_interpolated_vector_field_refiner(args...);
-    }
-
-    auto static try_make_field_variable_fill_pattern(
-        auto const& refOp, std::shared_ptr<SAMRAI::xfer::VariableFillPattern> fillPattern = nullptr)
-    {
-        if (!fillPattern and refOp and dynamic_cast<AFieldRefineOperator const*>(refOp.get()))
-            fillPattern = FieldFillPattern<ResourcesManager::dimension>::make_shared(refOp);
-        return fillPattern;
-    }
-
-
     auto& register_resource(auto& rm, auto& dst, auto& src, auto& scratch, auto&&... args)
     {
-        // PHARE_LOG_LINE_SS(dst << " " << src << " " << scratch);
         auto&& [idDst, idSrc, idScrtch] = rm->getIDsList(dst, src, scratch);
         this->add_algorithm()->registerRefine(idDst, idSrc, idScrtch, args...);
         return *this;
     }
 
-    auto& register_interpolated_resource(auto& rm, auto& dst, auto& src, auto& told, auto& tnew,
-                                         auto&&... args)
+
+    auto& register_time_interpolated_resource(auto& rm, auto& dst, auto& src, auto& told,
+                                              auto& tnew, auto&&... args)
     {
-        // PHARE_LOG_LINE_SS(dst << " " << src << " " << told << " " << tnew);
         auto&& [idDst, idSrc, idTold, idTnew] = rm->getIDsList(dst, src, told, tnew);
         this->add_algorithm()->registerRefine(idDst, idSrc, idTold, idTnew, idDst, args...);
         return *this;
     }
 
 
-    auto& register_vector_field(auto&&... args)
+    auto& register_vector_field(auto& rm, auto& dst, auto& src, auto& refOp, auto& fillPat)
     {
-        auto const tuple = std::forward_as_tuple(args...);
-        using Tuple      = decltype(tuple);
-
-        static_assert(std::tuple_size_v<Tuple> > 3 and std::tuple_size_v<Tuple> < 6);
-        if constexpr (std::tuple_size_v<Tuple> == 4)
-        {
-            return register_vector_field(args...,
-                                         try_make_field_variable_fill_pattern(std::get<3>(tuple)));
-        }
-        else
-        { ////      0   1    2    3      4
-            auto&& [rm, dst, src, refOp, fillPat] = tuple;
-            return (*this)
-                .register_resource(rm, dst.xName, src.xName, dst.xName, refOp, fillPat)
-                .register_resource(rm, dst.yName, src.yName, dst.yName, refOp, fillPat)
-                .register_resource(rm, dst.zName, src.zName, dst.zName, refOp, fillPat);
-        }
+        return (*this)
+            .register_resource(rm, dst.xName, src.xName, dst.xName, refOp, fillPat)
+            .register_resource(rm, dst.yName, src.yName, dst.yName, refOp, fillPat)
+            .register_resource(rm, dst.zName, src.zName, dst.zName, refOp, fillPat);
     }
 
-    auto& register_time_interpolated_vector_field_refiner(auto&&... args)
+
+    auto& register_time_interpolated_vector_field(auto& rm, auto& dst, auto& src, auto& told,
+                                                  auto& tnew, auto&&... args)
     {
-        auto const tuple = std::forward_as_tuple(args...);
-        using Tuple      = decltype(tuple);
-
-        static_assert(std::tuple_size_v<Tuple> > 5 and std::tuple_size_v<Tuple> < 9);
-
-        if constexpr (std::tuple_size_v<Tuple> == 7)
-        {
-            return register_time_interpolated_vector_field(
-                args..., try_make_field_variable_fill_pattern(std::get<5>(tuple)));
-        }
-        else
-        { ////      0   1    2    3     4     5      6       7
-            auto&& [rm, dst, src, told, tnew, refOp, timeOp, fillPat]
-                = std::forward_as_tuple(args...);
-            register_interpolated_resource(rm, dst.xName, src.xName, told.xName, tnew.xName, refOp,
-                                           timeOp, fillPat);
-            register_interpolated_resource(rm, dst.yName, src.yName, told.yName, tnew.yName, refOp,
-                                           timeOp, fillPat);
-            register_interpolated_resource(rm, dst.zName, src.zName, told.zName, tnew.zName, refOp,
-                                           timeOp, fillPat);
-            return (*this);
-        }
+        return (*this)
+            .register_time_interpolated_resource(rm, dst.xName, src.xName, told.xName, tnew.xName,
+                                                 args...)
+            .register_time_interpolated_resource(rm, dst.yName, src.yName, told.yName, tnew.yName,
+                                                 args...)
+            .register_time_interpolated_resource(rm, dst.zName, src.zName, told.zName, tnew.zName,
+                                                 args...);
     }
 };
 } // namespace PHARE::amr

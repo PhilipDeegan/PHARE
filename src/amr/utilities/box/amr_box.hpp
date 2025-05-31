@@ -2,12 +2,13 @@
 #define PHARE_AMR_UTILITIES_BOX_BOX_HPP
 
 
-#include "core/def/phare_mpi.hpp"
+#include "core/def.hpp"
+#include "core/def/phare_mpi.hpp" // IWYU pragma: keep
+#include "core/utilities/box/box.hpp"
 
+#include "amr/amr_constants.hpp"
 
 #include "SAMRAI/hier/Box.h"
-#include "core/utilities/box/box.hpp"
-#include "core/def.hpp"
 
 
 namespace PHARE::amr
@@ -17,8 +18,8 @@ NO_DISCARD auto samrai_box_from(PHARE::core::Box<Type, dim> const& box, int samr
 {
     SAMRAI::tbox::Dimension dimension{dim};
     SAMRAI::hier::BlockId blockId{samrai_blockId};
-    return SAMRAI::hier::Box{SAMRAI::hier::Index{dimension, (*box.lower).data()},
-                             SAMRAI::hier::Index{dimension, (*box.upper).data()}, blockId};
+    return SAMRAI::hier::Box{SAMRAI::hier::Index{dimension, &box.lower[0]},
+                             SAMRAI::hier::Index{dimension, &box.upper[0]}, blockId};
 }
 
 template<std::size_t dim, typename Type = int>
@@ -42,6 +43,9 @@ NO_DISCARD inline bool operator==(SAMRAI::hier::Box const& b1, SAMRAI::hier::Box
 {
     auto dim1 = b1.getDim().getValue();
     auto dim2 = b2.getDim().getValue();
+
+    if (dim1 != dim2)
+        return false;
 
     bool boxesAreEqual = true;
     for (auto i = 0u; i < dim1; ++i)
@@ -95,16 +99,12 @@ struct Box : public PHARE::core::Box<Type, dim>
 
 
 
-template<typename Particle>
-NO_DISCARD inline bool isInBox(SAMRAI::hier::Box const& box, Particle const& particle)
+
+template<typename T, std::size_t dim>
+inline bool isInBox(SAMRAI::hier::Box const& box, std::array<T, dim> const& iCell)
 {
-    constexpr auto dim = Particle::dimension;
-
-    auto const& iCell = particle.iCell;
-
     auto const& lower = box.lower();
     auto const& upper = box.upper();
-
 
     if (iCell[0] >= lower(0) && iCell[0] <= upper(0))
     {
@@ -134,6 +134,13 @@ NO_DISCARD inline bool isInBox(SAMRAI::hier::Box const& box, Particle const& par
 }
 
 
+template<typename Particle>
+inline bool isInBox(SAMRAI::hier::Box const& box, Particle const& particle)
+{
+    return isInBox(box, particle.iCell());
+}
+
+
 template<std::size_t dim>
 auto as_point(SAMRAI::hier::IntVector const& vec)
 {
@@ -146,6 +153,20 @@ template<std::size_t dim>
 auto as_point(SAMRAI::hier::Transformation const& tform)
 {
     return as_point<dim>(tform.getOffset());
+}
+
+
+template<typename Box_t>
+Box_t refine_box(Box_t const& box)
+{
+    return Box_t{((box.lower) * refinementRatio) + 1, ((box.upper) * refinementRatio) + 1};
+}
+
+
+template<typename Box_t>
+Box_t coarsen_box(Box_t const& box)
+{
+    return Box_t{(box.lower) / refinementRatio, (box.upper) / refinementRatio};
 }
 
 

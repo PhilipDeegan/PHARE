@@ -187,7 +187,9 @@ class Run:
         ranks = compute_hier_from(_get_rank, B)
         return ScalarField(self._get(ranks, time, merged, interp))
 
-    def GetParticles(self, time, pop_name, hier=None, **kwargs):
+    def GetParticles(self, time, pop_name, hier=None, type="domain", **kwargs):
+        assert type in ["domain", "levelGhost"]
+
         def filename(name):
             return f"ions_pop_{name}_domain.h5"
 

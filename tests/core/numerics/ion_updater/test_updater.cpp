@@ -1,18 +1,22 @@
 #include "gtest/gtest.h"
 #include <core/utilities/types.hpp>
+#include <unordered_map>
 
+#include "core/data/particles/particle_array_appender.hpp"
+#include "core/data/particles/particle_array_converter.hpp"
+#include "core/data/particles/particle_array_def.hpp"
 #include "phare_core.hpp"
 
-#include "core/numerics/ion_updater/ion_updater.hpp"
+#include "core/numerics/ion_updater/ion_updaters.hpp"
 
 #include "tests/core/data/vecfield/test_vecfield_fixtures.hpp"
 #include "tests/core/data/electromag/test_electromag_fixtures.hpp"
 #include "tests/core/data/tensorfield/test_tensorfield_fixtures.hpp"
 #include "tests/core/data/ion_population/test_ion_population_fixtures.hpp"
 
-using namespace PHARE::core;
 
-
+namespace PHARE::core
+{
 
 using Param  = std::vector<double> const&;
 using Return = std::shared_ptr<PHARE::core::Span<double>>;
@@ -154,45 +158,86 @@ static auto init_dict = createDict();
 
 
 
-template<std::size_t dim, std::size_t interporder>
-struct DimInterp
+
+template<auto opts_>
+struct TestParam
 {
-    static constexpr auto dimension    = dim;
-    static constexpr auto interp_order = interporder;
+    auto static constexpr opts         = opts_;
+    static constexpr auto dimension    = opts.dimension;
+    static constexpr auto interp_order = opts.interp_order;
 };
 
+template<auto layout_mode, auto opts>
+struct updater_test_bits;
 
-
-
-template<typename DimInterpT>
-struct IonUpdaterTest : public ::testing::Test
+template<auto opts>
+struct updater_test_bits<core::LayoutMode::AoSTS, opts>
 {
-    static constexpr auto dim          = DimInterpT::dimension;
-    static constexpr auto interp_order = DimInterpT::interp_order;
-    using PHARETypes                   = PHARE::core::PHARE_Types<dim, interp_order>;
+    auto static constexpr atomic_ops = false;
+    using PHARETypes                 = PHARE::core::PHARE_Types<opts>;
+    using Ions                       = PHARETypes::Ions_t;
+    using Electromag                 = PHARETypes::Electromag_t;
+    using GridLayout                 = PHARETypes::GridLayout_t;
+    using ParticleArray              = PHARETypes::ParticleArray_t;
+    using IonUpdater = core::IonUpdaterImplResolver<Ions, Electromag, GridLayout>::IonUpdater_t;
+    using Boxing_t   = PHARE::core::UpdaterSelectionBoxing<GridLayout>;
+};
+template<auto opts>
+struct updater_test_bits<core::LayoutMode::AoSMapped, opts>
+{
+    auto static constexpr atomic_ops = false;
+    using PHARETypes                 = PHARE::core::PHARE_Types<opts>;
+    using Ions                       = PHARETypes::Ions_t;
+    using Electromag                 = PHARETypes::Electromag_t;
+    using GridLayout                 = PHARETypes::GridLayout_t;
+    using ParticleArray              = PHARETypes::ParticleArray_t;
+    using IonUpdater = core::IonUpdaterImplResolver<Ions, Electromag, GridLayout>::IonUpdater_t;
+    using Selector_t = IonUpdater::Pusher::ParticleSelector;
+    using Boxing_t   = PHARE::core::UpdaterCellMapSelectionBoxing<Selector_t, GridLayout>;
+};
+
+template<auto layout_mode, auto opts>
+struct updater_test_bits
+{
+    // finish if needed
+};
+
+template<typename TestParam_t>
+struct IonUpdaterTest : public ::testing::Test,
+                        public updater_test_bits<TestParam_t::opts.layout_mode, TestParam_t::opts>
+{
+    auto static constexpr opts         = TestParam_t::opts;
+    static constexpr auto dim          = opts.dimension;
+    static constexpr auto interp_order = opts.interp_order;
+    using PHARETypes                   = PHARE::core::PHARE_Types<opts>;
     using Ions                         = PHARETypes::Ions_t;
     using Electromag                   = PHARETypes::Electromag_t;
-    using GridLayout    = PHARE::core::GridLayout<GridLayoutImplYee<dim, interp_order>>;
-    using ParticleArray = PHARETypes::ParticleArray_t;
-    using ParticleInitializerFactory = PHARETypes::ParticleInitializerFactory;
-    using UsableVecFieldND           = UsableVecField<dim>;
-    using IonUpdater                 = PHARE::core::IonUpdater<Ions, Electromag, GridLayout>;
-    using Boxing_t                   = PHARE::core::UpdaterSelectionBoxing<IonUpdater, GridLayout>;
+    using GridLayout                   = PHARETypes::GridLayout_t;
+    using ParticleArray                = PHARETypes::ParticleArray_t;
+    using ParticleInitializerFactory   = PHARETypes::ParticleInitializerFactory_t;
 
+    using basics       = updater_test_bits<TestParam_t::opts.layout_mode, TestParam_t::opts>;
+    using IonUpdater   = basics::IonUpdater;
+    using Boxing_t     = basics::Boxing_t;
+    using Interpolator = Interpolating<ParticleArray, interp_order, basics::atomic_ops>;
+
+    using UsableElectromag_t = UsableElectromag<GridLayout, opts.alloc_mode, opts.layout_mode>;
+
+    Interpolator interpolator;
 
     double const dt{0.01};
 
     // grid configuration
-    std::array<int, dim> const ncells = ConstArray<int, dim>(100);
-    GridLayout const layout{{0.1}, {100u}, {{0.}}};
+    TestGridLayout<GridLayout> const layout{100};
 
     // assumes no level ghost cells
     Boxing_t const boxing{layout, grow(layout.AMRBox(), GridLayout::nbrParticleGhosts())};
+    std::unordered_map<std::string, Boxing_t> const levelBoxing{{"patch_id", boxing}};
 
-    UsableElectromag<dim> EM{layout, init_dict["electromag"]};
+    static_assert(std::is_same_v<Electromag, typename UsableElectromag_t::Super>);
+    UsableElectromag_t EM{layout, init_dict["electromag"]};
 
     UsableIons_t<ParticleArray, interp_order> ions{layout, init_dict["ions"]};
-
 
     IonUpdaterTest()
     {
@@ -244,6 +289,7 @@ struct IonUpdaterTest : public ::testing::Test
                 auto& patchGhostPart    = pop.patchGhostParticles();
 
 
+
                 // copies need to be put in the ghost cell
                 // we have copied particles be now their iCell needs to be udpated
                 // our choice is :
@@ -264,52 +310,58 @@ struct IonUpdaterTest : public ::testing::Test
                 //     |      |       |     |
                 //     -------|-------|     |
                 //            ---------------
-                for (auto const& part : domainPart)
+
+                auto const per_particles = [&](auto& parts) {
+                    for (auto const& part : parts)
+                    {
+                        if constexpr (interp_order == 2 or interp_order == 3)
+                        {
+                            if (part.iCell()[0] == firstAMRCell[0]
+                                or part.iCell()[0] == firstAMRCell[0] + 1)
+                            {
+                                auto p{part};
+                                p.iCell()[0] -= 2;
+                                levelGhostPartOld.push_back(p);
+                            }
+                        }
+                        else if constexpr (interp_order == 1)
+                        {
+                            if (part.iCell()[0] == firstAMRCell[0])
+                            {
+                                auto p{part};
+                                p.iCell()[0] -= 1;
+                                levelGhostPartOld.push_back(p);
+                            }
+                        }
+                    }
+                };
+
+                if constexpr (opts.layout_mode == LayoutMode::AoSTS)
                 {
-                    if constexpr (interp_order == 2 or interp_order == 3)
-                    {
-                        if (part.iCell[0] == firstAMRCell[0]
-                            or part.iCell[0] == firstAMRCell[0] + 1)
-                        {
-                            auto p{part};
-                            p.iCell[0] -= 2;
-                            levelGhostPartOld.push_back(p);
-                        }
-                    }
-                    else if constexpr (interp_order == 1)
-                    {
-                        if (part.iCell[0] == firstAMRCell[0])
-                        {
-                            auto p{part};
-                            p.iCell[0] -= 1;
-                            levelGhostPartOld.push_back(p);
-                        }
-                    }
+                    for (auto& tile : domainPart())
+                        per_particles(tile());
+                }
+                else
+                {
+                    per_particles(domainPart);
                 }
 
+                levelGhostPartNew = levelGhostPartOld;
+                levelGhostPart    = levelGhostPartOld;
 
-                std::copy(std::begin(levelGhostPartOld), std::end(levelGhostPartOld),
-                          std::back_inserter(levelGhostPartNew));
-
-
-                std::copy(std::begin(levelGhostPartOld), std::end(levelGhostPartOld),
-                          std::back_inserter(levelGhostPart));
-
+                // append_particles<ParticleType::Ghost>(levelGhostPartOld, levelGhostPartNew);
+                // append_particles<ParticleType::Ghost>(levelGhostPartOld, levelGhostPart);
 
                 EXPECT_GT(pop.domainParticles().size(), 0ull);
                 EXPECT_GT(levelGhostPartOld.size(), 0ull);
                 EXPECT_EQ(patchGhostPart.size(), 0);
 
+
             } // end 1D
         } // end pop loop
-        PHARE::core::depositParticles(ions, layout, Interpolator<dim, interp_order>{},
-                                      PHARE::core::DomainDeposit{});
+        PHARE::core::depositParticles(ions, layout, interpolator, PHARE::core::DomainDeposit{});
 
-        PHARE::core::depositParticles(ions, layout, Interpolator<dim, interp_order>{},
-                                      PHARE::core::PatchGhostDeposit{});
-
-        PHARE::core::depositParticles(ions, layout, Interpolator<dim, interp_order>{},
-                                      PHARE::core::LevelGhostDeposit{});
+        PHARE::core::depositParticles(ions, layout, interpolator, PHARE::core::LevelGhostDeposit{});
 
 
         ions.computeDensity();
@@ -317,23 +369,44 @@ struct IonUpdaterTest : public ::testing::Test
     } // end Ctor
 
 
+    struct Patch
+    {
+        using ParticleArray_t = ParticleArray;
+        using GridLayout_t    = GridLayout;
+        using Electromag_t    = Electromag;
+
+        GridLayout layout;
+        Ions ions;
+        Electromag electromag;
+
+        std::string patchID() const { return "patch_id"; }
+    };
+
+    Patch as_patch() { return Patch{layout, *ions, *EM}; }
+
+    auto update(auto& ionUpdater, auto const mode)
+    {
+        if constexpr (ParticleArray::layout_mode == AoSMapped)
+            ionUpdater.updatePopulations(*ions, *EM, boxing, dt, mode);
+
+        else
+        {
+            std::vector<Patch> level{as_patch()};
+            assert(ions.density().data() == level[0].ions.density().data());
+            ionUpdater.updatePopulations(level, levelBoxing, dt, mode);
+        }
+    }
 
     void fillIonsMomentsGhosts()
     {
-        using Interpolator = typename IonUpdater::Interpolator;
-        Interpolator interpolate;
-
         for (auto& pop : this->ions)
         {
             double alpha = 0.5;
-            interpolate(makeIndexRange(pop.levelGhostParticlesNew()), pop.density(), pop.flux(),
-                        layout,
-                        /*coef = */ alpha);
+            interpolator(pop.levelGhostParticlesNew(), pop.density(), pop.flux(), layout,
+                         /*coef = */ alpha);
 
-
-            interpolate(makeIndexRange(pop.levelGhostParticlesOld()), pop.density(), pop.flux(),
-                        layout,
-                        /*coef = */ (1. - alpha));
+            interpolator(pop.levelGhostParticlesOld(), pop.density(), pop.flux(), layout,
+                         /*coef = */ (1. - alpha));
         }
     }
 
@@ -343,15 +416,15 @@ struct IonUpdaterTest : public ::testing::Test
     {
         auto& populations = this->ions.getRunTimeResourcesViewList();
 
-        auto& protonDensity = populations[0].density();
-        auto& protonFx      = populations[0].flux().getComponent(Component::X);
-        auto& protonFy      = populations[0].flux().getComponent(Component::Y);
-        auto& protonFz      = populations[0].flux().getComponent(Component::Z);
+        auto const& protonDensity = reduce(populations[0].density());
+        auto const& protonFx      = reduce(populations[0].flux().getComponent(Component::X));
+        auto const& protonFy      = reduce(populations[0].flux().getComponent(Component::Y));
+        auto const& protonFz      = reduce(populations[0].flux().getComponent(Component::Z));
 
-        auto& alphaDensity = populations[1].density();
-        auto& alphaFx      = populations[1].flux().getComponent(Component::X);
-        auto& alphaFy      = populations[1].flux().getComponent(Component::Y);
-        auto& alphaFz      = populations[1].flux().getComponent(Component::Z);
+        auto const& alphaDensity = reduce(populations[1].density());
+        auto const& alphaFx      = reduce(populations[1].flux().getComponent(Component::X));
+        auto const& alphaFy      = reduce(populations[1].flux().getComponent(Component::Y));
+        auto const& alphaFz      = reduce(populations[1].flux().getComponent(Component::Z));
 
         auto ix0 = this->layout.physicalStartIndex(QtyCentering::primal, Direction::X);
         auto ix1 = this->layout.physicalEndIndex(QtyCentering::primal, Direction::X);
@@ -367,7 +440,8 @@ struct IonUpdaterTest : public ::testing::Test
                 std::cout << "nonZero failed for " << type << " : " << field.name() << "\n";
         };
 
-        auto check = [&](auto const& newField, auto const& originalField) {
+        auto check = [&](auto const& newField, auto const& og) {
+            auto const& originalField = reduce(og);
             nonZero(newField, "newField");
             // nonZero(originalField, "originalField");
             for (auto ix = ix0; ix <= ix1; ++ix)
@@ -394,10 +468,13 @@ struct IonUpdaterTest : public ::testing::Test
         check(alphaFy, ionsBufferCpy[1].flux()(Component::Y));
         check(alphaFz, ionsBufferCpy[1].flux()(Component::Z));
 
-        check(ions.density(), ionsBufferCpy.density());
-        check(ions.velocity().getComponent(Component::X), ionsBufferCpy.velocity()(Component::X));
-        check(ions.velocity().getComponent(Component::Y), ionsBufferCpy.velocity()(Component::Y));
-        check(ions.velocity().getComponent(Component::Z), ionsBufferCpy.velocity()(Component::Z));
+        check(reduce(ions.density()), ionsBufferCpy.density());
+        check(reduce(ions.velocity().getComponent(Component::X)),
+              ionsBufferCpy.velocity()(Component::X));
+        check(reduce(ions.velocity().getComponent(Component::Y)),
+              ionsBufferCpy.velocity()(Component::Y));
+        check(reduce(ions.velocity().getComponent(Component::Z)),
+              ionsBufferCpy.velocity()(Component::Z));
     }
 
 
@@ -430,8 +507,9 @@ struct IonUpdaterTest : public ::testing::Test
                 EXPECT_GE(0.07, diff);
 
                 if (diff >= 0.07)
-                    std::cout << "actual : " << density(ix) << " prescribed : " << functionX[i]
-                              << " diff : " << diff << " ix : " << ix << "\n";
+                    std::cout << i << " actual : " << density(ix)
+                              << " prescribed : " << functionX[i] << " diff : " << diff
+                              << " ix : " << ix << " max: " << functionX.size() << "\n";
             }
         };
 
@@ -439,17 +517,21 @@ struct IonUpdaterTest : public ::testing::Test
         auto& protonDensity = populations[0].density();
         auto& alphaDensity  = populations[1].density();
 
-        check(protonDensity, density);
-        check(alphaDensity, density);
+        check(reduce(protonDensity), density);
+        check(reduce(alphaDensity), density);
     }
 };
 
 
 
-using DimInterps = ::testing::Types<DimInterp<1, 1>, DimInterp<1, 2>, DimInterp<1, 3>>;
+using Permutations = ::testing::Types< //
+    TestParam<SimOpts{1, 1}>,          //
+    TestParam<SimOpts{1, 2}>,          //
+    TestParam<SimOpts{1, 3}>,          //
+    TestParam<SimOpts{1, 1, LayoutMode::AoSTS}>>;
 
 
-TYPED_TEST_SUITE(IonUpdaterTest, DimInterps, );
+TYPED_TEST_SUITE(IonUpdaterTest, Permutations, );
 
 
 
@@ -503,19 +585,21 @@ TYPED_TEST(IonUpdaterTest, loadsLevelGhostParticlesOnLeftGhostArea)
     {
         for (auto& pop : this->ions)
         {
+            auto const ghost = convert_to<LayoutMode::AoS>(pop.levelGhostParticles(), this->layout);
+
             if constexpr (TypeParam::interp_order == 1)
             {
-                for (auto const& part : pop.levelGhostParticles())
+                for (auto it = ghost.begin(); it != ghost.end(); ++it)
                 {
-                    EXPECT_EQ(firstAMRCell[0] - 1, part.iCell[0]);
+                    EXPECT_EQ(firstAMRCell[0] - 1, it.iCell()[0]);
                 }
             }
             else if constexpr (TypeParam::interp_order == 2 or TypeParam::interp_order == 3)
             {
-                typename IonUpdaterTest<TypeParam>::ParticleArray copy{pop.levelGhostParticles()};
+                auto copy                 = ghost;
                 auto firstInOuterMostCell = std::partition(
                     std::begin(copy), std::end(copy), [&firstAMRCell](auto const& particle) {
-                        return particle.iCell[0] == firstAMRCell[0] - 1;
+                        return particle.iCell()[0] == firstAMRCell[0] - 1;
                     });
                 EXPECT_EQ(nbrPartPerCell, std::distance(std::begin(copy), firstInOuterMostCell));
                 EXPECT_EQ(nbrPartPerCell, std::distance(firstInOuterMostCell, std::end(copy)));
@@ -538,9 +622,7 @@ TYPED_TEST(IonUpdaterTest, particlesUntouchedInMomentOnlyMode)
 
     auto ionsBufferCpy = this->ions;
 
-
-    ionUpdater.updatePopulations(this->ions, this->EM, this->boxing, this->dt,
-                                 UpdaterMode::domain_only);
+    this->update(ionUpdater, UpdaterMode::domain_only);
 
     this->fillIonsMomentsGhosts();
 
@@ -549,17 +631,20 @@ TYPED_TEST(IonUpdaterTest, particlesUntouchedInMomentOnlyMode)
 
     auto& populations = this->ions.getRunTimeResourcesViewList();
 
-    auto checkIsUnTouched = [](auto const& original, auto const& cpy) {
+    auto checkIsUnTouched = [&](auto const& og, auto const& cp) {
+        auto const original = convert_to<LayoutMode::AoS>(og, this->layout);
+        auto const cpy      = convert_to<LayoutMode::AoS>(cp, this->layout);
+
         // no particles should have moved, so none should have left the domain
         EXPECT_EQ(cpy.size(), original.size());
         for (std::size_t iPart = 0; iPart < original.size(); ++iPart)
         {
-            EXPECT_EQ(cpy[iPart].iCell[0], original[iPart].iCell[0]);
-            EXPECT_DOUBLE_EQ(cpy[iPart].delta[0], original[iPart].delta[0]);
+            EXPECT_EQ(cpy.iCell(iPart)[0], original.iCell(iPart)[0]);
 
+            EXPECT_DOUBLE_EQ(cpy.delta(iPart)[0], original.delta(iPart)[0]);
             for (std::size_t iDir = 0; iDir < 3; ++iDir)
             {
-                EXPECT_DOUBLE_EQ(cpy[iPart].v[iDir], original[iPart].v[iDir]);
+                EXPECT_DOUBLE_EQ(cpy.v(iPart)[iDir], original.v(iPart)[iDir]);
             }
         }
     };
@@ -612,7 +697,7 @@ TYPED_TEST(IonUpdaterTest, momentsAreChangedInParticlesAndMomentsMode)
 
     assert(ionsBufferCpy.density().data() != this->ions.density().data());
 
-    ionUpdater.updatePopulations(this->ions, this->EM, this->boxing, this->dt, UpdaterMode::all);
+    this->update(ionUpdater, UpdaterMode::all);
 
     this->fillIonsMomentsGhosts();
 
@@ -634,8 +719,7 @@ TYPED_TEST(IonUpdaterTest, momentsAreChangedInMomentsOnlyMode)
 
     assert(ionsBufferCpy.density().data() != this->ions.density().data());
 
-    ionUpdater.updatePopulations(this->ions, this->EM, this->boxing, this->dt,
-                                 UpdaterMode::domain_only);
+    this->update(ionUpdater, UpdaterMode::domain_only);
 
     this->fillIonsMomentsGhosts();
 
@@ -652,8 +736,7 @@ TYPED_TEST(IonUpdaterTest, thatNoNaNsExistOnPhysicalNodesMoments)
     typename IonUpdaterTest<TypeParam>::IonUpdater ionUpdater{
         init_dict["simulation"]["algo"]["ion_updater"]};
 
-    ionUpdater.updatePopulations(this->ions, this->EM, this->boxing, this->dt,
-                                 UpdaterMode::domain_only);
+    this->update(ionUpdater, UpdaterMode::domain_only);
 
     this->fillIonsMomentsGhosts();
 
@@ -666,12 +749,12 @@ TYPED_TEST(IonUpdaterTest, thatNoNaNsExistOnPhysicalNodesMoments)
     {
         for (auto ix = ix0; ix <= ix1; ++ix)
         {
-            auto& density = pop.density();
-            auto& flux    = pop.flux();
+            auto const& density = reduce(pop.density());
+            auto const& flux    = pop.flux();
 
-            auto& fx = flux.getComponent(Component::X);
-            auto& fy = flux.getComponent(Component::Y);
-            auto& fz = flux.getComponent(Component::Z);
+            auto const& fx = reduce(flux.getComponent(Component::X));
+            auto const& fy = reduce(flux.getComponent(Component::Y));
+            auto const& fz = reduce(flux.getComponent(Component::Z));
 
             EXPECT_FALSE(std::isnan(density(ix)));
             EXPECT_FALSE(std::isnan(fx(ix)));
@@ -681,7 +764,7 @@ TYPED_TEST(IonUpdaterTest, thatNoNaNsExistOnPhysicalNodesMoments)
     }
 }
 
-
+} // namespace PHARE::core
 
 
 int main(int argc, char** argv)

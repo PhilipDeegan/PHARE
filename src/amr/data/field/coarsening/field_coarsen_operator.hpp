@@ -3,12 +3,15 @@
 
 
 #include "core/def/phare_mpi.hpp"
-
-#include "amr/data/field/field_data.hpp"
-#include "amr/data/field/field_geometry.hpp"
-#include "default_field_coarsener.hpp"
+#include "core/data/grid/grid_tiles.hpp"
 #include "core/utilities/constants.hpp"
 #include "core/utilities/point/point.hpp"
+
+#include "amr/utilities/box/amr_box.hpp"
+#include "amr/data/field/field_data.hpp"
+#include "amr/data/field/field_geometry.hpp"
+
+#include "default_field_coarsener.hpp"
 
 #include <SAMRAI/hier/Box.h>
 #include <SAMRAI/hier/CoarsenOperator.h>
@@ -45,7 +48,7 @@ namespace amr
         FieldCoarsenOperator(FieldCoarsenOperator const&)            = delete;
         FieldCoarsenOperator(FieldCoarsenOperator&&)                 = delete;
         FieldCoarsenOperator& operator=(FieldCoarsenOperator const&) = delete;
-        FieldCoarsenOperator&& operator=(FieldCoarsenOperator&&)     = delete;
+        FieldCoarsenOperator& operator=(FieldCoarsenOperator&&)      = delete;
 
 
         virtual ~FieldCoarsenOperator() = default;
@@ -106,8 +109,6 @@ namespace amr
             // in coarseIt operator
             auto const& qty = destinationField.physicalQuantity();
 
-
-
             // We get different boxes : destination , source, restrictBoxes
             // and transform them in the correct indexing.
             auto destPData = destinationPatch.getPatchData(destinationId);
@@ -120,69 +121,42 @@ namespace amr
             auto coarseFieldBox = FieldGeometryT::toFieldBox(coarseBox, qty, coarseLayout);
 
             auto const intersectionBox = destGBox * coarseFieldBox;
+            auto const box             = phare_box_from<dimension>(intersectionBox);
 
-
-            // We can now create the coarsening operator
-            FieldCoarsenerPolicy coarsener{destLayout.centering(qty), srcGBox, destGBox, ratio};
-
-            // now we can loop over the intersection box
-
-            core::Point<int, dimension> startIndex;
-            core::Point<int, dimension> endIndex;
-
-            startIndex[dirX] = intersectionBox.lower(dirX);
-            endIndex[dirX]   = intersectionBox.upper(dirX);
-
-            if constexpr (dimension > 1)
+            if constexpr (core::is_field_tile_set_v<FieldT>)
             {
-                startIndex[dirY] = intersectionBox.lower(dirY);
-                endIndex[dirY]   = intersectionBox.upper(dirY);
-            }
-            if constexpr (dimension > 2)
-            {
-                startIndex[dirZ] = intersectionBox.lower(dirZ);
-                endIndex[dirZ]   = intersectionBox.upper(dirZ);
-            }
-
-            if constexpr (dimension == 1)
-            {
-                for (int ix = startIndex[dirX]; ix <= endIndex[dirX]; ++ix)
+                for (auto& dst_tile : destinationField())
                 {
-                    coarsener(sourceField, destinationField, {{ix}});
-                }
-            }
-
-
-
-
-            else if constexpr (dimension == 2)
-            {
-                for (int ix = startIndex[dirX]; ix <= endIndex[dirX]; ++ix)
-                {
-                    for (int iy = startIndex[dirY]; iy <= endIndex[dirY]; ++iy)
+                    auto const dst_box = dst_tile.ghost_box();
+                    if (auto const dst_overlap = dst_box * box)
                     {
-                        coarsener(sourceField, destinationField, {{ix, iy}});
-                    }
-                }
-            }
-
-
-
-
-            else if constexpr (dimension == 3)
-            {
-                for (int ix = startIndex[dirX]; ix <= endIndex[dirX]; ++ix)
-                {
-                    for (int iy = startIndex[dirY]; iy <= endIndex[dirY]; ++iy)
-                    {
-                        for (int iz = startIndex[dirZ]; iz <= endIndex[dirZ]; ++iz)
-
+                        for (auto const& src_tile : sourceField())
                         {
-                            coarsener(sourceField, destinationField, {{ix, iy, iz}});
+                            auto const src_box = src_tile.field_box();
+                            if (auto const src_overlap = src_box * refine_box(box))
+                            {
+                                if (auto const& overlap = *dst_overlap * coarsen_box(*src_overlap))
+                                {
+                                    FieldCoarsenerPolicy coarsener{
+                                        destLayout.centering(qty),
+                                        samrai_box_from(src_tile.ghost_box()),
+                                        samrai_box_from(dst_tile.ghost_box()), ratio};
+
+                                    for (auto const& bix : *overlap)
+                                        coarsener(src_tile(), dst_tile(), *bix);
+                                }
+                            }
                         }
                     }
                 }
-            } // end 3D
+            }
+            else
+            {
+                // We can now create the coarsening operator
+                FieldCoarsenerPolicy coarsener{destLayout.centering(qty), srcGBox, destGBox, ratio};
+                for (auto const& bix : box)
+                    coarsener(sourceField, destinationField, *bix);
+            }
         }
     };
 } // namespace amr

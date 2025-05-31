@@ -2,13 +2,13 @@
 #define PHARE_SRC_AMR_FIELD_FIELD_VARIABLE_FILL_PATTERN_HPP
 
 
-#include "amr/data/field/field_geometry.hpp"
 #include "core/def/phare_mpi.hpp"
 #include "core/utilities/types.hpp"
 #include "core/utilities/mpi_utils.hpp"
 #include <core/hybrid/hybrid_quantities.hpp>
 
 #include <amr/utilities/box/amr_box.hpp>
+#include "amr/data/field/field_geometry.hpp"
 #include "amr/data/field/refine/field_refine_operator.hpp"
 
 #include <SAMRAI/pdat/CellOverlap.h>
@@ -51,19 +51,9 @@ class FieldFillPattern : public SAMRAI::xfer::VariableFillPattern
     constexpr static std::size_t dim = dimension;
 
 public:
-    FieldFillPattern(std::optional<bool> overwrite_interior)
-        : opt_overwrite_interior_{overwrite_interior}
+    FieldFillPattern(bool overwrite_interior = false)
+        : overwrite_interior_{overwrite_interior}
     {
-    }
-
-    static auto make_shared(std::shared_ptr<SAMRAI::hier::RefineOperator> const& samrai_op)
-    {
-        auto const& op = dynamic_cast<AFieldRefineOperator const&>(*samrai_op);
-
-        if (op.node_only)
-            return std::make_shared<FieldFillPattern<dim>>(std::nullopt);
-
-        return std::make_shared<FieldFillPattern<dim>>(false);
     }
 
 
@@ -81,40 +71,9 @@ public:
 #endif
         TBOX_ASSERT_OBJDIM_EQUALITY2(dst_patch_box, src_mask);
 
-        bool overwrite_interior = true; // replace func param
-        assert(fn_overwrite_interior == overwrite_interior);
+        assert(fn_overwrite_interior == true); // replace func param
 
-        if (opt_overwrite_interior_) // not node only
-        {
-            // this sets overwrite_interior to false
-            overwrite_interior = *opt_overwrite_interior_;
-        }
-
-        // opt_overwrite_interior_ is nullopt : assume primal node shared border schedule
-        else
-        {
-            // cast into the Base class to get the pureInteriorFieldBox method
-            // see field_geometry.hpp for more explanations about why this base class exists
-            auto& dst_cast = dynamic_cast<FieldGeometryBase<dimension> const&>(dst_geometry);
-            auto& src_cast = dynamic_cast<FieldGeometryBase<dimension> const&>(src_geometry);
-
-            if (src_cast.patchBox.getGlobalId().getOwnerRank()
-                != dst_cast.patchBox.getGlobalId().getOwnerRank())
-                overwrite_interior
-                    = src_cast.patchBox.getGlobalId() > dst_cast.patchBox.getGlobalId();
-
-            auto basic_overlap = dst_geometry.calculateOverlap(src_geometry, src_mask, fill_box,
-                                                               overwrite_interior, transformation);
-            auto& overlap      = dynamic_cast<FieldOverlap const&>(*basic_overlap);
-
-            auto destinationBoxes = overlap.getDestinationBoxContainer();
-            destinationBoxes.removeIntersections(src_cast.pureInteriorFieldBox());
-
-            return std::make_shared<FieldOverlap>(destinationBoxes, overlap.getTransformation());
-        }
-
-        // overwrite_interior is always false here
-        return dst_geometry.calculateOverlap(src_geometry, src_mask, fill_box, overwrite_interior,
+        return dst_geometry.calculateOverlap(src_geometry, src_mask, fill_box, overwrite_interior_,
                                              transformation);
     }
 
@@ -167,7 +126,7 @@ private:
         return pdf.getBoxGeometry(patch_box)->setUpOverlap(overlap_boxes, transformation);
     }
 
-    std::optional<bool> opt_overwrite_interior_{std::nullopt};
+    bool overwrite_interior_;
 };
 
 
@@ -176,8 +135,9 @@ private:
 template<typename Gridlayout_t> // ASSUMED ALL PRIMAL!
 class FieldGhostInterpOverlapFillPattern : public SAMRAI::xfer::VariableFillPattern
 {
-    std::size_t constexpr static dim = Gridlayout_t::dimension;
-    using FieldGeometry_t            = FieldGeometryBase<dim>;
+    auto constexpr static dim          = Gridlayout_t::dimension;
+    auto constexpr static interp_order = Gridlayout_t::interp_order;
+    using FieldGeometry_t              = FieldGeometryBase<dim>;
 
 public:
     FieldGhostInterpOverlapFillPattern() {}
@@ -195,7 +155,7 @@ public:
         if (phare_box_from<dim>(dst_patch_box) == phare_box_from<dim>(src_mask))
             return std::make_shared<FieldOverlap>(SAMRAI::hier::BoxContainer{}, transformation);
 
-        auto const _primal_ghost_box = [](auto const& box) {
+        auto const _primal_ghost_box = [](auto box) {
             auto gb = grow(box, Gridlayout_t::nbrGhosts());
             gb.upper += 1;
             return gb;

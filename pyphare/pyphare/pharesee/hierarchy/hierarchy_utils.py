@@ -603,9 +603,7 @@ class EqualityReport:
             print(msg)
             try:
                 if type(ref) is FieldData:
-                    phut.assert_fp_any_all_close(
-                        ref[ref.box], cmp[cmp.box], atol=self.atol
-                    )
+                    phut.assert_fp_any_all_close(ref[:], cmp[:], atol=self.atol)
             except AssertionError as e:
                 print(e)
 

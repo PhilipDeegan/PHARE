@@ -1,31 +1,55 @@
 #ifndef PHARE_SOLVER_PPC_HPP
 #define PHARE_SOLVER_PPC_HPP
 
+#include "core/data/electromag/electromag.hpp"
+#include "core/data/tensorfield/tensorfield.hpp"
 #include "core/def/phare_mpi.hpp"
 
-#include "core/numerics/ion_updater/ion_updater.hpp"
-#include "core/numerics/ampere/ampere.hpp"
-#include "core/numerics/faraday/faraday.hpp"
 #include "core/numerics/ohm/ohm.hpp"
-
+#include "core/utilities/algorithm.hpp"
+#include "core/numerics/ampere/ampere.hpp"
 #include "core/data/vecfield/vecfield.hpp"
+#include "core/numerics/faraday/faraday.hpp"
 #include "core/data/grid/gridlayout_utils.hpp"
+#include "core/numerics/ion_updater/ion_updaters.hpp"
+#include "core/data/particles/particle_array_def.hpp"
+#include "core/numerics/ion_updater/ion_updater_def.hpp"
+#include "core/numerics/ion_updater/ion_updater_multi_ts.hpp"
+
+
+#include "amr/solvers/solver.hpp"
+#include "amr/solvers/solver_ppc_model_view.hpp"
 
 #include "amr/messengers/hybrid_messenger.hpp"
 #include "amr/messengers/hybrid_messenger_info.hpp"
 #include "amr/resources_manager/amr_utils.hpp"
 
-#include "amr/solvers/solver.hpp"
-#include "amr/solvers/solver_ppc_model_view.hpp"
-
 #include <SAMRAI/hier/Patch.h>
 
+#include <stdexcept>
 #include <unordered_map>
 
 
 namespace PHARE::solver
 {
 // -----------------------------------------------------------------------------
+
+
+template<typename GridLayout, typename Boxing_t>
+auto make_selection_boxes_for(auto const& hierarchy, auto& level)
+{
+    std::unordered_map<std::string, Boxing_t> levelBoxing;
+    for (auto const& patch : level)
+        if (auto [it, suc] = levelBoxing.try_emplace(
+                amr::to_string(patch->getGlobalId()),
+                Boxing_t{amr::layoutFromPatch<GridLayout>(*patch),
+                         amr::makeNonLevelGhostBoxFor<GridLayout>(*patch, hierarchy)});
+            !suc)
+            throw std::runtime_error("boxing map insertion failure");
+
+    return levelBoxing;
+}
+
 
 template<typename HybridModel, typename AMR_Types>
 class SolverPPC : public ISolver<AMR_Types>
@@ -48,7 +72,8 @@ private:
     using Faraday_t    = ModelViews_t::Faraday_t;
     using Ampere_t     = ModelViews_t::Ampere_t;
     using Ohm_t        = ModelViews_t::Ohm_t;
-    using IonUpdater_t = PHARE::core::IonUpdater<Ions, Electromag, GridLayout>;
+
+    using IonUpdater_t = core::IonUpdaterImplResolver<Ions, Electromag, GridLayout>::IonUpdater_t;
 
     Electromag electromagPred_{"EMPred"};
     Electromag electromagAvg_{"EMAvg"};
@@ -56,6 +81,8 @@ private:
     Faraday_t faraday_;
     Ampere_t ampere_;
     Ohm_t ohm_;
+
+
 
     IonUpdater_t ionUpdater_;
 
@@ -130,12 +157,13 @@ private:
                   double const newTime);
 
 
+
     void moveIons_(level_t& level, ModelViews_t& views, Messenger& fromCoarser,
                    double const currentTime, double const newTime, core::UpdaterMode mode);
 
 
-    void saveState_(level_t& level, ModelViews_t& views);
-    void restoreState_(level_t& level, ModelViews_t& views);
+    void saveState_(ModelViews_t& views);
+    void restoreState_(ModelViews_t& views);
 
 
     struct TimeSetter
@@ -151,21 +179,14 @@ private:
         double newTime;
     };
 
+
     void make_boxes(hierarchy_t const& hierarchy, level_t& level)
     {
         int const lvlNbr = level.getLevelNumber();
         if (boxing.count(lvlNbr))
             return;
-
-        auto& levelBoxing = boxing[lvlNbr]; // creates if missing
-
-        for (auto const& patch : level)
-            if (auto [it, suc] = levelBoxing.try_emplace(
-                    amr::to_string(patch->getGlobalId()),
-                    Boxing_t{amr::layoutFromPatch<GridLayout>(*patch),
-                             amr::makeNonLevelGhostBoxFor<GridLayout>(*patch, hierarchy)});
-                !suc)
-                throw std::runtime_error("boxing map insertion failure");
+        boxing.try_emplace(lvlNbr,
+                           make_selection_boxes_for<GridLayout, Boxing_t>(hierarchy, level));
     }
 
     auto& setup_level(hierarchy_t const& hierarchy, int const levelNumber)
@@ -177,8 +198,8 @@ private:
     }
 
 
-
-    using Boxing_t = core::UpdaterSelectionBoxing<IonUpdater_t, GridLayout>;
+    using Boxing_t
+        = std::decay_t<decltype(*core::selection_boxing_impl<IonUpdater_t, GridLayout>())>;
     std::unordered_map<int /*level*/, std::unordered_map<std::string /*patchid*/, Boxing_t>> boxing;
 
 
@@ -245,6 +266,7 @@ void SolverPPC<HybridModel, AMR_Types>::advanceLevel(hierarchy_t const& hierarch
 
     average_(level, modelView, fromCoarser, newTime);
 
+
     moveIons_(level, modelView, fromCoarser, currentTime, newTime, core::UpdaterMode::domain_only);
 
     predictor2_(level, modelView, fromCoarser, currentTime, newTime);
@@ -276,6 +298,8 @@ void SolverPPC<HybridModel, AMR_Types>::predictor1_(level_t& level, ModelViews_t
         setTime([](auto& state) -> auto& { return state.electromagPred.B; });
     }
 
+    for (auto& state : views)
+        core::check_electromag(state.electromagPred);
     {
         PHARE_LOG_SCOPE(1, "SolverPPC::predictor1_.ampere");
         ampere_(views.layouts, views.electromagPred_B, views.J);
@@ -425,36 +449,63 @@ void SolverPPC<HybridModel, AMR_Types>::moveIons_(level_t& level, ModelViews_t& 
                                                   Messenger& fromCoarser, double const currentTime,
                                                   double const newTime, core::UpdaterMode mode)
 {
+    using enum core::LayoutMode;
+    using ParticleArray_t = Ions::particle_array_type;
+
     PHARE_LOG_SCOPE(1, "SolverPPC::moveIons_");
     PHARE_DEBUG_DO(_debug_log_move_ions(views);)
 
     TimeSetter setTime{views, newTime};
-    auto const& levelBoxing = boxing[level.getLevelNumber()];
 
-    {
-        auto dt = newTime - currentTime;
+    auto const& levelBoxing = boxing[level.getLevelNumber()];
+    auto const dt           = newTime - currentTime;
+
+    if constexpr (ParticleArray_t::layout_mode == AoSMapped)
         for (auto& state : views)
             ionUpdater_.updatePopulations(
                 state.ions, state.electromagAvg,
                 levelBoxing.at(amr::to_string(state.patch->getGlobalId())), dt, mode);
-    }
+
+    else
+        ionUpdater_.updatePopulations(views, levelBoxing, dt, mode);
 
     // this needs to be done before calling the messenger
     setTime([](auto& state) -> auto& { return state.ions; });
 
 
+    fromCoarser.fillIonPopMomentGhosts(views.model().state.ions, level, newTime);
     fromCoarser.fillFluxBorders(views.model().state.ions, level, newTime);
     fromCoarser.fillDensityBorders(views.model().state.ions, level, newTime);
-    fromCoarser.fillIonGhostParticles(views.model().state.ions, level, newTime);
-    fromCoarser.fillIonPopMomentGhosts(views.model().state.ions, level, newTime);
+    if (mode != core::UpdaterMode::domain_only)
+        fromCoarser.fillIonGhostParticles(views.model().state.ions, level, newTime);
 
     for (auto& state : views)
-        ionUpdater_.updateIons(state.ions);
+        IonUpdater_t::updateIons(state.ions);
+
     // no need to update time, since it has been done before
 
     // now Ni and Vi are calculated we can fill pure ghost nodes
     // these were not completed by the deposition of patch and levelghost particles
     fromCoarser.fillIonMomentGhosts(views.model().state.ions, level, newTime);
+
+    PHARE_DEBUG_DO({
+        for (auto& state : views)
+        {
+            state.ions.density().notZero();
+            if constexpr (ParticleArray_t::layout_mode == AoSTS)
+                for (auto& pop : state.ions)
+                {
+                    assert(pop.patchGhostParticles().size() == 0);
+
+                    particle_array_domain_is_valid(pop.domainParticles(), state.layout.AMRBox());
+                    particle_array_domain_is_valid(*pop.domainParticles(), state.layout.AMRBox());
+                    particle_array_ghost_is_valid(pop.levelGhostParticles(), state.layout.AMRBox(),
+                                                  grow(state.layout.AMRBox(), 2));
+                    particle_array_ghost_is_valid(*pop.levelGhostParticles(), state.layout.AMRBox(),
+                                                  grow(state.layout.AMRBox(), 2));
+                }
+        }
+    })
 }
 
 

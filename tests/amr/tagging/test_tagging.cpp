@@ -1,6 +1,4 @@
 
-#include <cmath>
-#include <algorithm>
 
 #include "phare_solver.hpp"
 #include "amr/tagging/tagger.hpp"
@@ -11,11 +9,14 @@
 #include "core/models/hybrid_state.hpp"
 #include "core/utilities/span.hpp"
 
+#include "tests/core/data/gridlayout/gridlayout_test.hpp"
+#include "tests/core/data/vecfield/test_vecfield_fixtures.hpp"
+
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-#include "tests/core/data/gridlayout/gridlayout_test.hpp"
-#include "tests/core/data/vecfield/test_vecfield_fixtures.hpp"
+#include <cmath>
+#include <algorithm>
 
 using namespace PHARE::amr;
 
@@ -23,7 +24,8 @@ using namespace PHARE::amr;
 
 TEST(test_tagger, fromFactoryValid)
 {
-    using phare_types = PHARE::solver::PHARE_Types<1, 1, 2>;
+    auto static constexpr opts = PHARE::SimOpts::make(1ul, 1ul, 2ul);
+    using phare_types          = PHARE::solver::PHARE_Types<opts>;
     PHARE::initializer::PHAREDict dict;
     dict["model"]     = std::string{"HybridModel"};
     dict["method"]    = std::string{"default"};
@@ -34,7 +36,8 @@ TEST(test_tagger, fromFactoryValid)
 
 TEST(test_tagger, fromFactoryInvalid)
 {
-    using phare_types = PHARE::solver::PHARE_Types<1, 1, 2>;
+    auto static constexpr opts = PHARE::SimOpts::make(1ul, 1ul, 2ul);
+    using phare_types          = PHARE::solver::PHARE_Types<opts>;
     PHARE::initializer::PHAREDict dict;
     dict["model"]     = std::string{"invalidModel"};
     dict["method"]    = std::string{"invalidStrat"};
@@ -168,11 +171,12 @@ struct TestTagger : public ::testing::Test
     auto static constexpr dim            = TaggingTestInfo_t::dim;
     auto static constexpr interp_order   = TaggingTestInfo_t::interp;
     auto static constexpr refinedPartNbr = TaggingTestInfo_t::refinedPartNbr;
+    auto static constexpr opts           = PHARE::SimOpts::make(dim, interp_order, refinedPartNbr);
 
-    using phare_types = PHARE::solver::PHARE_Types<dim, interp_order, refinedPartNbr>;
-    using Electromag  = typename phare_types::Electromag_t;
-    using Ions        = typename phare_types::Ions_t;
-    using Electrons   = typename phare_types::Electrons_t;
+    using phare_types = PHARE::solver::PHARE_Types<opts>;
+    using Electromag  = phare_types::Electromag_t;
+    using Ions        = phare_types::Ions_t;
+    using Electrons   = phare_types::Electrons_t;
     using GridLayoutT = GridLayout<GridLayoutImplYee<dim, interp_order>>;
 
     struct SinglePatchHybridModel
@@ -184,7 +188,7 @@ struct TestTagger : public ::testing::Test
 
     GridLayoutT layout;
 
-    UsableVecField<dim> B, E;
+    UsableVecField<GridLayoutT> B, E;
 
     SinglePatchHybridModel model;
     std::vector<int> tags;
