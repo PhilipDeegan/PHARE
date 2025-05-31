@@ -4,12 +4,17 @@
 
 #include "core/def/phare_mpi.hpp"
 
+#include "core/utilities/constants.hpp"
+#include "core/data/grid/grid_tiles.hpp"
+#include "core/utilities/point/point.hpp"
+#include "core/data/grid/gridlayoutdefs.hpp"
+
+
+#include "amr/utilities/box/amr_box.hpp"
+#include "amr/resources_manager/amr_utils.hpp"
+
 #include <SAMRAI/hier/Box.h>
 
-#include "amr/resources_manager/amr_utils.hpp"
-#include "core/utilities/constants.hpp"
-#include "core/data/grid/gridlayoutdefs.hpp"
-#include "core/utilities/point/point.hpp"
 
 #include <cstddef>
 
@@ -31,6 +36,7 @@ public:
         : fineBox_{destinationGhostBox}
         , coarseBox_{sourceGhostBox}
         , centerings_{centering}
+        , ratio_{ratio}
     {
     }
 
@@ -40,6 +46,28 @@ public:
     template<typename FieldT>
     void operator()(FieldT const& coarseField, FieldT& fineField,
                     core::Point<int, dimension> fineIndex)
+    {
+        if constexpr (core::is_field_tile_set_v<FieldT>)
+        {
+            auto coarseIdx{fineIndex};
+            for (auto& idx : coarseIdx)
+                idx = idx / refinementRatio;
+            auto const locCoarseIdx = AMRToLocal(coarseIdx, coarseBox_);
+            for (auto const& src_tile : coarseField())
+                if (auto const src_box = src_tile.field_box(); isIn(coarseIdx, src_box))
+                    for (auto& dst_tile : fineField())
+                        if (auto const dst_box = dst_tile.field_box(); isIn(fineIndex, dst_box))
+                            ElectricFieldRefiner{centerings_, samrai_box_from(dst_box),
+                                                 samrai_box_from(src_box),
+                                                 ratio_}(src_tile(), dst_tile(), fineIndex);
+        }
+        else
+            field_t(coarseField, fineField, fineIndex);
+    }
+
+    template<typename FieldT>
+    void field_t(FieldT const& coarseField, FieldT& fineField,
+                 core::Point<int, dimension> fineIndex)
     {
         TBOX_ASSERT(coarseField.physicalQuantity() == fineField.physicalQuantity());
 
@@ -317,6 +345,7 @@ private:
     SAMRAI::hier::Box const fineBox_;
     SAMRAI::hier::Box const coarseBox_;
     std::array<core::QtyCentering, dimension> const centerings_;
+    SAMRAI::hier::IntVector const& ratio_;
 };
 } // namespace PHARE::amr
 

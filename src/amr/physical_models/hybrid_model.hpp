@@ -1,56 +1,93 @@
 #ifndef PHARE_HYBRID_MODEL_HPP
 #define PHARE_HYBRID_MODEL_HPP
 
-#include <string>
 
-#include "initializer/data_provider.hpp"
-#include "core/models/hybrid_state.hpp"
-#include "amr/physical_models/physical_model.hpp"
-#include "core/data/ions/particle_initializers/particle_initializer_factory.hpp"
-#include "amr/resources_manager/resources_manager.hpp"
-#include "amr/messengers/hybrid_messenger_info.hpp"
-#include "core/data/vecfield/vecfield.hpp"
 #include "core/def.hpp"
+#include "hybrid_model_storage.hpp"
+#include "initializer/data_provider.hpp"
+
+#include "core/models/hybrid_state.hpp"
+#include "core/data/vecfield/vecfield.hpp"
+#include "core/data/ions/particle_initializers/particle_initializer_factory.hpp"
+
+#include "amr/physical_models/physical_model.hpp"
+#include "amr/messengers/hybrid_messenger_info.hpp"
+
+
+#include <string>
+#include <tuple>
+#include <type_traits>
 
 namespace PHARE::solver
 {
+
+// for optional compile time per patch resources - eg grids for reducing during diags
+template<typename AMR_Types, typename Ions, typename Grid_t>
+class HybridModelBase
+    : public IPhysicalModel<AMR_Types>,
+      public hybrid_model_storage<Ions::particle_array_type::layout_mode, Ions, Grid_t>
+{
+public:
+    using Super     = IPhysicalModel<AMR_Types>;
+    using storage_t = hybrid_model_storage<Ions::particle_array_type::layout_mode, Ions, Grid_t>;
+    using resources_manager_type = storage_t::resources_manager_type;
+
+    HybridModelBase(std::string const& model_name)
+        : Super{model_name}
+        , storage_t{}
+    {
+    }
+
+    NO_DISCARD auto getCompileTimeResourcesViewList() const
+    {
+        return storage_t::getCompileTimeResourcesViewList();
+    }
+    NO_DISCARD auto getCompileTimeResourcesViewList()
+    {
+        return storage_t::getCompileTimeResourcesViewList();
+    }
+};
+
+
 /**
  * @brief The HybridModel class is a concrete implementation of a IPhysicalModel. The class
  * holds a HybridState and a ResourcesManager.
  */
 template<typename GridLayoutT, typename Electromag, typename Ions, typename Electrons,
          typename AMR_Types, typename Grid_t>
-class HybridModel : public IPhysicalModel<AMR_Types>
+class HybridModel : public HybridModelBase<AMR_Types, Ions, Grid_t>
 {
 public:
     static constexpr auto dimension = GridLayoutT::dimension;
 
-    using type_list
+    using type_list // torm
         = PHARE::core::type_list<GridLayoutT, Electromag, Ions, Electrons, AMR_Types, Grid_t>;
     using Interface              = IPhysicalModel<AMR_Types>;
+    using Super                  = HybridModelBase<AMR_Types, Ions, Grid_t>;
     using amr_types              = AMR_Types;
     using electrons_t            = Electrons;
-    using patch_t                = typename AMR_Types::patch_t;
-    using level_t                = typename AMR_Types::level_t;
+    using patch_t                = AMR_Types::patch_t;
+    using level_t                = AMR_Types::level_t;
+    using State_t                = core::HybridState<Electromag, Ions, Electrons>;
     using gridlayout_type        = GridLayoutT;
     using electromag_type        = Electromag;
-    using vecfield_type          = typename Electromag::vecfield_type;
-    using field_type             = typename vecfield_type::field_type;
+    using vecfield_type          = Electromag::vecfield_type;
+    using field_type             = vecfield_type::field_type;
     using grid_type              = Grid_t;
     using ions_type              = Ions;
-    using particle_array_type    = typename Ions::particle_array_type;
-    using resources_manager_type = amr::ResourcesManager<gridlayout_type, grid_type>;
-    using ParticleInitializerFactory
+    using particle_array_type    = Ions::particle_array_type;
+    using resources_manager_type = Super::resources_manager_type;
+    using ParticleInitializerFactory_t
         = core::ParticleInitializerFactory<particle_array_type, gridlayout_type>;
 
-    static const inline std::string model_name = "HybridModel";
+    static inline std::string const model_name = "HybridModel";
 
 
-    core::HybridState<Electromag, Ions, Electrons> state;
+    State_t state;
     std::shared_ptr<resources_manager_type> resourcesManager;
 
 
-    virtual void initialize(level_t& level) override;
+    void initialize(level_t& level) override;
 
 
     /**
@@ -59,7 +96,8 @@ public:
      */
     virtual void allocate(patch_t& patch, double const allocateTime) override
     {
-        resourcesManager->allocate(state, patch, allocateTime);
+        core::apply(getCompileTimeResourcesViewList(),
+                    [&](auto& el) { resourcesManager->allocate(el, patch, allocateTime); });
     }
 
 
@@ -70,7 +108,7 @@ public:
      * @brief fillMessengerInfo describes which variables of the model are to be initialized or
      * filled at ghost nodes.
      */
-    virtual void fillMessengerInfo(std::unique_ptr<amr::IMessengerInfo> const& info) const override;
+    void fillMessengerInfo(std::unique_ptr<amr::IMessengerInfo> const& info) const override;
 
 
     NO_DISCARD auto setOnPatch(patch_t& patch)
@@ -79,11 +117,10 @@ public:
     }
 
 
-    HybridModel(PHARE::initializer::PHAREDict const& dict,
-                std::shared_ptr<resources_manager_type> const& _resourcesManager)
-        : IPhysicalModel<AMR_Types>{model_name}
+    HybridModel(PHARE::initializer::PHAREDict const& dict)
+        : Super{model_name}
         , state{dict}
-        , resourcesManager{std::move(_resourcesManager)}
+        , resourcesManager{std::make_shared<resources_manager_type>()}
     {
     }
 
@@ -98,9 +135,25 @@ public:
 
     NO_DISCARD bool isSettable() const { return state.isSettable(); }
 
-    NO_DISCARD auto getCompileTimeResourcesViewList() const { return std::forward_as_tuple(state); }
+    NO_DISCARD auto getCompileTimeResourcesViewList() const
+    {
+        auto tup = std::tuple_cat(std::forward_as_tuple(state),
+                                  Super::getCompileTimeResourcesViewList());
+        core::for_N<std::tuple_size_v<decltype(tup)>>([&](auto i) {
+            static_assert(std::is_reference_v<std::tuple_element_t<i, decltype(tup)>>);
+        });
+        return tup;
+    }
 
-    NO_DISCARD auto getCompileTimeResourcesViewList() { return std::forward_as_tuple(state); }
+    NO_DISCARD auto getCompileTimeResourcesViewList()
+    {
+        auto tup = std::tuple_cat(std::forward_as_tuple(state),
+                                  Super::getCompileTimeResourcesViewList());
+        core::for_N<std::tuple_size_v<decltype(tup)>>([&](auto i) {
+            static_assert(std::is_reference_v<std::tuple_element_t<i, decltype(tup)>>);
+        });
+        return tup;
+    }
 
     //-------------------------------------------------------------------------
     //                  ends the ResourcesUser interface
@@ -132,7 +185,7 @@ void HybridModel<GridLayoutT, Electromag, Ions, Electrons, AMR_Types, Grid_t>::i
         for (auto& pop : ions)
         {
             auto const& info         = pop.particleInitializerInfo();
-            auto particleInitializer = ParticleInitializerFactory::create(info);
+            auto particleInitializer = ParticleInitializerFactory_t::create(info);
             particleInitializer->loadParticles(pop.domainParticles(), layout);
         }
 
@@ -166,7 +219,6 @@ void HybridModel<GridLayoutT, Electromag, Ions, Electrons, AMR_Types, Grid_t>::f
     hybridInfo.ghostCurrent.push_back(core::VecFieldNames{state.J});
     hybridInfo.ghostBulkVelocity.push_back(hybridInfo.modelIonBulkVelocity);
 
-
     auto transform_ = [](auto& ions, auto& inserter) {
         std::transform(std::begin(ions), std::end(ions), std::back_inserter(inserter),
                        [](auto const& pop) { return pop.name(); });
@@ -175,6 +227,12 @@ void HybridModel<GridLayoutT, Electromag, Ions, Electrons, AMR_Types, Grid_t>::f
     transform_(state.ions, hybridInfo.levelGhostParticlesOld);
     transform_(state.ions, hybridInfo.levelGhostParticlesNew);
     transform_(state.ions, hybridInfo.patchGhostParticles);
+
+    for (auto const& pop : state.ions)
+    {
+        hybridInfo.ghostFlux.emplace_back(pop.flux());
+        hybridInfo.sumBorderFields.emplace_back(pop.density().name());
+    }
 }
 
 

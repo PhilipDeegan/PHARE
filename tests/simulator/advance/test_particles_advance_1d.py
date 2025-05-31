@@ -17,37 +17,33 @@ ndim = 1
 interp_orders = [1, 2, 3]
 
 
-def per_interp(dic):
-    return [(interp, dic) for interp in interp_orders]
+def permute(boxes={}):
+    return [
+        dict(
+            interp_order=interp_order,
+            refinement_boxes=boxes,
+            sim_setup_kwargs=dict(layout=layout),
+        )
+        for interp_order, layout in itertools.product(
+            interp_orders, supported_particle_layouts()
+        )
+    ]
 
 
 @ddt
 class AdvanceTest(AdvanceTestBase):
-    @data(
-        *per_interp({}),
-        *per_interp({"L0": [Box1D(10, 20)]}),
-        *per_interp({"L0": [Box1D(2, 12), Box1D(13, 25)]}),
-    )
+    @data(*permute())
     @unpack
-    def test_overlapped_particledatas_have_identical_particles(
-        self, interp_order, refinement_boxes
-    ):
-        self._test_overlapped_particledatas_have_identical_particles(
-            ndim, interp_order, refinement_boxes
-        )
-
-    @data(*interp_orders)
-    def test_L0_particle_number_conservation(self, interp):
-        self._test_L0_particle_number_conservation(ndim, interp)
+    def test_L0_particle_number_conservation(self, interp_order, **kwargs):
+        print(f"{self._testMethodName}_{ndim}d")
+        self._test_L0_particle_number_conservation(ndim, **kwargs)
 
     @data(
-        *per_interp(({"L0": {"B0": Box1D(10, 14)}})),
+        *permute(({"L0": {"B0": Box1D(10, 14)}})),
     )
     @unpack
-    def test_domain_particles_on_refined_level(self, interp_order, refinement_boxes):
-        self._test_domain_particles_on_refined_level(
-            ndim, interp_order, refinement_boxes
-        )
+    def test_domain_particles_on_refined_level(self, interp_order, **kwargs):
+        self._test_domain_particles_on_refined_level(ndim, interp_order, **kwargs)
 
 
 if __name__ == "__main__":

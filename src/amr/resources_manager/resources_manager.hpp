@@ -79,16 +79,21 @@ namespace amr
      *
      * obj1 and obj2 become unusable again at the end of the scope of dataOnPatch
      *
-     *
+     *  struct ResourcesUserTypes{
+     *     using patch_data_type = SAMRAI::hier::PatchData;  // subclass thereof
+     *     using variable_type   = SAMRAI::hier::Variable;   // subclass thereof
+     *  };
      */
-    template<typename GridLayoutT, typename Grid_t>
+    template<typename GridLayoutT, typename Grid_t, typename... ResourcesUserTypes>
     class ResourcesManager
     {
-        using This = ResourcesManager<GridLayoutT, Grid_t>;
+        using This = ResourcesManager<GridLayoutT, Grid_t, ResourcesUserTypes...>;
 
     public:
         static constexpr std::size_t dimension    = GridLayoutT::dimension;
         static constexpr std::size_t interp_order = GridLayoutT::interp_order;
+
+        using ResourceUserTypes = std::tuple<ResourcesUserTypes...>;
 
         using UserField_t = UserFieldType<Grid_t, GridLayoutT>;
 
@@ -280,6 +285,25 @@ namespace amr
         }
 
 
+        auto getIDsList(auto&&... keys)
+        {
+            auto const Fn = [&](auto& key) {
+                if (auto const id = getID(key))
+                    return *id;
+                throw std::runtime_error("bad key");
+            };
+            return std::array{Fn(keys)...};
+        }
+
+        void print_resources() const
+        {
+            for (auto& [key, _] : nameToResourceInfo_)
+            {
+                PHARE_LOG_LINE_SS(key);
+            }
+        }
+
+
 
         ~ResourcesManager()
         {
@@ -438,7 +462,7 @@ namespace amr
                 ResourcesInfo info;
                 info.variable = ResourcesResolver_t::make_shared_variable(view);
                 info.id       = variableDatabase_->registerVariableAndContext(
-                          info.variable, context_, SAMRAI::hier::IntVector::getZero(dimension_));
+                    info.variable, context_, SAMRAI::hier::IntVector::getZero(dimension_));
 
                 nameToResourceInfo_.emplace(view.name(), info);
             }
