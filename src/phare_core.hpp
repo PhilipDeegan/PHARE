@@ -1,63 +1,89 @@
 #ifndef PHARE_CORE_INCLUDE_HPP
 #define PHARE_CORE_INCLUDE_HPP
 
-#include "core/data/grid/grid.hpp"
-#include "core/data/electromag/electromag.hpp"
-#include "core/data/electrons/electrons.hpp"
-#include "core/data/grid/gridlayout.hpp"
-#include "core/data/grid/gridlayoutimplyee.hpp"
-#include "core/data/ions/ion_population/ion_population.hpp"
-#include "core/data/ions/ions.hpp"
-#include "core/data/ions/particle_initializers/maxwellian_particle_initializer.hpp"
-#include "core/data/ndarray/ndarray_vector.hpp"
-#include "core/data/particles/particle_array.hpp"
-#include "core/data/vecfield/vecfield.hpp"
-#include "core/models/physical_state.hpp"
-#include "core/models/physical_state.hpp"
-#include "core/utilities/meta/meta_utilities.hpp"
-#include "core/utilities/algorithm.hpp"
-#include "core/logger.hpp"
+#include "core/def/phare_config.hpp"
 
-#include <string>
-#include <vector>
-#include <cstdint>
-#include <functional>
-#include <unordered_map>
+#include "core/data/grid/grid.hpp"
+#include "core/data/ions/ions.hpp"
+#include "core/data/grid/grid_tiles.hpp"
+#include "core/data/grid/gridlayout.hpp"
+#include "core/data/vecfield/vecfield.hpp"
+#include "core/data/electrons/electrons.hpp"
+#include "core/data/electromag/electromag.hpp"
+#include "core/data/ndarray/ndarray_vector.hpp"
+#include "core/data/grid/gridlayoutimplyee.hpp"
+#include "core/data/particles/particle_array.hpp"
+#include "core/data/ions/ion_population/ion_population.hpp"
+#include "core/data/ions/particle_initializers/particle_initializer_factory.hpp"
+
+#include "phare_simulator_options.hpp"
 
 #include "cppdict/include/dict.hpp"
 
+
+#include <string>
+#include <cstddef>
+#include <functional>
+#include <unordered_map>
+
 namespace PHARE::core
 {
-template<std::size_t dimension_, std::size_t interp_order_>
+
+template<typename GridLayout_t, auto L_, auto A_>
+struct UsingResolver
+{
+    bool static constexpr c_ordering   = true;
+    auto static constexpr dimension    = GridLayout_t::dimension;
+    auto static constexpr interp_order = GridLayout_t::interp_order;
+
+    using Array_t = NdArrayVector<dimension, double, c_ordering, A_>;
+    using Grid_t  = Grid<Array_t, HybridQuantity::Scalar>;
+    using Field_t = Field<dimension, HybridQuantity::Scalar, double, A_>;
+};
+
+template<typename GridLayout_t, auto A_>
+struct UsingResolver<GridLayout_t, LayoutMode::AoSTS, A_>
+{
+    bool static constexpr c_ordering   = true;
+    auto static constexpr dimension    = GridLayout_t::dimension;
+    auto static constexpr interp_order = GridLayout_t::interp_order;
+
+    using base_types      = UsingResolver<GridLayout_t, LayoutMode::AoS, A_>;
+    using Grid_base_type  = base_types::Grid_t;
+    using Field_base_type = basic::Field<FieldOpts<HybridQuantity::Scalar, double>{dimension, A_}>;
+    using Grid_t          = GridTileSet<GridLayout_t, Grid_base_type, Field_base_type>;
+    using Field_t         = FieldTileSet<GridLayout_t, Grid_base_type, Field_base_type>;
+};
+
+template<SimOpts opts>
 struct PHARE_Types
 {
-    static auto constexpr dimension    = dimension_;
-    static auto constexpr interp_order = interp_order_;
+    auto static constexpr dimension      = opts.dimension;
+    auto static constexpr interp_order   = opts.interp_order;
+    auto static constexpr layout_mode    = opts.layout_mode;
+    auto static constexpr allocator_mode = opts.alloc_mode;
 
-    using Array_t          = PHARE::core::NdArrayVector<dimension>;
-    using ArrayView_t      = PHARE::core::NdArrayView<dimension>;
-    using Grid_t           = PHARE::core::Grid<Array_t, PHARE::core::HybridQuantity::Scalar>;
-    using Field_t          = PHARE::core::Field<dimension, PHARE::core::HybridQuantity::Scalar>;
-    using VecField_t       = PHARE::core::VecField<Field_t, PHARE::core::HybridQuantity>;
-    using SymTensorField_t = PHARE::core::SymTensorField<Field_t, PHARE::core::HybridQuantity>;
-    using Electromag_t     = PHARE::core::Electromag<VecField_t>;
-    using YeeLayout_t      = PHARE::core::GridLayoutImplYee<dimension, interp_order>;
-    using GridLayout_t     = PHARE::core::GridLayout<YeeLayout_t>;
+    using ParticleSoA_t = SoAParticleArray<dimension>;
+    using ParticleArray_t
+        = ParticleArray<dimension, ParticleArrayInternals<dimension, layout_mode,
+                                                          StorageMode::VECTOR, allocator_mode>>;
 
-    using Particle_t      = PHARE::core::Particle<dimension>;
-    using ParticleAoS_t   = PHARE::core::ParticleArray<dimension>;
-    using ParticleArray_t = ParticleAoS_t;
-    using ParticleSoA_t   = PHARE::core::ContiguousParticles<dimension>;
+    using GridLayout_t = GridLayout<GridLayoutImplYee<dimension, interp_order>>;
 
-    using MaxwellianParticleInitializer_t
-        = PHARE::core::MaxwellianParticleInitializer<ParticleArray_t, GridLayout_t>;
-    using IonPopulation_t
-        = PHARE::core::IonPopulation<ParticleArray_t, VecField_t, SymTensorField_t>;
-    using Ions_t      = PHARE::core::Ions<IonPopulation_t, GridLayout_t>;
-    using Electrons_t = PHARE::core::Electrons<Ions_t>;
+    using Resolver_t = UsingResolver<GridLayout_t, layout_mode, allocator_mode>;
 
-    using ParticleInitializerFactory
-        = PHARE::core::ParticleInitializerFactory<ParticleArray_t, GridLayout_t>;
+    using Array_t = NdArrayVector<dimension, double, Resolver_t::c_ordering, allocator_mode>;
+
+    using Grid_t  = Resolver_t::Grid_t;  // layout dependent
+    using Field_t = Resolver_t::Field_t; // layout dependent
+
+    using VecField_t       = VecField<Field_t, HybridQuantity>;
+    using Electromag_t     = Electromag<VecField_t>;
+    using SymTensorField_t = SymTensorField<Field_t, HybridQuantity>;
+    using IonPopulation_t  = IonPopulation<ParticleArray_t, VecField_t, SymTensorField_t>;
+    using Ions_t           = Ions<IonPopulation_t, GridLayout_t>;
+    using Electrons_t      = Electrons<Ions_t>;
+    using ParticleInitializerFactory_t = ParticleInitializerFactory<ParticleArray_t, GridLayout_t>;
 };
 
 struct PHARE_Sim_Types
@@ -67,6 +93,9 @@ struct PHARE_Sim_Types
     using SimulationFunctors // code place id -> function_id -> function
         = std::unordered_map<std::string, std::unordered_map<std::string, SimFunctor>>;
 };
+
+
+
 
 } // namespace PHARE::core
 

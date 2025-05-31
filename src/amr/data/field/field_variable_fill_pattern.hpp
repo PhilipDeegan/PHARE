@@ -176,8 +176,9 @@ private:
 template<typename Gridlayout_t> // ASSUMED ALL PRIMAL!
 class FieldGhostInterpOverlapFillPattern : public SAMRAI::xfer::VariableFillPattern
 {
-    std::size_t constexpr static dim = Gridlayout_t::dimension;
-    using FieldGeometry_t            = FieldGeometryBase<dim>;
+    auto constexpr static dim          = Gridlayout_t::dimension;
+    auto constexpr static interp_order = Gridlayout_t::interp_order;
+    using FieldGeometry_t              = FieldGeometryBase<dim>;
 
 public:
     FieldGhostInterpOverlapFillPattern() {}
@@ -195,7 +196,13 @@ public:
         if (phare_box_from<dim>(dst_patch_box) == phare_box_from<dim>(src_mask))
             return std::make_shared<FieldOverlap>(SAMRAI::hier::BoxContainer{}, transformation);
 
-        auto const _primal_ghost_box = [](auto const& box) {
+        auto const _primal_interp_box = [](auto box) {
+            auto ib = grow(box, interp_order - 1);
+            ib.upper += 1;
+            return ib;
+        };
+
+        auto const _primal_ghost_box = [](auto box) {
             auto gb = grow(box, Gridlayout_t::nbrGhosts());
             gb.upper += 1;
             return gb;

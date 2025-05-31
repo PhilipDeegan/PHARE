@@ -1,0 +1,154 @@
+
+#ifndef PHARE_CORE_DATA_PARTICLES_EXPORTING_DETAIL_AOS_EXPORTER
+#define PHARE_CORE_DATA_PARTICLES_EXPORTING_DETAIL_AOS_EXPORTER
+
+
+#include "core/def.hpp"
+#include "core/utilities/box/box.hpp"
+#include "core/data/particles/particle_array_def.hpp"
+#include "core/data/particles/particle_array_appender.hpp"
+#include "core/data/particles/particle_array_partitioner.hpp"
+#include "core/data/particles/exporting/detail/def_exporting.hpp"
+
+
+#include <stdexcept>
+
+
+
+
+namespace PHARE::core
+{
+
+using enum LayoutMode;
+using enum AllocatorMode;
+
+
+
+
+template<>
+template<typename Src, typename Dst, typename Box_t, typename Fn0>
+void ParticlesExporter<AoSMapped, CPU>::move_particles(Src& src, Dst& dst, Box_t const& box,
+                                                       Fn0 fn0)
+{
+    throw std::runtime_error("finish");
+
+    // constexpr static std::uint16_t N = 256;
+
+    // using ArrayParticleArray = typename Src::template array_type<N>;
+    // using SpanParticleArray  = Src::Span_t;
+
+    // std::uint16_t big_buffer_cnt = 0;
+    // ArrayParticleArray big_buffer;
+    // SpanParticleArray span{big_buffer};
+
+    // auto const send = [&]() {
+    //     assert(big_buffer_cnt <= N);
+    //     span.resize(big_buffer_cnt);
+    //     append_particles<ParticleType::Domain>(span, dst);
+    //     big_buffer_cnt = 0;
+    // };
+
+    // for (auto const& particle : src)
+    // {
+    //     if (not isIn(particle, box))
+    //         continue;
+
+    //     auto&& [p_count, buffer] = fn0(particle);
+    //     if (big_buffer_cnt + p_count > N)
+    //         send();
+    //     std::copy(buffer.data(), buffer.data() + p_count, big_buffer.data() + big_buffer_cnt);
+    //     big_buffer_cnt += p_count;
+    // }
+
+    // if (big_buffer_cnt)
+    //     send();
+}
+
+
+
+template<>
+template<typename Src, typename Dst, typename Box_t>
+void ParticlesExporter<AoSTS, CPU>::move_particles(Src& src, Dst& dst, Box_t const& box,
+                                                   std::size_t const growby)
+{
+    static_assert(Src::layout_mode == Dst::layout_mode);
+    assert(src().size() == dst().size());
+
+    for (std::size_t tidx = 0; tidx < src().size(); ++tidx)
+    {
+        auto& src_tile     = src()[tidx];
+        auto const src_box = grow(src_tile, growby);
+        if (!(box * src_box))
+            continue;
+
+        auto& dst_tile        = dst()[tidx];
+        auto const not_in_box = partition_particles_not_in(src_tile(), box);
+        auto const start      = not_in_box.size();
+        auto const end        = src_tile().size();
+
+        if (auto const size = end - start)
+            append_particles<ParticleType::Domain>(src_tile().view(start, size), dst_tile());
+
+        src_tile().resize(not_in_box.size());
+    }
+
+    src.sync();
+    dst.sync();
+}
+
+
+template<> // slow
+template<typename Src, typename Dst, typename Box_t>
+void ParticlesExporter<AoSTS, GPU_UNIFIED>::move_particles(Src& src, Dst& dst, Box_t const& box,
+                                                           std::size_t const growby)
+{
+    ParticlesExporter<AoSTS, CPU>{}.move_particles(src, dst, box, growby);
+}
+
+
+template<> // slow
+template<typename Src, typename Dst, typename Box_t, typename Fn0>
+void ParticlesExporter<AoSTS, GPU_UNIFIED>::move_particles(Src& src, Dst& dst, Box_t const& box,
+                                                           Fn0 fn0)
+{
+    throw std::runtime_error("finish");
+}
+
+
+template<>
+template<bool in, typename Src, typename Box_t>
+void ParticlesExporter<AoS, CPU>::delete_particles(Src& src, Box_t const& box)
+{
+}
+
+
+template<>
+template<bool in, typename Src, typename Box_t>
+void ParticlesExporter<AoSMapped, CPU>::delete_particles(Src& src, Box_t const& box)
+{
+}
+
+
+template<>
+template<bool in, typename Src, typename Box_t>
+void ParticlesExporter<AoSTS, CPU>::delete_particles(Src& src, Box_t const& box)
+{
+    static_assert(in == false); // for now
+
+    using Partitioner = ParticleArrayPartitioner<typename Src::per_tile_particles>;
+
+    auto const ghost_nbr = (src.ghost_box().shape()[0] - src.box().shape()[0]) / 2;
+
+    for (auto& tile : src())
+    {
+        auto const tile_gbox = grow(*tile, ghost_nbr);
+        if (tile_gbox * box)
+            tile().resize(Partitioner{tile()}(box).size());
+    }
+}
+
+
+} // namespace PHARE::core
+
+
+#endif /* PHARE_CORE_DATA_PARTICLES_EXPORTING_DETAIL_AOS_EXPORTER */
