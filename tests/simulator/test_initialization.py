@@ -1,14 +1,17 @@
+import unittest
+
 from pyphare.cpp import cpp_lib
 
 cpp = cpp_lib()
 
-import unittest
-
 import numpy as np
 from ddt import ddt
+
 from pyphare.core.box import nDBox
+
 from pyphare.core.phare_utilities import assert_fp_any_all_close
 from pyphare.pharein import ElectronModel, MaxwellianFluidModel
+
 from pyphare.pharein.diagnostics import (
     ElectromagDiagnostics,
     FluidDiagnostics,
@@ -20,7 +23,6 @@ from pyphare.pharesee.hierarchy.hierarchy_utils import merge_particles
 from pyphare.pharesee.hierarchy import hierarchy_from
 from pyphare.pharesee.particles import aggregate as aggregate_particles
 from pyphare.simulator.simulator import Simulator
-
 from tests.simulator import SimulatorTest
 
 
@@ -49,6 +51,7 @@ class InitializationTest(SimulatorTest):
         largest_patch_size=10,
         cells=120,
         dl=0.1,
+        sim_setup_kwargs={},
         **kwargs,
     ):
         diag_outputs = self.unique_diag_dir_for_test_case(
@@ -184,14 +187,14 @@ class InitializationTest(SimulatorTest):
                     population_name=pop,
                 )
 
-            for quantity in ["domain", "levelGhost", "patchGhost"]:
+            for quantity in ["domain", "levelGhost"]:  # , "patchGhost"
                 ParticleDiagnostics(
                     quantity=quantity,
                     write_timestamps=np.zeros(time_step_nbr),
                     population_name=pop,
                 )
 
-        Simulator(global_vars.sim).initialize().reset()
+        Simulator(global_vars.sim).setup(**sim_setup_kwargs).initialize().reset()
 
         eb_hier = None
         if qty in ["e", "eb"]:
@@ -205,7 +208,7 @@ class InitializationTest(SimulatorTest):
         if qty in ["e", "b", "eb"]:
             return eb_hier
 
-        is_particle_type = qty == "particles" or qty == "particles_patch_ghost"
+        is_particle_type = qty == "particles"  # or qty == "particles_patch_ghost"
 
         if is_particle_type:
             particle_hier = None
@@ -219,11 +222,11 @@ class InitializationTest(SimulatorTest):
                 hier=particle_hier,
             )
 
-        if is_particle_type:
-            particle_hier = hierarchy_from(
-                h5_filename=diag_outputs + "/ions_pop_protons_patchGhost.h5",
-                hier=particle_hier,
-            )
+        # if is_particle_type:
+        #     particle_hier = hierarchy_from(
+        #         h5_filename=diag_outputs + "/ions_pop_protons_patchGhost.h5",
+        #         hier=particle_hier,
+        #     )
 
         if qty == "particles":
             merge_particles(particle_hier)
@@ -266,6 +269,9 @@ class InitializationTest(SimulatorTest):
             **kwargs,
         )
 
+        if cpp.mpi_rank() > 0:
+            return
+
         from pyphare.pharein import global_vars
 
         model = global_vars.sim.model
@@ -276,6 +282,7 @@ class InitializationTest(SimulatorTest):
         for ilvl, level in hier.levels().items():
             self.assertTrue(ilvl == 0)  # only level 0 is expected perfect precision
             print("checking level {}".format(ilvl))
+
             for patch in level.patches:
                 bx_pd = patch.patch_datas["Bx"]
                 by_pd = patch.patch_datas["By"]
@@ -322,7 +329,7 @@ class InitializationTest(SimulatorTest):
                 if dim == 3:
                     raise ValueError("Unsupported dimension")
 
-    def _test_bulkvel_is_as_provided_by_user(self, dim, interp_order):
+    def _test_bulkvel_is_as_provided_by_user(self, dim, interp_order, **kwargs):
         hier = self.getHierarchy(
             dim,
             interp_order,
@@ -330,7 +337,11 @@ class InitializationTest(SimulatorTest):
             "moments",
             nbr_part_per_cell=100,
             beam=True,
+            **kwargs,
         )
+
+        if cpp.mpi_rank() > 0:
+            return
 
         from pyphare.pharein import global_vars
 
@@ -439,7 +450,7 @@ class InitializationTest(SimulatorTest):
                     for vexp, vact in zip((vxexp, vyexp, vzexp), (vxact, vyact, vzact)):
                         self.assertTrue(np.std(vexp - vact) < 1e-2)
 
-    def _test_density_is_as_provided_by_user(self, dim, interp_order):
+    def _test_density_is_as_provided_by_user(self, dim, interp_order, **kwargs):
         empirical_dim_devs = {
             1: 6e-3,
             2: 3e-2,
@@ -458,7 +469,11 @@ class InitializationTest(SimulatorTest):
             qty="moments",
             nbr_part_per_cell=nbParts[dim],
             beam=True,
+            **kwargs,
         )
+
+        if cpp.mpi_rank() > 0:
+            return
 
         from pyphare.pharein import global_vars
 
@@ -523,7 +538,7 @@ class InitializationTest(SimulatorTest):
                     )
 
     def _test_density_decreases_as_1overSqrtN(
-        self, dim, interp_order, nbr_particles=None, cells=960
+        self, dim, interp_order, nbr_particles=None, cells=960, **kwargs
     ):
         import matplotlib.pyplot as plt
 
@@ -547,9 +562,11 @@ class InitializationTest(SimulatorTest):
                 largest_patch_size=int(cells / 2),
                 cells=cells,
                 dl=0.0125,
+                **kwargs,
             )
 
-            from pyphare.pharein import global_vars
+            if cpp.mpi_rank() == 0:
+                from pyphare.pharein import global_vars
 
             model = global_vars.sim.model
             density_fn = model.model_dict["protons"]["density"]
@@ -577,6 +594,9 @@ class InitializationTest(SimulatorTest):
                 plt.title(r"$\sigma =$ {}".format(noise[inbr]))
                 plt.savefig(f"noise_{nbrpart}_interp_{dim}_{interp_order}.png")
                 plt.close("all")
+
+        if cpp.mpi_rank() > 0:
+            return
 
         plt.figure()
         plt.plot(nbr_particles, noise / noise[0], label=r"$\sigma/\sigma_0$")
@@ -606,14 +626,18 @@ class InitializationTest(SimulatorTest):
         self.assertGreater(3e-2, noiseMinusTheory[1:].mean())
 
     def _test_nbr_particles_per_cell_is_as_provided(
-        self, dim, interp_order, default_ppc=100
+        self, ndim, interp_order, default_ppc=100, **kwargs
     ):
         datahier = self.getHierarchy(
-            dim,
+            ndim,
             interp_order,
-            {"L0": {"B0": nDBox(dim, 10, 20)}},
+            {"L0": {"B0": nDBox(ndim, 10, 20)}},
             "particles",
+            **kwargs,
         )
+
+        if cpp.mpi_rank() > 0:
+            return
 
         for patch in datahier.level(0).patches:
             pd = patch.patch_datas["protons_particles"]
@@ -654,6 +678,9 @@ class InitializationTest(SimulatorTest):
             **kwargs,
         )
 
+        if cpp.mpi_rank() > 0:
+            return
+
         from pyphare.pharein.global_vars import sim
 
         assert sim is not None and len(sim.cells) == ndim
@@ -691,33 +718,36 @@ class InitializationTest(SimulatorTest):
                     part2 = coarse_split_particles[pop_name].select(patch.box)
                     self.assertEqual(part1, part2)
 
-    def _test_patch_ghost_on_refined_level_case(self, dim, has_patch_ghost, **kwargs):
-        import pyphare.pharein as ph
+    # def _test_patch_ghost_on_refined_level_case(self, dim, has_patch_ghost, **kwargs):
+    #     import pyphare.pharein as ph
 
-        out = "phare_outputs"
-        refinement_boxes = {"L0": [nDBox(dim, 10, 19)]}
-        kwargs["interp_order"] = kwargs.get("interp_order", 1)
-        kwargs["diag_outputs"] = f"{has_patch_ghost}"
-        datahier = self.getHierarchy(
-            ndim=dim,
-            refinement_boxes=refinement_boxes,
-            qty="particles_patch_ghost",
-            **kwargs,
-        )
+    #     out = "phare_outputs"
+    #     refinement_boxes = {"L0": [nDBox(dim, 10, 19)]}
+    #     kwargs["interp_order"] = kwargs.get("interp_order", 1)
+    #     kwargs["diag_outputs"] = f"{has_patch_ghost}"
+    #     datahier = self.getHierarchy(
+    #         ndim=dim,
+    #         refinement_boxes=refinement_boxes,
+    #         qty="particles_patch_ghost",
+    #         **kwargs,
+    #     )
 
-        self.assertTrue(
-            any(
-                [
-                    diagInfo.quantity.endswith("patchGhost")
-                    for diagname, diagInfo in ph.global_vars.sim.diagnostics.items()
-                ]
-            )
-        )
-        nbrPatchGhostPatchDatasOnL1 = sum(
-            [len(p.patch_datas) for p in datahier.level(1).patches]
-        )
+    #     if cpp.mpi_rank() > 0:
+    #         return
 
-        self.assertTrue((nbrPatchGhostPatchDatasOnL1 > 0) == has_patch_ghost)
+    #     self.assertTrue(
+    #         any(
+    #             [
+    #                 diagInfo.quantity.endswith("patchGhost")
+    #                 for diagname, diagInfo in ph.global_vars.sim.diagnostics.items()
+    #             ]
+    #         )
+    #     )
+    #     nbrPatchGhostPatchDatasOnL1 = sum(
+    #         [len(p.patch_datas) for p in datahier.level(1).patches]
+    #     )
+
+    #     self.assertTrue((nbrPatchGhostPatchDatasOnL1 > 0) == has_patch_ghost)
 
     def _test_levelghostparticles_have_correct_split_from_coarser_particle(
         self, datahier

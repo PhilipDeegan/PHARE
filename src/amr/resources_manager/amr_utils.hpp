@@ -206,7 +206,7 @@ namespace amr
         return particleGhostBoxMinusLevelGhostsCells;
     }
 
-    inline auto to_string(SAMRAI::hier::GlobalId const& id)
+    inline auto to_string(auto const& id)
     {
         std::stringstream patchID;
         patchID << id;

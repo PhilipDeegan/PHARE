@@ -5,6 +5,7 @@
 
 
 #include <tuple>
+#include <cassert>
 #include <iterator>
 #include <type_traits>
 
@@ -81,11 +82,16 @@ namespace core
 
                           SimulatorOption<DimConst<2>, InterpConst<1>, 4, 5, 8, 9>,
                           SimulatorOption<DimConst<2>, InterpConst<2>, 4, 5, 8, 9, 16>,
-                          SimulatorOption<DimConst<2>, InterpConst<3>, 4, 5, 8, 9, 25>>{};
+                          SimulatorOption<DimConst<2>, InterpConst<3>, 4, 5, 8, 9, 25>,
+
+                          SimulatorOption<DimConst<3>, InterpConst<1>, 6>,
+                          SimulatorOption<DimConst<3>, InterpConst<2>, 6>,
+                          SimulatorOption<DimConst<3>, InterpConst<3>, 6> //
+                          >{};
     }
 
-    template<std::size_t dim, std::size_t interp>
-    constexpr auto defaultNbrRefinedParts()
+
+    constexpr std::size_t defaultNbrRefinedParts(std::size_t dim, std::size_t interp)
     {
         auto sims            = possibleSimulators();
         using SimsTuple_t    = decltype(sims);
@@ -96,8 +102,8 @@ namespace core
         for_N<nsims>([&](auto i) {
             using SimOption = std::tuple_element_t<i, SimsTuple_t>;
 
-            if constexpr (std::tuple_element_t<0, SimOption>{}() == dim
-                          and std::tuple_element_t<1, SimOption>{}() == interp)
+            if (std::tuple_element_t<0, SimOption>{}() == dim
+                and std::tuple_element_t<1, SimOption>{}() == interp)
             {
                 nbRefinedPart = std::tuple_element_t<2, SimOption>{};
             }
@@ -107,6 +113,7 @@ namespace core
 
         return nbRefinedPart;
     }
+
 
 
     template<typename Maker> // used from PHARE::amr::Hierarchy

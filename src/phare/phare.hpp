@@ -14,6 +14,7 @@
 #include <memory>
 #include <iostream>
 
+
 namespace PHARE
 {
 class StreamAppender : public SAMRAI::tbox::Logger::Appender
@@ -45,7 +46,7 @@ public:
         SAMRAI::tbox::Logger::getInstance()->setWarningAppender(appender);
         PHARE_WITH_PHLOP( //
             if (auto e = core::get_env("PHARE_SCOPE_TIMING", "false"); e == "1" || e == "true")
-                phlop::ScopeTimerMan::INSTANCE()
+                phlop::threaded::ScopeTimerMan::INSTANCE()
                     .file_name(".phare/timings/rank." + std::to_string(core::mpi::rank()) + ".txt")
                     .init(); //
         )
@@ -53,20 +54,23 @@ public:
 
     ~SamraiLifeCycle()
     {
-        PHARE_WITH_PHLOP(phlop::ScopeTimerMan::reset());
+        PHARE_WITH_PHLOP(phlop::threaded::ScopeTimerMan::reset());
         SAMRAI::tbox::SAMRAIManager::shutdown();
         SAMRAI::tbox::SAMRAIManager::finalize();
         SAMRAI::tbox::SAMRAI_MPI::finalize();
+        PHARE::initializer::PHAREDictHandler::INSTANCE().stop();
     }
 
     static void reset()
     {
-        PHARE_WITH_PHLOP(phlop::ScopeTimerMan::reset());
+        PHARE_WITH_PHLOP(phlop::threaded::ScopeTimerMan::reset());
         PHARE::initializer::PHAREDictHandler::INSTANCE().stop();
         SAMRAI::tbox::SAMRAIManager::shutdown();
         SAMRAI::tbox::SAMRAIManager::startup();
     }
 };
+
+
 
 
 } // namespace PHARE

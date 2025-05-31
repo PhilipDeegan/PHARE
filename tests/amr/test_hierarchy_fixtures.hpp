@@ -2,6 +2,7 @@
 #define PHARE_TEST_AMR_HIERARCHY_FIXTURES_HPP
 
 #include "phare_solver.hpp"
+// #include "phare_simulator_options.hpp"
 #include "amr/types/amr_types.hpp"
 
 #include "tests/initializer/init_functions.hpp"
@@ -29,6 +30,9 @@ struct DimDict<1>
         dict["ions"]["pop0"]["particle_initializer"]["density"]
             = static_cast<InitFunctionT<dim>>(density);
 
+        dict["ions"]["pop0"]["particle_initializer"]["init"]["seed"]
+            = std::optional<std::size_t>(1337);
+
         dict["ions"]["pop0"]["particle_initializer"]["bulk_velocity_x"]
             = static_cast<InitFunctionT<dim>>(vx);
 
@@ -50,6 +54,9 @@ struct DimDict<1>
 
         dict["ions"]["pop1"]["particle_initializer"]["density"]
             = static_cast<InitFunctionT<dim>>(density);
+
+        dict["ions"]["pop1"]["particle_initializer"]["init"]["seed"]
+            = std::optional<std::size_t>(7113);
 
         dict["ions"]["pop1"]["particle_initializer"]["bulk_velocity_x"]
             = static_cast<InitFunctionT<dim>>(vx);
@@ -96,6 +103,9 @@ struct DimDict<2>
         dict["ions"]["pop0"]["particle_initializer"]["density"]
             = static_cast<InitFunctionT<dim>>(density);
 
+        dict["ions"]["pop0"]["particle_initializer"]["init"]["seed"]
+            = std::optional<std::size_t>(1337);
+
         dict["ions"]["pop0"]["particle_initializer"]["bulk_velocity_x"]
             = static_cast<InitFunctionT<dim>>(vx);
 
@@ -116,6 +126,9 @@ struct DimDict<2>
 
         dict["ions"]["pop1"]["particle_initializer"]["density"]
             = static_cast<InitFunctionT<dim>>(density);
+
+        dict["ions"]["pop1"]["particle_initializer"]["init"]["seed"]
+            = std::optional<std::size_t>(7113);
 
         dict["ions"]["pop1"]["particle_initializer"]["bulk_velocity_x"]
             = static_cast<InitFunctionT<dim>>(vx);
@@ -245,15 +258,17 @@ public:
 };
 
 
-template<std::uint8_t dim, std::size_t interpOrder, std::size_t nbRefinePart>
+template<auto opts>
 struct AfullHybridBasicHierarchy
 {
-    using Phare_core_Types   = PHARE::core::PHARE_Types<dim, interpOrder>;
-    using Phare_amr_Types    = PHARE::amr::PHARE_Types<dim, interpOrder, nbRefinePart>;
-    using Phare_solver_Types = PHARE::solver::PHARE_Types<dim, interpOrder, nbRefinePart>;
+    auto static constexpr dim = opts.dimension;
+
+    using Phare_core_Types   = PHARE::core::PHARE_Types<opts>;
+    using Phare_amr_Types    = PHARE::amr::PHARE_Types<opts>;
+    using Phare_solver_Types = PHARE::solver::PHARE_Types<opts>;
     using HybridModelT       = Phare_solver_Types::HybridModel_t;
     using MHDModelT          = Phare_solver_Types::MHDModel_t;
-    using ResourcesManagerT  = typename HybridModelT::resources_manager_type;
+    using ResourcesManagerT  = HybridModelT::resources_manager_type;
 
     int const firstHybLevel{0};
     int const ratio{2};
@@ -264,7 +279,7 @@ struct AfullHybridBasicHierarchy
 
     AfullHybridBasicHierarchy(std::string const& inputConfigFile)
     {
-        hybridModel->resourcesManager->registerResources(hybridModel->state);
+        hybridModel->resourcesManager->registerResources(*hybridModel);
 
         solver->registerResources(*hybridModel);
 
@@ -277,11 +292,9 @@ struct AfullHybridBasicHierarchy
     PHARE::initializer::PHAREDict dict{createDict<dim>()};
     SAMRAI::tbox::SAMRAI_MPI mpi{MPI_COMM_WORLD};
 
-    std::shared_ptr<ResourcesManagerT> resourcesManagerHybrid{
-        std::make_shared<ResourcesManagerT>()};
+    std::shared_ptr<HybridModelT> hybridModel{std::make_shared<HybridModelT>(dict)};
+    std::shared_ptr<ResourcesManagerT> resourcesManagerHybrid = hybridModel->resourcesManager;
 
-    std::shared_ptr<HybridModelT> hybridModel{
-        std::make_shared<HybridModelT>(dict, resourcesManagerHybrid)};
 
     std::shared_ptr<HybridMessenger<HybridModelT>> messenger{
         std::make_shared<HybridMessenger<HybridModelT>>(

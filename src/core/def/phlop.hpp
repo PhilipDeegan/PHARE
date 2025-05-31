@@ -5,10 +5,12 @@
 #if __has_include("phlop/timing/scope_timer.hpp")                                                  \
                   and (!defined(PHARE_HAVE_PHLOP) || PHARE_HAVE_PHLOP == 1)
 
-#include "phlop/timing/scope_timer.hpp"
+#include "phlop/timing/threaded_scope_timer.hpp"
 #define PHARE_HAVE_PHLOP 1
 #define PHARE_WITH_PHLOP(...) __VA_ARGS__
+
 #else
+
 #define PHARE_HAVE_PHLOP 0
 #define PHARE_WITH_PHLOP(...)
 
