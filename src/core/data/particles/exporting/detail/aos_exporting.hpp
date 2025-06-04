@@ -26,47 +26,6 @@ using enum AllocatorMode;
 
 
 template<>
-template<typename Src, typename Dst, typename Box_t, typename Fn0>
-void ParticlesExporter<AoSMapped, CPU>::move_particles(Src& src, Dst& dst, Box_t const& box,
-                                                       Fn0 fn0)
-{
-    throw std::runtime_error("finish");
-
-    // constexpr static std::uint16_t N = 256;
-
-    // using ArrayParticleArray = typename Src::template array_type<N>;
-    // using SpanParticleArray  = Src::Span_t;
-
-    // std::uint16_t big_buffer_cnt = 0;
-    // ArrayParticleArray big_buffer;
-    // SpanParticleArray span{big_buffer};
-
-    // auto const send = [&]() {
-    //     assert(big_buffer_cnt <= N);
-    //     span.resize(big_buffer_cnt);
-    //     append_particles<ParticleType::Domain>(span, dst);
-    //     big_buffer_cnt = 0;
-    // };
-
-    // for (auto const& particle : src)
-    // {
-    //     if (not isIn(particle, box))
-    //         continue;
-
-    //     auto&& [p_count, buffer] = fn0(particle);
-    //     if (big_buffer_cnt + p_count > N)
-    //         send();
-    //     std::copy(buffer.data(), buffer.data() + p_count, big_buffer.data() + big_buffer_cnt);
-    //     big_buffer_cnt += p_count;
-    // }
-
-    // if (big_buffer_cnt)
-    //     send();
-}
-
-
-
-template<>
 template<typename Src, typename Dst, typename Box_t>
 void ParticlesExporter<AoSTS, CPU>::move_particles(Src& src, Dst& dst, Box_t const& box,
                                                    std::size_t const growby)
@@ -74,26 +33,44 @@ void ParticlesExporter<AoSTS, CPU>::move_particles(Src& src, Dst& dst, Box_t con
     static_assert(Src::layout_mode == Dst::layout_mode);
     assert(src().size() == dst().size());
 
+    auto const old_size = src.size();
     for (std::size_t tidx = 0; tidx < src().size(); ++tidx)
     {
         auto& src_tile     = src()[tidx];
         auto const src_box = grow(src_tile, growby);
-        if (!(box * src_box))
+        if (!src_tile().size() or !(box * src_box))
             continue;
 
         auto& dst_tile        = dst()[tidx];
         auto const not_in_box = partition_particles_not_in(src_tile(), box);
         auto const start      = not_in_box.size();
         auto const end        = src_tile().size();
+        auto const size       = end - start;
 
-        if (auto const size = end - start)
-            append_particles<ParticleType::Domain>(src_tile().view(start, size), dst_tile());
+        if (!size)
+            continue;
 
-        src_tile().resize(not_in_box.size());
+        append_particles<ParticleType::Domain>(src_tile().view(start, size), dst_tile());
+
+        if (old_size)
+        {
+            auto const& p = src_tile()[0];
+            assert(start);
+        }
+
+        PHARE_LOG_LINE_SS("resizing " << src_tile().size() << " to " << start << " "
+                                      << src_tile()[0]);
+        src_tile().resize(start);
     }
 
     src.sync();
     dst.sync();
+
+    auto const new_size = src.size();
+    if (old_size)
+    {
+        assert(new_size);
+    }
 }
 
 
@@ -106,19 +83,13 @@ void ParticlesExporter<AoSTS, GPU_UNIFIED>::move_particles(Src& src, Dst& dst, B
 }
 
 
-template<> // slow
-template<typename Src, typename Dst, typename Box_t, typename Fn0>
-void ParticlesExporter<AoSTS, GPU_UNIFIED>::move_particles(Src& src, Dst& dst, Box_t const& box,
-                                                           Fn0 fn0)
-{
-    throw std::runtime_error("finish");
-}
 
 
 template<>
 template<bool in, typename Src, typename Box_t>
 void ParticlesExporter<AoS, CPU>::delete_particles(Src& src, Box_t const& box)
 {
+    throw std::runtime_error("todo");
 }
 
 
@@ -126,6 +97,7 @@ template<>
 template<bool in, typename Src, typename Box_t>
 void ParticlesExporter<AoSMapped, CPU>::delete_particles(Src& src, Box_t const& box)
 {
+    throw std::runtime_error("todo");
 }
 
 
@@ -139,11 +111,38 @@ void ParticlesExporter<AoSTS, CPU>::delete_particles(Src& src, Box_t const& box)
 
     auto const ghost_nbr = (src.ghost_box().shape()[0] - src.box().shape()[0]) / 2;
 
+    src.sync();
+    auto const old_size = src.size();
     for (auto& tile : src())
     {
-        auto const tile_gbox = grow(*tile, ghost_nbr);
-        if (tile_gbox * box)
-            tile().resize(Partitioner{tile()}(box).size());
+        PHARE_LOG_LINE_SS(tile);
+        
+        if (tile().size() == 0)
+            continue;
+        PHARE_LOG_LINE_SS(tile()[0]);
+
+        if (auto const tile_gbox = grow(*tile, ghost_nbr); tile_gbox * box)
+        {
+            PHARE_LOG_LINE_SS(tile()[0]);
+            auto const range = Partitioner{tile()}(box);
+            PHARE_LOG_LINE_SS(tile()[0]);
+            auto const resiz = range.size();
+            if (old_size > 200)
+            {
+                auto const& p = tile()[0];
+                PHARE_LOG_LINE_SS(p);
+                assert(resiz > 0);
+            }
+            assert(resiz <= tile().size());
+            tile().resize(resiz);
+        }
+    }
+
+    src.sync();
+    auto const new_size = src.size();
+    if (old_size > 200)
+    {
+        assert(new_size);
     }
 }
 

@@ -112,17 +112,14 @@ void IonUpdaterMultiTS<Ions, Electromag, GridLayout>::updateAndDepositDomain_(
         assert(boxings.count(patch_id));
         auto const& patch_boxings = boxings.at(patch_id);
 
-        auto const per_arr = [&](auto& particles) {
-            delete_particles<false>(particles, patch_boxings.nonLevelGhostBox);
-        };
-
-        auto const per_pop = [&](auto const pop_idx) {
-            per_arr(MultiBoris_t::domains[pop_idx]);
-            per_arr(MultiBoris_t::levelGhosts[pop_idx]);
-        };
-
         for (std::size_t j = 0; j < view.ions.size(); ++j)
-            per_pop(i + j);
+        {
+            auto const popidx = view.ions.size() * i + j;
+            delete_particles<false>(MultiBoris_t::domains[popidx], patch_boxings.nonLevelGhostBox);
+
+            move_particles(MultiBoris_t::levelGhosts[popidx], MultiBoris_t::domains[popidx],
+                           patch_boxings.nonLevelGhostBox, GridLayout::nbrParticleGhosts());
+        }
     });
 
     if constexpr (any_in(Particles::alloc_mode, AllocatorMode::GPU_UNIFIED))
@@ -143,14 +140,13 @@ void IonUpdaterMultiTS<Ions, Electromag, GridLayout>::updateAndDepositDomain_(
                 auto& pop             = view.ions[j];
                 interp.particleToMesh(MultiBoris_t::domains[parts_idx], view.layout, pop.density(),
                                       pop.flux());
-                interp.particleToMesh(MultiBoris_t::levelGhosts[parts_idx], view.layout,
-                                      pop.density(), pop.flux());
             }
         });
     }
 
 
-    in.streamer();
+    in.streamer.join(false);
+
     in.streamer.sync();
     // in.streamer.dump_times(detail::timings_dir_str + "/updateAndDepositDomain_.txt");
 
@@ -187,13 +183,24 @@ void IonUpdaterMultiTS<Ions, Electromag, GridLayout>::updateAndDepositAll_(Model
 
         auto const per_pop = [&](auto& pop) {
             auto& domain = pop.domainParticles();
+
+            check_particles(domain);
+            check_particles_views(domain);
+
+            assert(domain.size());
             delete_particles<false>(domain, patch_boxings.nonLevelGhostBox);
+            assert(domain.size());
             for (auto const& box : domain.ghost_box().remove(domain.box()))
                 move_particles(domain, pop.patchGhostParticles(), box,
                                GridLayout::nbrParticleGhosts());
-            move_particles(pop.levelGhostParticles(), domain, patch_boxings.nonLevelGhostBox);
+            assert(domain.size());
+            move_particles(pop.levelGhostParticles(), domain, patch_boxings.nonLevelGhostBox,
+                           GridLayout::nbrParticleGhosts());
+            assert(domain.size());
             delete_particles<false>(pop.levelGhostParticles(), patch_boxings.ghostBox);
+            assert(domain.size());
             delete_particles<false>(domain, patch_boxings.domainBox);
+            assert(domain.size());
         };
 
         for (auto& pop : view.ions)
@@ -243,7 +250,7 @@ void IonUpdaterMultiTS<Ions, Electromag, GridLayout>::updateAndDepositAll_(Model
         });
     }
 
-    in.streamer().sync();
+    in.streamer.join(false);
 
     if constexpr (any_in(Particles::alloc_mode, AllocatorMode::GPU_UNIFIED))
     {

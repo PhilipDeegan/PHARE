@@ -266,7 +266,14 @@ auto count_particles_per_cell(ParticleArray_t const& ps)
     return count_per_cell;
 }
 
-
+template<typename ParticleArray_t>
+auto print_particles_per_cell(ParticleArray_t const& ps)
+{
+    for (auto [k, v] : count_particles_per_cell(ps))
+    {
+        PHARE_LOG_LINE_SS(k << " " << v);
+    }
+}
 
 
 template<std::size_t D, typename I0>

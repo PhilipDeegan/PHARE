@@ -20,8 +20,6 @@ struct ParticlesExporter
 
     template<typename Src, typename Dst, typename Box_t>
     void move_particles(Src& src, Dst& dst, Box_t const& box, std::size_t const growby = 0);
-    template<typename Src, typename Dst, typename Box_t, typename Fn0>
-    void move_particles(Src& src, Dst& dst, Box_t const& box, Fn0 fn0);
 
 
     template<bool in = true, typename Src, typename Box_t>

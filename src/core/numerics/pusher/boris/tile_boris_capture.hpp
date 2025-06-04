@@ -113,7 +113,7 @@ struct MultiBorisFunctors
     {
         for (std::size_t i = 0; i < GridLayout_t::dimension; ++i)
         {
-            PHARE_ASSERT(particle.iCell()[i] < 1000);
+            assert(std::abs(particle.iCell()[i]) < 1000);
         }
     }
 
@@ -205,6 +205,7 @@ struct MultiBorisFunctors
                 if (moved_tile)
                     pps.icell_changer(tile_cell, pidx, particle.iCell());
             }
+        check(particle);
     }
     void per_particle(auto&&... args)
     {
@@ -275,15 +276,16 @@ public:
 
             for (std::size_t j = 0; j < view.ions.size(); ++j)
             {
-                auto& pop = view.ions[j];
+                auto const popidx = view.ions.size() * i + j;
+                auto& pop         = view.ions[j];
 
                 auto& domain
-                    = copy ? MultiBoris<ModelViews>::domains[i + j] : pop.domainParticles();
+                    = copy ? MultiBoris<ModelViews>::domains[popidx] : pop.domainParticles();
                 domain.reset_views();
                 Functors<ParticleType::Domain, mode>{in, view, pop, domain}();
 
-                auto& level_ghost
-                    = copy ? MultiBoris<ModelViews>::levelGhosts[i + j] : pop.levelGhostParticles();
+                auto& level_ghost = copy ? MultiBoris<ModelViews>::levelGhosts[popidx]
+                                         : pop.levelGhostParticles();
                 level_ghost.reset_views();
                 Functors<ParticleType::LevelGhost, mode>{in, view, pop, level_ghost}();
             }
@@ -295,15 +297,35 @@ public:
             in.streamer.streams[i].sync();
             auto& view = in.views[i];
 
-            if constexpr (!copy)
-                for (auto& pop : view.ions)
-                {
-                    pop.domainParticles().template sync<PHASE>();
-                    (*pop.domainParticles()).sync(in.streamer.streams[i]);
+            auto const per_arr = [&](auto& arr) {
+                check_particles(arr);
+                check_particles_views(arr);
+                print_particles_per_cell(arr);
 
-                    pop.levelGhostParticles().template sync<PHASE>();
-                    (*pop.levelGhostParticles()).sync(in.streamer.streams[i]);
-                }
+                arr.template sync<PHASE>();
+                (*arr).sync(in.streamer.streams[i]);
+                arr.template sync<0>();
+
+                check_particles(arr);
+                check_particles_views(arr);
+                print_particles_per_cell(arr);
+            };
+
+
+            for (std::size_t j = 0; j < view.ions.size(); ++j)
+            {
+                auto& pop         = view.ions[j];
+                auto const popidx = view.ions.size() * i + j;
+
+                auto& domain
+                    = copy ? MultiBoris<ModelViews>::domains[popidx] : pop.domainParticles();
+
+                auto& level_ghost = copy ? MultiBoris<ModelViews>::levelGhosts[popidx]
+                                         : pop.levelGhostParticles();
+
+                per_arr(domain);
+                per_arr(level_ghost);
+            }
         });
     }
 };
