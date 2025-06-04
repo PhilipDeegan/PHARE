@@ -47,8 +47,9 @@ struct hybrid_model_storage<core::LayoutMode::AoSTS, TiledIons, Grid_t>
     }
 
     field_type scratch_field{"phare_scratch_field", PhysicalQuantity_t::Scalar::Vx};
-    vecfield_type scratch_vecfield{"phare_scratch_field", PhysicalQuantity_t::Vector::V};
-    tensorfield_type scratch_tensorfield{"phare_scratch_field", PhysicalQuantity_t::Tensor::M};
+    vecfield_type scratch_vecfield{"phare_scratch_vec_field", PhysicalQuantity_t::Vector::V};
+    tensorfield_type scratch_tensorfield{"phare_scratch_tensor_field",
+                                         PhysicalQuantity_t::Tensor::M};
 };
 
 template<auto layout_mode, typename Ions, typename Grid_t>

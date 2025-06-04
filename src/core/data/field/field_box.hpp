@@ -412,6 +412,8 @@ template<typename... T0s, auto opts>
 void copy_fields(basic::Field<opts>& dst, FieldTileSet<T0s...> const& src)
 {
     assert(src().size());
+    dst.reshape(src.shape());
+    assert(dst.shape() == src.shape());
     auto const layout = src()[0].layout().copy_as(src.box());
 
     for (auto& tile : src)

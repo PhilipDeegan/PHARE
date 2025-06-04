@@ -329,7 +329,7 @@ public:
     {
         for (auto& tile : super())
             for (auto const& e : tile())
-                if (e < 1e-15)
+                if (std::abs(e) < 1e-15)
                     throw std::runtime_error("ZERO");
     }
 

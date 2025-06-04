@@ -68,10 +68,10 @@ public:
         : Super{box}
         , particles{make_particles<Particles>(box)}
         , field_ghost_box{bounded_ghost_box(box, tileset)}
-        , rho{ndarray_builder(field_ghost_box)}
-        , fx{ndarray_builder(field_ghost_box)}
-        , fy{ndarray_builder(field_ghost_box)}
-        , fz{ndarray_builder(field_ghost_box)}
+    // , rho{ndarray_builder(field_ghost_box)}
+    // , fx{ndarray_builder(field_ghost_box)}
+    // , fy{ndarray_builder(field_ghost_box)}
+    // , fz{ndarray_builder(field_ghost_box)}
     {
         // static_assert(std::is_trivially_move_constructible_v<This>);
     }
@@ -83,10 +83,10 @@ public:
         : Super{tile}
         , particles{tile(), tile().size()}
         , field_ghost_box{tile.field_ghost_box}
-        , rho{*tile.rho}
-        , fx{*tile.fx}
-        , fy{*tile.fy}
-        , fz{*tile.fz}
+    // , rho{*tile.rho}
+    // , fx{*tile.fx}
+    // , fy{*tile.fy}
+    // , fz{*tile.fz}
     {
     }
 
@@ -103,8 +103,8 @@ public:
     auto& links() { return _links; }
     auto& links() const { return _links; }
 
-    auto fields() _PHARE_ALL_FN_ { return std::forward_as_tuple(rho, fx, fy, fz); }
-    auto fields() const _PHARE_ALL_FN_ { return std::forward_as_tuple(rho, fx, fy, fz); }
+    // auto fields() _PHARE_ALL_FN_ { return std::forward_as_tuple(rho, fx, fy, fz); }
+    // auto fields() const _PHARE_ALL_FN_ { return std::forward_as_tuple(rho, fx, fy, fz); }
     auto& field_box() const _PHARE_ALL_FN_ { return field_ghost_box; }
 
     template<typename P, typename N>
@@ -116,7 +116,7 @@ public:
 private:
     Particles particles;
     Super field_ghost_box; // tilebox + field ghosts
-    NdArray_t rho, fx, fy, fz;
+    // NdArray_t rho, fx, fy, fz;
 
     std::array<ParticlesTile*, 7> _links = ConstArray<ParticlesTile*, 7>(nullptr);
 };
@@ -147,7 +147,7 @@ private:
             return arr.particles_;
         else
         {
-            arr.check();
+            // arr.check();
             return arr.particles_views_.make_view();
         }
     }
@@ -159,7 +159,7 @@ private:
             return arr.gaps_;
         else
         {
-            arr.check();
+            // arr.check();
             return *arr.gap_views_;
         }
     }
@@ -780,7 +780,11 @@ struct TileSetParticles : public Super_
         bool constexpr static GPU    = alloc_mode == AllocatorMode::GPU_UNIFIED;
         using Op                     = Operators<typename Super::SIZE_T, ATOMIC, GPU>;
 
-        Super::gaps_(cell)[Op{Super::gap_idx_(cell)}.increment_return_old()] = idx;
+        auto& gidx      = Super::gap_idx_(cell);
+        auto const nidx = Op{gidx}.increment_return_old();
+        auto& gaps      = Super::gaps_(cell);
+        assert(nidx < gaps.size());
+        gaps[nidx] = idx;
 
         if (isIn(newcell, Super::ghost_box()))
         {

@@ -1,19 +1,22 @@
 #ifndef PHARE_FLUID_PARTICLE_INITIALIZER_HPP
 #define PHARE_FLUID_PARTICLE_INITIALIZER_HPP
 
+
+#include "core/def.hpp"
+#include "core/utilities/types.hpp"
+#include "core/utilities/point/point.hpp"
+#include "core/data/particles/particle.hpp"
+#include "core/data/grid/gridlayoutdefs.hpp"
+#include "core/data/particles/particle_array_def.hpp"
+#include "core/data/particles/particle_array_service.hpp"
+#include "core/data/ions/particle_initializers/particle_initializer.hpp"
+
+#include "initializer/data_provider.hpp"
+
 #include <memory>
 #include <random>
 #include <cassert>
-#include <functional>
 
-#include "core/data/grid/gridlayoutdefs.hpp"
-#include "core/hybrid/hybrid_quantities.hpp"
-#include "core/utilities/types.hpp"
-#include "core/data/ions/particle_initializers/particle_initializer.hpp"
-#include "core/data/particles/particle.hpp"
-#include "initializer/data_provider.hpp"
-#include "core/utilities/point/point.hpp"
-#include "core/def.hpp"
 
 
 namespace PHARE::core
@@ -206,6 +209,7 @@ void MaxwellianParticleInitializer<ParticleArray_t, GridLayout>::loadParticles(
     }
 
     // out_particles = std::move(particles);
+    core::ParticleArrayService::sync<2, ParticleType::Domain>(particles);
 }
 
 } // namespace PHARE::core

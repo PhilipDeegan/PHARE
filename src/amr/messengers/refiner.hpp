@@ -5,7 +5,6 @@
 #include "core/data/vecfield/vecfield.hpp"
 
 #include "amr/messengers/field_sum_transaction.hpp"
-#include "amr/data/field/field_variable_fill_pattern.hpp"
 
 #include <tuple>
 #include <stdexcept>
@@ -21,7 +20,7 @@ enum class RefinerType {
     InitInteriorPart,
     LevelBorderParticles,
     InteriorGhostParticles,
-    SharedBorder,
+    SharedBorder, // deprecated?
     PatchFieldBorderSum,
     ExteriorGhostParticles
 };
@@ -208,9 +207,8 @@ public:
     {
         constexpr auto dimension = ResourcesManager::dimension;
 
-        register_time_interpolated_vector_field_refiner(
-            rm, ghost, ghost, oldModel, model, refineOp, timeOp,
-            try_make_field_variable_fill_pattern(refineOp, variableFillPattern));
+        register_time_interpolated_vector_field_refiner(rm, ghost, ghost, oldModel, model, refineOp,
+                                                        timeOp, variableFillPattern);
     }
 
 
@@ -226,9 +224,8 @@ public:
     {
         constexpr auto dimension = ResourcesManager::dimension;
 
-        register_interpolated_resource(
-            rm, ghost, ghost, oldModel, model, refineOp, timeOp,
-            try_make_field_variable_fill_pattern(refineOp, variableFillPattern));
+        register_interpolated_resource(rm, ghost, ghost, oldModel, model, refineOp, timeOp,
+                                       variableFillPattern);
     }
 
 
@@ -251,11 +248,6 @@ public:
             std::shared_ptr<SAMRAI::hier::RefineOperator> refineOp,
             std::shared_ptr<SAMRAI::xfer::VariableFillPattern> variableFillPattern = nullptr)
     {
-        if constexpr (Type == RefinerType::GhostField or Type == RefinerType::PatchGhostField
-                      or Type == RefinerType::SharedBorder)
-            variableFillPattern
-                = try_make_field_variable_fill_pattern(refineOp, variableFillPattern);
-
         register_vector_field(rm, dst, src, refineOp, variableFillPattern);
     }
 
@@ -294,13 +286,6 @@ public:
         return Refiner{}.register_time_interpolated_vector_field_refiner(args...);
     }
 
-    auto static try_make_field_variable_fill_pattern(
-        auto const& refOp, std::shared_ptr<SAMRAI::xfer::VariableFillPattern> fillPattern = nullptr)
-    {
-        if (!fillPattern and refOp and dynamic_cast<AFieldRefineOperator const*>(refOp.get()))
-            fillPattern = FieldFillPattern<ResourcesManager::dimension>::make_shared(refOp);
-        return fillPattern;
-    }
 
 
     auto& register_resource(auto& rm, auto& dst, auto& src, auto& scratch, auto&&... args)
@@ -329,8 +314,7 @@ public:
         static_assert(std::tuple_size_v<Tuple> > 3 and std::tuple_size_v<Tuple> < 6);
         if constexpr (std::tuple_size_v<Tuple> == 4)
         {
-            return register_vector_field(args...,
-                                         try_make_field_variable_fill_pattern(std::get<3>(tuple)));
+            return register_vector_field(args..., nullptr);
         }
         else
         { ////      0   1    2    3      4
@@ -351,8 +335,7 @@ public:
 
         if constexpr (std::tuple_size_v<Tuple> == 7)
         {
-            return register_time_interpolated_vector_field(
-                args..., try_make_field_variable_fill_pattern(std::get<5>(tuple)));
+            return register_time_interpolated_vector_field(args..., nullptr);
         }
         else
         { ////      0   1    2    3     4     5      6       7

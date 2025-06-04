@@ -6,6 +6,7 @@
 #include "core/utilities/types.hpp"
 
 #include <array>
+#include <iterator>
 #include <vector>
 #include <cstdint>
 #include <stdexcept>
@@ -159,8 +160,9 @@ public:
 
     void notZero() const
     {
-        for (auto const& e : *this)
-            if (e == 0)
+        // for (auto const& e : *this)
+        for (std::size_t i = 2; i < size() - 2; ++i)
+            if (std::abs(data()[i]) < 1e-15)
                 throw std::runtime_error("ZERO");
     }
 

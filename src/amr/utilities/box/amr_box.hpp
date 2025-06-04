@@ -166,7 +166,7 @@ Box_t refine_box(Box_t const& box)
 template<typename Box_t>
 Box_t coarsen_box(Box_t const& box)
 {
-    return Box_t{(box.lower + 1) / refinementRatio, (box.upper + 1) / refinementRatio};
+    return Box_t{(box.lower) / refinementRatio, (box.upper) / refinementRatio};
 }
 
 

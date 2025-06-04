@@ -59,7 +59,7 @@ class AdvanceTestBase(SimulatorTest):
         sim_setup_kwargs={},
     ):
         diag_outputs = self.unique_diag_dir_for_test_case(
-            "phare_outputs/advance", ndim, interp_order, diag_outputs
+            "phare_outputs/advance", ndim, interp_order, sim_setup_kwargs, diag_outputs
         )
 
         from pyphare.pharein import global_vars
@@ -428,12 +428,14 @@ class AdvanceTestBase(SimulatorTest):
             )
         )
 
+        import random
         from pyphare.pharein import global_vars
-
         from .utilities.field_coarsening import coarsen
 
-        time_step_nbr = 3
+        rando = 1183932801  # random.randint(0, int(1e10))
+        print(f"RNG FOR ADVANCE TEST = {rando}")
 
+        time_step_nbr = 3
         datahier = self.getHierarchy(
             dim,
             interp_order,
@@ -444,6 +446,7 @@ class AdvanceTestBase(SimulatorTest):
             extra_diag_options={"fine_dump_lvl_max": 10},
             time_step_nbr=time_step_nbr,
             largest_patch_size=30,
+            model_init={"seed": rando},
             **kwargs,
         )
 
@@ -745,6 +748,7 @@ class AdvanceTestBase(SimulatorTest):
         import random
 
         rando = random.randint(0, int(1e10))
+        print(f"RNG FOR ADVANCE TEST = {rando}")
 
         def _getHier(diag_dir, boxes=[]):
             return self.getHierarchy(
@@ -793,6 +797,7 @@ class AdvanceTestBase(SimulatorTest):
     def _test_domain_particles_on_refined_level(
         self, ndim, interp_order, refinement_boxes, **kwargs
     ):
+        import random
         import pyphare.pharein as ph
 
         time_step_nbr = 5
@@ -800,6 +805,9 @@ class AdvanceTestBase(SimulatorTest):
 
         out = "domain_particles"
 
+        rando = 1183932801
+        # rando = 9628442582  # random.randint(0, int(1e10))
+        print(f"RNG FOR ADVANCE TEST = {rando}")
         self.base_test_domain_particles_on_refined_level(
             self.getHierarchy(
                 ndim,
@@ -809,6 +817,7 @@ class AdvanceTestBase(SimulatorTest):
                 time_step=time_step,
                 time_step_nbr=time_step_nbr,
                 block_merging_particles=True,
+                model_init={"seed": rando},
                 **kwargs,
             )
         )

@@ -5,22 +5,22 @@ shopt -s expand_aliases
 alias cls="clear; printf '\033[3J'"
 cls
 
-set -e
+set -ex
 . $CWD/tools/mkn_func.sh
 CARGS=${CARGS:-""}
 
-FILE="tests/core/numerics/ion_updater/test_updater_pp_main.cpp"
-FILE="tests/core/data/particles/test_particles_construction.cpp"
-FILE="tests/core/numerics/faraday/test_tileset_faraday.cpp"
-FILE="tests/diagnostic/test-diagnostics_1d.cpp"
-FILE="tests/diagnostic/test_diagnostics_1d_cmp.cpp"
-FILE="tests/core/numerics/ohm/test_tileset_ohm.cpp"
-FILE="tests/core/numerics/ampere/test_tileset_ampere.cpp"
-FILE="tests/diagnostic/test-diagnostics_2d.cpp"
-FILE="tests/core/numerics/test_field_evolution.cpp"
-FILE="tests/amr/data/field/test_fields_schedules.cpp"
-FILE="tests/amr/data/particles/test_particles_schedules.cpp"
-FILE="tests/amr/data/particles/refine/test_particles_data_split.cpp"
+# FILE="tests/core/numerics/ion_updater/test_updater_pp_main.cpp"
+# FILE="tests/core/data/particles/test_particles_construction.cpp"
+# FILE="tests/core/numerics/faraday/test_tileset_faraday.cpp"
+# FILE="tests/diagnostic/test-diagnostics_1d.cpp"
+# FILE="tests/diagnostic/test_diagnostics_1d_cmp.cpp"
+# FILE="tests/core/numerics/ohm/test_tileset_ohm.cpp"
+# FILE="tests/core/numerics/ampere/test_tileset_ampere.cpp"
+# FILE="tests/diagnostic/test-diagnostics_2d.cpp"
+# FILE="tests/core/numerics/test_field_evolution.cpp"
+# FILE="tests/amr/data/particles/test_particles_schedules.cpp"
+# FILE="tests/amr/data/particles/refine/test_particles_data_split.cpp"
+# FILE="tests/amr/data/field/test_fields_schedules.cpp"
 FILE="tests/core/numerics/ion_updater/test_multi_updater.cpp"
 
 TEST=" -M ${FILE} "

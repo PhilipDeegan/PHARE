@@ -4,24 +4,6 @@
 """
 
 import unittest
-import matplotlib
-
-from pyphare.cpp import supported_particle_layouts
-from ddt import data, ddt, unpack
-from tests.simulator.test_initialization import InitializationTest
-
-matplotlib.use("Agg")  # for systems without GUI
-
-ndim = 1
-interp_orders = [1, 2, 3]
-
-
-"""
-  This file exists independently from test_initialization.py to isolate dimension
-    test cases and allow each to be overridden in some way if required.
-"""
-
-import unittest
 import itertools
 import matplotlib
 from pyphare.cpp import supported_particle_layouts

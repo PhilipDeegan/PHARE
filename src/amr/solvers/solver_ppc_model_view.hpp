@@ -8,6 +8,11 @@
 
 #include "amr/solvers/solver.hpp"
 #include <amr/resources_manager/amr_utils.hpp>
+
+#include "core/numerics/ohm/omg.hpp"
+#include "core/numerics/ampere/amdere.hpp"
+#include "core/numerics/faraday/faraqay.hpp"
+
 #include <type_traits>
 
 namespace PHARE::solver
@@ -37,7 +42,11 @@ public:
                     VecFields& Bnew, double dt)
     {
         using field_type = std::remove_pointer_t<typename VecFields::value_type>::field_type;
-        if constexpr (core::is_field_tile_set_v<field_type>) {}
+        if constexpr (core::is_field_tile_set_v<field_type>)
+        {
+            for (std::size_t i = 0; i < B.size(); ++i)
+                core::FaradaySingleTransformer{}(*layouts[i], *B[i], *E[i], *Bnew[i], dt);
+        }
         else
         {
             assert_equal_sizes(B, E, Bnew);
@@ -62,7 +71,11 @@ public:
     void operator()(GridLayouts const& layouts, VecFields const& B, VecFields& J)
     {
         using field_type = std::remove_pointer_t<typename VecFields::value_type>::field_type;
-        if constexpr (core::is_field_tile_set_v<field_type>) {}
+        if constexpr (core::is_field_tile_set_v<field_type>)
+        {
+            for (std::size_t i = 0; i < B.size(); ++i)
+                core::AmpereSingleTransformer{}(*layouts[i], *B[i], *J[i]);
+        }
         else
         {
             assert_equal_sizes(B, J);
@@ -84,6 +97,7 @@ class OhmTransformer
 public:
     explicit OhmTransformer(initializer::PHAREDict const& dict)
         : ohm_{dict}
+        , dict{dict}
     {
     }
 
@@ -92,7 +106,12 @@ public:
                     Fields const& Pe, VecFields const& B, VecFields const& J, VecFields& Enew)
     {
         using field_type = std::remove_pointer_t<typename VecFields::value_type>::field_type;
-        if constexpr (core::is_field_tile_set_v<field_type>) {}
+        if constexpr (core::is_field_tile_set_v<field_type>)
+        {
+            for (std::size_t i = 0; i < B.size(); ++i)
+                core::OhmSingleTransformer{dict}(*layouts[i], *n[i], *Ve[i], *Pe[i], *B[i], *J[i],
+                                                 *Enew[i]);
+        }
         else
         {
             assert_equal_sizes(n, Ve, Pe, B, J, Enew);
@@ -105,6 +124,7 @@ public:
     }
 
     core_type ohm_;
+    initializer::PHAREDict dict;
 };
 
 

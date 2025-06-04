@@ -343,7 +343,75 @@ namespace amr
             return ids;
         }
 
+
+        auto inline enumerate(SAMRAI::hier::PatchLevel& level, auto&&... args)
+        {
+            return LevelLooper{*this, level, args...};
+        }
+        auto inline operator()(SAMRAI::hier::PatchLevel& level, auto&&... args)
+        {
+            return LevelLooper{*this, level, args...};
+        }
+
     private:
+        template<typename... Args>
+        struct LevelLooper
+        {
+            LevelLooper(ResourcesManager& rm, SAMRAI::hier::PatchLevel& lvl, Args&... arrgs)
+                : rm{rm}
+                , level{lvl}
+                , args{std::forward_as_tuple(arrgs...)}
+            {
+            }
+
+            ~LevelLooper() {}
+
+            struct Iterator
+            {
+                using Super = SAMRAI::hier::PatchLevel::Iterator;
+                void operator++() { ++raw; }
+                bool operator==(Iterator const& that) { return raw == that.raw; }
+                bool operator!=(Iterator const& that) { return raw != that.raw; }
+                std::shared_ptr<SAMRAI::hier::Patch> const& operator*()
+                {
+                    looper->set(**raw);
+                    return *raw;
+                }
+
+                ~Iterator() { looper->unset(**raw); } // bad}
+
+                LevelLooper* looper;
+                SAMRAI::hier::PatchLevel::Iterator raw;
+            };
+
+            void set(auto& patch)
+            {
+                std::apply(
+                    [&](auto&... user) {
+                        ((rm.setResources_(user, UseResourcePtr{}, patch)), ...);
+                    },
+                    args);
+            }
+
+            void unset(auto& patch)
+            {
+                std::apply(
+                    [&](auto&... user) { ((rm.setResources_(user, UseNullPtr{}, patch)), ...); },
+                    args);
+            }
+
+            auto begin() { return Iterator{this, level.begin()}; }
+            auto end() { return Iterator{this, level.end()}; };
+
+            ResourcesManager& rm;
+            SAMRAI::hier::PatchLevel& level;
+            std::tuple<Args&...> args;
+        };
+
+        template<typename... Args>
+        LevelLooper(ResourcesManager&, SAMRAI::hier::PatchLevel&, Args&...) -> LevelLooper<Args...>;
+
+
         template<typename ResourcesView>
         void getIDs_(ResourcesView& obj, std::vector<int>& IDs) const
         {

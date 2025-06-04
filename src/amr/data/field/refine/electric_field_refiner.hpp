@@ -53,12 +53,12 @@ public:
             for (auto& idx : coarseIdx)
                 idx = idx / refinementRatio;
             auto const locCoarseIdx = AMRToLocal(coarseIdx, coarseBox_);
-            for (auto const& src_tile : coarseField())
-                if (auto const src_box = src_tile.field_box(); isIn(coarseIdx, src_box))
-                    for (auto& dst_tile : fineField())
-                        if (auto const dst_box = dst_tile.field_box(); isIn(fineIndex, dst_box))
+            for (auto& dst_tile : fineField())
+                if (auto const dst_box = dst_tile.ghost_box(); isIn(fineIndex, dst_box))
+                    for (auto const& src_tile : coarseField())
+                        if (auto const src_box = src_tile.field_box(); isIn(coarseIdx, src_box))
                             ElectricFieldRefiner{centerings_, samrai_box_from(dst_box),
-                                                 samrai_box_from(src_box),
+                                                 samrai_box_from(src_tile.ghost_box()),
                                                  ratio_}(src_tile(), dst_tile(), fineIndex);
         }
         else

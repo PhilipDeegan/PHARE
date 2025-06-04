@@ -1,14 +1,14 @@
 
 
-#include "core/def/phare_config.hpp"
 #include "phare_core.hpp"
-#include "phare/phare.hpp"
+#include "core/def/phare_config.hpp"
 #include "core/utilities/types.hpp"
+
 #include "amr/data/particles/particles_data.hpp"
 
 #include "tests/amr/amr.hpp"
 #include "tests/core/data/gridlayout/test_gridlayout.hpp"
-#include "tests/core/data/particles/test_particles_fixtures.hpp"
+#include "tests/core/data/particles/test_particles.hpp"
 
 #include "gtest/gtest.h"
 

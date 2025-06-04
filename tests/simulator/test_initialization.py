@@ -55,7 +55,7 @@ class InitializationTest(SimulatorTest):
         **kwargs,
     ):
         diag_outputs = self.unique_diag_dir_for_test_case(
-            "phare_outputs/init", ndim, interp_order, diag_outputs
+            "phare_outputs/init", ndim, interp_order, sim_setup_kwargs, diag_outputs
         )
 
         from pyphare.pharein import global_vars

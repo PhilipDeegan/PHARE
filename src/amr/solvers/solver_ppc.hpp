@@ -3,14 +3,15 @@
 
 #include "core/def/phare_mpi.hpp"
 
-#include "core/numerics/ion_updater/ion_updater_def.hpp"
 #include "core/numerics/ohm/ohm.hpp"
+#include "core/utilities/algorithm.hpp"
 #include "core/numerics/ampere/ampere.hpp"
 #include "core/data/vecfield/vecfield.hpp"
 #include "core/numerics/faraday/faraday.hpp"
 #include "core/data/grid/gridlayout_utils.hpp"
 #include "core/numerics/ion_updater/ion_updater.hpp"
 #include "core/data/particles/particle_array_def.hpp"
+#include "core/numerics/ion_updater/ion_updater_def.hpp"
 #include "core/numerics/ion_updater/ion_updater_multi_ts.hpp"
 
 
@@ -23,6 +24,7 @@
 
 #include <SAMRAI/hier/Patch.h>
 
+#include <stdexcept>
 #include <unordered_map>
 
 
@@ -43,6 +45,8 @@ struct ImplResolverFns
         else if (ParticleArray_t::layout_mode == AoSTS)
             return _as_nullptr_<core::mkn::IonUpdaterMultiTS<Ions, Electromag, GridLayout>*>();
 #endif // PHARE_HAVE_MKN_GPU
+        else
+            throw std::runtime_error("no");
     }
 
     template<typename T>
@@ -497,11 +501,11 @@ void SolverPPC<HybridModel, AMR_Types>::moveIons_(level_t& level, ModelViews_t& 
     // this needs to be done before calling the messenger
     setTime([](auto& state) -> auto& { return state.ions; });
 
-    if (mode != core::UpdaterMode::domain_only)
-        fromCoarser.fillIonPopMomentGhosts(views.model().state.ions, level, newTime);
+    fromCoarser.fillIonPopMomentGhosts(views.model().state.ions, level, newTime);
     fromCoarser.fillFluxBorders(views.model().state.ions, level, newTime);
     fromCoarser.fillDensityBorders(views.model().state.ions, level, newTime);
-    fromCoarser.fillIonGhostParticles(views.model().state.ions, level, newTime);
+    if (mode != core::UpdaterMode::domain_only)
+        fromCoarser.fillIonGhostParticles(views.model().state.ions, level, newTime);
 
     for (auto& state : views)
         IonUpdater_t::updateIons(state.ions);

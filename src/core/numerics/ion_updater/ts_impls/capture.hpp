@@ -187,10 +187,13 @@ void IonUpdaterMultiTS<Ions, Electromag, GridLayout>::updateAndDepositAll_(Model
 
         auto const per_pop = [&](auto& pop) {
             auto& domain = pop.domainParticles();
+            delete_particles<false>(domain, patch_boxings.nonLevelGhostBox);
             for (auto const& box : domain.ghost_box().remove(domain.box()))
                 move_particles(domain, pop.patchGhostParticles(), box,
                                GridLayout::nbrParticleGhosts());
             move_particles(pop.levelGhostParticles(), domain, patch_boxings.nonLevelGhostBox);
+            delete_particles<false>(pop.levelGhostParticles(), patch_boxings.ghostBox);
+            delete_particles<false>(domain, patch_boxings.domainBox);
         };
 
         for (auto& pop : view.ions)

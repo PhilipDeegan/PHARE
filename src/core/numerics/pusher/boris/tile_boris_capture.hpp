@@ -80,7 +80,7 @@ struct MultiBoris
 };
 
 
-template<auto particle_type, typename MultiBorisPusher_t>
+template<auto particle_type, auto boris_mode, typename MultiBorisPusher_t>
 struct MultiBorisFunctors
 {
     static_assert(all_are<ParticleType>(particle_type));
@@ -113,7 +113,7 @@ struct MultiBorisFunctors
     {
         for (std::size_t i = 0; i < GridLayout_t::dimension; ++i)
         {
-            assert(particle.iCell()[i] < 1000);
+            PHARE_ASSERT(particle.iCell()[i] < 1000);
         }
     }
 
@@ -184,14 +184,11 @@ struct MultiBorisFunctors
 #endif
             per_particle(particles[pidx], args...);
     }
-    void per_particle(auto&&... args)
+    void per_particle_still_in_ghost_box(auto&&... args)
     {
         static constexpr auto alloc_mode                    = Particles_t::alloc_mode;
         auto const& [particle, layout, tile_cell, pidx, em] = std::forward_as_tuple(args...);
 
-        check(particle);
-        particle.iCell() = boris::advance<alloc_mode>(particle, halfdt);
-        check(particle);
         {
             Interpolator_t interp;
             boris::accelerate(particle, interp.m2p(particle, em, layout), dto2m);
@@ -200,7 +197,7 @@ struct MultiBorisFunctors
         particle.iCell() = boris::advance<alloc_mode>(particle, halfdt);
         check(particle);
 
-        if constexpr (particle_type == ParticleType::Domain)
+        if constexpr (boris_mode == MultiBorisMode::REF and particle_type == ParticleType::Domain)
             if (isIn(particle, pps.box()))
             {
                 auto const new_cell   = pps.local_tile_cell(particle.iCell());
@@ -208,6 +205,27 @@ struct MultiBorisFunctors
                 if (moved_tile)
                     pps.icell_changer(tile_cell, pidx, particle.iCell());
             }
+    }
+    void per_particle(auto&&... args)
+    {
+        static constexpr auto alloc_mode                    = Particles_t::alloc_mode;
+        auto const& [particle, layout, tile_cell, pidx, em] = std::forward_as_tuple(args...);
+
+        check(particle);
+        particle.iCell() = boris::advance<alloc_mode>(particle, halfdt);
+        check(particle);
+
+        if constexpr (particle_type == ParticleType::Domain)
+            per_particle_still_in_ghost_box(args...);
+        else if constexpr (particle_type == ParticleType::LevelGhost)
+        {
+            if (isIn(particle, pps.ghost_box()))
+                per_particle_still_in_ghost_box(args...);
+        }
+        else
+        {
+            PHARE_ASSERT(false);
+        }
     }
 
 
@@ -228,8 +246,8 @@ public:
     using Interpolator_t      = Interpolator;
     using This                = MultiBorisPusher<GridLayout, Particles, Electromag, Interpolator>;
 
-    template<auto pt>
-    using Functors = MultiBorisFunctors<pt, This>;
+    template<auto pt, auto mode>
+    using Functors = MultiBorisFunctors<pt, mode, This>;
 
 
     template<MultiBorisMode mode = MultiBorisMode::REF, typename ModelViews>
@@ -262,12 +280,12 @@ public:
                 auto& domain
                     = copy ? MultiBoris<ModelViews>::domains[i + j] : pop.domainParticles();
                 domain.reset_views();
-                Functors<ParticleType::Domain>{in, view, pop, domain}();
+                Functors<ParticleType::Domain, mode>{in, view, pop, domain}();
 
                 auto& level_ghost
                     = copy ? MultiBoris<ModelViews>::levelGhosts[i + j] : pop.levelGhostParticles();
                 level_ghost.reset_views();
-                Functors<ParticleType::Ghost>{in, view, pop, level_ghost}();
+                Functors<ParticleType::LevelGhost, mode>{in, view, pop, level_ghost}();
             }
         });
 

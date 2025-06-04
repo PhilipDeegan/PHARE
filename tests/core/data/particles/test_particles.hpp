@@ -43,7 +43,7 @@ Particle<dim> particle(int const icell = 15)
 }
 
 
-auto rando(std::optional<int> seed = std::nullopt)
+auto inline rando(std::optional<int> seed = std::nullopt)
 {
     if (seed.has_value())
         return std::mt19937_64(*seed);

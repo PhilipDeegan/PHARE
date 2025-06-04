@@ -134,7 +134,7 @@ namespace amr
 
                 for (auto& dst_tile : destinationField())
                 {
-                    auto const dst_box = dst_tile.ghost_box();
+                    auto const dst_box = dst_tile.field_box();
                     if (auto const dst_overlap = dst_box * box)
                     {
                         for (auto const& src_tile : sourceField())
@@ -147,7 +147,7 @@ namespace amr
                                     FieldCoarsenerPolicy coarsener{
                                         destinationLayout.centering(qty),
                                         samrai_box_from(src_tile.ghost_box()),
-                                        samrai_box_from(dst_box), ratio};
+                                        samrai_box_from(dst_tile.ghost_box()), ratio};
 
                                     for (auto const& bix : *overlap)
                                         coarsener(src_tile(), dst_tile(), *bix);
