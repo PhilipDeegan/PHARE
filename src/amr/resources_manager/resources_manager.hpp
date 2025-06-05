@@ -79,16 +79,21 @@ namespace amr
      *
      * obj1 and obj2 become unusable again at the end of the scope of dataOnPatch
      *
-     *
+     *  struct ResourcesUserTypes{
+     *     using patch_data_type = SAMRAI::hier::PatchData;  // subclass thereof
+     *     using variable_type   = SAMRAI::hier::Variable;   // subclass thereof
+     *  };
      */
-    template<typename GridLayoutT, typename Grid_t>
+    template<typename GridLayoutT, typename Grid_t, typename... ResourcesUserTypes>
     class ResourcesManager
     {
-        using This = ResourcesManager<GridLayoutT, Grid_t>;
+        using This = ResourcesManager<GridLayoutT, Grid_t, ResourcesUserTypes...>;
 
     public:
         static constexpr std::size_t dimension    = GridLayoutT::dimension;
         static constexpr std::size_t interp_order = GridLayoutT::interp_order;
+
+        using ResourceUserTypes = std::tuple<ResourcesUserTypes...>;
 
         using UserField_t = UserFieldType<Grid_t, GridLayoutT>;
 
@@ -280,6 +285,25 @@ namespace amr
         }
 
 
+        auto getIDsList(auto&&... keys)
+        {
+            auto const Fn = [&](auto& key) {
+                if (auto const id = getID(key))
+                    return *id;
+                throw std::runtime_error("bad key");
+            };
+            return std::array{Fn(keys)...};
+        }
+
+        void print_resources() const
+        {
+            for (auto& [key, _] : nameToResourceInfo_)
+            {
+                PHARE_LOG_LINE_SS(key);
+            }
+        }
+
+
 
         ~ResourcesManager()
         {
@@ -319,7 +343,75 @@ namespace amr
             return ids;
         }
 
+
+        auto inline enumerate(SAMRAI::hier::PatchLevel& level, auto&&... args)
+        {
+            return LevelLooper{*this, level, args...};
+        }
+        auto inline operator()(SAMRAI::hier::PatchLevel& level, auto&&... args)
+        {
+            return LevelLooper{*this, level, args...};
+        }
+
     private:
+        template<typename... Args>
+        struct LevelLooper
+        {
+            LevelLooper(ResourcesManager& rm, SAMRAI::hier::PatchLevel& lvl, Args&... arrgs)
+                : rm{rm}
+                , level{lvl}
+                , args{std::forward_as_tuple(arrgs...)}
+            {
+            }
+
+            ~LevelLooper() {}
+
+            struct Iterator
+            {
+                using Super = SAMRAI::hier::PatchLevel::Iterator;
+                void operator++() { ++raw; }
+                bool operator==(Iterator const& that) { return raw == that.raw; }
+                bool operator!=(Iterator const& that) { return raw != that.raw; }
+                std::shared_ptr<SAMRAI::hier::Patch> const& operator*()
+                {
+                    looper->set(**raw);
+                    return *raw;
+                }
+
+                ~Iterator() { looper->unset(**raw); } // bad}
+
+                LevelLooper* looper;
+                SAMRAI::hier::PatchLevel::Iterator raw;
+            };
+
+            void set(auto& patch)
+            {
+                std::apply(
+                    [&](auto&... user) {
+                        ((rm.setResources_(user, UseResourcePtr{}, patch)), ...);
+                    },
+                    args);
+            }
+
+            void unset(auto& patch)
+            {
+                std::apply(
+                    [&](auto&... user) { ((rm.setResources_(user, UseNullPtr{}, patch)), ...); },
+                    args);
+            }
+
+            auto begin() { return Iterator{this, level.begin()}; }
+            auto end() { return Iterator{this, level.end()}; };
+
+            ResourcesManager& rm;
+            SAMRAI::hier::PatchLevel& level;
+            std::tuple<Args&...> args;
+        };
+
+        template<typename... Args>
+        LevelLooper(ResourcesManager&, SAMRAI::hier::PatchLevel&, Args&...) -> LevelLooper<Args...>;
+
+
         template<typename ResourcesView>
         void getIDs_(ResourcesView& obj, std::vector<int>& IDs) const
         {
@@ -438,7 +530,7 @@ namespace amr
                 ResourcesInfo info;
                 info.variable = ResourcesResolver_t::make_shared_variable(view);
                 info.id       = variableDatabase_->registerVariableAndContext(
-                          info.variable, context_, SAMRAI::hier::IntVector::getZero(dimension_));
+                    info.variable, context_, SAMRAI::hier::IntVector::getZero(dimension_));
 
                 nameToResourceInfo_.emplace(view.name(), info);
             }

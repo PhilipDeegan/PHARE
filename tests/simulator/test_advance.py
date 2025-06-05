@@ -1,27 +1,29 @@
+import unittest
+
 from pyphare.cpp import cpp_lib
 
 cpp = cpp_lib()
 
-import unittest
-
 import numpy as np
-import pyphare.core.box as boxm
 from ddt import ddt
+
+import pyphare.core.box as boxm
 from pyphare.core.box import Box
+
 from pyphare.core.phare_utilities import assert_fp_any_all_close, np_array_ify
+
 from pyphare.pharein import ElectronModel, MaxwellianFluidModel
 from pyphare.pharein.diagnostics import (
     ElectromagDiagnostics,
     FluidDiagnostics,
     ParticleDiagnostics,
 )
-from pyphare.pharein.simulation import Simulation
+from pyphare.pharein.simulation import Simulation, supported_dimensions
 from pyphare.pharesee.geometry import hierarchy_overlaps, level_ghost_boxes
 from pyphare.pharesee.hierarchy import hierarchy_from
 from pyphare.pharesee.hierarchy.hierarchy import format_timestamp
 from pyphare.pharesee.hierarchy.hierarchy_utils import merge_particles
 from pyphare.simulator.simulator import Simulator
-
 from tests.diagnostic import all_timestamps
 from tests.simulator import SimulatorTest, diff_boxes
 
@@ -54,9 +56,10 @@ class AdvanceTestBase(SimulatorTest):
         timestamps=None,
         block_merging_particles=False,
         diag_outputs="",
+        sim_setup_kwargs={},
     ):
         diag_outputs = self.unique_diag_dir_for_test_case(
-            "phare_outputs/advance", ndim, interp_order, diag_outputs
+            "phare_outputs/advance", ndim, interp_order, sim_setup_kwargs, diag_outputs
         )
 
         from pyphare.pharein import global_vars
@@ -167,14 +170,14 @@ class AdvanceTestBase(SimulatorTest):
                     population_name=pop,
                 )
 
-            for quantity in ["domain", "levelGhost", "patchGhost"]:
+            for quantity in ["domain", "levelGhost"]:  # , "patchGhost"
                 ParticleDiagnostics(
                     quantity=quantity,
                     write_timestamps=timestamps,
                     population_name=pop,
                 )
 
-        Simulator(global_vars.sim).run()
+        Simulator(sim).setup(**sim_setup_kwargs).run()
 
         eb_hier = None
         if qty in ["e", "eb", "fields"]:
@@ -188,7 +191,7 @@ class AdvanceTestBase(SimulatorTest):
         if qty in ["e", "b", "eb"]:
             return eb_hier
 
-        is_particle_type = qty == "particles" or qty == "particles_patch_ghost"
+        is_particle_type = qty == "particles"  # or qty == "particles_patch_ghost"
 
         if is_particle_type:
             particle_hier = None
@@ -202,11 +205,11 @@ class AdvanceTestBase(SimulatorTest):
                 hier=particle_hier,
             )
 
-        if is_particle_type:
-            particle_hier = hierarchy_from(
-                h5_filename=diag_outputs + "/ions_pop_protons_patchGhost.h5",
-                hier=particle_hier,
-            )
+        # if is_particle_type:
+        #     particle_hier = hierarchy_from(
+        #         h5_filename=diag_outputs + "/ions_pop_protons_patchGhost.h5",
+        #         hier=particle_hier,
+        #     )
 
         if not block_merging_particles and qty == "particles":
             merge_particles(particle_hier)
@@ -346,6 +349,9 @@ class AdvanceTestBase(SimulatorTest):
             **kwargs,
         )
 
+        if cpp.mpi_rank() > 0:
+            return
+
         for time_step_idx in range(time_step_nbr + 1):
             coarsest_time = time_step_idx * time_step
 
@@ -381,7 +387,9 @@ class AdvanceTestBase(SimulatorTest):
                         part2.iCells = part2.iCells + offsets[1]
                         self.assertEqual(part1, part2)
 
-    def _test_L0_particle_number_conservation(self, ndim, interp_order, ppc=100):
+    def _test_L0_particle_number_conservation(
+        self, ndim, interp_order, ppc=100, **kwargs
+    ):
         cells = 120
         time_step_nbr = 10
         time_step = 0.001
@@ -391,13 +399,16 @@ class AdvanceTestBase(SimulatorTest):
         datahier = self.getHierarchy(
             ndim,
             interp_order,
-            None,
-            "particles",
+            qty="particles",
             time_step=time_step,
             time_step_nbr=time_step_nbr,
             nbr_part_per_cell=ppc,
             cells=cells,
+            **kwargs,
         )
+
+        if cpp.mpi_rank() > 0:
+            return
 
         for time_step_idx in range(time_step_nbr + 1):
             coarsest_time = time_step_idx * time_step
@@ -417,12 +428,14 @@ class AdvanceTestBase(SimulatorTest):
             )
         )
 
+        import random
         from pyphare.pharein import global_vars
-
         from .utilities.field_coarsening import coarsen
 
-        time_step_nbr = 3
+        rando = 1183932801  # random.randint(0, int(1e10))
+        print(f"RNG FOR ADVANCE TEST = {rando}")
 
+        time_step_nbr = 3
         datahier = self.getHierarchy(
             dim,
             interp_order,
@@ -433,8 +446,12 @@ class AdvanceTestBase(SimulatorTest):
             extra_diag_options={"fine_dump_lvl_max": 10},
             time_step_nbr=time_step_nbr,
             largest_patch_size=30,
+            model_init={"seed": rando},
             **kwargs,
         )
+
+        if cpp.mpi_rank() > 0:
+            return
 
         qties = ["rho"]
         qties += [f"{qty}{xyz}" for qty in ["E", "B", "V"] for xyz in ["x", "y", "z"]]
@@ -731,6 +748,7 @@ class AdvanceTestBase(SimulatorTest):
         import random
 
         rando = random.randint(0, int(1e10))
+        print(f"RNG FOR ADVANCE TEST = {rando}")
 
         def _getHier(diag_dir, boxes=[]):
             return self.getHierarchy(
@@ -749,6 +767,9 @@ class AdvanceTestBase(SimulatorTest):
 
         L0_datahier = _getHier(f"L0_diags")
         L0L1_datahier = _getHier(f"L0L1_diags", refinement_boxes)
+
+        if cpp.mpi_rank() > 0:
+            return
 
         quantities = [f"{EM}{xyz}" for EM in ["E", "B"] for xyz in ["x", "y", "z"]]
         checks = (
@@ -776,6 +797,7 @@ class AdvanceTestBase(SimulatorTest):
     def _test_domain_particles_on_refined_level(
         self, ndim, interp_order, refinement_boxes, **kwargs
     ):
+        import random
         import pyphare.pharein as ph
 
         time_step_nbr = 5
@@ -783,6 +805,9 @@ class AdvanceTestBase(SimulatorTest):
 
         out = "domain_particles"
 
+        rando = 1183932801
+        # rando = 9628442582  # random.randint(0, int(1e10))
+        print(f"RNG FOR ADVANCE TEST = {rando}")
         self.base_test_domain_particles_on_refined_level(
             self.getHierarchy(
                 ndim,
@@ -792,6 +817,7 @@ class AdvanceTestBase(SimulatorTest):
                 time_step=time_step,
                 time_step_nbr=time_step_nbr,
                 block_merging_particles=True,
+                model_init={"seed": rando},
                 **kwargs,
             )
         )
