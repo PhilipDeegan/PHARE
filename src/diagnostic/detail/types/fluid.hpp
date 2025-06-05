@@ -306,7 +306,7 @@ void FluidDiagnosticWriter<H5Writer>::write(DiagnosticProperties& diagnostic)
 
     auto const writeDS = [&](auto path, auto& field) {
         h5file.template write_data_set_flat<GridLayout::dimension>(
-            path, (this->field_reducer(field, false)).data());
+            path, &*(this->field_reducer(field, false)).data());
     };
     auto const writeVF = [&](auto path, auto& vecF) {
         h5Writer.writeTensorFieldAsDataset(h5file, path, this->vec_field_reducer(vecF, false));

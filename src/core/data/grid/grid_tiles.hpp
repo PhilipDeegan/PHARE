@@ -287,10 +287,7 @@ public:
         for (auto& tile : super())
         {
             assert(tile().size() < static_cast<std::size_t>(1e6));
-            if (nan)
-                for (auto const& e : tile())
-                    if (std::isnan(e))
-                        throw std::runtime_error("NAN");
+            tile().check();
         }
     }
 

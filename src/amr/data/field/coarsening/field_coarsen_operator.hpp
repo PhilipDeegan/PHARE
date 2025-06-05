@@ -134,7 +134,7 @@ namespace amr
 
                 for (auto& dst_tile : destinationField())
                 {
-                    auto const dst_box = dst_tile.field_box();
+                    auto const dst_box = dst_tile.ghost_box();
                     if (auto const dst_overlap = dst_box * box)
                     {
                         for (auto const& src_tile : sourceField())

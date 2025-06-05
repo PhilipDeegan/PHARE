@@ -1,6 +1,8 @@
 #ifndef PHARE_SOLVER_PPC_HPP
 #define PHARE_SOLVER_PPC_HPP
 
+#include "core/data/electromag/electromag.hpp"
+#include "core/data/tensorfield/tensorfield.hpp"
 #include "core/def/phare_mpi.hpp"
 
 #include "core/numerics/ohm/ohm.hpp"
@@ -319,6 +321,14 @@ void SolverPPC<HybridModel, AMR_Types>::predictor1_(level_t& level, ModelViews_t
 
     TimeSetter setTime{views, newTime};
 
+
+    for (auto& state : views)
+        core::check_electromag(state.electromag);
+    for (auto& state : views)
+        core::check_electromag(state.electromagPred);
+    for (auto& state : views)
+        core::check_tensorfield(state.J);
+
     {
         PHARE_LOG_SCOPE(1, "SolverPPC::predictor1_.faraday");
         auto dt = newTime - currentTime;
@@ -326,12 +336,28 @@ void SolverPPC<HybridModel, AMR_Types>::predictor1_(level_t& level, ModelViews_t
         setTime([](auto& state) -> auto& { return state.electromagPred.B; });
     }
 
+    for (auto& state : views)
+        core::check_electromag(state.electromagPred);
     {
         PHARE_LOG_SCOPE(1, "SolverPPC::predictor1_.ampere");
         ampere_(views.layouts, views.electromagPred_B, views.J);
         setTime([](auto& state) -> auto& { return state.J; });
         fromCoarser.fillCurrentGhosts(views.model().state.J, level.getLevelNumber(), newTime);
     }
+
+
+    for (auto* N : views.N)
+    {
+        PHARE_LOG_LINE_SS(*N);
+    }
+    for (auto* N : views.N)
+        N->check();
+    for (auto* N : views.N)
+        N->notZero();
+    for (auto* Ve : views.Ve)
+        core::check_tensorfield(*Ve);
+    for (auto* Pe : views.Pe)
+        Pe->check();
 
     {
         PHARE_LOG_SCOPE(1, "SolverPPC::predictor1_.ohm");
@@ -341,6 +367,13 @@ void SolverPPC<HybridModel, AMR_Types>::predictor1_(level_t& level, ModelViews_t
              views.electromagPred_E);
         setTime([](auto& state) -> auto& { return state.electromagPred.E; });
     }
+
+
+
+    for (auto& state : views)
+        core::check_electromag(state.electromag);
+    for (auto& state : views)
+        core::check_electromag(state.electromagPred);
 }
 
 
@@ -352,6 +385,13 @@ void SolverPPC<HybridModel, AMR_Types>::predictor2_(level_t& level, ModelViews_t
     PHARE_LOG_SCOPE(1, "SolverPPC::predictor2_");
 
     TimeSetter setTime{views, newTime};
+
+
+
+    for (auto& state : views)
+        core::check_electromag(state.electromag);
+    for (auto& state : views)
+        core::check_electromag(state.electromagPred);
 
     {
         PHARE_LOG_SCOPE(1, "SolverPPC::predictor2_.faraday");
@@ -376,6 +416,13 @@ void SolverPPC<HybridModel, AMR_Types>::predictor2_(level_t& level, ModelViews_t
              views.electromagPred_E);
         setTime([](auto& state) -> auto& { return state.electromagPred.E; });
     }
+
+
+
+    for (auto& state : views)
+        core::check_electromag(state.electromag);
+    for (auto& state : views)
+        core::check_electromag(state.electromagPred);
 }
 
 
@@ -390,6 +437,15 @@ void SolverPPC<HybridModel, AMR_Types>::corrector_(level_t& level, ModelViews_t&
 
     auto levelNumber = level.getLevelNumber();
     TimeSetter setTime{views, newTime};
+
+
+
+    for (auto& state : views)
+        core::check_electromag(state.electromag);
+    for (auto& state : views)
+        core::check_electromag(state.electromagPred);
+    for (auto& state : views)
+        core::check_tensorfield(state.J);
 
     {
         PHARE_LOG_SCOPE(1, "SolverPPC::corrector_.faraday");
@@ -415,6 +471,13 @@ void SolverPPC<HybridModel, AMR_Types>::corrector_(level_t& level, ModelViews_t&
 
         fromCoarser.fillElectricGhosts(views.model().state.electromag.E, levelNumber, newTime);
     }
+
+
+
+    for (auto& state : views)
+        core::check_electromag(state.electromag);
+    for (auto& state : views)
+        core::check_electromag(state.electromagPred);
 }
 
 
@@ -427,8 +490,13 @@ void SolverPPC<HybridModel, AMR_Types>::average_(level_t& level, ModelViews_t& v
 
     for (auto& state : views)
     {
+        core::check_electromag(state.electromag);
+        core::check_electromag(state.electromagPred);
+
         PHARE::core::average(state.electromag.B, state.electromagPred.B, state.electromagAvg.B);
         PHARE::core::average(state.electromag.E, state.electromagPred.E, state.electromagAvg.E);
+
+        core::check_electromag(state.electromagAvg);
     }
 
     // the following will fill E on all edges of all ghost cells, including those
@@ -480,6 +548,9 @@ void SolverPPC<HybridModel, AMR_Types>::moveIons_(level_t& level, ModelViews_t& 
     PHARE_LOG_SCOPE(1, "SolverPPC::moveIons_");
     PHARE_DEBUG_DO(_debug_log_move_ions(views);)
 
+    for (auto& state : views)
+        core::check_electromag(state.electromag);
+
     TimeSetter setTime{views, newTime};
 
     auto const& levelBoxing = boxing[level.getLevelNumber()];
@@ -515,6 +586,14 @@ void SolverPPC<HybridModel, AMR_Types>::moveIons_(level_t& level, ModelViews_t& 
     // now Ni and Vi are calculated we can fill pure ghost nodes
     // these were not completed by the deposition of patch and levelghost particles
     fromCoarser.fillIonMomentGhosts(views.model().state.ions, level, newTime);
+
+    for (auto& state : views)
+        core::check_electromag(state.electromag);
+
+    for (auto& state : views)
+    {
+        state.ions.density().notZero();
+    }
 }
 
 

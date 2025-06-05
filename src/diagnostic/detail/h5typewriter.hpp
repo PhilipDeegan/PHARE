@@ -2,6 +2,7 @@
 #define HIGHFIVEDIAGNOSTICWRITER_HPP
 
 
+#include "core/data/tensorfield/tensorfield.hpp"
 #include "core/utilities/mpi_utils.hpp"
 #include "core/data/field/field_box.hpp"
 #include "core/data/grid/grid_tiles.hpp"
@@ -157,6 +158,7 @@ protected:
     {
         if constexpr (core::is_field_tile_set_v<Field_t>)
         {
+            f.check();
             auto&& [a, field, c, d] = this->h5Writer_.modelView()();
             if (reduce)
                 core::reduce_single(field, f);
@@ -173,6 +175,7 @@ protected:
 
         if constexpr (core::is_field_tile_set_v<Field_t>)
         {
+            core::check_tensorfield(f);
             auto&& [a, b, vf, d] = this->h5Writer_.modelView()();
             if (reduce)
                 for (std::size_t i = 0; i < 3; ++i)
@@ -190,6 +193,7 @@ protected:
 
         if constexpr (core::is_field_tile_set_v<Field_t>)
         {
+            core::check_tensorfield(f);
             auto&& [a, b, c, tf] = this->h5Writer_.modelView()();
             if (reduce)
                 for (std::size_t i = 0; i < 6; ++i)

@@ -24,6 +24,18 @@ struct FieldBorderSumOp : public PlusEquals<D>
     // prevents duplicates on ghost of inner tiles
 };
 
+template<typename T>
+struct is_field_border_sum_op : std::false_type
+{
+};
+
+template<typename D>
+struct is_field_border_sum_op<FieldBorderSumOp<D>> : std::true_type
+{
+};
+
+template<typename D>
+auto constexpr static is_field_border_sum_op_v = is_field_border_sum_op<D>::value;
 
 template<typename Field_t>
 class FieldBox
@@ -127,7 +139,7 @@ void operate_on_fields(FieldBox<GridTileSet<GridLayout_t, Args...>>& dst,
 template<typename Operator, typename GridLayout_t, typename... Args>
 void operate_on_fields(FieldBox<GridTileSet<GridLayout_t, Args...>>& dst,
                        FieldBox<GridTileSet<GridLayout_t, Args...> const> const& src)
-    requires(std::is_same_v<FieldBorderSumOp<double>, Operator>)
+    requires(is_field_border_sum_op_v<Operator>)
 {
     auto const pq = dst.field.physicalQuantity();
     assert(src.field.physicalQuantity() == pq);
@@ -244,7 +256,7 @@ void FieldBox<Field_t>::op(FieldBox<Field_t0> const& that)
 
 template<typename Operator, typename... T0s, typename... T1s>
 void operate_on_fields(FieldBox<Grid<T0s...>>& dst, FieldBox<GridTileSet<T1s...> const> const& src)
-    requires(std::is_same_v<FieldBorderSumOp<double>, Operator>)
+    requires(is_field_border_sum_op_v<Operator>)
 {
     auto const pq         = dst.field.physicalQuantity();
     auto const dst_layout = src.field.layout().copy_as(dst.amr_box);

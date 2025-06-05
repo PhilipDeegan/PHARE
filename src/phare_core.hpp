@@ -29,6 +29,14 @@
 namespace PHARE::core
 {
 
+// This is for debugging nans
+// #ifdef NDEBUG
+using field_value_type = double;
+// #else
+// using field_value_type = Interceptor<double>;
+// #endif
+
+
 template<typename GridLayout_t, auto L_, auto A_>
 struct UsingResolver
 {
@@ -36,9 +44,9 @@ struct UsingResolver
     auto static constexpr dimension    = GridLayout_t::dimension;
     auto static constexpr interp_order = GridLayout_t::interp_order;
 
-    using Array_t = NdArrayVector<dimension, double, c_ordering, A_>;
+    using Array_t = NdArrayVector<dimension, field_value_type, c_ordering, A_>;
     using Grid_t  = Grid<Array_t, HybridQuantity::Scalar>;
-    using Field_t = Field<dimension, HybridQuantity::Scalar, double, A_>;
+    using Field_t = Field<dimension, HybridQuantity::Scalar, field_value_type, A_>;
 };
 
 template<typename GridLayout_t, auto A_>
@@ -48,11 +56,12 @@ struct UsingResolver<GridLayout_t, LayoutMode::AoSTS, A_>
     auto static constexpr dimension    = GridLayout_t::dimension;
     auto static constexpr interp_order = GridLayout_t::interp_order;
 
-    using base_types      = UsingResolver<GridLayout_t, LayoutMode::AoS, A_>;
-    using Grid_base_type  = base_types::Grid_t;
-    using Field_base_type = basic::Field<FieldOpts<HybridQuantity::Scalar, double>{dimension, A_}>;
-    using Grid_t          = GridTileSet<GridLayout_t, Grid_base_type, Field_base_type>;
-    using Field_t         = FieldTileSet<GridLayout_t, Grid_base_type, Field_base_type>;
+    using base_types     = UsingResolver<GridLayout_t, LayoutMode::AoS, A_>;
+    using Grid_base_type = base_types::Grid_t;
+    using Field_base_type
+        = basic::Field<FieldOpts<HybridQuantity::Scalar, field_value_type>{dimension, A_}>;
+    using Grid_t  = GridTileSet<GridLayout_t, Grid_base_type, Field_base_type>;
+    using Field_t = FieldTileSet<GridLayout_t, Grid_base_type, Field_base_type>;
 };
 
 template<SimOpts opts>
@@ -72,7 +81,8 @@ struct PHARE_Types
 
     using Resolver_t = UsingResolver<GridLayout_t, layout_mode, allocator_mode>;
 
-    using Array_t = NdArrayVector<dimension, double, Resolver_t::c_ordering, allocator_mode>;
+    using Array_t
+        = NdArrayVector<dimension, field_value_type, Resolver_t::c_ordering, allocator_mode>;
 
     using Grid_t  = Resolver_t::Grid_t;  // layout dependent
     using Field_t = Resolver_t::Field_t; // layout dependent

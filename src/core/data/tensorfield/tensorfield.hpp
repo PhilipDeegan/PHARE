@@ -339,7 +339,11 @@ inline std::ostream& operator<<(std::ostream& out,
     return out;
 }
 
-
+void check_tensorfield(auto const& tf)
+{
+    for (auto const& c : tf)
+        c.check();
+}
 
 } // namespace PHARE::core
 

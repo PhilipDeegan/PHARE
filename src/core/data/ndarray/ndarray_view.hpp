@@ -154,8 +154,12 @@ public:
     void check() const
     {
         for (auto const& e : *this)
+        {
             if (std::isnan(e))
                 throw std::runtime_error("NAN");
+            if (std::isinf(e))
+                throw std::runtime_error("INF");
+        }
     }
 
     void notZero() const

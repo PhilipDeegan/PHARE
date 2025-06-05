@@ -30,8 +30,8 @@ struct hybrid_model_storage<core::LayoutMode::AoSTS, TiledIons, Grid_t>
     using vecfield_type      = core::TensorField<field_type, PhysicalQuantity_t, 1>;
     using tensorfield_type   = core::TensorField<field_type, PhysicalQuantity_t, 2>;
 
-    static_assert(
-        std::is_same_v<field_type, core::Field<dim, core::HybridQuantity::Scalar>>); // torm
+    // static_assert(
+    //     std::is_same_v<field_type, core::Field<dim, core::HybridQuantity::Scalar>>); // torm
 
     using UserField_t = amr::UserFieldType<grid_type, gridlayout_type>;
 

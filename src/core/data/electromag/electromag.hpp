@@ -2,6 +2,7 @@
 #define PHARE_CORE_DATA_ELECTROMAG_ELECTROMAG_HPP
 
 
+#include "core/data/grid/grid_tiles.hpp"
 #include "core/def.hpp"
 #include "core/hybrid/hybrid_quantities.hpp"
 #include "core/data/vecfield/vecfield_initializer.hpp"
@@ -129,6 +130,26 @@ namespace core
 
 } // namespace core
 } // namespace PHARE
+
+
+namespace PHARE::core
+{
+
+
+
+void check_electromag(auto const& em)
+{
+    for (std::size_t i = 0; i < 3; ++i)
+    {
+        em.E[i].check();
+        em.B[i].check();
+    }
+}
+
+
+
+} // namespace PHARE::core
+
 
 
 #endif

@@ -114,6 +114,7 @@ struct MultiBorisFunctors
         for (std::size_t i = 0; i < GridLayout_t::dimension; ++i)
         {
             assert(std::abs(particle.iCell()[i]) < 1000);
+            assert(not std::isnan(particle.delta()[i]));
         }
     }
 

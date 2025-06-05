@@ -897,6 +897,28 @@ auto zip(Args&&... args)
 }
 
 
+template<typename T>
+struct Interceptor
+{
+    Interceptor(T const v = 0)
+        : t{v}
+    {
+    }
+
+    Interceptor& operator=(auto const v)
+    {
+        assert(not std::isinf(v));
+        assert(not std::isnan(v));
+        t = v;
+        return *this;
+    }
+    operator T const&() const { return t; }
+    operator T&() { return t; }
+    T const* operator&() const { return &t; }
+    T* operator&() { return &t; }
+
+    T t;
+};
 
 
 } // namespace PHARE::core

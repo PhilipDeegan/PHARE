@@ -163,10 +163,11 @@ public:
 
 
     template<typename TensorField>
-    static void writeTensorFieldAsDataset(HighFiveFile& h5, std::string path, TensorField& tField)
+    static void writeTensorFieldAsDataset(HighFiveFile& h5, std::string path,
+                                          TensorField const& tField)
     {
         for (auto& [id, type] : core::Components::componentMap<TensorField::rank>())
-            h5.write_data_set_flat<dimension>(path + "_" + id, tField.getComponent(type).data());
+            h5.write_data_set_flat<dimension>(path + "_" + id, &*tField.getComponent(type).data());
     }
 
     auto& modelView() { return modelView_; }
