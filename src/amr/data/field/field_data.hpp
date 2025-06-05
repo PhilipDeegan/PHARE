@@ -451,8 +451,6 @@ void FieldData<GridLayoutT, Grid_t, PhysicalQuantity>::unpackStreamAndSum(
 {
     using PlusEqualOp = core::PlusEquals<value_type>;
 
-    auto& fieldOverlap = dynamic_cast<FieldOverlap const&>(overlap);
-
     unpackStream<PlusEqualOp>(stream, overlap, field);
 }
 
