@@ -301,7 +301,7 @@ public:
             auto const per_arr = [&](auto& arr) {
                 check_particles(arr);
                 check_particles_views(arr);
-                print_particles_per_cell(arr);
+                // print_particles_per_cell(arr);
 
                 arr.template sync<PHASE>();
                 (*arr).sync(in.streamer.streams[i]);
@@ -309,7 +309,7 @@ public:
 
                 check_particles(arr);
                 check_particles_views(arr);
-                print_particles_per_cell(arr);
+                // print_particles_per_cell(arr);
             };
 
 

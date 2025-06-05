@@ -347,10 +347,6 @@ void SolverPPC<HybridModel, AMR_Types>::predictor1_(level_t& level, ModelViews_t
 
 
     for (auto* N : views.N)
-    {
-        PHARE_LOG_LINE_SS(*N);
-    }
-    for (auto* N : views.N)
         N->check();
     for (auto* N : views.N)
         N->notZero();

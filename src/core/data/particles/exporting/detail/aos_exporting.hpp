@@ -115,22 +115,16 @@ void ParticlesExporter<AoSTS, CPU>::delete_particles(Src& src, Box_t const& box)
     auto const old_size = src.size();
     for (auto& tile : src())
     {
-        PHARE_LOG_LINE_SS(tile);
-        
         if (tile().size() == 0)
             continue;
-        PHARE_LOG_LINE_SS(tile()[0]);
 
         if (auto const tile_gbox = grow(*tile, ghost_nbr); tile_gbox * box)
         {
-            PHARE_LOG_LINE_SS(tile()[0]);
             auto const range = Partitioner{tile()}(box);
-            PHARE_LOG_LINE_SS(tile()[0]);
             auto const resiz = range.size();
             if (old_size > 200)
             {
                 auto const& p = tile()[0];
-                PHARE_LOG_LINE_SS(p);
                 assert(resiz > 0);
             }
             assert(resiz <= tile().size());
