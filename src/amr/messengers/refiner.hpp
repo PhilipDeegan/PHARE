@@ -3,8 +3,13 @@
 
 #include "communicator.hpp"
 #include "core/data/vecfield/vecfield.hpp"
-
 #include "amr/data/field/field_variable_fill_pattern.hpp"
+
+#include "amr/messengers/field_sum_transaction.hpp"
+
+
+#include <stdexcept>
+
 
 namespace PHARE::amr
 {
@@ -15,14 +20,16 @@ enum class RefinerType {
     InitField,
     InitInteriorPart,
     LevelBorderParticles,
-    InteriorGhostParticles,
-    SharedBorder
+    PatchFieldBorderSum,
+    ExteriorGhostParticles,
 };
 
 
 template<typename ResourcesManager, RefinerType Type>
 class Refiner : private Communicator<RefinerTypes, ResourcesManager::dimension>
 {
+    using FieldData_t = typename ResourcesManager::UserField_t::patch_data_type;
+
 public:
     void registerLevel(std::shared_ptr<SAMRAI::hier::PatchHierarchy> const& hierarchy,
                        std::shared_ptr<SAMRAI::hier::PatchLevel> const& level)
@@ -62,6 +69,15 @@ public:
             else if constexpr (Type == RefinerType::PatchGhostField)
             {
                 this->add(algo, algo->createSchedule(level), levelNumber);
+            }
+
+            else if constexpr (Type == RefinerType::PatchFieldBorderSum)
+            {
+                this->add(algo,
+                          algo->createSchedule(
+                              level, 0,
+                              std::make_shared<FieldBorderSumTransactionFactory<FieldData_t>>()),
+                          levelNumber);
             }
 
             // this createSchedule overload is used to initialize fields.
@@ -107,15 +123,7 @@ public:
                           levelNumber);
             }
 
-            // this branch is used to create a schedule that will transfer particles into
-            // the patches' ghost zones.
-            else if constexpr (Type == RefinerType::InteriorGhostParticles)
-            {
-                this->add(algo, algo->createSchedule(level), levelNumber);
-            }
-
-            // schedule to synchronize shared border values, and not include refinement
-            else if constexpr (Type == RefinerType::SharedBorder)
+            else if constexpr (Type == RefinerType::ExteriorGhostParticles)
             {
                 this->add(algo, algo->createSchedule(level), levelNumber);
             }
@@ -125,7 +133,7 @@ public:
 
 
     void regrid(std::shared_ptr<SAMRAI::hier::PatchHierarchy> const& hierarchy,
-                const int levelNumber, std::shared_ptr<SAMRAI::hier::PatchLevel> const& oldLevel,
+                int const levelNumber, std::shared_ptr<SAMRAI::hier::PatchLevel> const& oldLevel,
                 double const initDataTime)
     {
         for (auto& algo : this->algos)
@@ -189,7 +197,7 @@ public:
             std::shared_ptr<SAMRAI::hier::TimeInterpolateOperator> timeOp)
     {
         constexpr auto dimension = ResourcesManager::dimension;
-        auto variableFillPattern = FieldFillPattern<dimension>::make_shared(refineOp);
+        auto variableFillPattern = std::make_shared<FieldFillPattern<dimension>>();
 
         auto registerRefine
             = [&rm, this, &refineOp, &timeOp](std::string const& ghost_, std::string const& model_,
@@ -226,7 +234,7 @@ public:
             std::shared_ptr<SAMRAI::hier::TimeInterpolateOperator> timeOp)
     {
         constexpr auto dimension = ResourcesManager::dimension;
-        auto variableFillPattern = FieldFillPattern<dimension>::make_shared(refineOp);
+        auto variableFillPattern = std::make_shared<FieldFillPattern<dimension>>();
 
         auto registerRefine
             = [&rm, this, &refineOp, &timeOp](std::string const& ghost_, std::string const& model_,
@@ -268,10 +276,12 @@ public:
      */
     Refiner(core::VecFieldNames const& source, core::VecFieldNames const& destination,
             std::shared_ptr<ResourcesManager> const& rm,
-            std::shared_ptr<SAMRAI::hier::RefineOperator> refineOp)
+            std::shared_ptr<SAMRAI::hier::RefineOperator> refineOp,
+            std::shared_ptr<SAMRAI::xfer::VariableFillPattern> variableFillPattern = nullptr)
     {
         constexpr auto dimension = ResourcesManager::dimension;
-        auto variableFillPattern = FieldFillPattern<dimension>::make_shared(refineOp);
+        if (!variableFillPattern)
+            variableFillPattern = std::make_shared<FieldFillPattern<dimension>>();
 
         auto registerRefine
             = [&rm, &refineOp, this](std::string src, std::string dst, auto& fillPattern) {
@@ -282,8 +292,7 @@ public:
                       /*if is a ghost field type Refiner, we need to add a fillPattern
                        * that will be used to overwrite or not the shared border node*/
                       if constexpr (Type == RefinerType::GhostField
-                                    or Type == RefinerType::PatchGhostField
-                                    or Type == RefinerType::SharedBorder)
+                                    or Type == RefinerType::PatchGhostField)
                           this->add_algorithm()->registerRefine(*idDest, *idSrc, *idDest, refineOp,
                                                                 fillPattern);
                       else
@@ -297,13 +306,14 @@ public:
 
     Refiner(std::string const& dest, std::string const& src,
             std::shared_ptr<ResourcesManager> const& rm,
-            std::shared_ptr<SAMRAI::hier::RefineOperator> refineOp)
+            std::shared_ptr<SAMRAI::hier::RefineOperator> refineOp,
+            std::shared_ptr<SAMRAI::xfer::VariableFillPattern> const& fillPatt = nullptr)
     {
         auto idSrc  = rm->getID(src);
         auto idDest = rm->getID(dest);
         if (idSrc and idDest)
         {
-            this->add_algorithm()->registerRefine(*idDest, *idSrc, *idDest, refineOp);
+            this->add_algorithm()->registerRefine(*idDest, *idSrc, *idDest, refineOp, fillPatt);
         }
     }
 
