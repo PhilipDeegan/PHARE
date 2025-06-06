@@ -15,6 +15,11 @@
 
 namespace PHARE::amr
 {
+
+// We use this class as a signal in particles_data.hpp
+//  that we are performing an export from the patch ghost layer
+//  of one patch, to the domain of adjacent patch which is the analogue
+//  of the original patch ghost layer
 class ParticlesDomainOverlap : public SAMRAI::pdat::CellOverlap
 {
     using Super = SAMRAI::pdat::CellOverlap;

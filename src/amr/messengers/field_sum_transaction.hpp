@@ -1,17 +1,12 @@
 #ifndef PHARE_AMR_MESSENGERS_FIELD_SUM_TRANSACTION_HPP
 #define PHARE_AMR_MESSENGERS_FIELD_SUM_TRANSACTION_HPP
 
-#include "core/logger.hpp"
-
-#include <SAMRAI/pdat/OuternodeDataFactory.cpp>
-#include <SAMRAI/tbox/Dimension.h>
-#include <SAMRAI/xfer/CoarsenAlgorithm.h>
-#include <SAMRAI/xfer/CoarsenSchedule.h>
-#include <SAMRAI/xfer/PatchLevelBorderFillPattern.h>
-#include <SAMRAI/xfer/PatchLevelInteriorFillPattern.h>
-#include <SAMRAI/xfer/RefineAlgorithm.h>
-#include <SAMRAI/xfer/RefineSchedule.h>
 #include <core/utilities/logger/logger_defaults.hpp>
+
+#include <SAMRAI/tbox/Dimension.h>
+#include <SAMRAI/hier/PatchLevel.h>
+#include <SAMRAI/hier/BoxOverlap.h>
+#include <SAMRAI/xfer/RefineAlgorithm.h>
 
 #include <stdexcept>
 

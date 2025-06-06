@@ -313,22 +313,11 @@ namespace amr
          *
          */
 
-        template<typename... Args>
-        void pack_from_ghost(Args&&... args) const;
+        void pack_from_ghost(SAMRAI::tbox::MessageStream&, ParticlesDomainOverlap const&) const;
 
-        void packStream(SAMRAI::tbox::MessageStream& stream,
-                        SAMRAI::hier::BoxOverlap const& overlap) const override
+        void pack_from_cell_overlap(SAMRAI::tbox::MessageStream& stream,
+                                    SAMRAI::pdat::CellOverlap const& pOverlap) const
         {
-            PHARE_LOG_SCOPE(3, "ParticleData::packStream");
-
-            if (auto casted = dynamic_cast<ParticlesDomainOverlap const*>(&overlap))
-            {
-                pack_from_ghost(stream, *casted);
-                return;
-            }
-
-            auto const& pOverlap{dynamic_cast<SAMRAI::pdat::CellOverlap const&>(overlap)};
-
             std::vector<Particle_t> outBuffer;
 
             if (pOverlap.isOverlapEmpty())
@@ -348,6 +337,22 @@ namespace amr
             }
         }
 
+        void packStream(SAMRAI::tbox::MessageStream& stream,
+                        SAMRAI::hier::BoxOverlap const& overlap) const override
+        {
+            PHARE_LOG_SCOPE(3, "ParticleData::packStream");
+
+            if (auto particleOverlap = dynamic_cast<ParticlesDomainOverlap const*>(&overlap))
+            {
+                pack_from_ghost(stream, *particleOverlap);
+                return;
+            }
+            else if (auto pOverlap = dynamic_cast<SAMRAI::pdat::CellOverlap const*>(&overlap))
+                pack_from_cell_overlap(stream, *pOverlap);
+            else
+                throw std::runtime_error("Unknown overlap type");
+        }
+
 
 
         /**
@@ -363,22 +368,12 @@ namespace amr
          *
          */
 
-        template<typename... Args>
-        void unpack_from_ghost(Args&&... args);
+        void unpack_from_ghost(SAMRAI::tbox::MessageStream& stream,
+                               ParticlesDomainOverlap const& overlap);
 
-        void unpackStream(SAMRAI::tbox::MessageStream& stream,
-                          SAMRAI::hier::BoxOverlap const& overlap) override
+        void unpack_cell_overlap(SAMRAI::tbox::MessageStream& stream,
+                                 SAMRAI::pdat::CellOverlap const& pOverlap)
         {
-            PHARE_LOG_SCOPE(3, "ParticleData::unpackStream");
-
-            if (auto casted = dynamic_cast<ParticlesDomainOverlap const*>(&overlap))
-            {
-                unpack_from_ghost(stream, *casted);
-                return;
-            }
-
-            auto const& pOverlap{dynamic_cast<SAMRAI::pdat::CellOverlap const&>(overlap)};
-
             if (!pOverlap.isOverlapEmpty())
             {
                 // unpack particles into a particle array
@@ -428,6 +423,22 @@ namespace amr
                     } // end box loop
                 } // end no rotation
             } // end overlap not empty
+        }
+
+        void unpackStream(SAMRAI::tbox::MessageStream& stream,
+                          SAMRAI::hier::BoxOverlap const& overlap) override
+        {
+            PHARE_LOG_SCOPE(3, "ParticleData::unpackStream");
+
+            if (auto* particleOverlap = dynamic_cast<ParticlesDomainOverlap const*>(&overlap))
+                unpack_from_ghost(stream, *particleOverlap);
+
+            else if (auto const* pOverlap
+                     = dynamic_cast<SAMRAI::pdat::CellOverlap const*>(&overlap))
+                unpack_cell_overlap(stream, *pOverlap);
+
+            else
+                throw std::runtime_error("Unknown overlap type");
         }
 
 
@@ -711,12 +722,10 @@ void ParticlesData<ParticleArray_t>::copy_from_ghost(Args&&... args)
 
 
 template<typename ParticleArray_t>
-template<typename... Args>
-void ParticlesData<ParticleArray_t>::pack_from_ghost(Args&&... args) const
+void ParticlesData<ParticleArray_t>::pack_from_ghost(SAMRAI::tbox::MessageStream& stream,
+                                                     ParticlesDomainOverlap const& pOverlap) const
 {
     PHARE_LOG_SCOPE(3, "ParticlesData::pack_from_ghost");
-
-    auto&& [stream, pOverlap] = std::forward_as_tuple(args...);
 
     if (pOverlap.isOverlapEmpty())
     {
@@ -748,12 +757,11 @@ void ParticlesData<ParticleArray_t>::pack_from_ghost(Args&&... args) const
 
 
 template<typename ParticleArray_t>
-template<typename... Args>
-void ParticlesData<ParticleArray_t>::unpack_from_ghost(Args&&... args)
+void ParticlesData<ParticleArray_t>::unpack_from_ghost(SAMRAI::tbox::MessageStream& stream,
+                                                       ParticlesDomainOverlap const& /*pOverlap*/)
 {
     PHARE_LOG_SCOPE(3, "ParticlesData::unpack_from_ghost");
 
-    auto&& [stream, pOverlap]   = std::forward_as_tuple(args...);
     std::size_t numberParticles = 0;
     stream >> numberParticles;
     std::vector<Particle_t> particleArray(numberParticles);
