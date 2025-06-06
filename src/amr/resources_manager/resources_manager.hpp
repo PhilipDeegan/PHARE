@@ -435,21 +435,6 @@ namespace amr
         }
 
 
-        void static handle_sub_resources(auto fn, auto& obj, auto&&... args)
-        {
-            using ResourcesView = decltype(obj);
-
-            if constexpr (has_runtime_subresourceview_list<ResourcesView>::value)
-                for (auto& runtimeResource : obj.getRunTimeResourcesViewList())
-                    fn(runtimeResource, args...);
-
-            // unpack the tuple subResources and apply for each element registerResources()
-            //  (recursively)
-            if constexpr (has_compiletime_subresourcesview_list<ResourcesView>::value)
-                std::apply([&](auto&... subResource) { (fn(subResource, args...), ...); },
-                           obj.getCompileTimeResourcesViewList());
-        }
-
 
         template<typename ResourcesView>
         void setResources_(ResourcesView& obj, SAMRAI::hier::Patch const& patch) const
