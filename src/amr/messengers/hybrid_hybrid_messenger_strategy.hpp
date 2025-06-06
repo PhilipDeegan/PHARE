@@ -659,26 +659,29 @@ namespace amr
         void registerGhostComms_(std::unique_ptr<HybridMessengerInfo> const& info)
         {
             magGhostsRefiners_.addStaticRefiners(info->ghostMagnetic, BfieldRefineOp_,
-                                                 makeKeys(info->ghostMagnetic));
+                                                 makeKeys(info->ghostMagnetic),
+                                                 defaultFieldFillPattern);
 
             magPatchGhostsRefiners_.addStaticRefiner(info->modelMagnetic, BfieldRefineOp_,
-                                                     info->modelMagnetic.vecName);
+                                                     info->modelMagnetic.vecName,
+                                                     defaultFieldFillPattern);
 
             elecGhostsRefiners_.addStaticRefiners(info->ghostElectric, EfieldRefineOp_,
-                                                  makeKeys(info->ghostElectric));
+                                                  makeKeys(info->ghostElectric),
+                                                  defaultFieldFillPattern);
 
             currentGhostsRefiners_.addTimeRefiners(info->ghostCurrent, info->modelCurrent,
                                                    core::VecFieldNames{Jold_}, EfieldRefineOp_,
-                                                   fieldTimeOp_);
+                                                   fieldTimeOp_, defaultFieldFillPattern);
 
             rhoGhostsRefiners_.addTimeRefiner(info->modelIonDensity, info->modelIonDensity,
                                               NiOld_.name(), fieldRefineOp_, fieldTimeOp_,
-                                              info->modelIonDensity);
+                                              info->modelIonDensity, defaultFieldFillPattern);
 
 
             velGhostsRefiners_.addTimeRefiners(info->ghostBulkVelocity, info->modelIonBulkVelocity,
                                                core::VecFieldNames{ViOld_}, fieldRefineOp_,
-                                               fieldTimeOp_);
+                                               fieldTimeOp_, defaultFieldFillPattern);
         }
 
 
@@ -1087,6 +1090,8 @@ namespace amr
         // the refinealgorithm to get the correct variablefillpattern
         RefOp_ptr BfieldRefineOp_{std::make_shared<MagneticFieldRefineOp>()};
         RefOp_ptr EfieldRefineOp_{std::make_shared<ElectricFieldRefineOp>()};
+        std::shared_ptr<FieldFillPattern_t> defaultFieldFillPattern
+            = std::make_shared<FieldFillPattern<dimension>>(); // stateless (mostly)
 
         std::shared_ptr<TimeInterpolateOperator> fieldTimeOp_{std::make_shared<FieldTimeInterp>()};
 

@@ -319,6 +319,17 @@ namespace amr
             return ids;
         }
 
+
+        auto getIDsList(auto&&... keys) const
+        {
+            auto const Fn = [&](auto& key) {
+                if (auto const id = getID(key))
+                    return *id;
+                throw std::runtime_error("bad key");
+            };
+            return std::array{Fn(keys)...};
+        }
+
     private:
         template<typename ResourcesView>
         void getIDs_(ResourcesView& obj, std::vector<int>& IDs) const
@@ -438,7 +449,7 @@ namespace amr
                 ResourcesInfo info;
                 info.variable = ResourcesResolver_t::make_shared_variable(view);
                 info.id       = variableDatabase_->registerVariableAndContext(
-                          info.variable, context_, SAMRAI::hier::IntVector::getZero(dimension_));
+                    info.variable, context_, SAMRAI::hier::IntVector::getZero(dimension_));
 
                 nameToResourceInfo_.emplace(view.name(), info);
             }
