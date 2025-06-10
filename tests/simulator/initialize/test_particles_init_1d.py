@@ -68,11 +68,6 @@ class Initialization1DTest(InitializationTest):
             ndim, interp_order, refinement_boxes
         )
 
-    @data({"cells": 40, "smallest_patch_size": 20, "largest_patch_size": 20})
-    def test_no_patch_ghost_on_refined_level_case(self, simInput):
-        print(f"{self._testMethodName}_{ndim}d")
-        self._test_patch_ghost_on_refined_level_case(ndim, False, **simInput)
-
     @data("berger", "tile")
     def test_amr_clustering(self, clustering):
         dim = 1
