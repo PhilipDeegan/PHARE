@@ -3,7 +3,6 @@
 
 
 #include "core/logger.hpp"
-// #include "core/data/ions/ions.hpp"
 #include "core/utilities/box/box.hpp"
 #include "core/utilities/range/range.hpp"
 #include "core/numerics/pusher/pusher.hpp"

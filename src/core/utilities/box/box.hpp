@@ -235,6 +235,12 @@ bool isIn(Point const& point, BoxContainer const& boxes)
     return false;
 }
 
+template<typename Particle, typename Type>
+NO_DISCARD auto isIn(Particle const& particle, Box<Type, Particle::dimension> const& box)
+    -> decltype(isIn(particle.iCell, box), bool())
+{
+    return isIn(particle.iCell, box);
+}
 
 /** This overload of isIn does the same as the one above but takes only
  * one box.
@@ -256,18 +262,6 @@ NO_DISCARD bool isIn(Point<Type, SIZE> const& point, Box<Type, SIZE> const& box)
     return false;
 }
 
-template<typename Particle, typename Type>
-NO_DISCARD auto isIn(Particle const& particle, Box<Type, Particle::dimension> const& box)
-    -> decltype(isIn(particle.iCell, box), bool())
-{
-    return isIn(particle.iCell, box);
-}
-
-template<typename... Args>
-NO_DISCARD auto isIn(Args const&&... args)
-{
-    return isIn(args...);
-}
 
 
 template<typename Type, std::size_t dim, typename OType>

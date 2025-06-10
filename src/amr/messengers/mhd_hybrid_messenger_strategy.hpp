@@ -112,12 +112,10 @@ namespace amr
         void fillFluxBorders(IonsT& /*ions*/, SAMRAI::hier::PatchLevel& /*level*/,
                              double const /*fillTime*/) override
         {
-            // strat_->fillFluxBorders(ions, level, fillTime);
         }
         void fillDensityBorders(IonsT& /*ions*/, SAMRAI::hier::PatchLevel& /*level*/,
                                 double const /*fillTime*/) override
         {
-            // strat_->fillDensityBorders(ions, level, fillTime);
         }
 
         void firstStep(IPhysicalModel& /*model*/, SAMRAI::hier::PatchLevel& /*level*/,

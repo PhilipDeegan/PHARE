@@ -189,7 +189,7 @@ namespace core
         {
             auto copy = *this;
             for (auto iDim = 0u; iDim < dim; ++iDim)
-                copy[iDim] *= value;
+                copy[iDim] *= value[iDim];
             return copy;
         }
         auto operator*(Point<Type, dim> const& value) const { return (*this) * value.r; }

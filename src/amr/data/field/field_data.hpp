@@ -223,7 +223,7 @@ namespace amr
 
             SAMRAI::hier::Transformation const& transformation = fieldOverlap.getTransformation();
             if (transformation.getRotation() != NO_ROTATE)
-                return; // throw, we don't do rotations in phare....
+                throw std::runtime_error("Rotations are not supported in PHARE");
 
             std::vector<value_type> buffer;
             buffer.reserve(getDataStreamSize_(overlap) / sizeof(double));
@@ -267,7 +267,7 @@ namespace amr
             auto& fieldOverlap = dynamic_cast<FieldOverlap const&>(overlap);
 
             if (fieldOverlap.getTransformation().getRotation() != NO_ROTATE)
-                return;
+                throw std::runtime_error("Rotations are not supported in PHARE");
 
             // For unpacking we need to know how much element we will need to extract
             std::vector<double> buffer(getDataStreamSize(overlap) / sizeof(value_type), 0.);

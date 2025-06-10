@@ -61,6 +61,7 @@ public:
 template<typename Operator>
 void operate_on_fields(auto& dst, auto const& src)
 {
+    assert(dst.lcl_box.size() == src.lcl_box.size());
     auto src_it = src.lcl_box.begin();
     auto dst_it = dst.lcl_box.begin();
     for (; dst_it != dst.lcl_box.end(); ++src_it, ++dst_it)

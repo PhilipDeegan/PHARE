@@ -1148,28 +1148,13 @@ namespace core
 
 
 
+        // essentially box form of allocSize(...)
         template<typename Field>
-        auto ghostBoxFor(Field const& field) const
+        Box<std::uint32_t, dimension> ghostBoxFor(Field const& field) const
         {
             return _BoxFor(field, [&](auto const& centering, auto const direction) {
                 return this->ghostStartToEnd(centering, direction);
             });
-        }
-
-        template<typename Field>
-        auto AMRGhostBoxFor(Field const& field) const
-        {
-            auto const centerings = centering(field);
-            auto const growBy     = [&]() {
-                std::array<int, dimension> arr;
-                for (std::uint8_t i = 0; i < dimension; ++i)
-                    arr[i] = nbrGhosts(centerings[i]);
-                return arr;
-            }();
-            auto ghostBox = grow(AMRBox_, growBy);
-            for (std::uint8_t i = 0; i < dimension; ++i)
-                ghostBox.upper[i] += (centerings[i] == QtyCentering::primal) ? 1 : 0;
-            return ghostBox;
         }
 
 
