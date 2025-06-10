@@ -499,8 +499,6 @@ struct IonUpdaterTest : public ::testing::Test
         PHARE::core::depositParticles(ions, layout, Interpolator<dim, interp_order>{},
                                       PHARE::core::DomainDeposit{});
 
-        PHARE::core::depositParticles(ions, layout, Interpolator<dim, interp_order>{},
-                                      PHARE::core::PatchGhostDeposit{});
 
         PHARE::core::depositParticles(ions, layout, Interpolator<dim, interp_order>{},
                                       PHARE::core::LevelGhostDeposit{});

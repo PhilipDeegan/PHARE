@@ -390,21 +390,14 @@ void _debug_log_move_ions(Args const&... args)
 {
     auto const& [views] = std::forward_as_tuple(args...);
 
-    std::size_t nbrDomainParticles        = 0;
-    std::size_t nbrPatchGhostParticles    = 0;
-    std::size_t nbrLevelGhostNewParticles = 0;
     std::size_t nbrLevelGhostOldParticles = 0;
-    std::size_t nbrLevelGhostParticles    = 0; //
+    std::size_t nbrLevelGhostParticles    = 0;
     for (auto& state : views)
     {
         for (auto& pop : state.ions)
         {
-            nbrDomainParticles += pop.domainParticles().size();
-            nbrPatchGhostParticles += pop.patchGhostParticles().size();
-            nbrLevelGhostNewParticles += pop.levelGhostParticlesNew().size();
             nbrLevelGhostOldParticles += pop.levelGhostParticlesOld().size();
             nbrLevelGhostParticles += pop.levelGhostParticles().size();
-            nbrPatchGhostParticles += pop.patchGhostParticles().size();
 
             if (nbrLevelGhostOldParticles < nbrLevelGhostParticles
                 and nbrLevelGhostOldParticles > 0)

@@ -270,28 +270,34 @@ namespace amr
 
         bool canEstimateStreamSizeFromBox() const override { return false; }
 
+        std::size_t getOutGoingDataStreamSize(ParticlesDomainOverlap const& pOverlap) const
+        {
+            auto& transformation        = pOverlap.getTransformation();
+            auto const& offset          = as_point<dim>(transformation);
+            auto const& noffset         = offset * -1;
+            std::size_t numberParticles = 0;
+            for (auto const& overlapBox : pOverlap.getDestinationBoxContainer())
+                numberParticles += patchGhostParticles.nbr_particles_in(
+                    shift(phare_box_from<dim>(overlapBox), noffset));
+            return sizeof(std::size_t) + numberParticles * sizeof(Particle_t);
+        }
 
 
+        std::size_t getCellOverlapDataStreamSize(SAMRAI::pdat::CellOverlap const& pOverlap) const
+        {
+            return sizeof(std::size_t) + countNumberParticlesIn_(pOverlap) * sizeof(Particle_t);
+        }
 
         std::size_t getDataStreamSize(SAMRAI::hier::BoxOverlap const& overlap) const override
         {
-            if (auto casted = dynamic_cast<ParticlesDomainOverlap const*>(&overlap))
-            {
-                auto& pOverlap              = *casted;
-                auto& transformation        = pOverlap.getTransformation();
-                auto const& offset          = as_point<dim>(transformation);
-                auto const& noffset         = offset * -1;
-                std::size_t numberParticles = 0;
-                for (auto const& overlapBox : pOverlap.getDestinationBoxContainer())
-                    numberParticles += patchGhostParticles.nbr_particles_in(
-                        shift(phare_box_from<dim>(overlapBox), noffset));
-                return sizeof(std::size_t) + numberParticles * sizeof(Particle_t);
-            }
-            // else
+            if (auto particleOverlap = dynamic_cast<ParticlesDomainOverlap const*>(&overlap))
+                return getOutGoingDataStreamSize(*particleOverlap);
 
-            auto const& pOverlap{dynamic_cast<SAMRAI::pdat::CellOverlap const&>(overlap)};
+            else if (auto pOverlap = dynamic_cast<SAMRAI::pdat::CellOverlap const*>(&overlap))
+                return getCellOverlapDataStreamSize(*pOverlap);
 
-            return sizeof(std::size_t) + countNumberParticlesIn_(pOverlap) * sizeof(Particle_t);
+            else
+                throw std::runtime_error("Unknown overlap type");
         }
 
 
@@ -408,19 +414,9 @@ namespace amr
                         auto const intersect = getGhostBox() * overlapBox;
 
                         for (auto const& particle : particleArray)
-                        {
                             if (isInBox(intersect, particle))
-                            {
-                                if (isInBox(myBox, particle))
-                                {
-                                    domainParticles.push_back(particle);
-                                }
-                                else
-                                {
-                                    patchGhostParticles.push_back(particle);
-                                }
-                            }
-                        } // end species loop
+                                domainParticles.push_back(particle);
+
                     } // end box loop
                 } // end no rotation
             } // end overlap not empty
@@ -478,12 +474,12 @@ namespace amr
 
             // first copy particles that fall into our domain array
             // they can come from the source domain or patch ghost
-            auto destBox  = myDomainBox * overlapBox;
-            auto new_size = domainParticles.size();
+            auto const destBox = myDomainBox * overlapBox;
+            auto new_size      = domainParticles.size();
 
             if (!destBox.empty())
             {
-                auto destBox_p = phare_box_from<dim>(destBox);
+                auto const destBox_p = phare_box_from<dim>(destBox);
                 new_size += srcDomainParticles.nbr_particles_in(destBox_p);
                 if (domainParticles.capacity() < new_size)
                     domainParticles.reserve(new_size);
@@ -498,7 +494,7 @@ namespace amr
             SAMRAI::hier::BoxContainer ghostLayerBoxes{};
             ghostLayerBoxes.removeIntersections(overlapBox, myDomainBox);
 
-            new_size = patchGhostParticles.size();
+            new_size = domainParticles.size();
             for (auto& selectionBox : ghostLayerBoxes)
             {
                 if (!selectionBox.empty())
@@ -507,8 +503,8 @@ namespace amr
                     new_size += srcDomainParticles.nbr_particles_in(selectionBox_p);
                 }
             }
-            if (patchGhostParticles.capacity() < new_size)
-                patchGhostParticles.reserve(new_size);
+            if (domainParticles.capacity() < new_size)
+                domainParticles.reserve(new_size);
 
 
             for (auto const& selectionBox : ghostLayerBoxes)
@@ -516,7 +512,7 @@ namespace amr
                 if (!selectionBox.empty())
                 {
                     auto selectionBox_p = phare_box_from<dim>(selectionBox);
-                    srcDomainParticles.export_particles(selectionBox_p, patchGhostParticles);
+                    srcDomainParticles.export_particles(selectionBox_p, domainParticles);
                 }
             }
             PHARE_LOG_STOP(3, "ParticlesData::copy_ DomainToGhosts");
@@ -577,7 +573,7 @@ namespace amr
             SAMRAI::hier::BoxContainer ghostLayerBoxes{};
             ghostLayerBoxes.removeIntersections(overlapBox, myDomainBox);
 
-            new_size = patchGhostParticles.size();
+            new_size = domainParticles.size();
             for (auto& selectionBox : ghostLayerBoxes)
             {
                 if (!selectionBox.empty())
@@ -587,8 +583,8 @@ namespace amr
                     new_size += srcDomainParticles.nbr_particles_in(selectionBox_p);
                 }
             }
-            if (patchGhostParticles.capacity() < new_size)
-                patchGhostParticles.reserve(new_size);
+            if (domainParticles.capacity() < new_size)
+                domainParticles.reserve(new_size);
 
 
             // ghostLayer boxes already have been inverse transformed
@@ -598,8 +594,7 @@ namespace amr
                 if (!selectionBox.empty())
                 {
                     auto selectionBox_p = phare_box_from<dim>(selectionBox);
-                    srcDomainParticles.export_particles(selectionBox_p, patchGhostParticles,
-                                                        offseter);
+                    srcDomainParticles.export_particles(selectionBox_p, domainParticles, offseter);
                 }
             }
 
