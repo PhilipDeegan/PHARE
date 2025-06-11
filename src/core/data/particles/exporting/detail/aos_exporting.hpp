@@ -135,8 +135,6 @@ void ParticlesExporter<AoSTS, CPU>::delete_particles(Src& src, Box_t const& box)
 {
     static_assert(in == false); // for now
 
-    using Partitioner = ParticleArrayPartitioner<typename Src::per_tile_particles>;
-
     auto const ghost_nbr = (src.ghost_box().shape()[0] - src.box().shape()[0]) / 2;
 
     src.sync();
@@ -148,7 +146,7 @@ void ParticlesExporter<AoSTS, CPU>::delete_particles(Src& src, Box_t const& box)
 
         if (auto const tile_gbox = grow(*tile, ghost_nbr); tile_gbox * box)
         {
-            auto const range = Partitioner{tile()}(box);
+            auto const range = partition_particles(tile(), box);
             auto const resiz = range.size();
 
             assert(resiz <= tile().size());

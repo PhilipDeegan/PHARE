@@ -94,7 +94,7 @@ void IonUpdaterPP<Ions, Electromag, GridLayout>::updateIons(Ions& ions)
 template<typename Particles, typename GridLayout>
 auto pp_partition_particles(Particles& particles, GridLayout const& layout)
 {
-    return ParticleArrayPartitioner<Particles>{particles}(
+    return ParticleArrayPartitioner<Particles::alloc_mode, Particles>{particles}(
         std::array{layout.AMRBox(), grow(layout.AMRBox(), GridLayout::nbrParticleGhosts())});
 }
 

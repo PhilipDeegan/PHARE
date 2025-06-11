@@ -71,6 +71,7 @@ struct ParticlesRefining
     static constexpr auto dim            = Splitter::dimension;
     static constexpr auto interpOrder    = Splitter::interp_order;
     static constexpr auto nbRefinedPart  = Splitter::nbRefinedPart;
+    static constexpr auto alloc_mode     = ParticleArray::alloc_mode;
     static constexpr auto ParticleType_v = splitType == ParticlesDataSplitType::interior
                                                ? core::ParticleType::Domain
                                                : core::ParticleType::Ghost;
@@ -124,15 +125,45 @@ struct ParticlesRefining
     void _forBox(core::Box<int, dim> const& destinationBox)
     {
         using ArrayParticleArray = typename ParticleArray::template array_type<nbRefinedPart>;
-        // auto const splitBox      = getSplitBox(destinationBox);
+
+        auto const final_size = [&]() {
+            if constexpr (ParticleType_v == ParticleType::Domain)
+                return phare_box_from<dim>(destParticlesData.getBox());
+            else
+                return phare_box_from<dim>(destParticlesData.getGhostBox());
+        }();
+
+        auto const domainBox = phare_box_from<dim>(destParticlesData.getBox());
 
         auto const per_particle = [&](auto const& particle, auto const& dst_box) {
             auto refined_info = std::tuple<std::uint16_t, ArrayParticleArray>{0, {}};
             auto& [p_count, refinedParticles] = refined_info;
             auto const particleRefinedPos     = toFineGrid(particle);
             split(particleRefinedPos, particle, refinedParticles);
-            p_count = core::ParticleArrayPartitioner<ArrayParticleArray>{refinedParticles}(dst_box)
-                          .size();
+            p_count
+                = core::ParticleArrayPartitioner<alloc_mode, ArrayParticleArray>{refinedParticles}(
+                      dst_box)
+                      .size();
+
+            if constexpr (ParticleType_v == ParticleType::Domain)
+                p_count = core::ParticleArrayPartitioner<alloc_mode,
+                                                         ArrayParticleArray>{refinedParticles, 0,
+                                                                             p_count}(domainBox)
+                              .size();
+            else
+            {
+                p_count = core::ParticleArrayPartitioner<alloc_mode,
+                                                         ArrayParticleArray>{refinedParticles, 0,
+                                                                             p_count}(
+                              phare_box_from<dim>(destParticlesData.getGhostBox()))
+                              .size();
+                p_count = core::ParticleArrayPartitioner<alloc_mode,
+                                                         ArrayParticleArray>{refinedParticles, 0,
+                                                                             p_count}
+                              .notIn(domainBox)
+                              .size();
+            }
+
             return refined_info;
         };
 

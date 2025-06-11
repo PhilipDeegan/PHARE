@@ -2,15 +2,17 @@
 #define PHARE_CORE_DATA_PARTICLES_PARTICLE_ARRAY_AOS_HPP
 
 
-#include "core/data/particles/particle.hpp"
-#include "core/data/particles/particle_array_def.hpp"
-
 #include "core/def/phare_config.hpp"
+
+
 #include "core/vector.hpp"
+#include "core/utilities/span.hpp"
 #include "core/utilities/box/box.hpp"
 #include "core/utilities/cellmap.hpp"
-#include "core/utilities/point/point.hpp"
-#include "core/utilities/range/range.hpp"
+// #include "core/utilities/point/point.hpp"
+// #include "core/utilities/range/range.hpp"
+// #include "core/data/particles/particle.hpp"
+#include "core/data/particles/particle_array_def.hpp"
 
 
 #include <vector>

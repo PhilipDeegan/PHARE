@@ -33,12 +33,6 @@ auto constexpr nb_split_parts(auto const dim)
     throw std::runtime_error("no impl for dim");
 }
 
-auto static particles_dict()
-{
-    initializer::PHAREDict dict;
-    dict["interp_order"] = interp;
-    return dict;
-}
 
 
 template<std::size_t _dim, auto lm, auto am>
@@ -92,9 +86,8 @@ struct Patch
         std::make_shared<SAMRAI::pdat::CellGeometry>(domain, ghostVec)};
 
     std::shared_ptr<ParticlesData<ParticleArray_t>> data{
-        std::make_shared<ParticlesData<ParticleArray_t>>(domain, ghostVec, "name", [&]() {
-            return make_particles<ParticleArray_t>(*layout, particles_dict());
-        })};
+        std::make_shared<ParticlesData<ParticleArray_t>>(
+            domain, ghostVec, "name", [&]() { return make_particles<ParticleArray_t>(*layout); })};
 
     SAMRAI::hier::Box const mask{data->getGhostBox()};
 };

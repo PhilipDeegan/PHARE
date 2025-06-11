@@ -21,14 +21,10 @@ namespace PHARE::amr
 std::size_t constexpr static interp      = 1;
 std::size_t constexpr static cells       = 5;
 std::size_t constexpr static ppc         = 10;
-std::size_t constexpr static ghost_cells = 2;
+std::size_t constexpr static ghost_cells = 1;
 
-auto static particles_dict()
-{
-    initializer::PHAREDict dict;
-    dict["interp_order"] = interp;
-    return dict;
-}
+
+
 
 template<typename AParticlesData>
 struct Patch
@@ -76,9 +72,7 @@ struct Patch
     std::shared_ptr<SAMRAI::hier::BoxGeometry> const geom{
         std::make_shared<SAMRAI::pdat::CellGeometry>(domain, ghostVec)};
     std::unique_ptr<ParticlesData<ParticleArray_t>> data{
-        std::make_unique<ParticlesData<ParticleArray_t>>(domain, ghostVec, "name", [&]() {
-            return make_particles<ParticleArray_t>(*layout, particles_dict());
-        })};
+        std::make_unique<ParticlesData<ParticleArray_t>>(domain, ghostVec, "name")};
     SAMRAI::hier::Box const mask{data->getGhostBox()};
 };
 

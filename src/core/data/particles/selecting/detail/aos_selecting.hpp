@@ -54,9 +54,6 @@ void ParticlesSelector<AoSTS, CPU>::select( //
     };
 
     auto const per_tile = [&](auto& src_tile, auto& dst_tile) { //
-        using SrcTileParticles           = std::decay_t<decltype(src_tile())>;
-        using ParticleArrayPartitioner_t = ParticleArrayPartitioner<SrcTileParticles>;
-
         auto& dst_particles     = dst_tile();
         auto& src_particles     = src_tile();
         auto const old_dst_size = dst_particles.size();
@@ -71,7 +68,7 @@ void ParticlesSelector<AoSTS, CPU>::select( //
                 }
                 else
                 {
-                    auto const in_dst = ParticleArrayPartitioner_t{src_particles}(overlap).size();
+                    auto const in_dst = partition_particles(src_particles, overlap).size();
                     dst_particles.resize(old_dst_size + in_dst);
                     mem::copy<CPU>(dst_particles.data() + old_dst_size, src_particles.data(),
                                    in_dst);
@@ -92,13 +89,10 @@ void ParticlesSelector<AoSTS, CPU>::select( // box is unshifted global AMR index
 {
     if constexpr (DstParticles::layout_mode == LayoutMode::AoSTS)
     {
-        std::size_t constexpr ghost_cells = 2; // todo
+        auto const ghost_cells = (src.ghost_box().shape()[0] - src.box().shape()[0]) / 2;
 
         for (auto& src_tile : const_cast<SrcParticles&>(src)())
         {
-            using SrcTileParticles           = std::decay_t<decltype(src_tile())>;
-            using ParticleArrayPartitioner_t = ParticleArrayPartitioner<SrcTileParticles>;
-
             if (auto const src_overlap = grow(src_tile, ghost_cells) * box)
             {
                 for (auto& dst_tile : dst())
@@ -108,7 +102,7 @@ void ParticlesSelector<AoSTS, CPU>::select( // box is unshifted global AMR index
                     {
                         auto& dst_particles = dst_tile();
                         auto& src_particles = src_tile();
-                        auto const in_dst   = ParticleArrayPartitioner_t{src_particles}(*overlap);
+                        auto const in_dst   = partition_particles(src_particles, *overlap);
                         if (in_dst.size() == 0)
                             continue;
 

@@ -38,7 +38,7 @@ void move_in_domain(Dst& dst, Src& src, Box_t const& domain_box)
         auto& src_tile = src()[tidx];
         auto& dst_tile = dst()[tidx];
 
-        auto const tile_ghost_box = grow(src_tile, 2);
+        auto const tile_ghost_box = grow(src_tile, 1);
         assert(src_tile == dst_tile);
 
         if (tile_ghost_box * domain_box == tile_ghost_box) // not border tile
@@ -75,7 +75,7 @@ void move_in_ghost_layer(Dst& dst, Src& src, Box_t const& domain_box, Box_t cons
         auto& src_tile = src()[tidx];
         auto& dst_tile = dst()[tidx];
 
-        auto const tile_ghost_box = grow(src_tile, 2);
+        auto const tile_ghost_box = grow(src_tile, 1);
         assert(src_tile == dst_tile);
 
         if (tile_ghost_box * domain_box == tile_ghost_box) // not border tile

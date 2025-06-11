@@ -87,19 +87,19 @@ void ParticlesRefiner<AoSTS, CPU>::operator()(Src const& src, Dst& dst, Box_t co
     auto const& dstBox  = dst.box();
     auto const splitBox = grow(box, 1); // Splitter::maxCellDistanceFromSplit() ?
 
+    auto const ghost_nbr = (dst.ghost_box().shape()[0] - dst.box().shape()[0]) / 2;
 
     auto const coarseDstBox = coarsen_box(splitBox);
 
     for (auto const& src_tile : src())
     {
-        if (not(coarseDstBox * grow(src_tile, 1)))
+        if (not(coarseDstBox * grow(src_tile, ghost_nbr)))
             continue;
-
 
         if constexpr (type == core::ParticleType::Domain)
         {
             for (auto& dst_tile : dst())
-                if (auto const growbox = grow(dst_tile, 1); splitBox * growbox)
+                if (auto const growbox = grow(dst_tile, ghost_nbr); splitBox * growbox)
                     if (auto const overlap = box * dst_tile)
                         ParticlesRefiner<AoS, CPU>{}.template operator()<type>(
                             src_tile(), dst_tile(), *overlap, fn0, fn1);
@@ -107,7 +107,8 @@ void ParticlesRefiner<AoSTS, CPU>::operator()(Src const& src, Dst& dst, Box_t co
         else if constexpr (type == core::ParticleType::Ghost)
         {
             for (auto& dst_tile : dst()) // only on dst patch borders
-                if (auto const growbox = grow(dst_tile, 2); *(dst.box() * growbox) != growbox)
+                if (auto const growbox = grow(dst_tile, ghost_nbr);
+                    *(dst.box() * growbox) != growbox)
                     if (auto const overlap = box * growbox)
                         ParticlesRefiner<AoS, CPU>{}.template operator()<type>(
                             src_tile(), dst_tile(), *overlap, fn0, fn1);

@@ -300,13 +300,14 @@ TEST_F(ParticlePartitioner, partition_ghosts)
 
     auto L = [&](auto&& particles) {
         using ParticleArray_t = std::decay_t<decltype(particles)>;
+        using Partitioner = ParticleArrayPartitioner<ParticleArray_t::alloc_mode, ParticleArray_t>;
 
         std::size_t ppc = 10;
         add_particles_in(particles, super_ghost_box, ppc);
         assert(particles.size() == std::pow(11, 3) * ppc);
 
-        auto iterators = ParticleArrayPartitioner<ParticleArray_t>{particles}(
-            std::array{middle_box, grow(middle_box, extra_ghost_cells)});
+        auto iterators
+            = Partitioner{particles}(std::array{middle_box, grow(middle_box, extra_ghost_cells)});
 
         assert(iterators.size() == 2);
         assert(particles.begin() == iterators[0].begin());

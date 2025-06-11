@@ -98,7 +98,7 @@ TYPED_TEST(TileMappingTest, view_outputs)
         //  PHARE_LOG_LINE_SS(box << " " << box.shape());
 
         TileSet_t tiles;
-        Tiler<TileSet_t, 3>{{tiles, box}}.f();
+        Tiler<TileSet_t, 0>{{tiles, box}}.f();
         // self.print(tiles);
 
         EXPECT_GT(tiles.size(), 0);

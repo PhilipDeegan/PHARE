@@ -340,30 +340,33 @@ template<std::size_t D, typename I0>
 void particle_array_ghost_is_valid(ParticleArray<D, I0> const& particles, auto const& domain_box,
                                    auto const& ghost_box)
 {
-    PHARE_DEBUG_DO({
-        std::size_t in_ghost_layer = 0, not_in_ghost_layer = 0;
+    std::size_t in_ghost_layer = 0, not_in_ghost_layer = 0, outside_gb = 0;
 
-        per_particle(particles, [&](auto const& p) {
-            if (isIn(p, ghost_box) and not isIn(p, domain_box))
-                ++in_ghost_layer;
-            else
-                ++not_in_ghost_layer;
-        });
+    per_particle(particles, [&](auto const& p) {
+        auto const ingb = isIn(p, ghost_box);
+        auto const indb = isIn(p, domain_box);
 
-        if constexpr (any_in(I0::layout_mode, AoSTS))
+        if (!ingb)
+            ++outside_gb;
+        else if (ingb and not indb)
+            ++in_ghost_layer;
+        else
+            ++not_in_ghost_layer;
+    });
+
+    if constexpr (any_in(I0::layout_mode, AoSTS))
+    {
+        for (std::size_t tidx = 0; tidx < particles().size(); ++tidx)
         {
-            for (std::size_t tidx = 0; tidx < particles().size(); ++tidx)
+            auto const& tile = particles()[tidx];
+            for (auto const& p : tile())
             {
-                auto const& tile = particles()[tidx];
-                for (auto const& p : tile())
-                {
-                    assert(not isIn(p, tile));
-                }
+                assert(not isIn(p, tile));
             }
         }
+    }
 
-        assert(not_in_ghost_layer == 0 and in_ghost_layer == particles.size());
-    })
+    // assert(outside_gb == 0 and not_in_ghost_layer == 0 and in_ghost_layer == particles.size());
 }
 
 

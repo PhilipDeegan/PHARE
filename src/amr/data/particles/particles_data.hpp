@@ -38,17 +38,12 @@
 #include "SAMRAI/hier/Transformation.h"
 
 
-
 #include <tuple>
-
 #include <vector>
 #include <cstddef>
 #include <stdexcept>
 
-#include <vector>
-#include <cstddef>
 
-#include <stdexcept>
 
 namespace PHARE
 {
@@ -97,14 +92,15 @@ namespace amr
         // add one cell surrounding ghost box to map particles exiting the ghost layer
         static constexpr int ghostSafeMapLayer = 1;
 
-        auto construct_particles() const
+
+
+        auto construct_particles(auto const& ghosts) const
         {
             if constexpr (ParticleArray::is_mapped)
                 return ParticleArray{grow(phare_box_from<dim>(getGhostBox()), ghostSafeMapLayer)};
-            else if constexpr (std::is_constructible_v<ParticleArray, Box<int, dim>>)
-                return ParticleArray{phare_box_from<dim>(getBox())};
+
             else
-                return ParticleArray{};
+                return make_particles<ParticleArray>(phare_box_from<dim>(getBox()), ghosts);
         }
 
         template<typename T, std::size_t S, typename A>
@@ -187,35 +183,44 @@ namespace amr
             }
         }
 
-    public:
-        template<typename ParticlesInitializer>
-        ParticlesData(SAMRAI::hier::Box const& box, SAMRAI::hier::IntVector const& ghost,
-                      std::string const& name, ParticlesInitializer const initializer)
-            : SAMRAI::hier::PatchData::PatchData(box, ghost)
-            , domainParticles{initializer()}
-            , patchGhostParticles{initializer()}
-            , levelGhostParticles{initializer()}
-            , levelGhostParticlesOld{initializer()}
-            , levelGhostParticlesNew{initializer()}
-            , pack{name,
-                   &domainParticles,
-                   &patchGhostParticles,
-                   &levelGhostParticles,
-                   &levelGhostParticlesOld,
-                   &levelGhostParticlesNew}
-            , interiorLocalBox_{AMRToLocal(box, this->getGhostBox())}
-            , name_{name}
+        void validate_ghosts(auto const ghost)
         {
+            core::for_N<dim>([&](auto i) {
+                if (ghost[i] != ghost[0])
+                    throw std::runtime_error("invalid");
+            });
         }
+
+    public:
+        // template<typename ParticlesInitializer>
+        // ParticlesData(SAMRAI::hier::Box const& box, SAMRAI::hier::IntVector const& ghost,
+        //               std::string const& name, ParticlesInitializer const initializer)
+        //     : SAMRAI::hier::PatchData::PatchData(box, ghost)
+        //     , domainParticles{initializer()}
+        //     , patchGhostParticles{initializer()}
+        //     , levelGhostParticles{initializer()}
+        //     , levelGhostParticlesOld{initializer()}
+        //     , levelGhostParticlesNew{initializer()}
+        //     , pack{name,
+        //            &domainParticles,
+        //            &patchGhostParticles,
+        //            &levelGhostParticles,
+        //            &levelGhostParticlesOld,
+        //            &levelGhostParticlesNew}
+        //     , interiorLocalBox_{AMRToLocal(box, this->getGhostBox())}
+        //     , name_{name}
+        // {
+        //     validate_ghosts(ghost);
+        // }
 
         ParticlesData(SAMRAI::hier::Box const& box, SAMRAI::hier::IntVector const& ghost,
                       std::string const& name)
             : SAMRAI::hier::PatchData::PatchData(box, ghost)
-            , domainParticles{construct_particles()}
-            , patchGhostParticles{construct_particles()}
-            , levelGhostParticles{construct_particles()}
-            , levelGhostParticlesOld{construct_particles()}
-            , levelGhostParticlesNew{construct_particles()}
+            , domainParticles{construct_particles(ghost[0])}
+            , patchGhostParticles{construct_particles(ghost[0])}
+            , levelGhostParticles{construct_particles(ghost[0])}
+            , levelGhostParticlesOld{construct_particles(ghost[0])}
+            , levelGhostParticlesNew{construct_particles(ghost[0])}
             , pack{name,
                    &domainParticles,
                    &patchGhostParticles,
@@ -225,6 +230,7 @@ namespace amr
             , interiorLocalBox_{AMRToLocal(box, this->getGhostBox())}
             , name_{name}
         {
+            validate_ghosts(ghost);
         }
 
 

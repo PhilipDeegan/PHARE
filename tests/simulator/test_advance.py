@@ -400,6 +400,7 @@ class AdvanceTestBase(SimulatorTest):
             ndim,
             interp_order,
             qty="particles",
+            refinement_boxes={},
             time_step=time_step,
             time_step_nbr=time_step_nbr,
             nbr_part_per_cell=ppc,

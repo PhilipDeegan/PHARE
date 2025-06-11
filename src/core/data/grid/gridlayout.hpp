@@ -57,7 +57,9 @@ namespace core
     template<std::size_t interpOrder>
     NO_DISCARD std::uint32_t constexpr static ghostWidthForParticles()
     {
-        return 2; //(interpOrder % 2 == 0 ? interpOrder / 2 + 1 : (interpOrder + 1) / 2);
+        static_assert(interpOrder > 0 and interpOrder < 4);
+        constexpr std::array ghosts = {1, 2, 2};
+        return ghosts[interpOrder - 1];
     }
 
 

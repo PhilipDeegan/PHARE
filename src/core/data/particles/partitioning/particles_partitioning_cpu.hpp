@@ -11,10 +11,10 @@
 #include <stdexcept>
 
 
-namespace PHARE::core::detail
+namespace PHARE::core
 {
 template<typename ParticleArray>
-class ParticleArrayPartitioner<AllocatorMode::CPU, /*impl = */ 0, ParticleArray>
+class ParticleArrayPartitioner<AllocatorMode::CPU, ParticleArray, /*impl = */ 0>
 {
 public:
     using box_t    = Box<int, ParticleArray::dimension>;
@@ -105,7 +105,7 @@ public:
 
 
 template<typename ParticleArray>
-class ParticleArrayPartitioner<AllocatorMode::CPU, /*impl = */ 1, ParticleArray>
+class ParticleArrayPartitioner<AllocatorMode::CPU, ParticleArray, /*impl = */ 1>
 {
 public:
     using box_t = Box<int, ParticleArray::dimension>;
@@ -124,6 +124,6 @@ public:
 
 
 
-} // namespace PHARE::core::detail
+} // namespace PHARE::core
 
 #endif /*PHARE_CORE_DATA_PARTICLES_PARTITIONING_PARTICLES_PARTITIONING_CPU_HPP*/

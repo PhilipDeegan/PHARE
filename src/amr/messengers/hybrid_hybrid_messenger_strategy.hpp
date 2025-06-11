@@ -373,22 +373,17 @@ namespace amr
 
             for (std::size_t i = 0; i < ions.size(); ++i)
             {
-                for (auto patch : level)
+                for (auto patch : resourcesManager_->enumerate(level, ions, scratch_vecfield))
                 {
-                    auto dataOnPatch
-                        = resourcesManager_->setOnPatch(*patch, ions, scratch_vecfield);
                     auto& pop = *(ions.begin() + i);
                     for (std::uint8_t c = 0; c < N; ++c)
                         core::reduce_into(scratch_vecfield[c], pop.flux()[c]);
                 }
 
-
                 popFluxBorderSumRefiners_[i].fill(level.getLevelNumber(), fillTime);
 
-                for (auto patch : level)
+                for (auto patch : resourcesManager_->enumerate(level, ions, scratch_vecfield))
                 {
-                    auto dataOnPatch
-                        = resourcesManager_->setOnPatch(*patch, ions, scratch_vecfield);
                     auto& pop = *(ions.begin() + i);
                     for (std::uint8_t c = 0; c < N; ++c)
                         core::copy_fields(pop.flux()[c], scratch_vecfield[c]);
@@ -401,10 +396,9 @@ namespace amr
         void fillDensityBorders(IonsT& ions, SAMRAI::hier::PatchLevel& level,
                                 double const fillTime) override
         {
-            auto& rm = *resourcesManager_;
             for (std::size_t i = 0; i < ions.size(); ++i)
             {
-                for (auto patch : rm.enumerate(level, ions, scratch_field))
+                for (auto patch : resourcesManager_->enumerate(level, ions, scratch_field))
                 {
                     auto& pop = *(ions.begin() + i);
                     core::reduce_into(scratch_field, pop.density());
@@ -412,7 +406,7 @@ namespace amr
 
                 popDensityBorderSumRefiners_[i].fill(level.getLevelNumber(), fillTime);
 
-                for (auto patch : rm(level, ions, scratch_field))
+                for (auto patch : resourcesManager_->enumerate(level, ions, scratch_field))
                 {
                     auto& pop = *(ions.begin() + i);
                     core::copy_fields(pop.density(), scratch_field);

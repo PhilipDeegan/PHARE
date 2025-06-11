@@ -46,17 +46,16 @@ class ParticlesTile : public Box<std::int32_t, Particles::dimension>
             return NdArray_t{0, cells}; // span with nullptr, updated later
     };
 
-    template<typename... Args>
-    auto constexpr static bounded_ghost_box(Args&&... args)
-    {
-        static_assert(sizeof...(args) == 2);
-        auto const& [tilebox, particle_array] = std::forward_as_tuple(args...);
-        auto tgbox                            = grow(tilebox, 3); // assume interp 1 for now
-        auto bounded_tgbox                    = tgbox * particle_array.ghost_box();
-        assert(bounded_tgbox);
-        (*bounded_tgbox).upper += 1; // +1 for primal
-        return *bounded_tgbox;
-    }
+    // template<typename... Args>
+    // auto constexpr static bounded_ghost_box(Args&&... args)
+    // {
+    //     static_assert(sizeof...(args) == 2);
+    //     auto const& [tilebox, particle_array] = std::forward_as_tuple(args...);
+    //     auto tgbox         = grow(tilebox, particle_array.ghost_cells_); // assume interp 1 for
+    //     now auto bounded_tgbox = tgbox * particle_array.ghost_box(); assert(bounded_tgbox);
+    //     (*bounded_tgbox).upper += 1; // +1 for primal
+    //     return *bounded_tgbox;
+    // }
 
 public:
     ParticlesTile(ParticlesTile const&)            = default;
@@ -64,11 +63,11 @@ public:
     ParticlesTile& operator=(ParticlesTile const&) = default;
     ParticlesTile& operator=(ParticlesTile&&)      = default;
 
-    template<typename TileSet>
-    ParticlesTile(Super const& box, TileSet const& tileset)
+
+    ParticlesTile(Super const& box, std::size_t const ghost_cells)
         : Super{box}
-        , particles{make_particles<Particles>(box)}
-        , field_ghost_box{bounded_ghost_box(box, tileset)}
+        , particles{make_particles<Particles>(box, ghost_cells)}
+    // , field_ghost_box{bounded_ghost_box(box, tileset)}
     // , rho{ndarray_builder(field_ghost_box)}
     // , fx{ndarray_builder(field_ghost_box)}
     // , fy{ndarray_builder(field_ghost_box)}
@@ -83,7 +82,7 @@ public:
     ParticlesTile(ParticlesTile<Ps, Nd>& tile)
         : Super{tile}
         , particles{tile(), tile().size()}
-        , field_ghost_box{tile.field_ghost_box}
+    // , field_ghost_box{tile.field_ghost_box}
     // , rho{*tile.rho}
     // , fx{*tile.fx}
     // , fy{*tile.fy}
@@ -106,7 +105,7 @@ public:
 
     // auto fields() _PHARE_ALL_FN_ { return std::forward_as_tuple(rho, fx, fy, fz); }
     // auto fields() const _PHARE_ALL_FN_ { return std::forward_as_tuple(rho, fx, fy, fz); }
-    auto& field_box() const _PHARE_ALL_FN_ { return field_ghost_box; }
+    // auto& field_box() const _PHARE_ALL_FN_ { return field_ghost_box; }
 
     template<typename P, typename N>
     void reset(ParticlesTile<P, N>& tile)
@@ -116,7 +115,7 @@ public:
 
 private:
     Particles particles;
-    Super field_ghost_box; // tilebox + field ghosts
+    // Super field_ghost_box; // tilebox + field ghosts
     // NdArray_t rho, fx, fy, fz;
 
     std::array<ParticlesTile*, 7> _links = ConstArray<ParticlesTile*, 7>(nullptr);
@@ -326,13 +325,12 @@ public:
     using SpnTile = ParticlesTile<PSpan_t, NdArrayView<dim, double>>;
 
 
-    TileSetVector(box_t const& box /*= {}*/, TileSetParticleArrayDetails const& deets = {})
-        : details{deets}
-        , ghost_cells_{deets.ghost_cells}
+    TileSetVector(box_t const& box, auto const ghost_cells)
+        : ghost_cells_{ghost_cells}
         , box_{box}
-        , ghost_box_{grow(box, deets.ghost_cells)}
+        , ghost_box_{grow(box, ghost_cells)}
     {
-        assert(ghost_cells_ == 2);
+        // assert(ghost_cells_ == 2);
         cell_size_.zero();
         gap_idx_.zero();
         add_into_.zero();
@@ -345,25 +343,23 @@ public:
     }
 
     TileSetVector(TileSetVector&& that)
-        : details{that.details}
-        , ghost_cells_{that.ghost_cells_}
+        : ghost_cells_{that.ghost_cells_}
         , box_{that.box_}
         , ghost_box_{that.ghost_box_}
         , particles_{std::move(that.particles_)}
         , total_size{that.total_size}
     {
-        assert(ghost_cells_ == 2);
+        // assert(ghost_cells_ == 2);
     }
 
     TileSetVector(TileSetVector const& that)
-        : details{that.details}
-        , ghost_cells_{that.ghost_cells_}
+        : ghost_cells_{that.ghost_cells_}
         , box_{that.box_}
         , ghost_box_{that.ghost_box_}
         , particles_{that.particles_.copy(TileSetter<dim>{that.box_, that.ghost_cells_})}
         , total_size{that.total_size}
     {
-        assert(ghost_cells_ == 2);
+        // assert(ghost_cells_ == 2);
         sync();
     }
 
@@ -582,9 +578,6 @@ protected:
     }
 
 
-
-    TileSetParticleArrayDetails details;
-
     std::size_t ghost_cells_;
 
     Box<int, dim> box_, ghost_box_;
@@ -602,11 +595,11 @@ protected:
     nd_array_t<std::size_t> cell_size_{local_box().shape()};
 
 
-    TileSet<VecTile, alloc_mode> particles_{TileSetter<dim>{box_, ghost_cells_}, *this};
+    TileSet<VecTile, alloc_mode> particles_{TileSetter<dim>{box_, ghost_cells_}, ghost_cells_};
 
     // only used for GPU
     TileSet<SpnTile, alloc_mode> particles_views_{generate_from<alloc_mode>(
-        TileSetter<dim>{box_, ghost_cells_}, reset_particle_views_fn(), particles_, *this)};
+        TileSetter<dim>{box_, ghost_cells_}, reset_particle_views_fn(), particles_, ghost_cells_)};
 
 
     std::size_t total_size = 0;
@@ -832,26 +825,26 @@ struct TileSetParticles : public Super_
     void print() const {}
     void check() const
     {
-        for (auto const& tile : Super::particles_())
-        {
-            auto const gb = tile.field_box();
+        // for (auto const& tile : Super::particles_())
+        // {
+        //     auto const gb = tile.field_box();
 
-            for (auto const& particle : tile())
-            {
-                assert(isIn(particle, gb));
-            }
-        }
+        //     for (auto const& particle : tile())
+        //     {
+        //         assert(isIn(particle, gb));
+        //     }
+        // }
 
-        if constexpr (storage_mode == StorageMode::VECTOR)
-            for (auto const& tile : Super::particles_views_())
-            {
-                auto const gb = tile.field_box();
+        // if constexpr (storage_mode == StorageMode::VECTOR)
+        //     for (auto const& tile : Super::particles_views_())
+        //     {
+        //         auto const gb = tile.field_box();
 
-                for (auto const& particle : tile())
-                {
-                    assert(isIn(particle, gb));
-                }
-            }
+        //         for (auto const& particle : tile())
+        //         {
+        //             assert(isIn(particle, gb));
+        //         }
+        //     }
     }
 
     auto max_size() const

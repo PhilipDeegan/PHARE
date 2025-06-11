@@ -171,7 +171,7 @@ auto make_ions(GridLayout_t const& layout)
         particles.domain_particles.reserve(particle_box.size() * ppc);
         add_particles_in(particles.domain_particles, particle_box, ppc);
 
-        add_ghost_particles(particles.level_ghost_particles, particle_box, ppc, /*ghosts*/ 2);
+        add_ghost_particles(particles.level_ghost_particles, particle_box, ppc, GridLayout_t::nbrParticleGhosts());
     };
 
     add_particles(ions.populations[0].particles);

@@ -15,11 +15,11 @@
 #include <thrust/universal_vector.h>
 
 
-namespace PHARE::core::detail
+namespace PHARE::core
 {
 
 template<typename ParticleArray>
-class ParticleArrayPartitioner<AllocatorMode::GPU_UNIFIED, /*impl = */ 0, ParticleArray>
+class ParticleArrayPartitioner<AllocatorMode::GPU_UNIFIED, ParticleArray, /*impl = */ 0>
 {
 public:
     using box_t    = Box<int, ParticleArray::dimension>;
@@ -101,7 +101,7 @@ public:
 
 
 
-} // namespace PHARE::core::detail
+} // namespace PHARE::core
 
 
 #endif // PHARE_HAVE_THRUST

@@ -82,17 +82,10 @@ struct AParticleArraySelectingTest : public ::testing::Test
             abort_if_not(domain.size() == ppc * layout.AMRBox().size());
         }
 
-        auto static _dict()
-        {
-            initializer::PHAREDict dict;
-            dict["interp_order"] = std::size_t{1};
-            return dict;
-        }
 
         GridLayout_t layout;
-        initializer::PHAREDict const dict = _dict();
-        ParticleArray_t domain            = make_particles<ParticleArray_t>(layout, dict);
-        ParticleArray_t ghost             = make_particles<ParticleArray_t>(layout, dict);
+        ParticleArray_t domain = make_particles<ParticleArray_t>(layout);
+        ParticleArray_t ghost  = make_particles<ParticleArray_t>(layout);
     };
 
     bool at_periodic_border(Box<int, dim> const& box) const

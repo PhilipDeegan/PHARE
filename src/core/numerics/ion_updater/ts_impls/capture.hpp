@@ -198,26 +198,26 @@ void IonUpdaterMultiTS<Ions, Electromag, GridLayout>::updateAndDepositAll_(Model
 
             assert(domain.size());
 
-            PHARE_DEBUG_DO({
-                for (auto const& tile : domain())
-                    for (auto const& p : tile())
-                    {
-                        assert(isIn(p, patch_boxings.domainBox));
-                        assert(isIn(p, tile));
-                    }
-                for (auto const& tile : pop.levelGhostParticles()())
-                    for (auto const& p : tile())
-                    {
-                        assert(isIn(p, patch_boxings.ghostBox)
-                               and not isIn(p, patch_boxings.domainBox));
-                    }
-                for (auto const& tile : pop.patchGhostParticles()())
-                    for (auto const& p : tile())
-                    {
-                        assert(isIn(p, patch_boxings.ghostBox)
-                               and not isIn(p, patch_boxings.domainBox));
-                    }
-            })
+            for (auto const& tile : domain())
+                for (auto const& p : tile())
+                {
+                    assert(isIn(p, patch_boxings.domainBox));
+                    assert(isIn(p, tile));
+                }
+            for (auto const& tile : pop.levelGhostParticles()())
+                for (auto const& p : tile())
+                {
+                    assert(isIn(p, patch_boxings.ghostBox)
+                           and not isIn(p, patch_boxings.domainBox));
+                    assert(not isIn(p, tile));
+                }
+            for (auto const& tile : pop.patchGhostParticles()())
+                for (auto const& p : tile())
+                {
+                    assert(isIn(p, patch_boxings.ghostBox)
+                           and not isIn(p, patch_boxings.domainBox));
+                    assert(not isIn(p, tile));
+                }
         };
 
         for (auto& pop : view.ions)

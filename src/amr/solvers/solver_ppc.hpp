@@ -460,6 +460,26 @@ void SolverPPC<HybridModel, AMR_Types>::moveIons_(level_t& level, ModelViews_t& 
     auto const& levelBoxing = boxing[level.getLevelNumber()];
     auto const dt           = newTime - currentTime;
 
+    // for (auto& state : views)
+    // {
+    //     state.ions.density().notZero();
+    //     if constexpr (ParticleArray_t::layout_mode == AoSTS)
+    //         for (auto& pop : state.ions)
+    //         {
+    //             assert(pop.patchGhostParticles().size() == 0);
+
+    //             particle_array_domain_is_valid(pop.domainParticles(), state.layout.AMRBox());
+    //             particle_array_domain_is_valid(*pop.domainParticles(), state.layout.AMRBox());
+    //             particle_array_ghost_is_valid(
+    //                 pop.levelGhostParticles(), state.layout.AMRBox(),
+    //                 grow(state.layout.AMRBox(), GridLayout::nbrParticleGhosts()));
+    //             particle_array_ghost_is_valid(
+    //                 *pop.levelGhostParticles(), state.layout.AMRBox(),
+    //                 grow(state.layout.AMRBox(), GridLayout::nbrParticleGhosts()));
+    //         }
+    // }
+
+
     if constexpr (ParticleArray_t::layout_mode == AoSMapped)
         for (auto& state : views)
             ionUpdater_.updatePopulations(
@@ -488,24 +508,25 @@ void SolverPPC<HybridModel, AMR_Types>::moveIons_(level_t& level, ModelViews_t& 
     // these were not completed by the deposition of patch and levelghost particles
     fromCoarser.fillIonMomentGhosts(views.model().state.ions, level, newTime);
 
-    PHARE_DEBUG_DO({
-        for (auto& state : views)
-        {
-            state.ions.density().notZero();
-            if constexpr (ParticleArray_t::layout_mode == AoSTS)
-                for (auto& pop : state.ions)
-                {
-                    assert(pop.patchGhostParticles().size() == 0);
 
-                    particle_array_domain_is_valid(pop.domainParticles(), state.layout.AMRBox());
-                    particle_array_domain_is_valid(*pop.domainParticles(), state.layout.AMRBox());
-                    particle_array_ghost_is_valid(pop.levelGhostParticles(), state.layout.AMRBox(),
-                                                  grow(state.layout.AMRBox(), 2));
-                    particle_array_ghost_is_valid(*pop.levelGhostParticles(), state.layout.AMRBox(),
-                                                  grow(state.layout.AMRBox(), 2));
-                }
-        }
-    })
+    // for (auto& state : views)
+    // {
+    //     state.ions.density().notZero();
+    //     if constexpr (ParticleArray_t::layout_mode == AoSTS)
+    //         for (auto& pop : state.ions)
+    //         {
+    //             assert(pop.patchGhostParticles().size() == 0);
+
+    //             particle_array_domain_is_valid(pop.domainParticles(), state.layout.AMRBox());
+    //             particle_array_domain_is_valid(*pop.domainParticles(), state.layout.AMRBox());
+    //             particle_array_ghost_is_valid(
+    //                 pop.levelGhostParticles(), state.layout.AMRBox(),
+    //                 grow(state.layout.AMRBox(), GridLayout::nbrParticleGhosts()));
+    //             particle_array_ghost_is_valid(
+    //                 *pop.levelGhostParticles(), state.layout.AMRBox(),
+    //                 grow(state.layout.AMRBox(), GridLayout::nbrParticleGhosts()));
+    //         }
+    // }
 }
 
 

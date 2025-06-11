@@ -6,7 +6,7 @@
 #include "core/utilities/box/box.hpp"
 #include "core/utilities/point/point.hpp"
 #include "core/data/particles/particle.hpp"
-#include "initializer/data_provider.hpp"
+
 
 #include <array>
 #include <cstdint>
@@ -38,24 +38,6 @@ struct ParticleDefaults
 };
 
 
-struct ParticleArrayDetails
-{
-    std::size_t ghost_cells = 2;
-
-    ParticleArrayDetails static FROM(initializer::PHAREDict const& dict)
-    {
-        ParticleArrayDetails const defaults{};
-        return {
-            cppdict::get_value(dict, "ghost_cells", defaults.ghost_cells),
-        };
-    }
-
-    template<typename GridLayout_t>
-    ParticleArrayDetails static FROM(GridLayout_t const& /*layout*/)
-    {
-        return {2}; //{GridLayout_t::nbrParticleGhosts()};
-    }
-};
 
 
 template<typename R = std::uint32_t, std::size_t dim>
@@ -124,54 +106,29 @@ private:
 
 
 
-struct TileSetParticleArrayDetails : public ParticleArrayDetails
-{
-    std::size_t interp_order = 1; // for fields per tile
 
-
-    template<typename GridLayout_t>
-    TileSetParticleArrayDetails static FROM(GridLayout_t const& layout,
-                                            initializer::PHAREDict const& dict)
-    {
-        auto const super = ParticleArrayDetails::FROM(layout);
-        TileSetParticleArrayDetails const defaults{};
-        return {
-            {super},
-            cppdict::get_value(dict, "interp_order", defaults.interp_order),
-        };
-    }
-};
-
-
-
-
-template<typename Particles_t>
-Particles_t make_particles([[maybe_unused]] Box<int, Particles_t::dimension> const& box = {})
+template<typename Particles_t, typename T, std::size_t D>
+Particles_t make_particles(Box<T, D> const& box, std::size_t const ghost_cells)
 {
     using enum LayoutMode;
-    if constexpr (any_in(Particles_t::layout_mode, AoS, SoA))
-        return Particles_t{};
+    if constexpr (any_in(Particles_t::layout_mode, AoSPC, SoAPC))
+        return Particles_t{box, ghost_cells};
+    else if constexpr (any_in(Particles_t::layout_mode, AoSTS, SoATS, SoAVXTS))
+        return Particles_t{box, ghost_cells};
+    else if constexpr (Particles_t::is_mapped)
+        return Particles_t{grow(box, ghost_cells + 1)};
+
     else
-        throw std::runtime_error("no");
+        return Particles_t{};
 }
 
 template<typename Particles_t, typename GridLayout_t>
-Particles_t make_particles(GridLayout_t const& layout,
-                           PHARE::initializer::PHAREDict const& dict = {})
+Particles_t make_particles(GridLayout_t const& layout)
 {
-    auto constexpr static ghost_cells = GridLayout_t::nbrParticleGhosts();
-
-    using enum LayoutMode;
-    if constexpr (any_in(Particles_t::layout_mode, AoSPC, SoAPC))
-        return Particles_t{layout.AMRBox(), ghost_cells};
-    else if constexpr (any_in(Particles_t::layout_mode, AoSTS, SoATS, SoAVXTS))
-        return Particles_t{layout.AMRBox(), TileSetParticleArrayDetails::FROM(layout, dict)};
-    else if constexpr (Particles_t::is_mapped)
-        return Particles_t{grow(layout.AMRBox(), ghost_cells + 1)};
-
-    else
-        return Particles_t{};
+    return make_particles<Particles_t>(layout.AMRBox(), GridLayout_t::nbrParticleGhosts());
 }
+
+
 
 
 } // namespace PHARE::core
