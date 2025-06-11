@@ -32,7 +32,7 @@ def config():
         cells=cells,
         dl=(0.40, 0.40),
         refinement="tagging",
-        max_nbr_levels=2,
+        max_nbr_levels=1,
         hyper_resistivity=0.002,
         resistivity=0.001,
         diag_options={
@@ -40,6 +40,7 @@ def config():
             "options": {"dir": diag_dir, "mode": "overwrite"},
         },
         strict=True,
+        nesting_buffer=1,
     )
 
     def density(x, y):

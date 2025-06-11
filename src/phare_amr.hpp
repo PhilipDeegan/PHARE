@@ -2,9 +2,9 @@
 #define PHARE_AMR_INCLUDE_HPP
 
 
+#include "phare_core.hpp"
 #include "core/def/phare_mpi.hpp" // IWYU pragma: keep
 
-#include "phare_core.hpp"
 #include "amr/wrappers/hierarchy.hpp"
 #include "amr/data/particles/refine/splitter.hpp"
 #include "amr/data/particles/refine/particles_data_split.hpp"
