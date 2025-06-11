@@ -8,7 +8,8 @@ from pathlib import Path
 import pyphare.pharein as ph
 from pyphare.cpp import cpp_lib
 from pyphare.pharesee.run import Run
-from pyphare.simulator.simulator import Simulator, startMPI
+from pyphare.simulator.simulator import Simulator
+from pyphare.simulator.simulator import startMPI
 
 from tests.simulator import SimulatorTest
 
