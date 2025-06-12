@@ -159,6 +159,10 @@ struct FieldTileSetter
     using value_type = TileSetView<Tile_vt, Span_t, Span_pt>;
 };
 
+} // namespace PHARE::core
+
+namespace PHARE::core::basic
+{
 template<typename GridLayout_t, typename Grid_t, typename Field_t>
 class FieldTileSet : public FieldTileSetter<GridLayout_t, Grid_t, Field_t>::value_type
 {
@@ -174,12 +178,11 @@ public:
     auto constexpr static dimension  = GridLayout_t::dimension;
     auto constexpr static alloc_mode = Grid_t::alloc_mode;
 
-    FieldTileSet(std::string const& name, auto physicalQuantity) _PHARE_ALL_FN_
-        : Super{{}, nullptr, 0, nullptr, {}} // set later
-        ,
-          qty_{physicalQuantity}
+    FieldTileSet(auto physicalQuantity) _PHARE_ALL_FN_ : Super{{}, nullptr, 0, nullptr, {}},
+                                                         qty_{physicalQuantity}
     {
     }
+
 
     FieldTileSet(FieldTileSet const&) _PHARE_ALL_FN_            = default;
     FieldTileSet(FieldTileSet&&) _PHARE_ALL_FN_                 = delete;
@@ -209,14 +212,12 @@ public:
             check();
             ghost_box_     = field->layout().AMRGhostBoxFor(qty_);
             max_tile_size_ = field->max_tile_size();
-            name_          = field->name().c_str();
         }
         else
             super() = Super{{}, nullptr, 0, nullptr, {}};
     }
 
 
-    NO_DISCARD auto physicalQuantity() const _PHARE_ALL_FN_ { return qty_; }
 
 
     void zero()
@@ -226,7 +227,7 @@ public:
 
         using vec_helper = PHARE::Vector<type, alloc_mode>;
         for (auto& tile : *this)
-            vec_helper::fill(tile().data(), tile().size(), 0); // 1e-16 NAN!
+            vec_helper::fill(tile().data(), tile().size(), 1e-16); // 1e-16 NAN!
     }
 
 
@@ -325,24 +326,60 @@ public:
 
 
     auto max_tile_size() const { return max_tile_size_; }
-    NO_DISCARD auto name() const
-    {
-        assert(name_);
-        return std::string{name_};
-    }
 
 
     template<typename, typename, typename>
     friend std::ostream& operator<<(std::ostream&, FieldTileSet const&);
 
+    NO_DISCARD auto physicalQuantity() const _PHARE_ALL_FN_ { return qty_; }
+
 private:
     Super& super() { return *this; }
     Super const& super() const { return *this; }
 
-    char const* name_;
     physical_quantity_type qty_;
     Box<int, dimension> ghost_box_{};
     std::uint32_t max_tile_size_;
+};
+
+
+} // namespace PHARE::core::basic
+
+namespace PHARE::core
+{
+
+template<typename GridLayout_t, typename Grid_t, typename Field_t>
+class FieldTileSet : public basic::FieldTileSet<GridLayout_t, Grid_t, Field_t>
+{
+public:
+    // using grid_type  = Grid_t;
+    // using field_type = Field_t;
+    using Super = basic::FieldTileSet<GridLayout_t, Grid_t, Field_t>;
+    // using value_type                 = local_types::Tile_vt;
+    // using physical_quantity_type     = Grid_t::physical_quantity_type;
+    // using type                       = Grid_t::type;
+    // auto constexpr static dimension  = GridLayout_t::dimension;
+    // auto constexpr static alloc_mode = Grid_t::alloc_mode;
+
+    FieldTileSet(std::string const& name, auto physicalQuantity) _PHARE_ALL_FN_
+        : Super{physicalQuantity},
+          name_{name}
+    {
+    }
+
+    // FieldTileSet(FieldTileSet const&) _PHARE_ALL_FN_            = default;
+    // FieldTileSet(FieldTileSet&&) _PHARE_ALL_FN_                 = delete;
+    // FieldTileSet& operator=(FieldTileSet const&) _PHARE_ALL_FN_ = delete;
+    // FieldTileSet& operator=(FieldTileSet&&) _PHARE_ALL_FN_      = delete;
+
+
+    NO_DISCARD auto& name() const { return name_; }
+
+private:
+    Super& super() { return *this; }
+    Super const& super() const { return *this; }
+
+    std::string const name_;
 };
 
 

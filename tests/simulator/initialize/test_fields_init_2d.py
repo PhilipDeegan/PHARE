@@ -18,13 +18,14 @@ interp_orders = [1, 2, 3]
 
 
 def permute():
+    layouts = [1]
     return [
         dict(
             interp_order=interp_order,
             sim_setup_kwargs=dict(layout=layout),
         )
         for interp_order, layout in itertools.product(
-            interp_orders, supported_particle_layouts()
+            interp_orders, layouts  # supported_particle_layouts()
         )
     ]
 

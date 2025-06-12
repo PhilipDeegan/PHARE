@@ -4,7 +4,7 @@
 
 #include "core/numerics/ion_updater/ion_updater.hpp"          // IWYU pragma: keep
 #include "core/numerics/ion_updater/ion_updater_multi_ts.hpp" // IWYU pragma: keep
-#include "core/numerics/ion_updater/ion_updater_multi_pc.hpp" // IWYU pragma: keep
+// #include "core/numerics/ion_updater/ion_updater_multi_pc.hpp" // IWYU pragma: keep
 
 
 namespace PHARE::core

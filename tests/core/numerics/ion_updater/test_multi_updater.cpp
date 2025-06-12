@@ -83,8 +83,8 @@ auto get_updater_for(Ions& /*ions*/, EM const& /*em*/, GridLayout_t const& /*lay
     using Particles = typename Ions::particle_array_type;
     if constexpr (Particles::is_mapped)
         return construct_<IonUpdater<Ions, EM, GridLayout_t>>();
-    else if constexpr (any_in(Particles::layout_mode, AoSPC, SoAPC))
-        return construct_<IonUpdaterMultiPC<Ions, EM, GridLayout_t>>();
+    // else if constexpr (any_in(Particles::layout_mode, AoSPC, SoAPC))
+    //     return construct_<IonUpdaterMultiPC<Ions, EM, GridLayout_t>>();
     else if constexpr (any_in(Particles::layout_mode, AoSTS, SoATS, SoAVXTS))
         return construct_<mkn::IonUpdaterMultiTS<Ions, EM, GridLayout_t>>();
     else
