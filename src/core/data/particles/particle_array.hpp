@@ -366,7 +366,7 @@ void particle_array_ghost_is_valid(ParticleArray<D, I0> const& particles, auto c
         }
     }
 
-    // assert(outside_gb == 0 and not_in_ghost_layer == 0 and in_ghost_layer == particles.size());
+    assert(outside_gb == 0 and not_in_ghost_layer == 0 and in_ghost_layer == particles.size());
 }
 
 
