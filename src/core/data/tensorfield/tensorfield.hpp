@@ -69,10 +69,10 @@ struct TensorField
     {
     }
 
-    TensorField(TensorField const& source)            = default;
-    TensorField(TensorField&& source)                 = default;
-    TensorField& operator=(TensorField const& source) = default;
-    TensorField& operator=(TensorField&& source)      = default;
+    TensorField(TensorField const& source) _PHARE_ALL_FN_            = default;
+    TensorField(TensorField&& source) _PHARE_ALL_FN_                 = default;
+    TensorField& operator=(TensorField const& source) _PHARE_ALL_FN_ = default;
+    TensorField& operator=(TensorField&& source) _PHARE_ALL_FN_      = default;
 
     template<typename... Args>
     TensorField(Args&&... args)
@@ -130,15 +130,15 @@ struct TensorField
     }
 
     template<typename V>
-    auto as(auto&& a, auto&&... args)
+    auto as(auto&& a, auto&&... args) _PHARE_ALL_FN_
     {
         V r{for_N<N, for_N_R_mode::make_array>([&](auto i) { return a(components_[i], args...); })};
-        assert(r.isUsable());
+        PHARE_ASSERT(r.isUsable());
         return r;
     }
 
     template<typename V>
-    auto as(auto&& a, auto&&... args) const
+    auto as(auto&& a, auto&&... args) const _PHARE_ALL_FN_
     {
         return V{
             for_N<N, for_N_R_mode::make_array>([&](auto i) { return a(components_[i], args...); })};

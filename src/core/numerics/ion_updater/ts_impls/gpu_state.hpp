@@ -271,12 +271,6 @@ void IonUpdaterMultiTS<Ions, Electromag, GridLayout>::updateAndDepositAll_(Model
     in.streamer.dump_times(detail::timings_dir_str + "/updateAndDepositAll_"
                            + std::string{Particles::type_id} + ".txt");
 
-    if constexpr (any_in(Particles::alloc_mode, AllocatorMode::GPU_UNIFIED)
-                  and INTERP_GPU_IMPL == 2)
-        [&](auto const i) {
-            if (pps[i].size()) // for testing : TORM?
-                Interpolating_t::ts_reducer(pps[i], layouts[i], fluxes[i], rhos[i]);
-        }(0);
 
 
 #else

@@ -19,7 +19,11 @@ void copy(T0* dst, T1* src, Size const size)
     }
     else if (CompileOptions::WithMknGpu)
     {
-        PHARE_WITH_MKN_GPU(mkn::gpu::copy(dst, src, size));
+        PHARE_WITH_MKN_GPU({
+            assert(
+                not(mkn::gpu::Pointer{dst}.is_host_ptr() and mkn::gpu::Pointer{src}.is_host_ptr()));
+            mkn::gpu::copy(dst, src, size);
+        })
     }
     else
         throw std::runtime_error("Vector::copy NO ALTERNATIVE");

@@ -315,7 +315,8 @@ NO_DISCARD bool isIn(Point_t<Type, SIZE> const& point, Box<Type, SIZE> const& bo
 
 
 template<typename Particle, typename Type>
-NO_DISCARD auto isIn(Particle const& particle, Box<Type, Particle::dimension> const& box)
+NO_DISCARD auto _PHARE_ALL_FN_ isIn(Particle const& particle,
+                                    Box<Type, Particle::dimension> const& box)
     -> decltype(isIn(particle.iCell(), box), bool())
 {
     return isIn(particle.iCell(), box);
@@ -354,7 +355,7 @@ bool isIn(ICell<T, S> const& icell, BoxContainer const& boxes) _PHARE_ALL_FN_
 
 
 template<typename... Args>
-NO_DISCARD auto isIn(Args const&&... args)
+NO_DISCARD auto isIn(Args const&&... args) _PHARE_ALL_FN_
 {
     return isIn(args...);
 }

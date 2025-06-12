@@ -1419,7 +1419,7 @@ namespace core
          */
         NO_DISCARD std::uint32_t constexpr static nbrDualGhosts_() _PHARE_ALL_FN_
         {
-            constexpr std::array<std::uint32_t, 3> per_interp{3, 4, 5};
+            constexpr std::array<std::uint32_t, 3> per_interp{2, 3, 4};
             static_assert(interp_order > 0 and interp_order < 4);
             return per_interp[interp_order - 1]; //(interp_order + 1) / 2 + nbrParticleGhosts();
         }

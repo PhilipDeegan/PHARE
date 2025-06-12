@@ -47,11 +47,8 @@ public:
     Super const& operator*() const _PHARE_ALL_FN_ { return *this; }
     auto& layout() const _PHARE_ALL_FN_ { return layout_; }
 
-    auto ghost_box() const { return layout_.AMRGhostBoxFor(physicalQuantity()); }
-    auto field_box() const
-    {
-        return shrink(layout_.AMRGhostBoxFor(physicalQuantity()), GridLayout_t::nbrGhosts());
-    }
+    auto ghost_box() const _PHARE_ALL_FN_ { return ghost_box_; }
+    auto field_box() const _PHARE_ALL_FN_ { return shrink(ghost_box(), GridLayout_t::nbrGhosts()); }
 
 
     template<template<typename, std::size_t> typename Point_t>
@@ -87,6 +84,7 @@ public:
 private:
     Field_t field_;
     GridLayout_t layout_;
+    Box<int, dimension> ghost_box_ = layout_.AMRGhostBoxFor(physicalQuantity());
 };
 
 
@@ -137,14 +135,10 @@ struct GridTile : public FieldTile<GridLayout_t, Field_t>
     GridTile& operator=(GridTile const&) = delete;
     GridTile& operator=(GridTile&&)      = default;
 
-
-    // auto& operator()() { return arr; }
-    // auto& operator()() const { return arr; }
     Super& operator*() _PHARE_ALL_FN_ { return *this; }
     Super const& operator*() const _PHARE_ALL_FN_ { return *this; }
 
     NO_DISCARD auto physicalQuantity() const _PHARE_ALL_FN_ { return (**this).physicalQuantity(); }
-
 
 private:
     void reset() { (**this)() = Field_t{(**this).physicalQuantity(), arr.data(), arr.shape()}; }
@@ -171,27 +165,26 @@ class FieldTileSet : public FieldTileSetter<GridLayout_t, Grid_t, Field_t>::valu
     using local_types = FieldTileSetter<GridLayout_t, Grid_t, Field_t>;
 
 public:
-    using grid_type  = Grid_t;
-    using field_type = Field_t;
-    using Super      = local_types::value_type;
-    using value_type = local_types::Tile_vt;
-
+    using grid_type                  = Grid_t;
+    using field_type                 = Field_t;
+    using Super                      = local_types::value_type;
+    using value_type                 = local_types::Tile_vt;
     using physical_quantity_type     = Grid_t::physical_quantity_type;
     using type                       = Grid_t::type;
     auto constexpr static dimension  = GridLayout_t::dimension;
     auto constexpr static alloc_mode = Grid_t::alloc_mode;
 
-    FieldTileSet(std::string const& name, auto physicalQuantity)
+    FieldTileSet(std::string const& name, auto physicalQuantity) _PHARE_ALL_FN_
         : Super{{}, nullptr, 0, nullptr, {}} // set later
-        , name_{name}
-        , qty_{physicalQuantity}
+        ,
+          qty_{physicalQuantity}
     {
     }
 
-    FieldTileSet(FieldTileSet const&)            = default;
-    FieldTileSet(FieldTileSet&&)                 = delete;
-    FieldTileSet& operator=(FieldTileSet const&) = delete;
-    FieldTileSet& operator=(FieldTileSet&&)      = delete;
+    FieldTileSet(FieldTileSet const&) _PHARE_ALL_FN_            = default;
+    FieldTileSet(FieldTileSet&&) _PHARE_ALL_FN_                 = delete;
+    FieldTileSet& operator=(FieldTileSet const&) _PHARE_ALL_FN_ = delete;
+    FieldTileSet& operator=(FieldTileSet&&) _PHARE_ALL_FN_      = delete;
 
 
     void setBuffer(std::nullptr_t ptr) _PHARE_ALL_FN_
@@ -208,14 +201,15 @@ public:
             super() = field->super().as([](auto&&... args) mutable {
                 auto&& [box, tiles_data, n_tiles, cells_data, cells_shape]
                     = std::forward_as_tuple(args...);
-
                 assert(cells_data);
                 return Super{box, &*tiles_data[0], n_tiles,
                              reinterpret_cast<FieldTile<GridLayout_t, Field_t>**>(cells_data),
                              cells_shape};
             });
             check();
-            ghost_box_ = field->layout().AMRGhostBoxFor(qty_);
+            ghost_box_     = field->layout().AMRGhostBoxFor(qty_);
+            max_tile_size_ = field->max_tile_size();
+            name_          = field->name().c_str();
         }
         else
             super() = Super{{}, nullptr, 0, nullptr, {}};
@@ -223,7 +217,7 @@ public:
 
 
     NO_DISCARD auto physicalQuantity() const _PHARE_ALL_FN_ { return qty_; }
-    NO_DISCARD auto& name() const { return name_; }
+
 
     void zero()
     {
@@ -236,14 +230,14 @@ public:
     }
 
 
-    auto& operator()()
+    auto& operator()() _PHARE_ALL_FN_
     {
-        assert(isUsable());
+        PHARE_ASSERT(isUsable());
         return super()();
     }
-    auto& operator()() const
+    auto& operator()() const _PHARE_ALL_FN_
     {
-        assert(isUsable());
+        PHARE_ASSERT(isUsable());
         return super()();
     }
 
@@ -263,8 +257,8 @@ public:
     }
     bool isSettable() const { return !isUsable(); }
 
-    auto& operator*() { return *this; }       // interop atm
-    auto& operator*() const { return *this; } // interop atm
+    // auto& operator*() { return *this; }       // interop atm
+    // auto& operator*() const { return *this; } // interop atm
 
     void copyData(FieldTileSet const& that)
     {
@@ -279,7 +273,7 @@ public:
 
     NO_DISCARD auto at(auto const&... args) { return super().at(args...); }
     NO_DISCARD auto at(auto const&... args) const { return super().at(args...); }
-    // NO_DISCARD auto size() const _PHARE_ALL_FN_ { return layout_.allocSize(qty_); }
+
 
     void check(bool const nan = false) const
     {
@@ -330,6 +324,14 @@ public:
     }
 
 
+    auto max_tile_size() const { return max_tile_size_; }
+    NO_DISCARD auto name() const
+    {
+        assert(name_);
+        return std::string{name_};
+    }
+
+
     template<typename, typename, typename>
     friend std::ostream& operator<<(std::ostream&, FieldTileSet const&);
 
@@ -337,10 +339,10 @@ private:
     Super& super() { return *this; }
     Super const& super() const { return *this; }
 
-
-    std::string name_;
+    char const* name_;
     physical_quantity_type qty_;
     Box<int, dimension> ghost_box_{};
+    std::uint32_t max_tile_size_;
 };
 
 
@@ -368,7 +370,9 @@ public:
                 physical_quantity_type const qty)
         : Super{layout.AMRBox(), layout, qty}
         , View{name, qty}
+        , name_{name}
         , layout_{layout}
+        , max_tile_size_{get_max_tile_size()}
     {
         assert(this->super()[0]().data());
         View::setBuffer(this);
@@ -381,6 +385,7 @@ public:
         : Super{that.super()}
         , View{that}
         , layout_{that.layout_}
+        , max_tile_size_{get_max_tile_size()}
     {
         View::setBuffer(this);
         assert((**this)[0]().data());
@@ -422,8 +427,22 @@ public:
     Super& super() { return *this; }
     Super const& super() const { return *this; }
 
+    NO_DISCARD auto& name() const { return name_; }
+    auto max_tile_size() const { return max_tile_size_; }
+
 private:
+    auto get_max_tile_size() const
+    {
+        std::uint32_t size = 0;
+        for (auto const& tile : super()())
+            if (std::uint32_t tile_size = product(tile.ghost_box().shape()); tile_size > size)
+                size = tile_size;
+        return size;
+    }
+
+    std::string name_;
     GridLayout_t layout_;
+    std::uint32_t max_tile_size_;
 };
 
 

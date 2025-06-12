@@ -1,8 +1,9 @@
 
-
+#include "core/logger.hpp"
 #include "core/vector.hpp"
 #include "core/data/particles/particle.hpp"
 #include "core/data/particles/particle_array.hpp"
+#include "core/data/particles/particle_array_sorter.hpp"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
@@ -39,8 +40,18 @@ public:
 
     void sort()
     {
-        ParticleArraySorter<ParticleArray_cpu>{ps_cpu, domain_box}();
-        ParticleArraySorter<ParticleArray_gpu>{ps_gpu, domain_box}();
+        // mkn::gpu::Pointer c{ps_cpu.data()};
+        // mkn::gpu::Pointer g{ps_gpu.data()};
+
+        // PHARE_LOG_LINE_SS(c.is_host_ptr());
+
+        // PHARE_LOG_LINE_SS(g.is_host_ptr());
+        // PHARE_LOG_LINE_SS(g.is_managed_ptr());
+
+        sort_particles(ps_cpu, domain_box);
+        sort_particles(ps_gpu, domain_box);
+        // ParticleArraySorter<ParticleArray_cpu>{*ps_cpu, domain_box}();
+        // ParticleArraySorter<ParticleArray_gpu>{*ps_gpu, domain_box}();
     }
 
     ParticleArray_cpu ps_cpu;
@@ -65,8 +76,8 @@ using SoAGPUParticleArray
 
 
 using ParticlesArrays
-    = testing::Types<ParticleArrayFixture3D<AoSParticleArray<3>, AoSGPUParticleArray>/*,
-                     ParticleArrayFixture3D<SoAParticleArray<3>, SoAGPUParticleArray>*/ //
+    = testing::Types<ParticleArrayFixture3D<AoSParticleArray<3>, AoSGPUParticleArray>,
+                     ParticleArrayFixture3D<SoAParticleArray<3>, SoAGPUParticleArray> //
                      >;
 
 TYPED_TEST_SUITE(ParticleArraySortingTest, ParticlesArrays, );

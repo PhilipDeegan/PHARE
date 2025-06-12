@@ -308,18 +308,7 @@ public:
     auto& insert_domain_from(PerCellVector const& src);
 
 
-    void replace_from(This const& that)
-    {
-        throw std::runtime_error("fix");
-        if (this == &that) // just in case
-            return;
 
-        cell_size_ = that.cell_size_;
-        particles_ = that.particles_;
-        box_       = that.box_;
-        ghost_box_ = that.ghost_box_;
-        p2c_       = that.p2c_;
-    }
 
     void cap()
     {

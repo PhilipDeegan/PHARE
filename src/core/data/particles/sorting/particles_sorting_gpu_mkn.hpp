@@ -26,6 +26,8 @@ public:
 
     void operator()(std::uint64_t l, std::uint64_t r)
     {
+        PHARE_LOG_SCOPE(1, "ParticleSorter<AllocatorMode::GPU_UNIFIED>");
+
         if constexpr (ParticleArray::layout_mode == LayoutMode::AoS)
         {
             auto ps = particles.view();
@@ -58,6 +60,7 @@ public:
     }
     void by_deltas(std::uint64_t l, std::uint64_t r)
     {
+        PHARE_LOG_SCOPE(1, "ParticleSorter<AllocatorMode::GPU_UNIFIED>");
         if constexpr (ParticleArray::layout_mode == LayoutMode::AoS)
         {
             auto ps = particles.view();
@@ -77,6 +80,7 @@ public:
 
     ParticleSorter& by_delta()
     {
+        PHARE_LOG_SCOPE(1, "ParticleSorter<AllocatorMode::GPU_UNIFIED>");
         // assumes already sorted by icell
         if (particles.size() == 0)
             return *this;

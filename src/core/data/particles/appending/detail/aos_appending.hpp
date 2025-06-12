@@ -60,28 +60,30 @@ void ParticlesAppender<AoSMapped, CPU, AoSTS, GPU_UNIFIED>::operator()( //
 {
     PHARE_LOG_SCOPE(3, "ParticlesAppender<AoSMapped, CPU, AoSTS, GPU_UNIFIED>::operator()");
 
-    auto const overlap = src.box() * dst.ghost_box();
-    if (!overlap)
-        return;
+    for (auto const& p : src)
+        dst.emplace_back(p);
 
-    std::int32_t src_start = 0;
-    auto finish            = [&](auto const lix, auto const size) {
-        auto& particles = dst(lix);
-        mem::copy<GPU_UNIFIED>(particles.data() + particles.size(), src.data() + src_start, size);
-        particles.resize(particles.size() + size);
-        src_start += size;
-    };
+    // auto const overlap = src.box() * dst.ghost_box();
+    // if (!overlap)
+    //     return;
 
-    for (auto& tile : dst())
-        tile().reserve(tile().size() + sum_from(*tile, [&](auto const bix) {
-                           return src.nbr_particles_in(bix);
-                       }));
+    // std::int32_t src_start = 0;
+    // auto finish            = [&](auto const lix, auto const size) {
+    //     auto& particles = dst(lix);
+    //     mem::copy<GPU_UNIFIED>(particles.data() + particles.size(), src.data() + src_start,
+    //     size); particles.resize(particles.size() + size); src_start += size;
+    // };
 
-    dst.reset_views();
+    // for (auto& tile : dst())
+    //     tile().reserve(tile().size() + sum_from(*tile, [&](auto const bix) {
+    //                        return src.nbr_particles_in(bix);
+    //                    }));
 
-    for (auto const bix : *overlap)
-        if (auto const size = src.nbr_particles_in(bix))
-            finish(dst.local_cell(bix), size);
+    // dst.reset_views();
+
+    // for (auto const bix : *overlap)
+    //     if (auto const size = src.nbr_particles_in(bix))
+    //         finish(dst.local_cell(bix), size);
 
     dst.template sync<2, type>();
 }

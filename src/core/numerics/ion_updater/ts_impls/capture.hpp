@@ -30,8 +30,10 @@ public:
     using ParticleArray_t              = Particles;
     using Interpolator_t               = Interpolator<dimension, interp_order, atomic_interp>;
     using Interpolating_t              = Interpolating<Particles, interp_order, atomic_interp>;
-
-    using Pusher_t = MultiBorisPusher<GridLayout, Particles, Electromag, Interpolator_t>;
+    using Pusher_t   = MultiBorisPusher<GridLayout, Particles, Electromag, Interpolator_t>;
+    using Vecfield_t = Electromag::vecfield_type;
+    using Field_t    = Vecfield_t::field_type;
+    using Tile_vt    = Field_t::value_type;
 
 private:
     Interpolating_t interpolator_;
@@ -95,6 +97,8 @@ template<typename ModelViews, typename Boxing_t>
 void IonUpdaterMultiTS<Ions, Electromag, GridLayout>::updateAndDepositDomain_(
     ModelViews& views, Boxing_t const& boxings)
 {
+    // static_assert(Field_t::alloc_mode == AllocatorMode::GPU_UNIFIED);
+
     PHARE_LOG_SCOPE(1, "IonUpdaterMultiTS::updateAndDepositDomain_");
 
     if (views.size() == 0)
@@ -124,7 +128,34 @@ void IonUpdaterMultiTS<Ions, Electromag, GridLayout>::updateAndDepositDomain_(
 
     if constexpr (any_in(Particles::alloc_mode, AllocatorMode::GPU_UNIFIED))
     {
-        throw std::runtime_error("finish");
+        in.streamer.host([&](auto const i) mutable {
+            PHARE_LOG_LINE_SS(i);
+            auto& view = in.views[i];
+            for (std::size_t j = 0; j < view.ions.size(); ++j)
+            {
+                auto const popidx = view.ions.size() * i + j;
+                auto& pop         = view.ions[j];
+
+                std::uint32_t const ds = in.views[i].ions.density().max_tile_size();
+
+                auto pps = *MultiBoris_t::domains[popidx];
+
+                using Launcher = gpu::ChunkLauncher<false>;
+                Launcher launcher{1, 0};
+                launcher.b.x = kernel::warp_size();
+                launcher.g.x = pps().size();
+                launcher.ds  = ds * 4 * 8;
+
+                assert(launcher.ds < 65000);
+
+                auto density = pop.density();
+                auto flux    = *pop.flux();
+
+                launcher.stream(in.streamer.streams[i], [=] __device__() mutable {
+                    Interpolating_t::template on_tiles<Tile_vt>(pps, flux, density);
+                });
+            }
+        });
     }
     else
     {
@@ -168,8 +199,6 @@ void IonUpdaterMultiTS<Ions, Electromag, GridLayout>::updateAndDepositAll_(Model
         return;
 
 #if PHARE_HAVE_MKN_GPU
-
-    using field_type = Ions::field_type::value_type;
 
 
     MultiBoris<ModelViews> in{dt_, views};
@@ -229,24 +258,54 @@ void IonUpdaterMultiTS<Ions, Electromag, GridLayout>::updateAndDepositAll_(Model
     {
         in.streamer.host([&](auto const i) mutable {
             PHARE_LOG_LINE_SS("");
-            auto& view     = in.views[i];
-            using Launcher = gpu::ChunkLauncher<false>;
+            // auto& view     = in.views[i];
+            // using Launcher = gpu::ChunkLauncher<false>;
 
-            for (auto& pop : view.ions)
+            // for (auto& pop : view.ions)
+            // {
+            //     auto const domain = *pop.domainParticles();
+            //     auto const pghost = *pop.patchGhostParticles();
+            //     PHARE_LOG_LINE_SS(pop.domainParticles().size() << " " << domain.size());
+            //     Launcher launcher{1, 0};
+            //     launcher.b.x = kernel::warp_size();
+            //     launcher.g.x = domain().size();
+            //     launcher.ds  = 9 * 9 * 9 * 4 * 8; // !!!! NO LONGER VALID non-homogenuous tile
+            //     sizes launcher.stream(in.streamer.streams[i],
+            //                     [=, layout = view.layout] __device__() mutable {
+            //                         Interpolating_t::template on_tiles<field_type>(domain,
+            //                         layout); Interpolating_t::template
+            //                         on_tiles<field_type>(pghost, layout);
+            //                     });
+            //     in.streamer.streams[i].sync();
+            // }
+
+            PHARE_LOG_LINE_SS(i);
+            auto& view = in.views[i];
+            for (std::size_t j = 0; j < view.ions.size(); ++j)
             {
+                auto const popidx = view.ions.size() * i + j;
+                auto& pop         = view.ions[j];
+
+                std::uint32_t const ds = in.views[i].ions.density().max_tile_size();
+
                 auto const domain = *pop.domainParticles();
                 auto const pghost = *pop.patchGhostParticles();
-                PHARE_LOG_LINE_SS(pop.domainParticles().size() << " " << domain.size());
+
+                using Launcher = gpu::ChunkLauncher<false>;
                 Launcher launcher{1, 0};
                 launcher.b.x = kernel::warp_size();
                 launcher.g.x = domain().size();
-                launcher.ds  = 9 * 9 * 9 * 4 * 8; // !!!! NO LONGER VALID non-homogenuous tile sizes
-                launcher.stream(in.streamer.streams[i],
-                                [=, layout = view.layout] __device__() mutable {
-                                    Interpolating_t::template on_tiles<field_type>(domain, layout);
-                                    Interpolating_t::template on_tiles<field_type>(pghost, layout);
-                                });
-                in.streamer.streams[i].sync();
+                launcher.ds  = ds * 4 * 8;
+
+                assert(launcher.ds < 65000);
+
+                auto density = pop.density();
+                auto flux    = *pop.flux();
+
+                launcher.stream(in.streamer.streams[i], [=] __device__() mutable {
+                    Interpolating_t::template on_tiles<Tile_vt>(domain, flux, density);
+                    Interpolating_t::template on_tiles<Tile_vt>(pghost, flux, density);
+                });
             }
         });
     }
@@ -278,18 +337,6 @@ void IonUpdaterMultiTS<Ions, Electromag, GridLayout>::updateAndDepositAll_(Model
 
     in.streamer.join(false);
 
-    if constexpr (any_in(Particles::alloc_mode, AllocatorMode::GPU_UNIFIED))
-    {
-        for (auto& stream : in.streamer.streams)
-            stream.sync();
-
-        for (auto& view : views)
-            for (auto& pop : view.ions)
-                Interpolating_t::ts_reducer(pop.domainParticles(), view.layout, pop.flux(),
-                                            pop.density());
-
-        in.streamer().sync();
-    }
 
     in.streamer.dump_times(detail::timings_dir_str + "/updateAndDepositDomain_.txt");
 

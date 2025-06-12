@@ -4,6 +4,7 @@
 
 
 #include "core/def.hpp"
+#include "core/def/phare_config.hpp"
 #include "core/utilities/box/box.hpp"
 #include "core/data/particles/particle_array_def.hpp"
 #include "core/data/particles/particle_array_appender.hpp"
@@ -155,6 +156,14 @@ void ParticlesExporter<AoSTS, CPU>::delete_particles(Src& src, Box_t const& box)
     }
 
     src.sync();
+}
+
+template<>
+template<bool in, typename Src, typename Box_t>
+void ParticlesExporter<AoSTS, AllocatorMode::GPU_UNIFIED>::delete_particles(Src& src,
+                                                                            Box_t const& box)
+{
+    ParticlesExporter<AoSTS, CPU>{}.delete_particles<in>(src, box);
 }
 
 

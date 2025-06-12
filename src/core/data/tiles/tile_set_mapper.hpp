@@ -2,7 +2,6 @@
 #define PHARE_CORE_DATA_TILES_TILE_SET_MAPPER_HPP
 
 #include "core/logger.hpp"
-// #include "core/utilities/types.hpp"
 #include "core/utilities/box/box.hpp"
 #include "core/utilities/point/point.hpp"
 
@@ -30,13 +29,15 @@ struct Tiler;
 template<typename TileSet_t>
 struct Tiler<TileSet_t, 0> : public ATiler<TileSet_t>
 {
-    static inline std::string const env_key = "PHARE_TILING_MIN_BEFORE_SPLIT";
+    static inline std::string const min_key = "PHARE_TILING_MIN_BEFORE_SPLIT";
+    static inline std::string const max_key = "PHARE_TILING_MAX_SIZE";
 
     template<typename... Args>
     auto f(Args&&... args);
 
-    std::size_t const min_tile_size               = 6;
-    std::size_t const min_patch_size_before_split = get_env_as(env_key, min_tile_size * 2);
+    std::size_t const min_tile_size               = 4;
+    std::size_t const max_tile_size               = get_env_as(max_key, 7);
+    std::size_t const min_patch_size_before_split = get_env_as(min_key, min_tile_size * 2);
 };
 
 
@@ -72,8 +73,8 @@ auto Tiler<TileSet_t, 0>::f(Args&&... args)
         {
             if (middle / 6 < 3)
             {
-                sizes.emplace_back(6);
-                sizes.emplace_back(middle - 6);
+                sizes.emplace_back(7);
+                sizes.emplace_back(7);
             }
             else
             {
@@ -90,6 +91,17 @@ auto Tiler<TileSet_t, 0>::f(Args&&... args)
         }
 
         sizes.push_back(border);
+
+        for (auto const s : sizes)
+        {
+            PHARE_LOG_LINE_SS(s);
+        }
+
+        for (auto const s : sizes)
+        {
+            assert(s <= max_tile_size);
+        }
+
         return sizes;
     };
 

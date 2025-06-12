@@ -109,7 +109,7 @@ struct MultiBorisFunctors
         check_particles_views(parts);
     }
 
-    void check(auto const& particle)
+    void check(auto const& particle) _PHARE_ALL_FN_
     {
         for (std::size_t i = 0; i < GridLayout_t::dimension; ++i)
         {
@@ -118,7 +118,7 @@ struct MultiBorisFunctors
         }
     }
 
-    void operator()()
+    void operator()(auto& in, auto const i)
     {
         if constexpr (Particles_t::alloc_mode == AllocatorMode::GPU_UNIFIED)
         {
@@ -137,7 +137,7 @@ struct MultiBorisFunctors
             };
 
             launcher.stream(in.streamer.streams[i],
-                            [self = *this] __device__() mutable { self.per_tile(tile_picker); });
+                            [=, self = *this] __device__() mutable { self.per_tile(tile_picker); });
 #endif // PHARE_HAVE_MKN_GPU
         }
         else
@@ -152,7 +152,7 @@ struct MultiBorisFunctors
         }
     }
 
-    void per_tile(auto const& tile_picker)
+    void per_tile(auto const& tile_picker) _PHARE_ALL_FN_
     {
         auto&& [tile_idx, tileptr, tidx, ws] = tile_picker();
         auto const& tile_idx_                = tile_idx; // bindings issue
@@ -174,18 +174,18 @@ struct MultiBorisFunctors
             if (tidx < parts.size() - (ws * each))
                 per_any_particle(parts, layout, tile_cell, pid * ws + tidx, em);
     }
-    void per_any_particle(auto& particles, auto&&... args)
+    void per_any_particle(auto& particles, auto&&... args) _PHARE_ALL_FN_
     {
         auto const& pidx = std::get<2>(std::forward_as_tuple(args...));
 #if PHARE_HAVE_THRUST
         using enum LayoutMode;
         if constexpr (any_in(Particles_t::layout_mode, SoA, SoAPC, SoATS))
-            per_particle(detail::SoAZipParticle{particles, pidx}, args...);
+            per_particle(SoAZipParticle{particles, pidx}, args...);
         else
 #endif
             per_particle(particles[pidx], args...);
     }
-    void per_particle_still_in_ghost_box(auto&&... args)
+    void per_particle_still_in_ghost_box(auto&&... args) _PHARE_ALL_FN_
     {
         static constexpr auto alloc_mode                    = Particles_t::alloc_mode;
         auto const& [particle, layout, tile_cell, pidx, em] = std::forward_as_tuple(args...);
@@ -208,7 +208,7 @@ struct MultiBorisFunctors
             }
         check(particle);
     }
-    void per_particle(auto&&... args)
+    void per_particle(auto&&... args) _PHARE_ALL_FN_
     {
         static constexpr auto alloc_mode                    = Particles_t::alloc_mode;
         auto const& [particle, layout, tile_cell, pidx, em] = std::forward_as_tuple(args...);
@@ -283,12 +283,12 @@ public:
                 auto& domain
                     = copy ? MultiBoris<ModelViews>::domains[popidx] : pop.domainParticles();
                 domain.reset_views();
-                Functors<ParticleType::Domain, mode>{in, view, pop, domain}();
+                Functors<ParticleType::Domain, mode>{in, view, pop, domain}(in, i);
 
                 auto& level_ghost = copy ? MultiBoris<ModelViews>::levelGhosts[popidx]
                                          : pop.levelGhostParticles();
                 level_ghost.reset_views();
-                Functors<ParticleType::LevelGhost, mode>{in, view, pop, level_ghost}();
+                Functors<ParticleType::LevelGhost, mode>{in, view, pop, level_ghost}(in, i);
             }
         });
 

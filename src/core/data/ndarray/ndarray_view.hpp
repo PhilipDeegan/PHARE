@@ -33,7 +33,7 @@ struct NdArrayViewer
             return idx(nCells, indexes[0], indexes[1], indexes[2]);
     }
 
-    static inline std::uint32_t idx(auto const nCells, Idx i) _PHARE_ALL_FN_ { return i; }
+    static inline std::uint32_t idx(auto const /*nCells*/, Idx i) _PHARE_ALL_FN_ { return i; }
 
 
     static inline std::uint32_t idx(auto const nCells, Idx i, Idx j) _PHARE_ALL_FN_

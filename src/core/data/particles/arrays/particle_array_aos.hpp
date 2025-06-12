@@ -295,13 +295,10 @@ struct AoSParticles : public Super_
     using Super::particles_;
 
 
-    AoSParticles(AoSParticles&& that)
-        : Super{std::forward<AoSParticles>(that)}
-    {
-    }
-    AoSParticles(AoSParticles const&)            = default;
-    AoSParticles& operator=(AoSParticles&&)      = default;
-    AoSParticles& operator=(AoSParticles const&) = default;
+    AoSParticles(AoSParticles&& that) _PHARE_ALL_FN_ : Super{std::forward<AoSParticles>(that)} {}
+    AoSParticles(AoSParticles const&) _PHARE_ALL_FN_       = default;
+    AoSParticles& operator=(AoSParticles&&) _PHARE_ALL_FN_ = default;
+    AoSParticles& operator=(AoSParticles const&)           = default;
 
     template<typename... Args>
     AoSParticles(Args&&... args)
@@ -324,6 +321,8 @@ struct AoSParticles : public Super_
     template<typename T, typename... Args>
     auto static it(T* t, Args&&... args) _PHARE_ALL_FN_
     {
+        // static_assert(storage_mode == StorageMode::SPAN);
+
         if constexpr (storage_mode == StorageMode::SPAN)
             return iterator_impl<T>{*t, args...};
         else
@@ -389,13 +388,7 @@ struct AoSParticles : public Super_
         std::swap(particles_[a], particles_[b]);
     }
 
-    void replace_from(This const& that)
-    {
-        if (this == &that) // just in case
-            return;
-        this->resize(that.size());
-        std::copy(that.begin(), that.end(), this->begin());
-    }
+
 
     void check() const {}
 
@@ -416,7 +409,7 @@ struct AoSParticles : public Super_
         assign(particles_[src], dst);
     }
 
-    auto nbr_particles_in(Box<int, dimension> const box) const
+    auto nbr_particles_in(Box<int, dimension> const /*box*/) const
     {
         throw std::runtime_error("finish this");
 
@@ -682,14 +675,6 @@ public:
     auto& box() const { return box_; }
 
 
-    void replace_from(This const& that)
-    {
-        if (this == &that) // just in case
-            return;
-        Super::replace_from(that);
-        this->box_     = that.box_;
-        this->cellMap_ = that.cellMap_;
-    }
 
 
 protected:
@@ -719,8 +704,8 @@ struct AoSParticles<OuterSuper>::iterator_impl
                                                                            curr_pos{s}
     {
     }
-    iterator_impl(iterator_impl&& that)      = default;
-    iterator_impl(iterator_impl const& that) = default;
+    iterator_impl(iterator_impl&& that) _PHARE_ALL_FN_      = default;
+    iterator_impl(iterator_impl const& that) _PHARE_ALL_FN_ = default;
 
     iterator_impl& operator=(iterator_impl&& that)      = default;
     iterator_impl& operator=(iterator_impl const& that) = default;

@@ -7,7 +7,7 @@
 
 // USE HIP_VISIBLE_DEVICES OR CUDA_VISIBLE_DEVICES env vars
 
-// #define PHARE_UNDEF_ASSERT
+#define PHARE_UNDEF_ASSERT
 #include "core/logger.hpp"
 #define PHARE_SKIP_MPI_IN_CORE
 
@@ -30,7 +30,7 @@
 namespace PHARE::core
 {
 // RUNTIME ENV VAR OVERRIDES
-auto static const bytes     = get_env_as("PHARE_GPU_BYTES", std::uint64_t{50000000});
+auto static const bytes     = get_env_as("PHARE_GPU_BYTES", std::uint64_t{500000000});
 auto static const cells     = get_env_as("PHARE_CELLS", std::uint32_t{12});
 auto static const ppc       = get_env_as("PHARE_PPC", std::size_t{100});
 auto static const seed      = get_env_as("PHARE_SEED", std::size_t{1067});
@@ -44,8 +44,8 @@ auto static const ref_only  = get_env_as("PHARE_REF_ONLY", std::size_t{0});
 
 bool static const premain = []() {
     assert(!(cmp_only and ref_only) && "Cant have both only");
-    PHARE_WITH_MKN_GPU({
-        // ::mkn::gpu::setLimitMallocHeapSize(bytes);
+    PHARE_WITH_MKN_GPU({ //
+        ::mkn::gpu::setLimitMallocHeapSize(bytes);
     })
 
     PHARE_WITH_PHLOP({
@@ -171,7 +171,8 @@ auto make_ions(GridLayout_t const& layout)
         particles.domain_particles.reserve(particle_box.size() * ppc);
         add_particles_in(particles.domain_particles, particle_box, ppc);
 
-        add_ghost_particles(particles.level_ghost_particles, particle_box, ppc, GridLayout_t::nbrParticleGhosts());
+        add_ghost_particles(particles.level_ghost_particles, particle_box, ppc,
+                            GridLayout_t::nbrParticleGhosts());
     };
 
     add_particles(ions.populations[0].particles);
@@ -368,12 +369,13 @@ struct MultiPatchIonUpdaterTest : public ::testing::Test
 // clang-format off
 using Permutations_t = testing::Types< // ! notice commas !
 
-     TestParam<3, LayoutMode::AoSTS, AllocatorMode::CPU,  UpdaterMode::domain_only>
-    ,TestParam<3, LayoutMode::AoSTS, AllocatorMode::CPU,  UpdaterMode::all>
+     TestParam<3, LayoutMode::AoSTS, AllocatorMode::CPU, UpdaterMode::domain_only>
+    ,TestParam<3, LayoutMode::AoSTS, AllocatorMode::CPU, UpdaterMode::all>
 
 PHARE_WITH_GPU(
 
-    ,TestParam<3, LayoutMode::AoSTS, AllocatorMode::GPU_UNIFIED,  UpdaterMode::all>
+    ,TestParam<3, LayoutMode::AoSTS, AllocatorMode::GPU_UNIFIED, UpdaterMode::domain_only>
+    ,TestParam<3, LayoutMode::AoSTS, AllocatorMode::GPU_UNIFIED, UpdaterMode::all>
 
 )
 

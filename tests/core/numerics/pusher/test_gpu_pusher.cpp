@@ -44,7 +44,7 @@ TYPED_TEST(PusherTest, doesMoveParticles)
     auto constexpr static no_op          = [](auto& particleRange) { return particleRange; };
 
     using ParticleArray_t   = TypeParam;
-    using PHARE_Types       = PHARE::core::PHARE_Types<SimOpts{dim, interp}>;
+    using PHARE_Types       = PHARE::core::PHARE_Types<PHARE::SimOpts{dim, interp}>;
     using GridLayout_t      = TestGridLayout<typename PHARE_Types::GridLayout_t>;
     using Electromag_t      = UsableElectromag<GridLayout_t, ParticleArray_t::alloc_mode>;
     using BoundaryCondition = PHARE::core::BoundaryCondition<dim, interp>;

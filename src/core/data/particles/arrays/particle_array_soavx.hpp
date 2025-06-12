@@ -77,14 +77,11 @@ struct SoAVXArray
     }
 
 #if PHARE_HAVE_THRUST
-    auto operator[](std::size_t const& s) _PHARE_ALL_FN_
-    {
-        return detail::SoAVXZipParticle(*this, s);
-    }
+    auto operator[](std::size_t const& s) _PHARE_ALL_FN_ { return SoAVXZipParticle(*this, s); }
 
     auto operator[](std::size_t const& s) const _PHARE_ALL_FN_
     {
-        return detail::SoAVXZipConstParticle(*this, s);
+        return SoAVXZipConstParticle(*this, s);
     }
 #endif
 
@@ -433,12 +430,12 @@ public:
     //     }
 
     //     template<typename That>
-    //     auto emplace_back(detail::SoAVXZipParticle<That> const& particle)
+    //     auto emplace_back(SoAVXZipParticle<That> const& particle)
     //     {
     //         return emplace_back_zip(particle);
     //     }
     //     template<typename That>
-    //     auto emplace_back(detail::SoAVXZipConstParticle<That> const& particle)
+    //     auto emplace_back(SoAVXZipConstParticle<That> const& particle)
     //     {
     //         return emplace_back_zip(particle);
     //     }
@@ -588,17 +585,6 @@ public:
     auto back() { return (*this)[size() - 1]; }
     auto front() { return (*this)[0]; }
 
-    // auto operator[](std::size_t const& s) const { return copy(s); }
-
-    void replace_from(This const& that)
-    {
-        if (this == &that) // just in case
-            return;
-        auto src_tuple = that.as_tuple();
-        auto dst_tuple = this->as_tuple();
-        for_N<std::tuple_size_v<decltype(src_tuple)>>(
-            [&](auto i) { std::get<i>(dst_tuple) = std::get<i>(src_tuple); });
-    }
 
     auto constexpr static size_of_particle()
     {
@@ -647,15 +633,12 @@ public:
     }
 
 #if PHARE_HAVE_THRUST // needs thrust or no compile on non-const access
-    auto operator[](std::size_t const& s) _PHARE_ALL_FN_
-    {
-        return detail::SoAVXZipParticle(*this, s);
-    }
+    auto operator[](std::size_t const& s) _PHARE_ALL_FN_ { return SoAVXZipParticle(*this, s); }
 #endif
 
     auto operator[](std::size_t const& s) const _PHARE_ALL_FN_
     {
-        return PHARE_WITH_THRUST(detail::SoAVXZipConstParticle(*this, s));
+        return PHARE_WITH_THRUST(SoAVXZipConstParticle(*this, s));
         // else
         PHARE_WITH_THRUST_ELSE(copy(s));
     }

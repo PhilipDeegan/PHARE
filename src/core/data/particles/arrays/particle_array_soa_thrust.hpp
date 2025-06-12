@@ -44,12 +44,8 @@ using SoAParticle_rt = std::tuple<double&,                  //  weight
 
 
 
-} // namespace PHARE::core
 
 #if PHARE_HAVE_THRUST
-
-namespace PHARE::core::detail
-{
 template<typename SoAParticles_t>
 struct SoAZipParticle;
 
@@ -249,8 +245,8 @@ struct SoAVXIteratorAdaptor
     template<std::uint8_t dim, std::uint8_t idx = 0, typename T>
     static auto& v(T&& it) _PHARE_ALL_FN_
     {
-        // 1d start = 4  // 3 +1 + 0 == 4
-        // 3d start = 6  // 3 +3 + 0 == 6
+        // 1d start = 4  // 3 + 1 + 0 == 4
+        // 3d start = 6  // 3 + 3 + 0 == 6
 
         return thrust::get<3 + dim + idx>(it);
     }
@@ -333,11 +329,7 @@ struct SoAVXZipConstParticle
 };
 
 
-} // namespace PHARE::core::detail
 
-
-namespace PHARE::core
-{
 
 template<typename SoAParticles_t, bool _is_const = false>
 struct SoAZipParticle_t
@@ -345,9 +337,8 @@ struct SoAZipParticle_t
     bool static constexpr is_const
         = _is_const || std::is_const_v<std::remove_reference_t<SoAParticles_t>>;
 
-    using value_type
-        = std::conditional_t<is_const, detail::SoAZipConstParticle<SoAParticles_t const>,
-                             detail::SoAZipParticle<SoAParticles_t>>;
+    using value_type = std::conditional_t<is_const, SoAZipConstParticle<SoAParticles_t const>,
+                                          SoAZipParticle<SoAParticles_t>>;
 };
 
 template<typename SoAParticles_t, bool _is_const = false>
@@ -356,9 +347,8 @@ struct SoAVXZipParticle_t
     bool static constexpr is_const
         = _is_const || std::is_const_v<std::remove_reference_t<SoAParticles_t>>;
 
-    using value_type
-        = std::conditional_t<is_const, detail::SoAVXZipConstParticle<SoAParticles_t const>,
-                             detail::SoAVXZipParticle<SoAParticles_t>>;
+    using value_type = std::conditional_t<is_const, SoAVXZipConstParticle<SoAParticles_t const>,
+                                          SoAVXZipParticle<SoAParticles_t>>;
 };
 
 
@@ -375,18 +365,17 @@ auto particle_zip_iterator(Particles& ps, std::size_t const i)
 }
 
 template<typename T, std::size_t dim>
-auto partitionner(detail::SoAIteratorAdaptor& begin, detail::SoAIteratorAdaptor& end,
-                  Box<T, dim> const& box)
+auto partitionner(SoAIteratorAdaptor& begin, SoAIteratorAdaptor& end, Box<T, dim> const& box)
 {
     return partitionner(begin, end, box, [&box](auto const& part) {
-        return isIn(detail::SoAIteratorAdaptor::iCell(part), box);
+        return isIn(SoAIteratorAdaptor::iCell(part), box);
     });
 }
 
-} // namespace PHARE::core
-
 
 #endif //  PHARE_HAVE_THRUST
+
+} // namespace PHARE::core
 
 
 #endif /* PHARE_CORE_DATA_PARTICLES_PARTICLE_ARRAY_SOA_THRUST_HPP */

@@ -208,28 +208,30 @@ public:
 #endif // PHARE_HAVE_MKN_GPU_HW
     }
 
-    template<typename Field, typename Particles, typename GridLayout>
-    static void on_tiles(Particles& particles, GridLayout& layout, double coef = 1.) _PHARE_DEV_FN_
+    template<typename Field_t>
+    static void on_tiles(auto& particles, auto& Flux, auto& Density,
+                         double coef = 1.) _PHARE_DEV_FN_
     {
 #if PHARE_HAVE_MKN_GPU_HW
+        // printf("L:%d i %llu \n", __LINE__, blockIdx.x);
 
         static_assert(atomic_ops, "GPU must be atomic");
-        // using TensorField_t = basic::TensorField<Field, 1>;
-        extern __shared__ double data[];
-        // printf("L:%d i %llu \n", __LINE__, blockIdx.x);
-        auto const ziz  = 9 * 9 * 9;
-        auto& tile      = particles()[blockIdx.x];
-        auto& parts     = tile();
-        auto const tbox = tile.field_box(); //(*tile).unsafe_intersection(particles.box());
-        auto const tidx = threadIdx.x;
-        auto const ws   = kernel::warp_size();
-        auto const each = parts.size() / ws;
-        auto const& [density, flux0, flux1, flux2] = tile.fields();
-        auto const r0                              = density;
+        using TensorField_t = basic::TensorField<typename Field_t::value_type, 1>;
 
-        using Field_        = std::decay_t<decltype(flux0)>;
-        using TensorField_t = basic::TensorField<Field_, 1>;
-        TensorField_t flux{flux0, flux1, flux2};
+        extern __shared__ double data[];
+
+        auto& rt      = Density[blockIdx.x];
+        auto ft       = Flux.template as<TensorField_t>([&](auto& c) { return c[blockIdx.x](); });
+        auto& density = rt(); // as ref = crash?
+
+        auto& tile                        = particles()[blockIdx.x];
+        auto const tbox                   = rt.ghost_box();
+        auto const ziz                    = product(tbox.shape());
+        auto const tidx                   = threadIdx.x;
+        auto const ws                     = kernel::warp_size();
+        auto const& [flux0, flux1, flux2] = ft();
+        auto const r0                     = density;
+        auto flux                         = ft;
 
         auto rho = make_array_view(&data[ziz * 0], density.shape());
         auto fx  = make_array_view(&data[ziz * 1], flux[0].shape());
@@ -241,32 +243,47 @@ public:
         flux[1].reset(fy);
         flux[2].reset(fz);
 
-        if (tidx == 0)
-            for (std::size_t i = 0; i < ziz * 4; ++i)
-                data[i] = 0;
+        mkn::gpu::zero(data, ziz * 4);
 
         Interpolator_t interp;
         std::size_t pid = 0;
 
-        __syncthreads();
-        for (; pid < each; ++pid)
-            interp.particleToMesh(parts[(pid * ws) + tidx], density, flux, layout, tbox, coef);
-        if (tidx < parts.size() - (ws * each))
-            interp.particleToMesh(parts[(pid * ws) + tidx], density, flux, layout, tbox, coef);
-        __syncthreads();
+        auto& parts = tile();
+        {
+            auto const each = parts.size() / ws;
+            __syncthreads();
+            for (; pid < each; ++pid)
+                interp.particleToMesh(parts[(pid * ws) + tidx], density, flux, /*layout,*/ tbox,
+                                      coef);
+            if (tidx < parts.size() - (ws * each))
+                interp.particleToMesh(parts[(pid * ws) + tidx], density, flux, /*layout,*/ tbox,
+                                      coef);
+            __syncthreads();
+        }
+
 
         density.reset(r0);
 
-        if (tidx == 0)
+        auto const each = rho.size() / ws;
+        pid             = 0;
+        for (; pid < each; ++pid)
         {
-            for (std::size_t i = 0; i < rho.size(); ++i)
-            {
-                density.data()[i] += rho.data()[i];
-                flux0.data()[i] += fx.data()[i];
-                flux1.data()[i] += fy.data()[i];
-                flux2.data()[i] += fz.data()[i];
-            }
-        };
+            auto const i = (pid * ws) + tidx;
+            density.data()[i] += rho.data()[i];
+            flux0.data()[i] += fx.data()[i];
+            flux1.data()[i] += fy.data()[i];
+            flux2.data()[i] += fz.data()[i];
+        }
+
+        if (tidx < parts.size() - (ws * each))
+        {
+            auto const i = pid * ws + tidx;
+            density.data()[i] += rho.data()[i];
+            flux0.data()[i] += fx.data()[i];
+            flux1.data()[i] += fy.data()[i];
+            flux2.data()[i] += fz.data()[i];
+        }
+
 
 #endif
     }
@@ -289,7 +306,7 @@ public:
             Interpolator_t interp;
             std::size_t pid = 0;
 
-            interp.particleToMesh(parts[pid], density, flux, layout, tbox, coef);
+            interp.particleToMesh(parts[pid], density, flux, /*layout,*/ tbox, coef);
         }
     }
 
@@ -402,38 +419,7 @@ public:
 #endif // PHARE_HAVE_MKN_GPU_HW
     }
 
-    template<typename Particles, typename GridLayout, typename VecField, typename Field>
-    static void ts_reducer(Particles& particles, GridLayout const& layout, VecField& flux,
-                           Field& density) _PHARE_ALL_FN_
-    {
-        auto const box = particles.box();
 
-        for (std::size_t tidx = 0; tidx < particles().size(); ++tidx)
-        {
-            auto const& ptile    = particles()[tidx];
-            auto const& tile_box = ptile.field_box();
-            auto& rtile          = density()[tidx];
-
-            auto const amr_tile_ghost_box
-                = rtile.layout().AMRGhostBoxFor(HybridQuantity::Scalar::rho);
-
-            auto& f0tile = flux[0]()[tidx];
-            auto& f1tile = flux[1]()[tidx];
-            auto& f2tile = flux[2]()[tidx];
-
-            auto const& [r0, f0, f1, f2] = ptile.fields();
-            for (auto const& bix : shrink(ptile.field_box(), 2))
-            {
-                auto const plix = (bix - amr_tile_ghost_box.lower()).as_unsigned();
-                auto const tlix = (bix - tile_box.lower()).as_unsigned();
-
-                rtile(plix) += r0(tlix);
-                f0tile(plix) += f0(tlix);
-                f1tile(plix) += f1(tlix);
-                f2tile(plix) += f2(tlix);
-            }
-        }
-    }
 
 
     Interpolator_t interp_;
