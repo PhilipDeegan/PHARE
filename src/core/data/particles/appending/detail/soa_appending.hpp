@@ -16,13 +16,13 @@
 namespace PHARE::core
 {
 
-using enum LayoutMode;
-using enum AllocatorMode;
+using LM = LayoutMode;
+using AM = AllocatorMode;
 
 
 template<>
 template<auto type, typename Src, typename Dst>
-void ParticlesAppender<AoSMapped, CPU, SoA, CPU>::operator()( //
+void ParticlesAppender<LM::AoSMapped, AM::CPU, LM::SoA, AM::CPU>::operator()( //
     Src const& src, Dst& dst)
 {
     dst.reserve(dst.size() + src.size());
@@ -34,7 +34,7 @@ void ParticlesAppender<AoSMapped, CPU, SoA, CPU>::operator()( //
 // AoSMapped-CPU to SoAPC-GPU_UNIFIED
 template<>
 template<auto type, typename Src, typename Dst>
-void ParticlesAppender<AoSMapped, CPU, SoAPC, GPU_UNIFIED>::operator()( //
+void ParticlesAppender<LM::AoSMapped, AM::CPU, LM::SoAPC, AM::GPU_UNIFIED>::operator()( //
     Src const& src, Dst& dst)
 {
     static constexpr std::uint8_t N = 128;
@@ -93,7 +93,7 @@ void ParticlesAppender<AoSMapped, CPU, SoAPC, GPU_UNIFIED>::operator()( //
 
 template<>
 template<auto type, typename Src, typename Dst>
-void ParticlesAppender<AoSMapped, CPU, SoATS, GPU_UNIFIED>::operator()( //
+void ParticlesAppender<LM::AoSMapped, AM::CPU, LM::SoATS, AM::GPU_UNIFIED>::operator()( //
     Src const& src, Dst& dst)
 {
     static constexpr std::uint8_t N = 128;
@@ -153,7 +153,7 @@ void ParticlesAppender<AoSMapped, CPU, SoATS, GPU_UNIFIED>::operator()( //
 
 template<>
 template<auto type, typename Src, typename Dst>
-void ParticlesAppender<AoSMapped, CPU, SoATS, CPU>::operator()( //
+void ParticlesAppender<LM::AoSMapped, AM::CPU, LM::SoATS, AM::CPU>::operator()( //
     Src const& src, Dst& dst)
 {
     auto const overlap = src.box() * dst.ghost_box();
@@ -182,7 +182,7 @@ void ParticlesAppender<AoSMapped, CPU, SoATS, CPU>::operator()( //
 
 template<>
 template<auto type, typename Src, typename Dst>
-void ParticlesAppender<AoSMapped, CPU, SoAVX, CPU>::operator()( //
+void ParticlesAppender<LM::AoSMapped, AM::CPU, LM::SoAVX, AM::CPU>::operator()( //
     Src const& src, Dst& dst)
 {
     dst.reserve(dst.size() + src.size());
@@ -193,7 +193,7 @@ void ParticlesAppender<AoSMapped, CPU, SoAVX, CPU>::operator()( //
 
 template<>
 template<auto type, typename Src, typename Dst>
-void ParticlesAppender<AoSMapped, CPU, SoAVXTS, CPU>::operator()( //
+void ParticlesAppender<LM::AoSMapped, AM::CPU, LM::SoAVXTS, AM::CPU>::operator()( //
     Src const& src, Dst& dst)
 {
     static constexpr std::uint8_t N = 128;

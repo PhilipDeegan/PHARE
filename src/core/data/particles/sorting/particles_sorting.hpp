@@ -38,7 +38,7 @@ namespace PHARE::core
 template<typename ParticleArray, std::size_t impl = 0>
 struct ParticleArraySorter
 {
-    using enum LayoutMode;
+    using LM        = LayoutMode;
     using box_t     = Box<int, ParticleArray::dimension>;
     using sort_impl = detail::ParticleSorter<ParticleArray::alloc_mode, impl, ParticleArray>;
 
@@ -49,7 +49,7 @@ struct ParticleArraySorter
 
     bool constexpr static is_cell_sortable()
     {
-        return !any_in(ParticleArray::layout_mode, AoSPC, SoAPC);
+        return !any_in(ParticleArray::layout_mode, LM::AoSPC, LM::SoAPC);
     }
 
     auto constexpr static sortable      = is_sortable();

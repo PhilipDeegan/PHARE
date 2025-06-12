@@ -12,13 +12,13 @@
 namespace PHARE::core
 {
 
-using enum LayoutMode;
-using enum AllocatorMode;
+using LM = LayoutMode;
+using AM = AllocatorMode;
 
 
 template<>
 template<auto type, typename Src, typename Dst>
-void ParticlesAppender<AoSMapped, CPU, AoS, CPU>::operator()( //
+void ParticlesAppender<LM::AoSMapped, AM::CPU, LM::AoS, AM::CPU>::operator()( //
     Src const& src, Dst& dst)
 {
     dst.reserve(dst.size() + src.size());
@@ -29,7 +29,7 @@ void ParticlesAppender<AoSMapped, CPU, AoS, CPU>::operator()( //
 
 template<>
 template<auto type, typename Src, typename Dst>
-void ParticlesAppender<AoSMapped, CPU, AoSPC, GPU_UNIFIED>::operator()( //
+void ParticlesAppender<LM::AoSMapped, AM::CPU, LM::AoSPC, AM::GPU_UNIFIED>::operator()( //
     Src const& src, Dst& dst)
 {
     auto const overlap = src.box() * dst.ghost_box();
@@ -55,7 +55,7 @@ void ParticlesAppender<AoSMapped, CPU, AoSPC, GPU_UNIFIED>::operator()( //
 
 template<>
 template<auto type, typename Src, typename Dst>
-void ParticlesAppender<AoSMapped, CPU, AoSTS, GPU_UNIFIED>::operator()( //
+void ParticlesAppender<LM::AoSMapped, AM::CPU, LM::AoSTS, AM::GPU_UNIFIED>::operator()( //
     Src const& src, Dst& dst)
 {
     PHARE_LOG_SCOPE(3, "ParticlesAppender<AoSMapped, CPU, AoSTS, GPU_UNIFIED>::operator()");
@@ -90,7 +90,7 @@ void ParticlesAppender<AoSMapped, CPU, AoSTS, GPU_UNIFIED>::operator()( //
 
 template<>
 template<auto type, typename Src, typename Dst>
-void ParticlesAppender<AoSMapped, CPU, AoSTS, CPU>::operator()( //
+void ParticlesAppender<LM::AoSMapped, AM::CPU, LM::AoSTS, AM::CPU>::operator()( //
     Src const& src, Dst& dst)
 {
     PHARE_LOG_SCOPE(3, "ParticlesAppender<AoSMapped, CPU, AoSTS, CPU>::operator()");
