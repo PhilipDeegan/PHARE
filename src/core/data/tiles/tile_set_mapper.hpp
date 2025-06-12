@@ -35,8 +35,8 @@ struct Tiler<TileSet_t, 0> : public ATiler<TileSet_t>
     template<typename... Args>
     auto f(Args&&... args);
 
-    std::size_t const min_tile_size               = 4;
-    std::size_t const max_tile_size               = get_env_as(max_key, 7);
+    std::size_t const min_tile_size = 4;
+    std::size_t const max_tile_size = get_env_as(max_key, 20); // matters for gpu dynamic shared mem
     std::size_t const min_patch_size_before_split = get_env_as(min_key, min_tile_size * 2);
 };
 
@@ -73,8 +73,8 @@ auto Tiler<TileSet_t, 0>::f(Args&&... args)
         {
             if (middle / 6 < 3)
             {
-                sizes.emplace_back(7);
-                sizes.emplace_back(7);
+                sizes.emplace_back(6);
+                sizes.emplace_back(middle - 6);
             }
             else
             {
@@ -92,15 +92,15 @@ auto Tiler<TileSet_t, 0>::f(Args&&... args)
 
         sizes.push_back(border);
 
-        for (auto const s : sizes)
-        {
-            PHARE_LOG_LINE_SS(s);
-        }
+        // for (auto const s : sizes)
+        // {
+        //     PHARE_LOG_LINE_SS(s);
+        // }
 
-        for (auto const s : sizes)
-        {
-            assert(s <= max_tile_size);
-        }
+        // for (auto const s : sizes)
+        // {
+        //     assert(s <= max_tile_size);
+        // }
 
         return sizes;
     };
@@ -167,7 +167,7 @@ auto Tiler<TileSet_t, 0>::f(Args&&... args)
 template<std::uint8_t impl = 0, typename TileSet_t, typename... Args>
 void tile_set_make_tiles(TileSet_t& tile_set, Args&&... args)
 {
-    Tiler<TileSet_t, impl>{tile_set}.f(args...);
+    Tiler<TileSet_t, impl>{{tile_set}}.f(args...);
 }
 
 template<typename TileSet_t, typename TileSet0>

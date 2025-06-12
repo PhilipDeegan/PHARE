@@ -86,8 +86,7 @@ struct Patch
         std::make_shared<SAMRAI::pdat::CellGeometry>(domain, ghostVec)};
 
     std::shared_ptr<ParticlesData<ParticleArray_t>> data{
-        std::make_shared<ParticlesData<ParticleArray_t>>(
-            domain, ghostVec, "name", [&]() { return make_particles<ParticleArray_t>(*layout); })};
+        std::make_shared<ParticlesData<ParticleArray_t>>(domain, ghostVec, "name")};
 
     SAMRAI::hier::Box const mask{data->getGhostBox()};
 };

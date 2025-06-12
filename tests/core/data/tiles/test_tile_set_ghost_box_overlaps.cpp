@@ -57,17 +57,10 @@ struct Patch
     {
     }
 
-    auto static _dict()
-    {
-        initializer::PHAREDict dict;
-        dict["interp_order"] = std::size_t{1};
-        return dict;
-    }
 
     GridLayout_t layout;
-    initializer::PHAREDict const dict = _dict();
-    ParticleArray_t domain            = make_particles<ParticleArray_t>(*layout, dict);
-    ParticleArray_t ghost             = make_particles<ParticleArray_t>(*layout, dict);
+    ParticleArray_t domain = make_particles<ParticleArray_t>(*layout);
+    ParticleArray_t ghost  = make_particles<ParticleArray_t>(*layout);
 };
 
 
