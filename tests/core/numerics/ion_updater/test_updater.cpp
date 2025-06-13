@@ -1,4 +1,5 @@
 #include "gtest/gtest.h"
+#include <core/data/grid/gridlayout.hpp>
 
 #include "phare_core.hpp"
 
@@ -515,7 +516,7 @@ struct IonUpdaterTest : public ::testing::Test
                 }
 
             } // end 1D
-        }     // end pop loop
+        } // end pop loop
         PHARE::core::depositParticles(ions, layout, Interpolator<dim, interp_order>{},
                                       PHARE::core::DomainDeposit{});
 
@@ -925,6 +926,38 @@ TYPED_TEST(IonUpdaterTest, thatNoNaNsExistOnPhysicalNodesMoments)
 }
 
 
+
+TYPED_TEST(IonUpdaterTest, hardCodedRegressionTest)
+{
+    using GridLayout   = TestFixture::GridLayout;
+    auto constexpr dim = TestFixture::dim;
+
+    Particle<dim> const particle{1.0 / nbrPartPerCell, 1, ConstArray<int, dim>(), a_delta, a_v};
+
+    auto const ghost_box = grow(this->layout.AMRBox(), GridLayout::nbrPartGhosts());
+
+    for (auto& pop : this->ions)
+    {
+        pop.domainParticles().clear();
+        pop.levelGhostParticles().clear();
+        pop.patchGhostParticles().clear();
+
+        for (auto const& bix : this->layout.AMRBox())
+            for (int i = 0; i < nbrPartPerCell; i++)
+                pop.domainParticles().emplace_bacK(particle).iCell = *bix;
+
+        for (auto const& box : ghost_box.remove(this->layout.AMRBox()))
+            for (auto const& bix : box)
+                for (int i = 0; i < nbrPartPerCell; i++)
+                    pop.levelGhostParticles().emplace_bacK(particle).iCell = *bix;
+    }
+
+    typename IonUpdaterTest<TypeParam>::IonUpdater ionUpdater{
+        init_dict["simulation"]["algo"]["ion_updater"]};
+
+    ionUpdater.updatePopulations(this->ions, this->EM, this->layout, this->dt,
+                                 UpdaterMode::domain_only);
+}
 
 
 int main(int argc, char** argv)
