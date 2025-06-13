@@ -764,6 +764,133 @@ TYPED_TEST(IonUpdaterTest, thatNoNaNsExistOnPhysicalNodesMoments)
     }
 }
 
+
+template<std::size_t dim>
+void pseudo_randomize_deltas(auto& parts)
+{
+    std::size_t k = 0;
+
+    per_particle(parts, [&](Particle<dim>& p) {
+        for (std::uint16_t i = 0; i < dim; ++i)
+        {
+            double dir   = k % 2 == 0 ? -1 : 1;
+            p.delta()[i] = dir * .05 * k;
+            if (k == 9)
+                k = 0;
+        }
+    });
+}
+
+template<typename GridLayout>
+void populate_particles(auto& ions, GridLayout& layout)
+{
+    auto constexpr dim = GridLayout::dimension;
+    Particle<dim> const particle{1.0 / nbrPartPerCell, 1, ConstArray<int, dim>(),
+                                 ConstArray<double, dim>(.5), ConstArray<double, 3>(1)};
+    auto const ghost_box = grow(layout.AMRBox(), GridLayout::nbrParticleGhosts());
+
+    auto const shift_particle = [](auto p, auto const bix) {
+        p.iCell() = bix;
+        return p;
+    };
+
+    for (auto& pop : ions)
+    {
+        pop.domainParticles().clear();
+        pop.levelGhostParticles().clear();
+        pop.patchGhostParticles().clear();
+
+        for (auto const& bix : layout.AMRBox())
+            for (int i = 0; i < nbrPartPerCell; i++)
+                pop.domainParticles().emplace_back(shift_particle(particle, *bix));
+
+        for (auto const& bix : ghost_box)
+            if (not isIn(bix, layout.AMRBox()))
+                for (int i = 0; i < nbrPartPerCell; i++)
+                    pop.levelGhostParticles().emplace_back(shift_particle(particle, *bix));
+
+        pseudo_randomize_deltas<dim>(pop.domainParticles());
+        pseudo_randomize_deltas<dim>(pop.levelGhostParticles());
+    }
+}
+
+
+
+
+TYPED_TEST(IonUpdaterTest, hardCodedRegressionTest0)
+{
+    using GridLayout      = TestFixture::GridLayout;
+    using IonUpdater      = TestFixture::IonUpdater;
+    auto constexpr dim    = TestFixture::dim;
+    auto constexpr interp = TestFixture::interp_order;
+
+    std::array<double, 3> expectations
+        = {203.99999999999886, 207.99999999999656, 207.99999999999673};
+
+    Particle<dim> const particle{1.0 / nbrPartPerCell, 1, ConstArray<int, dim>(),
+                                 ConstArray<double, dim>(.5), ConstArray<double, 3>(1)};
+
+    auto const ghost_box = grow(this->layout.AMRBox(), GridLayout::nbrParticleGhosts());
+
+    populate_particles(this->ions, this->layout);
+
+    IonUpdater ionUpdater{init_dict["simulation"]["algo"]["ion_updater"]};
+    this->update(ionUpdater, UpdaterMode::domain_only);
+
+    double densitySum = 0, fluxXSum = 0, fluxYSum = 0, fluxZSum = 0;
+    for (auto& pop : this->ions)
+    {
+        densitySum += PHARE::core::sum(reduce(pop.density()));
+        fluxXSum += PHARE::core::sum(reduce(pop.flux()[0]));
+        fluxYSum += PHARE::core::sum(reduce(pop.flux()[1]));
+        fluxZSum += PHARE::core::sum(reduce(pop.flux()[2]));
+    }
+
+    EXPECT_DOUBLE_EQ(densitySum, expectations[interp - 1]);
+    EXPECT_DOUBLE_EQ(fluxXSum, expectations[interp - 1]);
+    EXPECT_DOUBLE_EQ(fluxYSum, expectations[interp - 1]);
+    EXPECT_DOUBLE_EQ(fluxZSum, expectations[interp - 1]);
+}
+
+
+
+TYPED_TEST(IonUpdaterTest, hardCodedRegressionTest1)
+{
+    using GridLayout      = TestFixture::GridLayout;
+    using IonUpdater      = TestFixture::IonUpdater;
+    auto constexpr dim    = TestFixture::dim;
+    auto constexpr interp = TestFixture::interp_order;
+
+    std::array<double, 3> expectations
+        = {203.99999999999886, 207.99999999999656, 207.99999999999673};
+
+    Particle<dim> const particle{1.0 / nbrPartPerCell, 1, ConstArray<int, dim>(),
+                                 ConstArray<double, dim>(.5), ConstArray<double, 3>(1)};
+
+    auto const ghost_box = grow(this->layout.AMRBox(), GridLayout::nbrParticleGhosts());
+
+    populate_particles(this->ions, this->layout);
+
+    IonUpdater ionUpdater{init_dict["simulation"]["algo"]["ion_updater"]};
+    this->update(ionUpdater, UpdaterMode::all);
+
+    double densitySum = 0, fluxXSum = 0, fluxYSum = 0, fluxZSum = 0;
+    for (auto& pop : this->ions)
+    {
+        densitySum += PHARE::core::sum(reduce(pop.density()));
+        fluxXSum += PHARE::core::sum(reduce(pop.flux()[0]));
+        fluxYSum += PHARE::core::sum(reduce(pop.flux()[1]));
+        fluxZSum += PHARE::core::sum(reduce(pop.flux()[2]));
+    }
+
+    EXPECT_DOUBLE_EQ(densitySum, expectations[interp - 1]);
+    EXPECT_DOUBLE_EQ(fluxXSum, expectations[interp - 1]);
+    EXPECT_DOUBLE_EQ(fluxYSum, expectations[interp - 1]);
+    EXPECT_DOUBLE_EQ(fluxZSum, expectations[interp - 1]);
+}
+
+
+
 } // namespace PHARE::core
 
 

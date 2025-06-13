@@ -270,15 +270,15 @@ auto print_particles_per_cell(ParticleArray_t const& ps)
 
 
 template<std::size_t D, typename I0>
-void per_particle(ParticleArray<D, I0> const& particles, auto const fn)
+void per_particle(ParticleArray<D, I0>& particles, auto const fn)
 {
     using enum LayoutMode;
     if constexpr (any_in(I0::layout_mode, AoSTS))
-        for (auto const& tile : particles())
-            for (auto const& p : tile())
+        for (auto& tile : particles())
+            for (auto& p : tile())
                 fn(p);
     else
-        for (auto const& p : particles)
+        for (auto& p : particles)
             fn(p);
 }
 
