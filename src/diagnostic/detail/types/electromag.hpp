@@ -1,9 +1,9 @@
 #ifndef PHARE_DIAGNOSTIC_DETAIL_TYPES_ELECTROMAG_HPP
 #define PHARE_DIAGNOSTIC_DETAIL_TYPES_ELECTROMAG_HPP
 
-#include "diagnostic/detail/h5typewriter.hpp"
-
 #include "core/data/vecfield/vecfield_component.hpp"
+
+#include "diagnostic/detail/h5typewriter.hpp"
 
 namespace PHARE::diagnostic::h5
 {
@@ -47,6 +47,9 @@ public:
         DiagnosticProperties&, Attributes&,
         std::unordered_map<std::size_t, std::vector<std::pair<std::string, Attributes>>>&,
         std::size_t maxLevel) override;
+
+private:
+    using Super::vec_field_reducer;
 };
 
 
@@ -74,7 +77,7 @@ void ElectromagDiagnosticWriter<H5Writer>::getDataSetInfo(DiagnosticProperties& 
             // highfive doesn't accept uint32 which ndarray.shape() is
             auto const& array_shape = vecF.getComponent(type).shape();
             attr[name][id]          = std::vector<std::size_t>(array_shape.data(),
-                                                      array_shape.data() + array_shape.size());
+                                                               array_shape.data() + array_shape.size());
             auto ghosts = GridLayout::nDNbrGhosts(vecF.getComponent(type).physicalQuantity());
             attr[name][id + "_ghosts_x"] = static_cast<std::size_t>(ghosts[0]);
             if constexpr (GridLayout::dimension > 1)
@@ -88,7 +91,7 @@ void ElectromagDiagnosticWriter<H5Writer>::getDataSetInfo(DiagnosticProperties& 
     {
         auto& name = vecField->name();
         if (diagnostic.quantity == "/" + name)
-            infoVF(*vecField, name, patchAttributes[lvlPatchID]);
+            infoVF(vec_field_reducer(*vecField), name, patchAttributes[lvlPatchID]);
     }
 }
 
@@ -153,7 +156,7 @@ void ElectromagDiagnosticWriter<H5Writer>::write(DiagnosticProperties& diagnosti
         if (diagnostic.quantity == "/" + vecField->name())
             h5Writer.writeTensorFieldAsDataset(*fileData_.at(diagnostic.quantity),
                                                h5Writer.patchPath() + "/" + vecField->name(),
-                                               *vecField);
+                                               vec_field_reducer(*vecField, false));
 }
 
 
