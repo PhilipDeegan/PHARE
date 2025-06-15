@@ -1,0 +1,22 @@
+#!/usr/bin/env bash
+CWD="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )" && cd $CWD
+set -o pipefail
+shopt -s expand_aliases
+alias cls="clear; printf '\033[3J'"
+cls
+set -e
+. $CWD/mkn_func.sh
+
+export PHARE_GPU_BYTES=500000000 # 500MB
+export PHARE_SCOPE_TIMING=1
+export PHARE_ASYNC_THREADS=1
+export PHARE_COMPARE=1
+# ASAN_OPTIONS=detect_leaks=0 OMPI_MCA_memory=^patcher
+
+TEST="-M tests/core/numerics/ion_updater/test_multi_updater.cpp"
+ARGS="${TEST} $(mkn_get_opts)"
+
+(
+  cd ..
+  python3 -O tools/mkn_profile.py $ARGS $@
+)

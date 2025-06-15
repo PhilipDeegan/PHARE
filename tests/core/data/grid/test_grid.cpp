@@ -1,13 +1,13 @@
 
-#include <ctype.h>
-#include <string>
 
+#include "phare_core.hpp"
 #include "core/data/grid/grid.hpp"
 #include "core/data/ndarray/ndarray_vector.hpp"
 #include "core/hybrid/hybrid_quantities.hpp"
 
-#include "gmock/gmock.h"
 #include "gtest/gtest.h"
+
+#include <string>
 
 using namespace PHARE::core;
 
@@ -22,7 +22,7 @@ public:
     }
 
 protected:
-    const std::uint32_t nx = 10;
+    std::uint32_t const nx = 10;
     Grid<NdArrayImpl, HybridQuantity::Scalar> f;
 };
 
@@ -37,8 +37,8 @@ public:
     }
 
 protected:
-    const std::uint32_t nx = 10u;
-    const std::uint32_t ny = 12u;
+    std::uint32_t const nx = 10u;
+    std::uint32_t const ny = 12u;
     Grid<NdArrayImpl, HybridQuantity::Scalar> f;
 };
 
@@ -53,16 +53,19 @@ public:
     }
 
 protected:
-    const std::uint32_t nx = 10;
-    const std::uint32_t ny = 12;
-    const std::uint32_t nz = 12;
+    std::uint32_t const nx = 10;
+    std::uint32_t const ny = 12;
+    std::uint32_t const nz = 12;
     Grid<NdArrayImpl, HybridQuantity::Scalar> f;
 };
 
 
-using NdArrays1D = ::testing::Types<NdArrayVector<1>>;
-using NdArrays2D = ::testing::Types<NdArrayVector<2>>;
-using NdArrays3D = ::testing::Types<NdArrayVector<3>>;
+template<std::size_t dim>
+using NdArray_t = typename PHARE_Types<PHARE::SimOpts{dim}>::Array_t;
+
+using NdArrays1D = ::testing::Types<NdArray_t<1>>;
+using NdArrays2D = ::testing::Types<NdArray_t<2>>;
+using NdArrays3D = ::testing::Types<NdArray_t<3>>;
 
 TYPED_TEST_SUITE(GenericGrid1D, NdArrays1D);
 TYPED_TEST_SUITE(GenericGrid2D, NdArrays2D);
@@ -249,7 +252,6 @@ TEST(Grid1D, canBeAveraged)
     Grid<NdArrayVector<1>, HybridQuantity::Scalar> f2{"f2", HybridQuantity::Scalar::rho, nx};
     Grid<NdArrayVector<1>, HybridQuantity::Scalar> avg{"f2", HybridQuantity::Scalar::rho, nx};
 
-    //
     for (auto& v : f1)
     {
         v = 10.;

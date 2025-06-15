@@ -2,10 +2,13 @@
 import os
 import numpy as np
 
+from pathlib import Path
 import pyphare.pharein as ph
 from pyphare.cpp import cpp_lib
+from pyphare.pharesee.run import Run
 from pyphare.simulator.simulator import Simulator
 from pyphare.simulator.simulator import startMPI
+from tests.diagnostic import dump_all_diags
 
 os.environ["PHARE_SCOPE_TIMING"] = "1"  # turn on scope timing
 """
@@ -24,23 +27,25 @@ ph.NO_GUI()
 cpp = cpp_lib()
 startMPI()
 
+
 diag_outputs = "phare_outputs/test/harris/2d"
-time_step_nbr = 1000
+time_step_nbr = 10
 time_step = 0.001
 final_time = time_step * time_step_nbr
 dt = 10 * time_step
 nt = final_time / dt + 1
-timestamps = dt * np.arange(nt)
+timestamps = [0, final_time]  # dt * np.arange(nt)
+cells = (100, 100)
 
 
-def config():
+def config(diag_dir):
+    ph.global_vars.sim = None
     sim = ph.Simulation(
-        smallest_patch_size=15,
-        largest_patch_size=25,
+        # smallest_patch_size=10,
+        # largest_patch_size=10,
         time_step_nbr=time_step_nbr,
         time_step=time_step,
-        # boundary_types="periodic",
-        cells=(200, 400),
+        cells=cells,
         dl=(0.2, 0.2),
         refinement="tagging",
         max_nbr_levels=1,
@@ -48,9 +53,10 @@ def config():
         resistivity=0.001,
         diag_options={
             "format": "phareh5",
-            "options": {"dir": diag_outputs, "mode": "overwrite"},
+            "options": {"dir": diag_dir, "mode": "overwrite"},
         },
-        strict=True,
+        strict=False,
+        tag_buffer=4,
     )
 
     def density(x, y):
@@ -137,31 +143,103 @@ def config():
         "nbr_part_per_cell": 100,
     }
 
-    ph.MaxwellianFluidModel(
+    model = ph.MaxwellianFluidModel(
         bx=bx,
         by=by,
         bz=bz,
         protons={"charge": 1, "density": density, **vvv, "init": {"seed": 12334}},
     )
-
     ph.ElectronModel(closure="isothermal", Te=0.0)
 
-    for quantity in ["E", "B"]:
-        ph.ElectromagDiagnostics(quantity=quantity, write_timestamps=timestamps)
-    ph.InfoDiagnostics(quantity="particle_count")  # defaults all coarse time steps
+    dump_all_diags(model.populations)
+    # for quantity in ["E", "B"]:
+    #     ph.ElectromagDiagnostics(quantity=quantity, write_timestamps=timestamps)
+    # ph.InfoDiagnostics(quantity="particle_count")  # defaults all coarse time steps
+
+    # for quantity in ["density", "bulkVelocity"]:
+    #     ph.FluidDiagnostics(quantity=quantity, write_timestamps=timestamps)
+
+    # ph.FluidDiagnostics(
+    #     quantity="density", write_timestamps=timestamps, population_name="protons"
+    # )
 
     return sim
 
 
-def main():
-    Simulator(config()).run()
-    try:
-        from tools.python3 import plotting as m_plotting
+def get_time(path, time, datahier=None):
+    time = "{:.10f}".format(time)
+    from pyphare.pharesee.hierarchy import hierarchy_from
 
-        m_plotting.plot_run_timer_data(diag_outputs, cpp.mpi_rank())
-    except ImportError:
-        print("Phlop not found - install with: `pip install phlop`")
-    cpp.mpi_barrier()
+    datahier = hierarchy_from(h5_filename=path + "/EM_E.h5", times=time, hier=datahier)
+    datahier = hierarchy_from(h5_filename=path + "/EM_B.h5", times=time, hier=datahier)
+    return datahier
+
+
+def cmp():
+    ch = get_time(diag_outputs, 0)
+    gh = get_time(diag_outputs + "_gpu", 0)
+    assert ch == gh
+
+    # for key in ch.level(0)[0].keys():
+    #     print(ch.level(0)[0].box, gh.level(0)[0].box)
+    #     assert ch.level(0)[0][key] == gh.level(0)[0][key], f"{key} failed"
+
+
+def plot_file_for_qty(plot_dir, qty, time):
+    return f"{plot_dir}/harris_{qty}_t{time}.png"
+
+
+def plot(diag_dir, plot_dir):
+    Path(plot_dir).mkdir(exist_ok=True, parents=True)
+    run = Run(diag_dir)
+    for time in timestamps:
+        run.GetDivB(time).plot(
+            filename=plot_file_for_qty(plot_dir, "divb", time),
+            plot_patches=True,
+            vmin=1e-11,
+            vmax=2e-10,
+        )
+        run.GetRanks(time).plot(
+            filename=plot_file_for_qty(plot_dir, "Ranks", time),
+            plot_patches=True,
+        )
+        run.GetN(time, pop_name="protons").plot(
+            filename=plot_file_for_qty(plot_dir, "N", time),
+            plot_patches=True,
+        )
+        for c in ["x", "y", "z"]:
+            run.GetB(time).plot(
+                filename=plot_file_for_qty(plot_dir, f"b{c}", time),
+                qty=f"{c}",
+                plot_patches=True,
+            )
+        run.GetJ(time).plot(
+            filename=plot_file_for_qty(plot_dir, "jz", time),
+            qty="z",
+            plot_patches=True,
+            vmin=-2,
+            vmax=2,
+        )
+
+
+def main():
+    Simulator(config(diag_outputs)).setup().run()
+    plot(diag_outputs, diag_outputs + "_plots")
+
+    Simulator(config(diag_outputs + "_gpu")).setup(layout=3).initialize().run()
+    plot(diag_outputs + "_gpu", diag_outputs + "_gpu_plots")
+
+    # try:
+    #     from tools.python3 import plotting as m_plotting
+
+    #     m_plotting.plot_run_timer_data(diag_outputs, cpp.mpi_rank())
+    # except ImportError:
+    #     print("Phlop not found - install with: `pip install phlop`")
+
+    # except FileNotFoundError:
+    #     print("Phlop installed but not active`")
+
+    # cmp()
 
 
 if __name__ == "__main__":
