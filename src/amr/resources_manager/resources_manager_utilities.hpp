@@ -1,6 +1,7 @@
 #ifndef PHARE_AMR_TOOLS_RESOURCES_MANAGER_UTILITIES_HPP
 #define PHARE_AMR_TOOLS_RESOURCES_MANAGER_UTILITIES_HPP
 
+#include "core/data/grid/grid_tiles.hpp"
 #include "core/utilities/meta/meta_utilities.hpp"
 
 #include "field_resource.hpp"
@@ -8,6 +9,7 @@
 #include "core/data/ions/ion_population/particle_pack.hpp"
 
 #include <string>
+#include <tuple>
 #include <type_traits>
 #include <vector>
 
@@ -67,9 +69,25 @@ namespace amr
     template<typename ResourceManager, typename ResourceView>
     class ResourceResolver
     {
+        using ResourceUserTypes = ResourceManager::ResourceUserTypes;
+
+        int constexpr static tuple_idx()
+        {
+            int idx = -1;
+
+            core::for_N<std::tuple_size_v<ResourceUserTypes>>([&](auto i) {
+                if (idx == -1 and core::is_field_v<ResourceView>)
+                    idx = i;
+            });
+            return idx;
+        }
+
         auto constexpr static resolve_t()
         {
-            if constexpr (is_field_v<ResourceView>)
+            if constexpr (int constexpr tup_idx = tuple_idx(); tup_idx >= 0)
+                return std::tuple_element_t<tup_idx, ResourceUserTypes>{};
+
+            else if constexpr (is_field_v<ResourceView>)
                 return typename ResourceManager::UserField_t{};
             else if constexpr (is_particles_v<ResourceView>)
                 return typename ResourceManager::template UserParticle_t<ResourceView>{};
