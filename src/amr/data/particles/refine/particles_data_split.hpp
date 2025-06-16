@@ -144,16 +144,15 @@ namespace amr
         {
             // the source PatchData is a possible restriction of a "real" patchdata
             // so that it is the closest from the destination boxes
-            // if all particles from the original source patchdata are in "domainParticles"
-            // they can now be found in either domain of ghost particle arrays of this
-            // temporary restriction "source" patchData
-            // therefore we need references to the domain and ghost particle arrays
+            // particles to be split only ever come from domain array
+            // even if they are from a temporary patchdata created by streaming
+            // remote particles locally. Looking only at domain particles
+            // is consistent with unpack_cell_overlap in ParticlesData
             auto const& srcInteriorParticles = srcParticlesData.domainParticles;
 
             // the particle refine operator's job is to fill either domain (during initialization of
             // new patches) or coarse to fine boundaries (during advance), so we need references to
-            // these arrays on the destination. We don't fill ghosts with this operator, they are
-            // filled from exchanging with neighbor patches.
+            // these arrays on the destination. We don't fill ghosts with this operator
             auto const& destBoxes                = destFieldOverlap.getDestinationBoxContainer();
             auto& destCoarseBoundaryParticles    = destParticlesData.levelGhostParticles;
             auto& destDomainParticles            = destParticlesData.domainParticles;
