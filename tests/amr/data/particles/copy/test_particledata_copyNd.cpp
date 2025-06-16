@@ -62,22 +62,6 @@ TYPED_TEST_SUITE(AParticlesDataND, WithAllDim);
 
 
 
-// TYPED_TEST(AParticlesDataND, copiesSourceDomainParticleIntoGhostForDomainSrcOverGhostDest)
-// {
-//     static constexpr auto dim = TypeParam{}();
-
-//     // particle is in the domain of the source patchdata
-//     // and in first ghost of the destination patchdata
-
-//     this->particle.iCell = ConstArray<int, dim>(6);
-
-//     this->sourceData.domainParticles.push_back(this->particle);
-//     this->destData.copy(this->sourceData);
-
-//     ASSERT_THAT(this->destData.patchGhostParticles.size(), Eq(1));
-//     ASSERT_THAT(this->destData.domainParticles.size(), Eq(0));
-// }
-
 
 TYPED_TEST(AParticlesDataND, copiesSourceDomainParticleIntoDomainDestForDomainOverlapCells)
 {
