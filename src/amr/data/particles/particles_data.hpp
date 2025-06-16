@@ -222,11 +222,6 @@ namespace amr
         }
 
 
-        /**
-         * @brief copy with an overlap. Does the copy as the other overload but this time
-         * the copy must account for the intersection with the boxes within the overlap
-         * The copy is done between the source patch data and myself
-         */
 
         template<typename... Args>
         void copy_from_ghost(Args&&... args);
@@ -241,6 +236,13 @@ namespace amr
                 copy_(overlapBox, pSource, transformation);
         }
 
+        /**
+         * @brief copy with an overlap given by SAMARAI.
+         * At runtime we can deal with two kinds of overlaps:
+         * - ParticlesDomainOverlap: means this copy is from a context when we're grabbing
+         *   leaving domain particles from the neighbor patch, in the patchghost array.
+         * - CellOverlap: means domain particles are copied as part of a refinement operation.
+         */
         void copy(SAMRAI::hier::PatchData const& source,
                   SAMRAI::hier::BoxOverlap const& overlap) override
         {
@@ -303,24 +305,6 @@ namespace amr
 
 
 
-        /**
-         * @brief packStream is the function that takes particles from our particles arrays
-         * that lie in the boxes of the given overlap, and pack them to a stream.
-         *
-         * Streaming particles means that we have to take particles with iCell on a local source
-         * index space , communicate them, and load them at destination with iCell on a
-         * destination local index space. To do that we need to:
-         *
-         * 1- translate source iCell to source AMR index space
-         * 2- Apply the offset to shift this AMR index on top of the destination cells
-         * 3- pack and communicate particles
-         * 4- move back iCell from the shifted AMR index space to the local destination index
-         * space
-         *
-         * Note that step 2 could be done upon reception of the pack, we chose to do it before.
-         *
-         */
-
         void pack_from_ghost(SAMRAI::tbox::MessageStream&, ParticlesDomainOverlap const&) const;
 
         void pack_from_cell_overlap(SAMRAI::tbox::MessageStream& stream,
@@ -345,6 +329,26 @@ namespace amr
             }
         }
 
+        /**
+         * @brief packStream is the function that takes particles from our particles arrays
+         * that lie in the boxes of the given overlap, and pack them to a stream.
+         *
+         * Streaming particles means that we have to take particles with iCell on a local source
+         * index space , communicate them, and load them at destination with iCell on a
+         * destination local index space. To do that we need to:
+         *
+         * 1- translate source iCell to source AMR index space
+         * 2- Apply the offset to shift this AMR index on top of the destination cells
+         * 3- pack and communicate particles
+         * 4- move back iCell from the shifted AMR index space to the local destination index
+         * space
+         *
+         * Note that step 2 could be done upon reception of the pack, we chose to do it before.
+         *
+         * As for copy(), we can have two kinds of overlaps:
+         * - ParticlesDomainOverlap : for grabbing leaving domain particles
+         * - CellOverlap : copy as part of refinement operations
+         */
         void packStream(SAMRAI::tbox::MessageStream& stream,
                         SAMRAI::hier::BoxOverlap const& overlap) const override
         {
@@ -362,18 +366,6 @@ namespace amr
 
 
 
-        /**
-         * @brief unpackStream is the function that unpacks a stream of particles to our
-         * particle arrays.
-         *
-         * We get a stream and an overlap. The overlap contains boxes where to put particles and
-         * transformation from source to destination AMR indexes.
-         *
-         * By convention chosen in patckStream, packed particles have their iCell in our AMR
-         * index space. This means that before putting them into our local arrays, we need to
-         * apply AMRToLocal() to get the proper shift to apply to them
-         *
-         */
 
         void unpack_from_ghost(SAMRAI::tbox::MessageStream& stream,
                                ParticlesDomainOverlap const& overlap);
@@ -402,15 +394,21 @@ namespace amr
                     SAMRAI::hier::BoxContainer const& overlapBoxes
                         = pOverlap.getDestinationBoxContainer();
 
-                    auto myBox      = getBox();
-                    auto myGhostBox = getGhostBox();
 
                     for (auto const& overlapBox : overlapBoxes)
                     {
-                        // our goal here is :
-                        // 1/ to check if each particle is in the intersect of the overlap boxes
-                        // and our ghostBox 2/ if yes, check if these particles should go within
-                        // the interior array or ghost array
+                        // note that we intersect the overlap box with the ghost box
+                        // and not with the box although in the code, we never fill
+                        // the patch ghost layer with particles. (the level ghost layer
+                        // is filled with particles but that is done in the refinement op).
+                        // The reason for going into the ghost box YET putting the particles
+                        // in the domain particle array is that SAMRAI may ask us to stream
+                        // particles from a distant patch into a local temporary patch
+                        // whost ghost box extends over the source data selection box.
+                        // particles falling into our "ghost" layer here are thus not really
+                        // ghost particles so they are just put in domain.
+                        // Consistently, the ParticleRefineOperator will only look for
+                        // particles to split from the domain particle array
                         auto const intersect = getGhostBox() * overlapBox;
 
                         for (auto const& particle : particleArray)
@@ -422,6 +420,20 @@ namespace amr
             } // end overlap not empty
         }
 
+        /**
+         * @brief unpackStream is the function that unpacks a stream of particles to our
+         * particle arrays.
+         *
+         * We get a stream and an overlap. The overlap contains boxes where to put particles and
+         * transformation from source to destination AMR indexes.
+         *
+         * By convention chosen in patckStream, packed particles have their iCell in our AMR
+         * index space. This means that before putting them into our local arrays, we need to
+         * apply AMRToLocal() to get the proper shift to apply to them
+         *
+         *
+         *
+         */
         void unpackStream(SAMRAI::tbox::MessageStream& stream,
                           SAMRAI::hier::BoxOverlap const& overlap) override
         {
