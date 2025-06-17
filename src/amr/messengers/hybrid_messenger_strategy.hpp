@@ -3,6 +3,7 @@
 
 #include "amr/messengers/messenger_info.hpp"
 
+#include "amr/messengers/scheduler.hpp"
 #include "core/def/phare_mpi.hpp"
 
 
@@ -52,6 +53,13 @@ namespace amr
         virtual void registerLevel(std::shared_ptr<SAMRAI::hier::PatchHierarchy> const& hierarchy,
                                    int const levelNumber)
             = 0;
+
+        virtual void registerLevel(IPhysicalModel& model,
+                                   std::shared_ptr<SAMRAI::hier::PatchHierarchy> const& hierarchy,
+                                   int const levelNumber)
+        {
+            registerLevel(hierarchy, levelNumber);
+        }
 
         virtual void regrid(std::shared_ptr<SAMRAI::hier::PatchHierarchy> const& hierarchy,
                             int const levelNumber,
@@ -132,6 +140,12 @@ namespace amr
         virtual ~HybridMessengerStrategy() = default;
 
 
+        template<auto rtype>
+        void fill(std::string const& dst, SAMRAI::hier::PatchLevel& level, double time)
+        {
+            scheduler.template fill<rtype>(dst, level, time);
+        }
+
     protected:
         explicit HybridMessengerStrategy(std::string stratName)
             : stratname_{stratName}
@@ -139,6 +153,7 @@ namespace amr
         }
 
         std::string stratname_;
+        RefinerScheduler scheduler;
     };
 } // namespace amr
 } // namespace PHARE

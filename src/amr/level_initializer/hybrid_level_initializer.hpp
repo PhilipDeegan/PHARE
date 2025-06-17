@@ -14,6 +14,7 @@
 #include "core/numerics/moments/moments.hpp"
 #include "core/numerics/ohm/ohm.hpp"
 #include "initializer/data_provider.hpp"
+#include <string>
 
 namespace PHARE
 {
@@ -93,7 +94,11 @@ namespace solver
             }
 
             hybMessenger.fillFluxBorders(hybridModel.state.ions, level, initDataTime);
-            hybMessenger.fillDensityBorders(hybridModel.state.ions, level, initDataTime);
+            // hybMessenger.fillDensityBorders(hybridModel.state.ions, level, initDataTime);
+
+            for (std::size_t i = 0; i < hybridModel.state.ions.size(); ++i)
+                hybMessenger.template fill<amr::RefinerType::PatchFieldBorderSum>(
+                    "HybridModel-HybridModel_sumField" + std::to_string(i), level, initDataTime);
 
 
             for (auto& patch : level)
