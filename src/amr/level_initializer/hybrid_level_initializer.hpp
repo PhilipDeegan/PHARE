@@ -92,10 +92,16 @@ namespace solver
                 core::depositParticles(ions, layout, interpolate_, core::DomainDeposit{});
             }
 
+            // at this point flux and density is computed for all pops
+            // but nodes on ghost box overlaps are not complete because they lack
+            // contribution of neighbor particles.
+            // The following two calls will += flux and density on these overlaps.
             hybMessenger.fillFluxBorders(hybridModel.state.ions, level, initDataTime);
             hybMessenger.fillDensityBorders(hybridModel.state.ions, level, initDataTime);
 
 
+            // the only remaning incomplete nodes are those next to and on level ghost layers
+            // we now complete them by depositing levelghost particles
             for (auto& patch : level)
             {
                 auto& ions             = hybridModel.state.ions;
@@ -108,6 +114,9 @@ namespace solver
                     core::depositParticles(ions, layout, interpolate_, core::LevelGhostDeposit{});
                 }
 
+
+                // now all nodes are complete, the total ion moments
+                // can safely be computed.
                 ions.computeDensity();
                 ions.computeBulkVelocity();
             }

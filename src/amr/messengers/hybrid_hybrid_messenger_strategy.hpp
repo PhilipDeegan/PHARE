@@ -95,8 +95,8 @@ namespace amr
             resourcesManager_->registerResources(Jold_);
             resourcesManager_->registerResources(NiOld_);
             resourcesManager_->registerResources(ViOld_);
-            resourcesManager_->registerResources(sumVec);
-            resourcesManager_->registerResources(sumField);
+            resourcesManager_->registerResources(sumVec_);
+            resourcesManager_->registerResources(sumField_);
         }
 
         virtual ~HybridHybridMessengerStrategy() = default;
@@ -117,8 +117,8 @@ namespace amr
             resourcesManager_->allocate(Jold_, patch, allocateTime);
             resourcesManager_->allocate(NiOld_, patch, allocateTime);
             resourcesManager_->allocate(ViOld_, patch, allocateTime);
-            resourcesManager_->allocate(sumVec, patch, allocateTime);
-            resourcesManager_->allocate(sumField, patch, allocateTime);
+            resourcesManager_->allocate(sumVec_, patch, allocateTime);
+            resourcesManager_->allocate(sumField_, patch, allocateTime);
         }
 
 
@@ -347,24 +347,29 @@ namespace amr
             auto constexpr N = core::detail::tensor_field_dim_from_rank<1>();
             using value_type = FieldT::value_type;
 
+
+            // we cannot have the schedule doign the += in place in the flux array
+            // because some overlaps could be counted several times.
+            // we therefore first copy flux into a sumVec buffer and then
+            // execute the schedule onto that before copying it back onto the flux array
             for (std::size_t i = 0; i < ions.size(); ++i)
             {
-                for (auto patch : resourcesManager_->enumerate(level, ions, sumVec))
+                for (auto patch : resourcesManager_->enumerate(level, ions, sumVec_))
                 {
-                    auto& pop = *(ions.begin() + i);
+                    auto& pop = ions.population(i);
                     for (std::uint8_t c = 0; c < N; ++c)
-                        std::memcpy(sumVec[c].data(), pop.flux()[c].data(),
+                        std::memcpy(sumVec_[c].data(), pop.flux()[c].data(),
                                     pop.flux()[c].size() * sizeof(value_type));
                 }
 
 
                 popFluxBorderSumRefiners_[i].fill(level.getLevelNumber(), fillTime);
 
-                for (auto patch : resourcesManager_->enumerate(level, ions, sumVec))
+                for (auto patch : resourcesManager_->enumerate(level, ions, sumVec_))
                 {
-                    auto& pop = *(ions.begin() + i);
+                    auto& pop = ions.population(i);
                     for (std::uint8_t c = 0; c < N; ++c)
-                        std::memcpy(pop.flux()[c].data(), sumVec[c].data(),
+                        std::memcpy(pop.flux()[c].data(), sumVec_[c].data(),
                                     pop.flux()[c].size() * sizeof(value_type));
                 }
             }
@@ -375,21 +380,23 @@ namespace amr
         {
             using value_type = FieldT::value_type;
 
+            // see fillFluxBorders for the reason of using a sumField_ buffer
+            // and the memcpy
             for (std::size_t i = 0; i < ions.size(); ++i)
             {
-                for (auto patch : resourcesManager_->enumerate(level, ions, sumField))
+                for (auto patch : resourcesManager_->enumerate(level, ions, sumField_))
                 {
-                    auto& pop = *(ions.begin() + i);
-                    std::memcpy(sumField.data(), pop.density().data(),
+                    auto& pop = ions.population(i);
+                    std::memcpy(sumField_.data(), pop.density().data(),
                                 pop.density().size() * sizeof(value_type));
                 }
 
                 popDensityBorderSumRefiners_[i].fill(level.getLevelNumber(), fillTime);
 
-                for (auto patch : resourcesManager_->enumerate(level, ions, sumField))
+                for (auto patch : resourcesManager_->enumerate(level, ions, sumField_))
                 {
-                    auto& pop = *(ions.begin() + i);
-                    std::memcpy(pop.density().data(), sumField.data(),
+                    auto& pop = ions.population(i);
+                    std::memcpy(pop.density().data(), sumField_.data(),
                                 pop.density().size() * sizeof(value_type));
                 }
             }
@@ -997,8 +1004,8 @@ namespace amr
         VecFieldT ViOld_{stratName + "_VBulkOld", core::HybridQuantity::Vector::V};
         FieldT NiOld_{stratName + "_NiOld", core::HybridQuantity::Scalar::rho};
 
-        VecFieldT sumVec{stratName + "_sumVec", core::HybridQuantity::Vector::V};
-        FieldT sumField{stratName + "_sumField", core::HybridQuantity::Scalar::rho};
+        VecFieldT sumVec_{stratName + "_sumVec", core::HybridQuantity::Vector::V};
+        FieldT sumField_{stratName + "_sumField", core::HybridQuantity::Scalar::rho};
 
 
 
@@ -1026,7 +1033,9 @@ namespace amr
         using FieldGhostSumRefinerPool   = RefinerPool<rm_t, RefinerType::PatchFieldBorderSum>;
         using FieldFillPattern_t         = FieldFillPattern<dimension>;
 
+        //! += flux on ghost box overlap incomplete population moment nodes
         std::vector<FieldGhostSumRefinerPool> popFluxBorderSumRefiners_;
+        //! += density on ghost box overlap incomplete population moment nodes
         std::vector<FieldGhostSumRefinerPool> popDensityBorderSumRefiners_;
 
         InitRefinerPool magneticInitRefiners_{resourcesManager_};
@@ -1046,7 +1055,7 @@ namespace amr
         // these do not need sharedNode refiners. The reason is that
         // the border node is already complete by the deposit of ghost particles
         // these refiners are used to fill ghost nodes, and therefore, owing to
-        // the GhostField tag, will only assign pur ghost nodes. Border nodes will
+        // the GhostField tag, will only assign pure ghost nodes. Border nodes will
         // be overwritten only on level borders, which does not seem to be an issue.
         GhostRefinerPool rhoGhostsRefiners_{resourcesManager_};
         GhostRefinerPool velGhostsRefiners_{resourcesManager_};
@@ -1069,6 +1078,7 @@ namespace amr
         RefOp_ptr levelGhostParticlesNewOp_{std::make_shared<CoarseToFineRefineOpNew>()};
 
 
+        //! to grab particle leaving neighboring patches and inject into domain
         DomainGhostPartRefinerPool domainGhostPartRefiners_{resourcesManager_};
 
         SynchronizerPool<rm_t> densitySynchronizers_{resourcesManager_};
