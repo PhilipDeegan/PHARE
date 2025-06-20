@@ -36,7 +36,7 @@ def make_cpp_simulator(
     cpp_lib, dim, interp, nbrRefinedPart, hier, layout=1, allocator=0
 ):
     if SCOPE_TIMING:
-        mon.timing_setup(cpp_lib())
+        mon.timing_setup(cpp_lib)
 
     make_sim = f"make_simulator_{dim}_{interp}_{nbrRefinedPart}_{layout}_{allocator}"
     print("make_sim", make_sim)

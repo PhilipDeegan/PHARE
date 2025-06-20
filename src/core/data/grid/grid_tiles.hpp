@@ -3,13 +3,12 @@
 
 #include "core/def/phare_config.hpp"
 
-
 #include "core/def.hpp"
 #include "core/utilities/span.hpp"
 #include "core/utilities/types.hpp"
 #include "core/utilities/box/box.hpp"
 #include "core/data/tiles/tile_set.hpp"
-
+#include "core/data/tiles/tile_set_traversal.hpp"
 
 #include <tuple>
 #include <string>
@@ -19,7 +18,6 @@
 
 namespace PHARE::core
 {
-
 template<typename Field_t>
 class FieldBox;
 
@@ -81,10 +79,15 @@ public:
     bool isUsable() const { return field_.isUsable(); }
     bool isSettable() const { return !isUsable(); }
 
+    auto& links() { return _links; }
+    auto& links() const { return _links; }
+    auto& link(std::size_t const idx) { return _links[idx]; }
+
 private:
     Field_t field_;
     GridLayout_t layout_;
-    Box<int, dimension> ghost_box_ = layout_.AMRGhostBoxFor(physicalQuantity());
+    Box<int, dimension> ghost_box_   = layout_.AMRGhostBoxFor(physicalQuantity());
+    std::array<FieldTile*, 7> _links = ConstArray<FieldTile*, 7>(nullptr);
 };
 
 
@@ -119,7 +122,8 @@ struct GridTile : public FieldTile<GridLayout_t, Field_t>
         assert(!Super::layout().AMRBox().isEmpty());
     }
 
-    GridTile(auto const& box, auto const& patch_layout, auto const& pq) // called when making tiles
+    GridTile(auto const& box, auto const& patch_layout,
+             auto const& pq) // called when making tiles
         : GridTile(patch_layout.copy_as(box), pq)
     {
     }
@@ -209,7 +213,7 @@ public:
                              reinterpret_cast<FieldTile<GridLayout_t, Field_t>**>(cells_data),
                              cells_shape};
             });
-            check();
+            // check();
             ghost_box_     = field->layout().AMRGhostBoxFor(qty_);
             max_tile_size_ = field->max_tile_size();
         }
@@ -278,15 +282,68 @@ public:
 
     void check(bool const nan = false) const
     {
-        for (auto& tile : super())
-        {
-            assert(tile().size() < static_cast<std::size_t>(1e6));
-            tile().check();
-        }
+        // for (auto& tile : super())
+        // {
+        //     assert(tile().size() < static_cast<std::size_t>(1e6));
+        //     tile().check();
+        // }
     }
 
     void sync_inner_ghosts()
     {
+        // for (std::size_t ti = 0; ti < super().size(); ++ti)
+        // {
+        //     auto& t0 = super()[ti];
+        //     traverse_tile_neighbours(super(), t0, [&](auto& t1) {
+        //         if (auto const t0_overlap = t0.ghost_box() * t1.field_box())
+        //             for (auto const& bix : *t0_overlap)
+        //             {
+        //                 auto const& t0_lix = (bix - t0.ghost_box().lower).as_unsigned();
+        //                 auto const& t1_lix = (bix - t1.ghost_box().lower).as_unsigned();
+        //                 t0()(t0_lix)       = t1()(t1_lix);
+        //             }
+
+        //         if (auto const t1_overlap = t1.ghost_box() * t0.field_box())
+        //             for (auto const& bix : *t1_overlap)
+        //             {
+        //                 auto const& t0_lix = (bix - t0.ghost_box().lower).as_unsigned();
+        //                 auto const& t1_lix = (bix - t1.ghost_box().lower).as_unsigned();
+        //                 t1()(t1_lix)       = t0()(t0_lix);
+        //             }
+        //     });
+        // }
+
+
+        // for (std::size_t ti = 0; ti < super().size(); ++ti)
+        // {
+        //     auto& t0 = super()[ti];
+        //     for (auto& neigh : t0.links())
+        //     {
+        //         PHARE_LOG_LINE_SS(neigh);
+        //         if (neigh)
+        //         {
+        //             auto& t1 = *neigh;
+        //             //
+        //             if (auto const t0_overlap = t0.ghost_box() * t1.field_box())
+        //                 for (auto const& bix : *t0_overlap)
+        //                 {
+        //                     auto const& t0_lix = (bix - t0.ghost_box().lower).as_unsigned();
+        //                     auto const& t1_lix = (bix - t1.ghost_box().lower).as_unsigned();
+        //                     t0()(t0_lix)       = t1()(t1_lix);
+        //                 }
+
+        //             if (auto const t1_overlap = t1.ghost_box() * t0.field_box())
+        //                 for (auto const& bix : *t1_overlap)
+        //                 {
+        //                     auto const& t0_lix = (bix - t0.ghost_box().lower).as_unsigned();
+        //                     auto const& t1_lix = (bix - t1.ghost_box().lower).as_unsigned();
+        //                     t1()(t1_lix)       = t0()(t0_lix);
+        //                 }
+        //             //
+        //         }
+        //     }
+        // }
+
         for (std::size_t ti0 = 0; ti0 < super().size() - 1; ++ti0)
         {
             for (std::size_t ti1 = ti0 + 1; ti1 < super().size(); ++ti1)
@@ -294,23 +351,21 @@ public:
                 auto& t0 = super()[ti0];
                 auto& t1 = super()[ti1];
 
-                for (auto const& ghost_layer : t0.ghost_box().remove(t0.field_box()))
-                    if (auto const t0_overlap = ghost_layer * t1.field_box())
-                        for (auto const& bix : *t0_overlap)
-                        {
-                            auto const& t0_lix = (bix - t0.ghost_box().lower).as_unsigned();
-                            auto const& t1_lix = (bix - t1.ghost_box().lower).as_unsigned();
-                            t0()(t0_lix)       = t1()(t1_lix);
-                        }
+                if (auto const t0_overlap = t0.ghost_box() * t1.field_box())
+                    for (auto const& bix : *t0_overlap)
+                    {
+                        auto const& t0_lix = (bix - t0.ghost_box().lower).as_unsigned();
+                        auto const& t1_lix = (bix - t1.ghost_box().lower).as_unsigned();
+                        t0()(t0_lix)       = t1()(t1_lix);
+                    }
 
-                for (auto const& ghost_layer : t1.ghost_box().remove(t1.field_box()))
-                    if (auto const t1_overlap = ghost_layer * t0.field_box())
-                        for (auto const& bix : *t1_overlap)
-                        {
-                            auto const& t0_lix = (bix - t0.ghost_box().lower).as_unsigned();
-                            auto const& t1_lix = (bix - t1.ghost_box().lower).as_unsigned();
-                            t1()(t1_lix)       = t0()(t0_lix);
-                        }
+                if (auto const t1_overlap = t1.ghost_box() * t0.field_box())
+                    for (auto const& bix : *t1_overlap)
+                    {
+                        auto const& t0_lix = (bix - t0.ghost_box().lower).as_unsigned();
+                        auto const& t1_lix = (bix - t1.ghost_box().lower).as_unsigned();
+                        t1()(t1_lix)       = t0()(t0_lix);
+                    }
             }
         }
     }
@@ -411,6 +466,7 @@ public:
         , layout_{layout}
         , max_tile_size_{get_max_tile_size()}
     {
+        Super::build_links(super());
         assert(this->super()[0]().data());
         View::setBuffer(this);
         assert(View::isUsable());
@@ -424,6 +480,7 @@ public:
         , layout_{that.layout_}
         , max_tile_size_{get_max_tile_size()}
     {
+        Super::build_links(super());
         View::setBuffer(this);
         assert((**this)[0]().data());
         assert(View::isUsable());

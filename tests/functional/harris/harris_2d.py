@@ -17,15 +17,16 @@ mpl.use("Agg")
 
 cpp = cpp_lib()
 
-
-cells = (100, 50)
+ppc = 500
+cells = (400, 200)
 time_step = 0.005
 final_time = 50
 timestamps = np.arange(0, final_time + time_step, final_time / 5)
 diag_dir = "phare_outputs/harris"
 
-final_time = 0.05
-timestamps = np.arange(0, final_time + time_step, final_time / (final_time / time_step))
+final_time = 0.005
+timestamps = []
+# np.arange(0, final_time + time_step, final_time / (final_time / time_step))
 print("timestamps", timestamps)
 
 
@@ -38,7 +39,7 @@ def config():
         cells=cells,
         dl=(0.40, 0.40),
         refinement="tagging",
-        max_nbr_levels=2,
+        max_nbr_levels=1,
         hyper_resistivity=0.002,
         resistivity=0.001,
         diag_options={
@@ -128,7 +129,7 @@ def config():
         "vthx": vthx,
         "vthy": vthy,
         "vthz": vthz,
-        "nbr_part_per_cell": 100,
+        "nbr_part_per_cell": ppc,
     }
 
     model = ph.MaxwellianFluidModel(
@@ -139,9 +140,9 @@ def config():
     )
     ph.ElectronModel(closure="isothermal", Te=0.0)
 
-    dump_all_diags(model.populations)
+    # dump_all_diags(model.populations)
 
-    ph.LoadBalancer(active=True, auto=True, mode="nppc", tol=0.05)
+    # ph.LoadBalancer(active=True, auto=True, mode="nppc", tol=0.05)
 
     return sim
 
@@ -200,15 +201,16 @@ class HarrisTest(SimulatorTest):
         ph.global_vars.sim = None
 
     def test_run(self):
-        # self.register_diag_dir_for_cleanup(diag_dir)
+        self.register_diag_dir_for_cleanup(diag_dir)
         Simulator(config()).setup(layout=3).initialize().run()
 
-        if cpp.mpi_rank() == 0:
-            plot(diag_dir, self.plot_dir)
-        cpp.mpi_barrier()
+        # if cpp.mpi_rank() == 0:
+        #     plot(diag_dir, self.plot_dir)
+        # cpp.mpi_barrier()
         return self
 
 
 if __name__ == "__main__":
     startMPI()
-    HarrisTest().test_run().tearDown()
+    # HarrisTest().test_run().tearDown()
+    Simulator(config()).setup(layout=3).initialize().run()

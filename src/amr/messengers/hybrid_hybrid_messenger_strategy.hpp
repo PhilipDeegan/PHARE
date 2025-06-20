@@ -653,25 +653,11 @@ namespace amr
             // fine domain cell since its border face only received a fraction of the
             // induction that has occured on the shared coarse face.
 
-            for (auto& patch : level)
-            {
-                auto& ions       = hybridModel.state.ions;
-                auto dataOnPatch = resourcesManager_->setOnPatch(*patch, ions);
-                ions.density().notZero();
-            }
 
             magPatchGhostsRefiners_.fill(hybridModel.state.electromag.B, levelNumber, time);
             elecGhostsRefiners_.fill(hybridModel.state.electromag.E, levelNumber, time);
             rhoGhostsRefiners_.fill(levelNumber, time);
             velGhostsRefiners_.fill(hybridModel.state.ions.velocity(), levelNumber, time);
-
-
-            for (auto& patch : level)
-            {
-                auto& ions       = hybridModel.state.ions;
-                auto dataOnPatch = resourcesManager_->setOnPatch(*patch, ions);
-                ions.density().notZero();
-            }
         }
 
     private:

@@ -23,8 +23,9 @@ CARGS=${CARGS:-""}
 # FILE="tests/diagnostic/test-diagnostics_1d.cpp"
 FILE="tests/core/numerics/ion_updater/test_updater.cpp"
 FILE="tests/core/data/particles/test_particles_partitioning.cpp"
-FILE="tests/core/numerics/ion_updater/test_multi_updater.cpp"
 FILE="tests/core/data/particles/test_particles_AoSTS.cpp"
+FILE="tests/core/data/grid/test_grid_tile_set.cpp"
+FILE="tests/core/numerics/ion_updater/test_multi_updater.cpp"
 TEST=" -M ${FILE} "
 CARGS="${CARGS} $(mkn_get_opts)"
 

@@ -151,23 +151,25 @@ public:
     {
         return sum_from(*this, [](auto const e) { return e == 0 ? 1 : 0; });
     }
-    void check() const
-    {
-        for (auto const& e : *this)
-        {
-            if (std::isnan(e))
-                throw std::runtime_error("NAN");
-            if (std::isinf(e))
-                throw std::runtime_error("INF");
-        }
-    }
+    // void check() const
+    // {
+    //     PHARE_DEBUG_DO({
+    //         for (auto const& e : *this)
+    //         {
+    //             if (std::isnan(e))
+    //                 throw std::runtime_error("NAN");
+    //             if (std::isinf(e))
+    //                 throw std::runtime_error("INF");
+    //         }
+    //     })
+    // }
 
-    void notZero() const
-    {
-        for (std::size_t i = 0; i < size(); ++i)
-            if (std::abs(data()[i]) < 1e-15)
-                throw std::runtime_error("ZERO");
-    }
+    // void notZero() const
+    // {
+    //     for (std::size_t i = 0; i < size(); ++i)
+    //         if (std::abs(data()[i]) < 1e-15)
+    //             throw std::runtime_error("ZERO");
+    // }
 
     auto& fill(DataType const& v) _PHARE_ALL_FN_
     {

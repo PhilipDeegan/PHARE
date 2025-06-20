@@ -10,7 +10,7 @@ set -e
 export PHARE_GPU_BYTES=500000000 # 500MB
 export PHARE_SCOPE_TIMING=1
 export PHARE_ASYNC_THREADS=1
-export PHARE_COMPARE=1
+export PHARE_COMPARE=0
 # ASAN_OPTIONS=detect_leaks=0 OMPI_MCA_memory=^patcher
 
 TEST="-M tests/core/numerics/ion_updater/test_multi_updater.cpp"

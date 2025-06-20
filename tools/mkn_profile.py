@@ -4,11 +4,12 @@
 
 import os
 import sys
+import shlex
+import shutil
 import subprocess
 import numpy as np
-
 from pathlib import Path
-import shutil
+
 
 dim = 3
 run_sim = 1  # switch to just plot and not run a sim
@@ -40,7 +41,7 @@ fn_strings = {
     1: "sync",
     2: "Domain_insert",
     3: "Deposit",
-    4: "Reduce",
+    # 4: "Reduce",
 }
 
 
@@ -60,9 +61,9 @@ def run_permutation(patches, cells, ppc):
     print("run", run, env.get("MKN_DBG"))
 
     if run_sim:
-        subprocess.run(
-            ["mkn", run, "-p", "test_core"] + sys.argv[1:], check=True, env=env
-        )
+        cmd = "mkn run -p test_core"
+        cmd = "python3 -O tests/functional/harris/harris_2d.py"
+        subprocess.run(shlex.split(cmd), check=True, env=env)
 
     shutil.copy(".phare_times.0.txt", f"{times_dir}/scope_times.txt")
     return times_dir

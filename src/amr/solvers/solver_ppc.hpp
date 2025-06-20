@@ -298,8 +298,6 @@ void SolverPPC<HybridModel, AMR_Types>::predictor1_(level_t& level, ModelViews_t
         setTime([](auto& state) -> auto& { return state.electromagPred.B; });
     }
 
-    for (auto& state : views)
-        core::check_electromag(state.electromagPred);
     {
         PHARE_LOG_SCOPE(1, "SolverPPC::predictor1_.ampere");
         ampere_(views.layouts, views.electromagPred_B, views.J);

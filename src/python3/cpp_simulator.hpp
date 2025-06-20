@@ -176,7 +176,8 @@ constexpr bool valid_simulator()
 {
     using enum core::LayoutMode;
     using enum AllocatorMode;
-    return _dim{}() < 3 and core::any_in(layout_mode, AoSMapped, AoSTS)
+    auto constexpr v = _dim{}() == 2 and _interp{}() == 1;
+    return v and core::any_in(layout_mode, /*AoSMapped,*/ AoSTS)
            and core::any_in(allocator_mode, CPU);
     // and allocator_mode_supported<allocator_mode>();
     // layout_mode == core::LayoutMode::AoSMapped

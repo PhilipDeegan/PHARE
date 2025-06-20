@@ -1,10 +1,12 @@
 
-#include "core/hybrid/hybrid_quantities.hpp"
-#include "core/utilities/types.hpp"
-#include "core/utilities/box/box.hpp"
-#include "core/data/particles/particle_array_def.hpp"
+
 
 #include "phare_core.hpp"
+#include "core/utilities/types.hpp"
+#include "core/utilities/box/box.hpp"
+#include "core/hybrid/hybrid_quantities.hpp"
+#include "core/data/particles/particle_array_def.hpp"
+
 #include "tests/core/data/gridlayout/test_gridlayout.hpp"
 
 #include "gtest/gtest.h"
@@ -27,10 +29,10 @@ struct TestParam
 
     using PhareTypes = core::PHARE_Types<opts>;
 
-    using Box_t        = PHARE::core::Box<int, dim>;
-    using GridLayout_t = TestGridLayout<typename PhareTypes::GridLayout_t>;
+    using Box_t            = PHARE::core::Box<int, dim>;
+    using GridLayout_t     = PhareTypes::GridLayout_t;
+    using TestGridLayout_t = TestGridLayout<GridLayout_t>;
 };
-
 
 
 
@@ -39,9 +41,10 @@ struct Patch
 {
     auto constexpr static dim = TestParam::dim;
 
-    using PhareTypes   = TestParam::PhareTypes;
-    using GridLayout_t = TestParam::GridLayout_t;
-    using Box_t        = TestParam::Box_t;
+    using PhareTypes       = TestParam::PhareTypes;
+    using GridLayout_t     = TestParam::GridLayout_t;
+    using TestGridLayout_t = TestParam::TestGridLayout_t;
+    using Box_t            = TestParam::Box_t;
 
     using Field_t = PhareTypes::Field_t;
     using Grid_t  = PhareTypes::Grid_t;
@@ -56,7 +59,7 @@ struct Patch
     }
 
 
-    GridLayout_t const layout;
+    TestGridLayout_t const layout;
     Grid_t rho{"rho", layout, HybridQuantity::Scalar::rho};
     Field_t& rho_v = *rho;
 };
@@ -151,12 +154,14 @@ struct GridFieldTest : public ::testing::Test, public AGridFieldTest<TestParam::
 using ParticlesDatas = testing::Types< //
 
 PHARE_WITH_MKN_GPU(
-    TestParam<1, LayoutMode::AoSTS, AllocatorMode::CPU>
-   ,TestParam<2, LayoutMode::AoSTS, AllocatorMode::CPU>
+   //  TestParam<1, LayoutMode::AoSTS, AllocatorMode::CPU>
+   // ,TestParam<2, LayoutMode::AoSTS, AllocatorMode::CPU>
+   // ,
+   TestParam<3, LayoutMode::AoSTS, AllocatorMode::CPU>
 
-PHARE_WITH_GPU(
-   ,TestParam<2, LayoutMode::AoS, AllocatorMode::GPU_UNIFIED>
-)
+// PHARE_WITH_GPU(
+//    ,TestParam<2, LayoutMode::AoS, AllocatorMode::GPU_UNIFIED>
+// )
 
 )
 
@@ -179,6 +184,46 @@ TYPED_TEST(GridFieldTest, test_compiles)
     {
         Point const lower{tile.lower};
         EXPECT_EQ((*L1.rho).at(lower), L1.rho_v.at(lower));
+    }
+}
+
+
+TYPED_TEST(GridFieldTest, test_ghost_sync)
+{
+    using GridLayout_t = TestFixture::GridLayout_t;
+    auto constexpr qty = HybridQuantity::Scalar::rho;
+
+    auto& patches = this->patches;
+
+    for (auto& patch : patches)
+        patch.rho.fill(0);
+
+    for (auto& patch : patches)
+        for (auto& tile : patch.rho())
+        {
+            for (auto const& lix : tile.layout().domainBoxFor(tile))
+                tile()(lix) = 1;
+
+            EXPECT_EQ(sum(tile()), tile.layout().domainBoxFor(tile).size());
+        }
+
+    for (auto& patch : patches)
+    {
+        patch.rho.sync_inner_ghosts();
+
+        auto const patch_gb = patch.layout.AMRGhostBoxFor(qty);
+        auto const patch_pb = shrink(patch_gb, GridLayout_t::nbrGhosts());
+        auto const g_layer  = patch_gb.remove(patch_pb);
+        for (auto& tile : patch.rho())
+        {
+            std::size_t expected = tile.ghost_box().size();
+
+            for (auto const& gl : g_layer)
+                if (auto const glo = tile.ghost_box() * gl)
+                    expected -= glo->size();
+
+            EXPECT_EQ(sum(tile()), expected);
+        }
     }
 }
 

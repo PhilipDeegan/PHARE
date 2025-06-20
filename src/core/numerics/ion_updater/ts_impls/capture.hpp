@@ -177,7 +177,7 @@ void IonUpdaterMultiTS<Ions, Electromag, GridLayout>::updateAndDepositDomain_(
     }
 
     in.streamer.sync();
-    // in.streamer.dump_times(detail::timings_dir_str + "/updateAndDepositDomain_.txt");
+    in.streamer.dump_times(detail::timings_dir_str + "/updateAndDepositDomain.txt");
 
 #else
     throw std::runtime_error("No available implementation")
@@ -299,10 +299,8 @@ void IonUpdaterMultiTS<Ions, Electromag, GridLayout>::updateAndDepositAll_(Model
         });
     }
 
-    in.streamer.join(false);
-
-
-    in.streamer.dump_times(detail::timings_dir_str + "/updateAndDepositDomain_.txt");
+    in.streamer.sync();
+    in.streamer.dump_times(detail::timings_dir_str + "/updateAndDepositAll.txt");
 
 #else
     throw std::runtime_error("No available implementation")
