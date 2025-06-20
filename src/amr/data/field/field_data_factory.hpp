@@ -35,7 +35,7 @@ namespace amr
         FieldDataFactory(bool fineBoundaryRepresentsVariable, bool dataLivesOnPatchBorder,
                          std::string const& name, PhysicalQuantity qty)
             : SAMRAI::hier::PatchDataFactory(
-                SAMRAI::hier::IntVector{SAMRAI::tbox::Dimension(dimension), n_ghosts})
+                  SAMRAI::hier::IntVector{SAMRAI::tbox::Dimension(dimension), n_ghosts})
             , fineBoundaryRepresentsVariable_{fineBoundaryRepresentsVariable}
             , dataLivesOnPatchBorder_{dataLivesOnPatchBorder}
             , quantity_{qty}
@@ -62,7 +62,7 @@ namespace amr
          * it is expected that this routines will create a functional fieldData
          * (ie with a gridlayout and a FieldImpl)
          */
-        std ::shared_ptr<SAMRAI::hier::PatchData>
+        std::shared_ptr<SAMRAI::hier::PatchData>
         allocate(SAMRAI::hier::Patch const& patch) const final
         {
             auto const& domain = patch.getBox();
@@ -127,7 +127,7 @@ namespace amr
                 nbCell[iDim] = box.numberCells(iDim);
             }
 
-            const std::size_t baseField
+            std::size_t const baseField
                 = SAMRAI::tbox::MemoryUtilities::align(sizeof(FieldData<GridLayoutT, FieldImpl>));
 
             GridLayoutT gridLayout{dl, nbCell, origin};
@@ -166,6 +166,7 @@ namespace amr
         bool validCopyTo(std::shared_ptr<SAMRAI::hier::PatchDataFactory> const&
                              destinationPatchDataFactory) const final
         {
+            return true; // hax for the moment
             auto fieldDataFactory
                 = std::dynamic_pointer_cast<FieldDataFactory>(destinationPatchDataFactory);
             return (fieldDataFactory != nullptr);

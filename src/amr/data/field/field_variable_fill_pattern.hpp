@@ -1,15 +1,20 @@
 #ifndef PHARE_SRC_AMR_FIELD_FIELD_VARIABLE_FILL_PATTERN_HPP
 #define PHARE_SRC_AMR_FIELD_FIELD_VARIABLE_FILL_PATTERN_HPP
 
-#include <cassert>
 
 #include "core/def/phare_mpi.hpp"
-
-#include "SAMRAI/xfer/VariableFillPattern.h"
-
 #include "core/utilities/types.hpp"
 #include "core/utilities/mpi_utils.hpp"
+#include <core/hybrid/hybrid_quantities.hpp>
+
+#include <amr/utilities/box/amr_box.hpp>
+#include "amr/data/field/field_geometry.hpp"
 #include "amr/data/field/refine/field_refine_operator.hpp"
+
+#include <SAMRAI/pdat/CellOverlap.h>
+#include "SAMRAI/xfer/VariableFillPattern.h"
+
+#include <cassert>
 
 namespace PHARE::amr
 {
@@ -46,19 +51,9 @@ class FieldFillPattern : public SAMRAI::xfer::VariableFillPattern
     constexpr static std::size_t dim = dimension;
 
 public:
-    FieldFillPattern(std::optional<bool> overwrite_interior)
-        : opt_overwrite_interior_{overwrite_interior}
+    FieldFillPattern(bool overwrite_interior = false)
+        : overwrite_interior_{overwrite_interior}
     {
-    }
-
-    static auto make_shared(std::shared_ptr<SAMRAI::hier::RefineOperator> const& samrai_op)
-    {
-        auto const& op = dynamic_cast<AFieldRefineOperator const&>(*samrai_op);
-
-        if (op.node_only)
-            return std::make_shared<FieldFillPattern<dim>>(std::nullopt);
-
-        return std::make_shared<FieldFillPattern<dim>>(false);
     }
 
 
@@ -69,59 +64,28 @@ public:
                      SAMRAI::hier::BoxGeometry const& src_geometry,
                      SAMRAI::hier::Box const& dst_patch_box, SAMRAI::hier::Box const& src_mask,
                      SAMRAI::hier::Box const& fill_box, bool const fn_overwrite_interior,
-                     SAMRAI::hier::Transformation const& transformation) const
+                     SAMRAI::hier::Transformation const& transformation) const override
     {
 #ifndef DEBUG_CHECK_DIM_ASSERTIONS
         NULL_USE(dst_patch_box);
 #endif
         TBOX_ASSERT_OBJDIM_EQUALITY2(dst_patch_box, src_mask);
 
-        bool overwrite_interior = true; // replace func param
-        assert(fn_overwrite_interior == overwrite_interior);
+        assert(fn_overwrite_interior == true); // replace func param
 
-        if (opt_overwrite_interior_) // not node only
-        {
-            // this sets overwrite_interior to false
-            overwrite_interior = *opt_overwrite_interior_;
-        }
-
-        // opt_overwrite_interior_ is nullopt : assume primal node shared border schedule
-        else
-        {
-            // cast into the Base class to get the pureInteriorFieldBox method
-            // see field_geometry.hpp for more explanations about why this base class exists
-            auto& dst_cast = dynamic_cast<FieldGeometryBase<dimension> const&>(dst_geometry);
-            auto& src_cast = dynamic_cast<FieldGeometryBase<dimension> const&>(src_geometry);
-
-            if (src_cast.patchBox.getGlobalId().getOwnerRank()
-                != dst_cast.patchBox.getGlobalId().getOwnerRank())
-                overwrite_interior
-                    = src_cast.patchBox.getGlobalId() > dst_cast.patchBox.getGlobalId();
-
-            auto basic_overlap = dst_geometry.calculateOverlap(src_geometry, src_mask, fill_box,
-                                                               overwrite_interior, transformation);
-            auto& overlap      = dynamic_cast<FieldOverlap const&>(*basic_overlap);
-
-            auto destinationBoxes = overlap.getDestinationBoxContainer();
-            destinationBoxes.removeIntersections(src_cast.pureInteriorFieldBox());
-
-            return std::make_shared<FieldOverlap>(destinationBoxes, overlap.getTransformation());
-        }
-
-        // overwrite_interior is always false here
-        return dst_geometry.calculateOverlap(src_geometry, src_mask, fill_box, overwrite_interior,
+        return dst_geometry.calculateOverlap(src_geometry, src_mask, fill_box, overwrite_interior_,
                                              transformation);
     }
 
-    std::string const& getPatternName() const { return s_name_id; }
+    std::string const& getPatternName() const override { return s_name_id; }
 
 private:
     FieldFillPattern(FieldFillPattern const&)            = delete;
     FieldFillPattern& operator=(FieldFillPattern const&) = delete;
 
-    static const inline std::string s_name_id = "BOX_GEOMETRY_FILL_PATTERN";
+    static inline std::string const s_name_id = "BOX_GEOMETRY_FILL_PATTERN";
 
-    SAMRAI::hier::IntVector const& getStencilWidth()
+    SAMRAI::hier::IntVector const& getStencilWidth() override
     {
         TBOX_ERROR("getStencilWidth() should not be\n"
                    << "called.  This pattern creates overlaps based on\n"
@@ -146,7 +110,7 @@ private:
     computeFillBoxesOverlap(SAMRAI::hier::BoxContainer const& fill_boxes,
                             SAMRAI::hier::BoxContainer const& node_fill_boxes,
                             SAMRAI::hier::Box const& patch_box, SAMRAI::hier::Box const& data_box,
-                            SAMRAI::hier::PatchDataFactory const& pdf) const
+                            SAMRAI::hier::PatchDataFactory const& pdf) const override
     {
         NULL_USE(node_fill_boxes);
 
@@ -162,8 +126,78 @@ private:
         return pdf.getBoxGeometry(patch_box)->setUpOverlap(overlap_boxes, transformation);
     }
 
-    std::optional<bool> opt_overwrite_interior_{nullptr};
+    bool overwrite_interior_;
 };
+
+
+
+
+template<typename Gridlayout_t> // ASSUMED ALL PRIMAL!
+class FieldGhostInterpOverlapFillPattern : public SAMRAI::xfer::VariableFillPattern
+{
+    auto constexpr static dim          = Gridlayout_t::dimension;
+    auto constexpr static interp_order = Gridlayout_t::interp_order;
+    using FieldGeometry_t              = FieldGeometryBase<dim>;
+
+public:
+    FieldGhostInterpOverlapFillPattern() {}
+    ~FieldGhostInterpOverlapFillPattern() override {}
+
+    std::shared_ptr<SAMRAI::hier::BoxOverlap>
+    calculateOverlap(SAMRAI::hier::BoxGeometry const& dst_geometry,
+                     SAMRAI::hier::BoxGeometry const& src_geometry,
+                     SAMRAI::hier::Box const& dst_patch_box, SAMRAI::hier::Box const& src_mask,
+                     SAMRAI::hier::Box const& fill_box, bool const overwrite_interior,
+                     SAMRAI::hier::Transformation const& transformation) const override
+    {
+        PHARE_LOG_SCOPE(3, "FieldGhostInterpOverlapFillPattern::calculateOverlap");
+
+        if (phare_box_from<dim>(dst_patch_box) == phare_box_from<dim>(src_mask))
+            return std::make_shared<FieldOverlap>(SAMRAI::hier::BoxContainer{}, transformation);
+
+        auto const _primal_ghost_box = [](auto box) {
+            auto gb = grow(box, Gridlayout_t::nbrGhosts());
+            gb.upper += 1;
+            return gb;
+        };
+
+        auto const src_ghost_box
+            = core::shift(_primal_ghost_box(phare_box_from<dim>(
+                              dynamic_cast<FieldGeometry_t const&>(src_geometry).patchBox)),
+                          as_point<dim>(transformation));
+
+        auto const dst_ghost_box = _primal_ghost_box(
+            phare_box_from<dim>(dynamic_cast<FieldGeometry_t const&>(dst_geometry).patchBox));
+
+        SAMRAI::hier::BoxContainer dest;
+        if (auto overlap = dst_ghost_box * src_ghost_box)
+            dest.push_back(samrai_box_from(*overlap));
+
+        return std::make_shared<FieldOverlap>(dest, transformation);
+    }
+
+    std::string const& getPatternName() const override { return s_name_id; }
+
+private:
+    static inline std::string const s_name_id = "BOX_GEOMETRY_FILL_PATTERN";
+
+    SAMRAI::hier::IntVector const& getStencilWidth() override
+    {
+        throw std::runtime_error("never called");
+    }
+
+
+    std::shared_ptr<SAMRAI::hier::BoxOverlap>
+    computeFillBoxesOverlap(SAMRAI::hier::BoxContainer const& fill_boxes,
+                            SAMRAI::hier::BoxContainer const& node_fill_boxes,
+                            SAMRAI::hier::Box const& patch_box, SAMRAI::hier::Box const& data_box,
+                            SAMRAI::hier::PatchDataFactory const& pdf) const override
+    {
+        throw std::runtime_error("no refinement supported or expected");
+    }
+};
+
+
 
 } // namespace PHARE::amr
 
