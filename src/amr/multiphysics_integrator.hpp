@@ -12,30 +12,34 @@
 
 #include "core/def/phare_mpi.hpp"
 
-#include <SAMRAI/algs/TimeRefinementLevelStrategy.h>
-#include <SAMRAI/mesh/StandardTagAndInitStrategy.h>
 
-#include "SAMRAI/tbox/RestartManager.h"
-#include "SAMRAI/hier/PatchDataRestartManager.h"
-
-
-#include "amr/messengers/messenger.hpp"
-#include "amr/tagging/tagger.hpp"
-#include "amr/physical_models/hybrid_model.hpp"
-#include "amr/physical_models/mhd_model.hpp"
-#include "amr/physical_models/physical_model.hpp"
-#include "amr/solvers/solver.hpp"
-#include "amr/messenger_registration.hpp"
-#include "amr/level_initializer/level_initializer.hpp"
-#include "amr/solvers/solver_mhd.hpp"
-#include "amr/solvers/solver_ppc.hpp"
-
+#include "phare_core.hpp"
 #include "core/logger.hpp"
 #include "core/utilities/algorithm.hpp"
 
+
+#include "amr/tagging/tagger.hpp"
+#include "amr/messengers/messenger.hpp"
+#include "amr/messenger_registration.hpp"
+#include "amr/physical_models/mhd_model.hpp"
+#include "amr/physical_models/hybrid_model.hpp"
+#include "amr/physical_models/physical_model.hpp"
+#include "amr/level_initializer/level_initializer.hpp"
+
+#include "amr/solvers/solver.hpp"
+#include "amr/solvers/solver_mhd.hpp"
+#include "amr/solvers/solver_ppc.hpp"
+
+
 #include "load_balancing/load_balancer_manager.hpp"
 #include "load_balancing/load_balancer_estimator.hpp"
-#include "phare_core.hpp"
+
+
+#include "SAMRAI/tbox/RestartManager.h"
+#include "SAMRAI/hier/PatchDataRestartManager.h"
+#include <SAMRAI/mesh/StandardTagAndInitStrategy.h>
+#include <SAMRAI/algs/TimeRefinementLevelStrategy.h>
+
 
 
 namespace PHARE
@@ -370,9 +374,9 @@ namespace solver
                 load_balancer_manager_->estimate(*level, model);
 
             if (static_cast<std::size_t>(levelNumber) == model_views_.size())
-                model_views_.push_back(solver.make_view(*level, model));
+                model_views_.push_back(solver.make_view(*hierarchy, *level, model));
             else
-                model_views_[levelNumber] = solver.make_view(*level, model);
+                model_views_[levelNumber] = solver.make_view(*hierarchy, *level, model);
         }
 
 
@@ -393,7 +397,7 @@ namespace solver
                     messenger.registerLevel(hierarchy, ilvl);
 
                     model_views_.push_back(getSolver_(ilvl).make_view(
-                        AMR_Types::getLevel(*hierarchy, ilvl), getModel_(ilvl)));
+                        *hierarchy, AMR_Types::getLevel(*hierarchy, ilvl), getModel_(ilvl)));
 
                     auto level = hierarchy->getPatchLevel(ilvl);
                     for (auto& patch : *level)
@@ -436,7 +440,7 @@ namespace solver
 
 
         void initializeLevelIntegrator(
-            const std::shared_ptr<SAMRAI::mesh::GriddingAlgorithmStrategy>& /*griddingAlg*/)
+            std::shared_ptr<SAMRAI::mesh::GriddingAlgorithmStrategy> const& /*griddingAlg*/)
             override
         {
         }
@@ -557,7 +561,7 @@ namespace solver
         standardLevelSynchronization(std::shared_ptr<SAMRAI::hier::PatchHierarchy> const& hierarchy,
                                      int const coarsestLevel, int const finestLevel,
                                      double const syncTime,
-                                     const std::vector<double>& /*oldTimes*/) override
+                                     std::vector<double> const& /*oldTimes*/) override
         {
             // TODO use messengers to sync with coarser
             for (auto ilvl = finestLevel; ilvl > coarsestLevel; --ilvl)

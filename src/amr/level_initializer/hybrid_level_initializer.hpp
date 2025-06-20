@@ -7,12 +7,15 @@
 #include "amr/physical_models/hybrid_model.hpp"
 #include "amr/physical_models/physical_model.hpp"
 #include "amr/resources_manager/amr_utils.hpp"
+#include "core/data/grid/grid_tiles.hpp"
 #include "core/data/grid/gridlayout_utils.hpp"
 #include "core/data/ions/ions.hpp"
-#include "core/numerics/ampere/ampere.hpp"
+#include "core/data/particles/particle_array.hpp"
+#include "core/numerics/ampere/amdere.hpp"
 #include "core/numerics/interpolator/interpolator.hpp"
+#include "core/numerics/interpolator/interpolating.hpp"
 #include "core/numerics/moments/moments.hpp"
-#include "core/numerics/ohm/ohm.hpp"
+#include "core/numerics/ohm/omg.hpp"
 #include "initializer/data_provider.hpp"
 
 namespace PHARE
@@ -33,8 +36,12 @@ namespace solver
         static constexpr auto dimension    = GridLayoutT::dimension;
         static constexpr auto interp_order = GridLayoutT::interp_order;
 
-        PHARE::core::Ohm<GridLayoutT> ohm_;
-        PHARE::core::Ampere<GridLayoutT> ampere_;
+        using ParticleArray_t = HybridModel::particle_array_type;
+        using Interpolating_t
+            = core::Interpolating<ParticleArray_t, interp_order, /*atomic_interp*/ false>;
+
+        PHARE::core::OhmSingleTransformer ohm_;
+        PHARE::core::AmpereSingleTransformer ampere_;
 
         inline bool isRootLevel(int levelNumber) const { return levelNumber == 0; }
 
@@ -48,7 +55,8 @@ namespace solver
                                 amr::IMessenger<IPhysicalModelT>& messenger, double initDataTime,
                                 bool isRegridding) override
         {
-            core::Interpolator<dimension, interp_order> interpolate_;
+            Interpolating_t interpolate_;
+
             auto& hybridModel = static_cast<HybridModel&>(model);
             auto& level       = amr_types::getLevel(*hierarchy, levelNumber);
 
@@ -79,8 +87,7 @@ namespace solver
                 }
             }
 
-            // now all particles are here
-            // we must compute moments.
+            // now all particles are here, we must compute moments.
 
             for (auto& patch : level)
             {
@@ -91,12 +98,20 @@ namespace solver
 
                 core::resetMoments(ions);
                 core::depositParticles(ions, layout, interpolate_, core::DomainDeposit{});
-                core::depositParticles(ions, layout, interpolate_, core::PatchGhostDeposit{});
 
                 if (!isRootLevel(levelNumber))
-                {
                     core::depositParticles(ions, layout, interpolate_, core::LevelGhostDeposit{});
-                }
+            }
+
+
+            hybMessenger.fillDensityBorders(hybridModel.state.ions, level, initDataTime);
+            hybMessenger.fillFluxBorders(hybridModel.state.ions, level, initDataTime);
+
+            for (auto& patch : level)
+            {
+                auto& ions             = hybridModel.state.ions;
+                auto& resourcesManager = hybridModel.resourcesManager;
+                auto dataOnPatch       = resourcesManager->setOnPatch(*patch, ions);
 
                 ions.computeDensity();
                 ions.computeBulkVelocity();
@@ -128,8 +143,7 @@ namespace solver
                     {
                         auto _      = hybridModel.resourcesManager->setOnPatch(*patch, B, J);
                         auto layout = PHARE::amr::layoutFromPatch<GridLayoutT>(*patch);
-                        auto __     = core::SetLayout(&layout, ampere_);
-                        ampere_(B, J);
+                        ampere_(layout, B, J);
 
                         hybridModel.resourcesManager->setTime(J, *patch, 0.);
                     }
@@ -147,8 +161,8 @@ namespace solver
                         auto& Ve = electrons.velocity();
                         auto& Ne = electrons.density();
                         auto& Pe = electrons.pressure();
-                        auto __  = core::SetLayout(&layout, ohm_);
-                        ohm_(Ne, Ve, Pe, B, J, E);
+
+                        ohm_(layout, Ne, Ve, Pe, B, J, E);
                         hybridModel.resourcesManager->setTime(E, *patch, 0.);
                     }
 

@@ -3,20 +3,21 @@
 
 #include "core/def/phare_mpi.hpp"
 
-#include <SAMRAI/geom/CartesianPatchGeometry.h>
-#include <SAMRAI/hier/Box.h>
-#include <SAMRAI/hier/BoxOverlap.h>
-#include <SAMRAI/hier/IntVector.h>
-#include <SAMRAI/hier/Patch.h>
-#include <SAMRAI/hier/PatchData.h>
 
-
-#include "amr/types/amr_types.hpp"
+#include "core/def.hpp"
 #include "core/utilities/constants.hpp"
 #include "core/utilities/point/point.hpp"
-#include "core/def.hpp"
 
+#include "amr/types/amr_types.hpp"
 #include "amr/utilities/box/amr_box.hpp"
+
+#include <SAMRAI/hier/Box.h>
+#include <SAMRAI/hier/Patch.h>
+#include <SAMRAI/hier/IntVector.h>
+#include <SAMRAI/hier/PatchData.h>
+#include <SAMRAI/hier/BoxOverlap.h>
+#include <SAMRAI/hier/HierarchyNeighbors.h>
+#include <SAMRAI/geom/CartesianPatchGeometry.h>
 
 namespace PHARE
 {
@@ -43,7 +44,8 @@ namespace amr
     /**
      * @brief AMRToLocal sets the AMRBox to local indexing relative to the referenceAMRBox
      */
-    void AMRToLocal(SAMRAI::hier::Box& AMRBox, SAMRAI::hier::Box const& referenceAMRBox);
+    SAMRAI::hier::Box& AMRToLocal(SAMRAI::hier::Box& AMRBox,
+                                  SAMRAI::hier::Box const& referenceAMRBox);
 
 
 
@@ -134,7 +136,7 @@ namespace amr
     template<typename GridLayoutT>
     NO_DISCARD GridLayoutT layoutFromPatch(SAMRAI::hier::Patch const& patch)
     {
-        int constexpr dimension = GridLayoutT::dimension;
+        auto constexpr dimension = GridLayoutT::dimension;
 
         SAMRAI::tbox::Dimension const dim{dimension};
 
@@ -173,25 +175,40 @@ namespace amr
             }
         }
 
-        SAMRAI::hier::Box domain = patch.getBox();
+        SAMRAI::hier::Box const domain = patch.getBox();
 
-        std::array<std::uint32_t, dimension> nbrCell;
+        auto const nbrCell = core::for_N<dimension, core::for_N_R_mode::make_array>(
+            [&](auto iDim) { return static_cast<std::uint32_t>(domain.numberCells(iDim)); });
 
-        for (std::size_t iDim = 0; iDim < dimension; ++iDim)
-        {
-            nbrCell[iDim] = static_cast<std::uint32_t>(domain.numberCells(iDim));
-        }
+        auto const lvlNbr = patch.getPatchLevelNumber();
 
-        auto lvlNbr = patch.getPatchLevelNumber();
         return GridLayoutT{dl, nbrCell, origin, amr::Box<int, dimension>{domain}, lvlNbr};
     }
 
-    inline auto to_string(SAMRAI::hier::GlobalId const& id)
+    // potentially to replace with SAMRAI coarse to fine boundary stuff
+    template<typename GridLayoutT>
+    NO_DISCARD auto makeNonLevelGhostBoxFor(SAMRAI::hier::Patch const& patch,
+                                            SAMRAI::hier::PatchHierarchy const& hierarchy)
     {
-        std::stringstream patchID;
-        patchID << id;
-        return patchID.str();
+        auto constexpr dimension       = GridLayoutT::dimension;
+        auto const lvlNbr              = patch.getPatchLevelNumber();
+        SAMRAI::hier::Box const domain = patch.getBox();
+        auto const domBox              = phare_box_from<dimension>(domain);
+        auto const particleGhostBox    = grow(domBox, GridLayoutT::nbrParticleGhosts());
+
+        SAMRAI::hier::HierarchyNeighbors const hier_nbrs{hierarchy, lvlNbr, lvlNbr};
+        auto const neighbor_boxes = hier_nbrs.getSameLevelNeighbors(domain, lvlNbr);
+        std::vector<core::Box<int, GridLayoutT::dimension>> nonLevelGhostBoxes;
+        nonLevelGhostBoxes.reserve(neighbor_boxes.size() + 1 /*for domain*/);
+        nonLevelGhostBoxes.emplace_back(domBox);
+        for (auto const& neighbox : neighbor_boxes)
+            nonLevelGhostBoxes.emplace_back(
+                *(particleGhostBox * phare_box_from<dimension>(neighbox)));
+
+        return nonLevelGhostBoxes;
     }
+
+
 
     template<typename GridLayout, typename ResMan, typename Action, typename... Args>
     void visitLevel(SAMRAI_Types::level_t& level, ResMan& resman, Action&& action, Args&&... args)
@@ -200,8 +217,18 @@ namespace amr
         {
             auto guard        = resman.setOnPatch(*patch, args...);
             GridLayout layout = layoutFromPatch<GridLayout>(*patch);
-            action(layout, to_string(patch->getGlobalId()),
+            action(layout, core::to_string(patch->getGlobalId()),
                    static_cast<std::size_t>(level.getLevelNumber()));
+        }
+    }
+
+    template<typename ResMan, typename Action, typename... Args>
+    void visitLevel(SAMRAI_Types::level_t& level, ResMan& resman, Action&& action, Args&&... args)
+    {
+        for (auto& patch : level)
+        {
+            auto guard = resman.setOnPatch(*patch, args...);
+            action();
         }
     }
 
