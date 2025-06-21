@@ -4,6 +4,10 @@
 
 
 def cpp_lib(override=None):
+    global _cpp_lib
+    if _cpp_lib:
+        return _cpp_lib
+
     import importlib
 
     return importlib.import_module("pybindlibs.cpp")

@@ -206,6 +206,25 @@ auto constexpr is_hybrid_model_v = is_hybrid_model(static_cast<Model*>(nullptr))
 
 
 
+
+
+template<typename Model>
+auto constexpr is_hybrid_model(Model* m) -> decltype(m->model_type_name, bool())
+{
+    return Model::model_type_name == "HybridModel";
+}
+
+template<typename... Args>
+auto constexpr is_hybrid_model(Args...)
+{
+    return false;
+}
+
+template<typename Model>
+auto constexpr is_hybrid_model_v = is_hybrid_model((Model*)(nullptr));
+
+
+
 } // namespace PHARE::solver
 
 #endif

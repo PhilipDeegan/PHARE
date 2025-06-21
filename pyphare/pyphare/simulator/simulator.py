@@ -180,7 +180,8 @@ class Simulator:
         except KeyboardInterrupt as e:
             self._throw(f"KeyboardInterrupt in simulator.py::advance: \n{e}")
 
-        if self._auto_dump() and self.post_advance is not None:
+        self._auto_dump()
+        if self.post_advance is not None:
             self.post_advance(self.cpp_sim.currentTime())
         return self
 
@@ -206,7 +207,7 @@ class Simulator:
         if self.simulation.dry_run:
             return self
         if monitoring:
-            mon.setup_monitoring(cpp_lib())
+            mon.setup_monitoring(cpp_lib(), monitoring)
         perf = []
         end_time = self.cpp_sim.endTime()
         t = self.cpp_sim.currentTime()
