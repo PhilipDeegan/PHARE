@@ -1158,6 +1158,25 @@ namespace core
         }
 
 
+
+        template<typename Field>
+        auto AMRGhostBoxFor(Field const& field) const
+        {
+            auto const centerings = centering(field);
+            auto const growBy     = [&]() {
+                std::array<int, dimension> arr;
+                for (std::uint8_t i = 0; i < dimension; ++i)
+                    arr[i] = nbrGhosts(centerings[i]);
+                return arr;
+            }();
+            auto ghostBox = grow(AMRBox_, growBy);
+            for (std::uint8_t i = 0; i < dimension; ++i)
+                ghostBox.upper[i] += (centerings[i] == QtyCentering::primal) ? 1 : 0;
+            return ghostBox;
+        }
+
+
+
         template<typename Field, typename Fn>
         void evalOnBox(Field& field, Fn&& fn) const
         {

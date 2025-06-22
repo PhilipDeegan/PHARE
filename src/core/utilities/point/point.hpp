@@ -144,6 +144,19 @@ namespace core
                 r[iDim] += value[iDim];
             return *this;
         }
+        auto& operator-=(Type const& value)
+        {
+            for (auto iDim = 0u; iDim < dim; ++iDim)
+                r[iDim] -= value;
+            return *this;
+        }
+        template<template<typename, std::size_t> typename Arr, typename T>
+        auto& operator-=(Arr<T, dim> const& value)
+        {
+            for (auto iDim = 0u; iDim < dim; ++iDim)
+                r[iDim] -= value[iDim];
+            return *this;
+        }
 
         auto operator+(Type const& value) const
         {

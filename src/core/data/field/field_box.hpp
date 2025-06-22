@@ -22,13 +22,13 @@ public:
     auto constexpr static dimension = Field_t::dimension;
 
     Field_t& field;
-    Box<int, dimension> amr_box;
+    Box<int, dimension> amr_ghost_box;
     Box<std::uint32_t, dimension> lcl_box;
 
     template<typename GridLayout_t>
     FieldBox(Field_t& field_, GridLayout_t const& layout)
         : field{field_}
-        , amr_box{layout.AMRBox()}
+        , amr_ghost_box{layout.AMRGhostBoxFor(field.physicalQuantity())}
         , lcl_box{layout.ghostBoxFor(field)}
     {
     }
@@ -37,7 +37,7 @@ public:
     FieldBox(Field_t& field_, GridLayout_t const& layout,
              Box<std::uint32_t, dimension> const& selection)
         : field{field_}
-        , amr_box{layout.AMRBox()}
+        , amr_ghost_box{layout.AMRGhostBoxFor(field.physicalQuantity())}
         , lcl_box{selection}
     {
     }
@@ -45,7 +45,7 @@ public:
     template<typename GridLayout_t>
     FieldBox(Field_t& field_, GridLayout_t const& layout, Box<int, dimension> const& selection)
         : field{field_}
-        , amr_box{layout.AMRBox()}
+        , amr_ghost_box{layout.AMRGhostBoxFor(field.physicalQuantity())}
         , lcl_box{layout.AMRToLocal(selection)}
     {
     }

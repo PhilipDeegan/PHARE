@@ -85,6 +85,14 @@ struct Box
         }
     }
 
+    template<typename Size>
+    auto& grow(std::array<Size, dim> const& size)
+    {
+        lower -= size;
+        upper += size;
+        return *this;
+    }
+
     NO_DISCARD auto shape() const { return upper - lower + 1; }
     NO_DISCARD auto size() const { return core::product(shape()); }
 
