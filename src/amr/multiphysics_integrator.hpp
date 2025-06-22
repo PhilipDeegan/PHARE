@@ -436,7 +436,7 @@ namespace solver
 
 
         void initializeLevelIntegrator(
-            const std::shared_ptr<SAMRAI::mesh::GriddingAlgorithmStrategy>& /*griddingAlg*/)
+            std::shared_ptr<SAMRAI::mesh::GriddingAlgorithmStrategy> const& /*griddingAlg*/)
             override
         {
         }
@@ -502,6 +502,8 @@ namespace solver
                             double const currentTime, double const newTime, bool const firstStep,
                             bool const lastStep, bool const regridAdvance = false) override
         {
+            PHARE_DEBUG_TIME(newTime);
+            PHARE_DEBUG_SCOPE("level/" + std::to_string(level->getLevelNumber()) + "/");
             PHARE_LOG_SCOPE(3, "Multiphys::advanceLevel");
 
             if (regridAdvance)
@@ -557,7 +559,7 @@ namespace solver
         standardLevelSynchronization(std::shared_ptr<SAMRAI::hier::PatchHierarchy> const& hierarchy,
                                      int const coarsestLevel, int const finestLevel,
                                      double const syncTime,
-                                     const std::vector<double>& /*oldTimes*/) override
+                                     std::vector<double> const& /*oldTimes*/) override
         {
             // TODO use messengers to sync with coarser
             for (auto ilvl = finestLevel; ilvl > coarsestLevel; --ilvl)

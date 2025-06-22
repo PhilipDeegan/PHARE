@@ -14,12 +14,13 @@
 #include "initializer/data_provider.hpp"
 
 
+#include <cstdint>
 #include <memory>
 
 
 namespace PHARE::core
 {
-enum class UpdaterMode { domain_only = 1, all = 2 };
+enum class UpdaterMode : std::uint16_t { domain_only = 0, all };
 
 template<typename Ions, typename Electromag, typename GridLayout>
 class IonUpdater

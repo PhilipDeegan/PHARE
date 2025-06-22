@@ -363,7 +363,7 @@ namespace amr
         }
 
         template<typename Operator = SetEqualOp>
-        void copy_(FieldData const& source, FieldOverlap const& overlap, Grid_t& dst)
+        void copy_(FieldData const& source, FieldOverlap const& overlap, Grid_t& fieldDestination)
         {
             // Here the first step is to get the transformation from the overlap
             // we transform the box from the source, and from the destination
@@ -398,9 +398,19 @@ namespace amr
                         SAMRAI::hier::Box const intersectionBox{box * transformedSource
                                                                 * destinationBox};
 
+                        auto const& offset = as_point<dimension>(transformation);
+
                         if (!intersectionBox.empty())
-                            copy_<Operator>(intersectionBox, transformedSource, destinationBox,
-                                            source, dst);
+                        {
+                            core::FieldBox dst{fieldDestination, gridLayout,
+                                               phare_lcl_box_from<dimension>(
+                                                   AMRToLocal(intersectionBox, destinationBox))};
+                            core::FieldBox src{source.field, source.gridLayout,
+                                               phare_lcl_box_from<dimension>(
+                                                   AMRToLocal(intersectionBox, transformedSource))};
+
+                            operate_on_fields<Operator>(dst, src.offset(offset));
+                        }
                     }
                 }
             }

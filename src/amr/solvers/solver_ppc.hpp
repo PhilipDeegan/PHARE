@@ -1,6 +1,7 @@
 #ifndef PHARE_SOLVER_PPC_HPP
 #define PHARE_SOLVER_PPC_HPP
 
+#include "core/debug.hpp"
 #include "core/def/phare_mpi.hpp"
 
 #include "core/numerics/ion_updater/ion_updater.hpp"
@@ -415,6 +416,8 @@ void SolverPPC<HybridModel, AMR_Types>::moveIons_(level_t& level, ModelViews_t& 
                                                   Messenger& fromCoarser, double const currentTime,
                                                   double const newTime, core::UpdaterMode mode)
 {
+    PHARE_DEBUG_SCOPE("SolverPPC/moveIons/" + std::to_string(static_cast<std::uint16_t>(mode))
+                      + "/");
     PHARE_LOG_SCOPE(1, "SolverPPC::moveIons_");
     PHARE_DEBUG_DO(_debug_log_move_ions(views);)
 
@@ -444,6 +447,8 @@ void SolverPPC<HybridModel, AMR_Types>::moveIons_(level_t& level, ModelViews_t& 
     // now Ni and Vi are calculated we can fill pure ghost nodes
     // these were not completed by the deposition of patch and levelghost particles
     fromCoarser.fillIonMomentGhosts(views.model().state.ions, level, newTime);
+
+    PHARE_DEBUG_ALL_FIELDS(views);
 }
 
 

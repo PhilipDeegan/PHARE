@@ -2,6 +2,7 @@
 #define PHARE_CORE_DATA_FIELD_FIELD_BOX_HPP
 
 #include "core/def.hpp"
+#include "core/debug.hpp"
 #include "core/logger.hpp"
 #include "core/utilities/types.hpp"
 #include "core/utilities/box/box.hpp"
@@ -55,12 +56,22 @@ public:
     void set_from(std::vector<value_type> const& vec, std::size_t seek = 0);
 
     void append_to(std::vector<value_type>& vec);
+
+    auto& offset(auto const& offset)
+    {
+        offset_ = offset;
+        return *this;
+    }
+
+    Point<int, dimension> offset_ = ConstArray<int, dimension>();
 };
 
 
 template<typename Operator>
 void operate_on_fields(auto& dst, auto const& src)
 {
+    PHARE_DEBUG_FIELDS(dst, src);
+
     assert(dst.lcl_box.size() == src.lcl_box.size());
     auto src_it = src.lcl_box.begin();
     auto dst_it = dst.lcl_box.begin();
