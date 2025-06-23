@@ -199,13 +199,13 @@ namespace amr
         {
             auto const level = hierarchy->getPatchLevel(levelNumber);
 
-
-
             magPatchGhostsRefineSchedules[levelNumber]
                 = Balgo.createSchedule(level, &magneticRefinePatchStrategy_);
 
             magGhostsRefineSchedules[levelNumber] = Balgo.createSchedule(
                 level, levelNumber - 1, hierarchy, &magneticRefinePatchStrategy_);
+
+            elecSharedNodesRefiners_.registerLevel(hierarchy, level);
 
 
             elecGhostsRefiners_.registerLevel(hierarchy, level);
@@ -358,9 +358,14 @@ namespace amr
 
 
 
-        void fillElectricGhosts(VecFieldT& E, int const levelNumber, double const fillTime) override
+        void fillElectricGhosts(VecFieldT& E, int const levelNumber_,
+                                double const fillTime) override
         {
+            bool const hax        = levelNumber_ >= 10;
+            int const levelNumber = hax ? levelNumber_ - 10 : levelNumber_;
             PHARE_LOG_SCOPE(3, "HybridHybridMessengerStrategy::fillElectricGhosts");
+            if (hax)
+                elecSharedNodesRefiners_.fill(E, levelNumber, fillTime);
             elecGhostsRefiners_.fill(E, levelNumber, fillTime);
         }
 
@@ -632,6 +637,9 @@ namespace amr
 
             auto& hybridModel = static_cast<HybridModel&>(model);
 
+            // elecSharedNodesRefiners_.fill(hybridModel.state.electromag.E, levelNumber,
+            //                               initDataTime);
+
             elecGhostsRefiners_.fill(hybridModel.state.electromag.E, levelNumber, initDataTime);
 
             // at some point in the future levelGhostParticles could be filled with injected
@@ -678,8 +686,9 @@ namespace amr
             auto levelNumber  = level.getLevelNumber();
             auto& hybridModel = static_cast<HybridModel&>(model);
 
-            PHARE_LOG_LINE_STR("postSynchronize level " + std::to_string(levelNumber))
+            PHARE_LOG_LINE_STR("postSynchronize level " + std::to_string(levelNumber));
 
+            // elecSharedNodesRefiners_.fill(hybridModel.state.electromag.E, levelNumber, time);
 
             // we fill magnetic field ghosts only on patch ghost nodes and not on level
             // ghosts the reason is that 1/ filling ghosts is necessary to prevent mismatch
@@ -705,13 +714,10 @@ namespace amr
 
         void registerGhostComms_(std::unique_ptr<HybridMessengerInfo> const& info)
         {
-            // magGhostsRefiners_.addStaticRefiners(info->ghostMagnetic, BfieldRefineOp_,
-            //                                      makeKeys(info->ghostMagnetic),
-            //                                      defaultFieldFillPattern);
+            elecSharedNodesRefiners_.addStaticRefiners(
+                info->ghostElectric, EfieldRefineOp_, makeKeys(info->ghostElectric),
+                std::make_shared<FieldFillPattern<dimension>>(std::nullopt));
 
-            // magPatchGhostsRefiners_.addStaticRefiner(info->modelMagnetic, BfieldRefineOp_,
-            //                                          info->modelMagnetic.vecName,
-            //                                          defaultFieldFillPattern);
 
             elecGhostsRefiners_.addStaticRefiners(info->ghostElectric, EfieldRefineOp_,
                                                   makeKeys(info->ghostElectric),
@@ -1047,6 +1053,7 @@ namespace amr
         // a new level (initLevel) or regridding (regrid)
         using InitRefinerPool            = RefinerPool<rm_t, RefinerType::InitField>;
         using GhostRefinerPool           = RefinerPool<rm_t, RefinerType::GhostField>;
+        using SharedNodeRefinerPool      = RefinerPool<rm_t, RefinerType::SharedBorder>;
         using PatchGhostRefinerPool      = RefinerPool<rm_t, RefinerType::PatchGhostField>;
         using InitDomPartRefinerPool     = RefinerPool<rm_t, RefinerType::InitInteriorPart>;
         using DomainGhostPartRefinerPool = RefinerPool<rm_t, RefinerType::ExteriorGhostParticles>;
@@ -1068,6 +1075,7 @@ namespace amr
 
 
         //! store refiners for electric fields that need ghosts to be filled
+        SharedNodeRefinerPool elecSharedNodesRefiners_{resourcesManager_};
         GhostRefinerPool elecGhostsRefiners_{resourcesManager_};
 
         GhostRefinerPool currentGhostsRefiners_{resourcesManager_};

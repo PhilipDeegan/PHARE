@@ -20,7 +20,8 @@ enum class RefinerType {
     InitInteriorPart,
     LevelBorderParticles,
     PatchFieldBorderSum,
-    ExteriorGhostParticles
+    ExteriorGhostParticles,
+    SharedBorder
 };
 
 
@@ -126,6 +127,13 @@ public:
 
 
             else if constexpr (Type == RefinerType::ExteriorGhostParticles)
+            {
+                this->add(algo, algo->createSchedule(level), levelNumber);
+            }
+
+
+            // schedule to synchronize shared border values, and not include refinement
+            else if constexpr (Type == RefinerType::SharedBorder)
             {
                 this->add(algo, algo->createSchedule(level), levelNumber);
             }

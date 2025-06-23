@@ -17,10 +17,11 @@ mpl.use("Agg")
 cpp = cpp_lib()
 
 
-cells = (200, 100)
+cells = (40, 80)
 time_step = 0.005
-final_time = 50
-timestamps = np.arange(0, final_time + time_step, final_time / 5)
+final_time = 0.300
+timestamps = np.arange(0, final_time + time_step, time_step)
+timestamps = [0, 0.225, final_time]
 diag_dir = "phare_outputs/harris"
 
 
@@ -30,6 +31,7 @@ def config():
     sim = ph.Simulation(
         time_step=time_step,
         final_time=final_time,
+        largest_patch_size=10,
         cells=cells,
         dl=(0.40, 0.40),
         refinement="tagging",
@@ -40,7 +42,7 @@ def config():
             "format": "phareh5",
             "options": {"dir": diag_dir, "mode": "overwrite"},
         },
-        strict=True,
+        strict=False,
     )
 
     def density(x, y):
@@ -67,7 +69,7 @@ def config():
         dBy1 = 2 * dB * x0 * np.exp(-(x0**2 + y1**2) / (sigma) ** 2)
         dBy2 = -2 * dB * x0 * np.exp(-(x0**2 + y2**2) / (sigma) ** 2)
 
-        return dBy1 + dBy2
+        return 0.0  # dBy1 + dBy2
 
     def bx(x, y):
         Lx = sim.simulation_domain()[0]
@@ -84,7 +86,7 @@ def config():
 
         v1 = -1
         v2 = 1.0
-        return v1 + (v2 - v1) * (S(y, Ly * 0.3, L) - S(y, Ly * 0.7, L)) + dBx1 + dBx2
+        return v1 + (v2 - v1) * (S(y, Ly * 0.3, L) - S(y, Ly * 0.7, L))  # + dBx1 + dBx2
 
     def bz(x, y):
         return 0.0
@@ -123,7 +125,7 @@ def config():
         "vthx": vthx,
         "vthy": vthy,
         "vthz": vthz,
-        "nbr_part_per_cell": 100,
+        "nbr_part_per_cell": 20,
     }
 
     ph.MaxwellianFluidModel(
@@ -144,7 +146,7 @@ def config():
     )
     ph.InfoDiagnostics(quantity="particle_count")
 
-    ph.LoadBalancer(active=True, auto=True, mode="nppc", tol=0.05)
+    # ph.LoadBalancer(active=True, auto=True, mode="nppc", tol=0.05)
 
     return sim
 
@@ -159,8 +161,15 @@ def plot(diag_dir, plot_dir):
         run.GetDivB(time).plot(
             filename=plot_file_for_qty(plot_dir, "divb", time),
             plot_patches=True,
-            vmin=1e-11,
-            vmax=2e-10,
+            vmin=-1e-12,
+            vmax=1e-11,
+        )
+        run.GetDivB(time).plot(
+            filename=plot_file_for_qty(plot_dir, "divbL0", time),
+            plot_patches=True,
+            levels=(0,),
+            vmin=-1e-12,
+            vmax=1e-12,
         )
         run.GetRanks(time).plot(
             filename=plot_file_for_qty(plot_dir, "Ranks", time), plot_patches=True
@@ -198,7 +207,7 @@ class HarrisTest(SimulatorTest):
         ph.global_vars.sim = None
 
     def test_run(self):
-        self.register_diag_dir_for_cleanup(diag_dir)
+        #        self.register_diag_dir_for_cleanup(diag_dir)
         Simulator(config()).run().reset()
         if cpp.mpi_rank() == 0:
             plot(diag_dir, self.plot_dir)

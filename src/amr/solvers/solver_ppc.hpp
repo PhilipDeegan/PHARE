@@ -126,8 +126,10 @@ private:
                     double const currentTime, double const newTime);
 
 
-    void average_(level_t& level, ModelViews_t& views, Messenger& fromCoarser,
-                  double const newTime);
+    void average_1(level_t& level, ModelViews_t& views, Messenger& fromCoarser,
+                   double const newTime);
+    void average_2(level_t& level, ModelViews_t& views, Messenger& fromCoarser,
+                   double const newTime);
 
 
     void moveIons_(level_t& level, ModelViews_t& views, Messenger& fromCoarser,
@@ -241,14 +243,14 @@ void SolverPPC<HybridModel, AMR_Types>::advanceLevel(hierarchy_t const& hierarch
 
     predictor1_(level, modelView, fromCoarser, currentTime, newTime);
 
-    average_(level, modelView, fromCoarser, newTime);
+    average_1(level, modelView, fromCoarser, newTime);
 
     moveIons_(level, modelView, fromCoarser, currentTime, newTime, core::UpdaterMode::domain_only);
 
     predictor2_(level, modelView, fromCoarser, currentTime, newTime);
 
 
-    average_(level, modelView, fromCoarser, newTime);
+    average_2(level, modelView, fromCoarser, newTime);
 
     moveIons_(level, modelView, fromCoarser, currentTime, newTime, core::UpdaterMode::all);
 
@@ -368,8 +370,8 @@ void SolverPPC<HybridModel, AMR_Types>::corrector_(level_t& level, ModelViews_t&
 
 
 template<typename HybridModel, typename AMR_Types>
-void SolverPPC<HybridModel, AMR_Types>::average_(level_t& level, ModelViews_t& views,
-                                                 Messenger& fromCoarser, double const newTime)
+void SolverPPC<HybridModel, AMR_Types>::average_1(level_t& level, ModelViews_t& views,
+                                                  Messenger& fromCoarser, double const newTime)
 {
     PHARE_LOG_SCOPE(1, "SolverPPC::average_");
 
@@ -383,6 +385,23 @@ void SolverPPC<HybridModel, AMR_Types>::average_(level_t& level, ModelViews_t& v
     // on domain border. For level ghosts, electric field will be obtained from
     // next coarser level E average
     fromCoarser.fillElectricGhosts(electromagAvg_.E, level.getLevelNumber(), newTime);
+}
+template<typename HybridModel, typename AMR_Types>
+void SolverPPC<HybridModel, AMR_Types>::average_2(level_t& level, ModelViews_t& views,
+                                                  Messenger& fromCoarser, double const newTime)
+{
+    PHARE_LOG_SCOPE(1, "SolverPPC::average_");
+
+    for (auto& state : views)
+    {
+        PHARE::core::average(state.electromag.B, state.electromagPred.B, state.electromagAvg.B);
+        PHARE::core::average(state.electromag.E, state.electromagPred.E, state.electromagAvg.E);
+    }
+
+    // the following will fill E on all edges of all ghost cells, including those
+    // on domain border. For level ghosts, electric field will be obtained from
+    // next coarser level E average
+    fromCoarser.fillElectricGhosts(electromagAvg_.E, level.getLevelNumber() + 10, newTime);
 }
 
 

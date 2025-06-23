@@ -30,9 +30,8 @@ class FieldFillPattern : public SAMRAI::xfer::VariableFillPattern
 
 public:
     // defaulted param makes this the default constructor also
-    FieldFillPattern(bool overwrite_interior = false)
-        : overwrite_interior_{overwrite_interior}
-
+    FieldFillPattern(std::optional<bool> overwrite_interior = false)
+        : opt_overwrite_interior_{overwrite_interior}
     {
     }
 
@@ -51,10 +50,40 @@ public:
 #endif
         TBOX_ASSERT_OBJDIM_EQUALITY2(dst_patch_box, src_mask);
 
-        assert(fn_overwrite_interior == true); // expect default as true
+        bool overwrite_interior = true; // replace func param
+        assert(fn_overwrite_interior == overwrite_interior);
 
-        return dst_geometry.calculateOverlap(src_geometry, src_mask, fill_box, overwrite_interior_,
+        if (opt_overwrite_interior_) // not node only
+        {
+            // this sets overwrite_interior to false
+            overwrite_interior = *opt_overwrite_interior_;
+        }
 
+        // opt_overwrite_interior_ is nullopt : assume primal node shared border schedule
+        else
+        {
+            // cast into the Base class to get the pureInteriorFieldBox method
+            // see field_geometry.hpp for more explanations about why this base class exists
+            auto& dst_cast = dynamic_cast<FieldGeometryBase<dimension> const&>(dst_geometry);
+            auto& src_cast = dynamic_cast<FieldGeometryBase<dimension> const&>(src_geometry);
+
+            if (src_cast.patchBox.getGlobalId().getOwnerRank()
+                != dst_cast.patchBox.getGlobalId().getOwnerRank())
+                overwrite_interior
+                    = src_cast.patchBox.getGlobalId() > dst_cast.patchBox.getGlobalId();
+
+            auto basic_overlap = dst_geometry.calculateOverlap(src_geometry, src_mask, fill_box,
+                                                               overwrite_interior, transformation);
+            auto& overlap      = dynamic_cast<FieldOverlap const&>(*basic_overlap);
+
+            auto destinationBoxes = overlap.getDestinationBoxContainer();
+            destinationBoxes.removeIntersections(src_cast.pureInteriorFieldBox());
+
+            return std::make_shared<FieldOverlap>(destinationBoxes, overlap.getTransformation());
+        }
+
+        // overwrite_interior is always false here
+        return dst_geometry.calculateOverlap(src_geometry, src_mask, fill_box, overwrite_interior,
                                              transformation);
     }
 
@@ -107,7 +136,7 @@ private:
         return pdf.getBoxGeometry(patch_box)->setUpOverlap(overlap_boxes, transformation);
     }
 
-    bool overwrite_interior_;
+    std::optional<bool> opt_overwrite_interior_{nullptr};
 };
 
 
