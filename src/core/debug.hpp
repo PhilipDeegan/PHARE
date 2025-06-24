@@ -3,6 +3,7 @@
 
 #include "core/logger.hpp"
 #include "core/utilities/box/box.hpp"
+#include "core/utilities/types.hpp"
 
 #include <cassert>
 #include <sstream>
@@ -29,12 +30,89 @@ struct FieldActiveFunction
 };
 
 
-std::unordered_map<std::string, FieldActiveFunction> static inline debugging{
-    {"Simulator/advance/level/0/", {.005, Box<int, DEBUG_DIM>{{0, 0}, {1, 1}}, "EMAvg_E_x"}},
-    {"Simulator/advance/level/0/SolverPPC/moveIons/0/",
-     {.005, Box<int, DEBUG_DIM>{{-2, -2}, {2, 2}}, "HybridModel-HybridModel_sumVec_x"}},
-    {"Simulator/advance/level/0/SolverPPC/moveIons/1/",
-     {.005, Box<int, DEBUG_DIM>{{-2, -2}, {2, 2}}, "HybridModel-HybridModel_sumVec_x"}},
+std::unordered_map<std::string, std::vector<FieldActiveFunction>> static inline debugging{
+    //
+    {
+        "Simulator/advance/level/0/SolverPPC/average/2/",
+        {
+            //
+            // {.225, Box<int, DEBUG_DIM>{{31, 18}, {32, 21}}, "EM_E_x"},
+            // {.225, Box<int, DEBUG_DIM>{{31, 18}, {32, 21}}, "EM_E_y"},
+            // {.225, Box<int, DEBUG_DIM>{{31, 18}, {32, 21}}, "EM_E_z"},
+
+            // {.225, Box<int, DEBUG_DIM>{{31, 18}, {32, 21}}, "EMAvg_E_x"},
+            // {.225, Box<int, DEBUG_DIM>{{31, 18}, {32, 21}}, "EMAvg_E_y"},
+            // {.225, Box<int, DEBUG_DIM>{{31, 18}, {32, 21}}, "EMAvg_E_z"},
+
+            // {.225, Box<int, DEBUG_DIM>{{31, 18}, {32, 21}}, "EMPred_E_x"},
+            // {.225, Box<int, DEBUG_DIM>{{31, 18}, {32, 21}}, "EMPred_E_y"},
+            // {.225, Box<int, DEBUG_DIM>{{31, 18}, {32, 21}}, "EMPred_E_z"} //
+        },
+    },
+    {
+        "Simulator/advance/level/1/SolverPPC/predictor1/",
+        {
+            //
+
+            // {.225, Box<int, DEBUG_DIM>{{62, 36}, {64, 42}}, "rho"},
+
+            // {.225, Box<int, DEBUG_DIM>{{62, 36}, {64, 42}}, "EM_B_x"},
+            // {.225, Box<int, DEBUG_DIM>{{62, 36}, {64, 42}}, "EM_B_y"},
+            // {.225, Box<int, DEBUG_DIM>{{62, 36}, {64, 42}}, "EM_B_z"},
+
+            // {.225, Box<int, DEBUG_DIM>{{62, 36}, {64, 42}}, "EM_E_x"},
+            // {.225, Box<int, DEBUG_DIM>{{62, 36}, {64, 42}}, "EM_E_y"},
+            // {.225, Box<int, DEBUG_DIM>{{62, 36}, {64, 42}}, "EM_E_z"},
+
+            // {.225, Box<int, DEBUG_DIM>{{62, 36}, {64, 42}}, "EMAvg_E_x"},
+            // {.225, Box<int, DEBUG_DIM>{{62, 36}, {64, 42}}, "EMAvg_E_y"},
+            // {.225, Box<int, DEBUG_DIM>{{62, 36}, {64, 42}}, "EMAvg_E_z"},
+
+            // {.225, Box<int, DEBUG_DIM>{{62, 36}, {64, 42}}, "EMPred_B_x"},
+            // {.225, Box<int, DEBUG_DIM>{{62, 36}, {64, 42}}, "EMPred_B_y"},
+            // {.225, Box<int, DEBUG_DIM>{{62, 36}, {64, 42}}, "EMPred_B_z"},
+
+            // {.225, Box<int, DEBUG_DIM>{{62, 36}, {64, 42}}, "EMPred_E_x"},
+            // {.225, Box<int, DEBUG_DIM>{{62, 36}, {64, 42}}, "EMPred_E_y"},
+            // {.225, Box<int, DEBUG_DIM>{{62, 36}, {64, 42}}, "EMPred_E_z"},
+        } //
+    },
+    {
+        "Simulator/advance/HyHyMessStrat/before_sync/",
+        {
+            // {.225, Box<int, DEBUG_DIM>{{62, 36}, {64, 42}}, "EM_B_x"},
+            // {.225, Box<int, DEBUG_DIM>{{62, 36}, {64, 42}}, "EM_B_y"},
+            // {.225, Box<int, DEBUG_DIM>{{62, 36}, {64, 42}}, "EM_B_z"},
+
+            // {.225, Box<int, DEBUG_DIM>{{62, 36}, {64, 42}}, "EMAvg_E_x"},
+            // {.225, Box<int, DEBUG_DIM>{{62, 36}, {64, 42}}, "EMAvg_E_y"},
+            // {.225, Box<int, DEBUG_DIM>{{62, 36}, {64, 42}}, "EMAvg_E_z"},
+
+            // {.225, Box<int, DEBUG_DIM>{{62, 36}, {64, 42}}, "EMPred_E_x"},
+            // {.225, Box<int, DEBUG_DIM>{{62, 36}, {64, 42}}, "EMPred_E_y"},
+            // {.225, Box<int, DEBUG_DIM>{{62, 36}, {64, 42}}, "EMPred_E_z"},
+
+            // {.225, Box<int, DEBUG_DIM>{{62, 36}, {64, 42}}, "EMPred_B_x"},
+            // {.225, Box<int, DEBUG_DIM>{{62, 36}, {64, 42}}, "EMPred_B_y"},
+            // {.225, Box<int, DEBUG_DIM>{{62, 36}, {64, 42}}, "EMPred_B_z"},
+
+            // {.225, Box<int, DEBUG_DIM>{{62, 36}, {64, 42}}, "rho"},
+
+            // {.225, Box<int, DEBUG_DIM>{{62, 36}, {64, 42}}, "bulkVel_x"},
+            // {.225, Box<int, DEBUG_DIM>{{62, 36}, {64, 42}}, "bulkVel_y"},
+            // {.225, Box<int, DEBUG_DIM>{{62, 36}, {64, 42}}, "bulkVel_z"},
+
+
+        } //
+    }, //
+    {
+        "Simulator/advance/HyHyMessStrat/after_sync/",
+        {
+            // {.225, Box<int, DEBUG_DIM>{{62, 36}, {64, 42}}, "EM_B_x"},
+            // {.225, Box<int, DEBUG_DIM>{{62, 36}, {64, 42}}, "EM_B_y"},
+            // {.225, Box<int, DEBUG_DIM>{{62, 36}, {64, 42}}, "EM_B_z"},
+        } //
+    } //
 };
 
 
@@ -142,10 +220,11 @@ void debug_if_active_fields(auto const& dst, auto const& src)
                                    << " / field: " << dst.field.name() << " " << dst_amr_box);
         }
 
-        for (auto [k, v] : debugging)
-            if (float_equals(debugger.time, v.time) and path == k and v.dst_name == dst.field.name()
-                and v.box * dst_amr_box)
-                debug_fields(dst, src, k, v);
+        for (auto [k, vs] : debugging)
+            for (auto const& v : vs)
+                if (float_equals(debugger.time, v.time) and path == k
+                    and v.dst_name == dst.field.name() and v.box * dst_amr_box)
+                    debug_fields(dst, src, k, v);
     }
 }
 
@@ -158,19 +237,20 @@ void debug_field(auto& field, auto& layout, auto& k, auto& v)
     auto const path          = scope.full_path();
     auto const dst_ghost_box = layout.AMRGhostBoxFor(field.physicalQuantity());
 
-    PHARE_LOG_LINE_SS("debugging: " << path << " / time: " << v.time
-                                    << " / field: " << field.name());
+    PHARE_LOG_LINE_SS("debugging: " << path << " / time: " << v.time << " / field: " << field.name()
+                                    << " patch" << layout.AMRBox());
 
-    for (auto const& bix : layout.AMRToLocal(v.box))
-    {
-        auto const amr_idx = (bix + dst_ghost_box.lower).as_signed();
-        if (isIn(amr_idx, v.box))
+    if (auto const overlap = v.box * dst_ghost_box)
+        for (auto const& bix : layout.AMRToLocal(*overlap))
         {
-            auto const dv = to_string_with_precision(field(*bix), 17);
+            auto const amr_idx = (bix + dst_ghost_box.lower).as_signed();
+            if (isIn(amr_idx, v.box))
+            {
+                auto const dv = to_string_with_precision(field(*bix), 17);
 
-            std::cout << "amr_idx=" << amr_idx << " dst(" << dv << ") " << std::endl;
+                std::cout << "amr_idx=" << amr_idx << " dst(" << dv << ") " << std::endl;
+            }
         }
-    }
 }
 
 void debug_if_active_field(auto const& field, auto const& layout)
@@ -189,10 +269,11 @@ void debug_if_active_field(auto const& field, auto const& layout)
                                    << " " << dst_ghost_box);
         }
 
-        for (auto [k, v] : debugging)
-            if (float_equals(debugger.time, v.time) and path == k and v.dst_name == field.name()
-                and v.box * dst_ghost_box)
-                debug_field(field, layout, k, v);
+        for (auto [k, vs] : debugging)
+            for (auto const& v : vs)
+                if (float_equals(debugger.time, v.time) and path == k and v.dst_name == field.name()
+                    and v.box * dst_ghost_box)
+                    debug_field(field, layout, k, v);
     }
 }
 
@@ -216,16 +297,90 @@ void debug_all_fields(auto& views)
     }
 }
 
+void check_fields(auto const& p0, auto const& p1, auto const vid) {}
+
+void check_all_fields(auto& views)
+{
+    using ResourcesManager_t = std::decay_t<decltype(*views.model().resourcesManager)>;
+    using FieldData_t        = typename ResourcesManager_t::UserField_t::patch_data_type;
+    auto const& rm           = *views.model().resourcesManager;
+    auto& debugger           = Debuggerino::INSTANCE();
+    auto& scope              = *debugger.stack_ptr;
+    auto const path          = scope.full_path();
+    auto const time          = debugger.time;
+
+    auto const& states = views.states;
+
+
+
+    for (auto [k, v] : rm.all_resources())
+        for (std::size_t i = 0; i < states.size() - 1; ++i)
+            for (std::size_t j = i + 1; j < states.size(); ++j)
+            {
+                auto const& p0 = *states[i].patch;
+                auto const& p1 = *states[j].patch;
+                auto const& d0 = p0.getPatchData(v.id);
+                auto const& d1 = p1.getPatchData(v.id);
+                auto f0        = dynamic_cast<FieldData_t*>(d0.get());
+                if (not f0)
+                    continue;
+
+                auto const name = f0->field.name();
+                // if (name != "rho_protons" or name != "protons_flux_x")
+                //     continue;
+
+                auto f1 = dynamic_cast<FieldData_t*>(d1.get());
+
+                auto const layout0 = f0->gridLayout;
+                auto const layout1 = f1->gridLayout;
+
+                auto const pq = f0->field.physicalQuantity();
+                // auto const gb0 = grow(layout0.AMRGhostBoxFor(pq), -layout0.nbrGhosts());
+                // auto const gb1 = grow(layout1.AMRGhostBoxFor(pq), -layout1.nbrGhosts());
+
+                auto const gb0 = layout0.AMRGhostBoxFor(pq);
+                auto const gb1 = layout1.AMRGhostBoxFor(pq);
+
+                if (auto overlap_ = gb0 * gb1)
+                {
+                    auto const overlap = *overlap_;
+                    auto const lb0     = layout0.AMRToLocal(overlap);
+                    auto const lb1     = layout1.AMRToLocal(overlap);
+
+                    auto itamr = overlap.begin();
+                    auto it0   = lb0.begin();
+                    auto it1   = lb1.begin();
+                    for (; it0 != lb0.end(); ++it0, ++it1, ++itamr)
+                    {
+                        auto const v0 = f0->field(*it0);
+                        auto const v1 = f1->field(*it1);
+                        if (!float_equals(v0, v1))
+                        {
+                            PHARE_LOG_LINE_SS("fail " << path << " " << f0->field.name() << " time "
+                                                      << time);
+                            PHARE_LOG_LINE_SS(layout0.AMRBox() << " " << layout1.AMRBox());
+                            PHARE_LOG_LINE_SS((*itamr) << " " << to_string_with_precision(v0, 17)
+                                                       << " " << to_string_with_precision(v1, 17));
+                        }
+                    }
+                }
+            }
+}
 
 } // namespace PHARE::core
 
 #if defined(PHARE_DEBUGGERINO) and PHARE_DEBUGGERINO
 
-#define PHARE_DEBUG_SCOPE(key) PHARE::core::debug_scope _debug_scope_{key};
-#define PHARE_DEBUG_TIME(time) PHARE::core::Debuggerino::INSTANCE().settime(time);
-#define PHARE_DEBUG_FIELDS(...) PHARE::core::debug_if_active_fields(__VA_ARGS__);
-#define PHARE_DEBUG_FIELD(...) PHARE::core::debug_if_active_field(__VA_ARGS__);
-#define PHARE_DEBUG_ALL_FIELDS(...) PHARE::core::debug_all_fields(__VA_ARGS__);
+#define PHARE_DEBUG_SCOPE(key)                                                                     \
+    PHARE::core::debug_scope _debug_scope_                                                         \
+    {                                                                                              \
+        key                                                                                        \
+    }
+#define PHARE_DEBUG_TIME(time) PHARE::core::Debuggerino::INSTANCE().settime(time)
+#define PHARE_DEBUG_FIELDS(...) PHARE::core::debug_if_active_fields(__VA_ARGS__)
+#define PHARE_DEBUG_FIELD(...) PHARE::core::debug_if_active_field(__VA_ARGS__)
+#define PHARE_DEBUG_ALL_FIELDS(...) PHARE::core::debug_all_fields(__VA_ARGS__)
+#define PHARE_DEBUG_CHECK_ALL_OVERLAPS(...) PHARE::core::check_all_fields(__VA_ARGS__)
 
 #else // disabled
 
@@ -234,6 +389,7 @@ void debug_all_fields(auto& views)
 #define PHARE_DEBUG_FIELDS(...)
 #define PHARE_DEBUG_FIELD(...)
 #define PHARE_DEBUG_ALL_FIELDS(...)
+#define PHARE_DEBUG_CHECK_ALL_OVERLAPS(...)
 
 #endif // PHARE_DEBUGGERINO
 

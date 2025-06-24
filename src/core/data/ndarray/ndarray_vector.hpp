@@ -243,12 +243,17 @@ public:
         , data_((... * nodes))
     {
         static_assert(sizeof...(Nodes) == dim);
+
+        if constexpr (std::is_arithmetic_v<DataType>)
+            fill(0);
     }
 
     explicit NdArrayVector(std::array<std::uint32_t, dim> const& ncells)
         : nCells_{ncells}
         , data_(std::accumulate(ncells.begin(), ncells.end(), 1, std::multiplies<int>()))
     {
+        if constexpr (std::is_arithmetic_v<DataType>)
+            fill(0);
     }
 
     NdArrayVector(NdArrayVector const& source)            = default;
@@ -301,6 +306,11 @@ public:
         return MaskedView{*this, std::forward<Mask>(mask)};
     }
 
+    auto& fill(DataType const& v)
+    {
+        std::fill(begin(), end(), v);
+        return *this;
+    }
 
     NO_DISCARD auto& vector() { return data_; }
     NO_DISCARD auto& vector() const { return data_; }

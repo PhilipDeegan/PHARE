@@ -74,15 +74,8 @@ struct Box
 
     void grow(Type const& size)
     {
-        assert(size >= 0);
-        for (auto& c : lower)
-        {
-            c -= size;
-        }
-        for (auto& c : upper)
-        {
-            c += size;
-        }
+        lower -= size;
+        upper += size;
     }
 
     template<typename Size>

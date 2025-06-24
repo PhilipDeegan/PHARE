@@ -46,6 +46,8 @@ public:
         , qty_{qty}
     {
         static_assert(sizeof...(Dims) == dimension, "Invalid dimension");
+
+        Super::fill(0);
     }
 
     template<std::size_t dim>
@@ -54,6 +56,7 @@ public:
         , name_{name}
         , qty_{qty}
     {
+        Super::fill(0);
     }
 
     template<typename GridLayout_t>
@@ -62,6 +65,7 @@ public:
         , name_{name}
         , qty_{qty}
     {
+        Super::fill(0);
     }
 
     Grid(Grid const& source) // let field_ default
@@ -69,6 +73,7 @@ public:
         , name_{source.name()}
         , qty_{source.physicalQuantity()}
     {
+        Super::fill(0);
     }
 
     NO_DISCARD std::string name() const { return name_; }

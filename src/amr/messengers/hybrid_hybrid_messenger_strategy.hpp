@@ -2,6 +2,7 @@
 #define PHARE_HYBRID_HYBRID_MESSENGER_STRATEGY_HPP
 
 #include "core/def.hpp"
+#include "core/debug.hpp"
 #include "core/logger.hpp"
 #include "core/def/phare_mpi.hpp"
 
@@ -33,6 +34,7 @@
 
 
 #include <SAMRAI/hier/IntVector.h>
+#include <SAMRAI/hier/VariableDatabase.h>
 #include <SAMRAI/xfer/RefineSchedule.h>
 #include <SAMRAI/xfer/RefineAlgorithm.h>
 #include <SAMRAI/hier/CoarseFineBoundary.h>
@@ -364,8 +366,8 @@ namespace amr
             bool const hax        = levelNumber_ >= 10;
             int const levelNumber = hax ? levelNumber_ - 10 : levelNumber_;
             PHARE_LOG_SCOPE(3, "HybridHybridMessengerStrategy::fillElectricGhosts");
-            if (hax)
-                elecSharedNodesRefiners_.fill(E, levelNumber, fillTime);
+            // if (hax)
+            //     elecSharedNodesRefiners_.fill(E, levelNumber, fillTime);
             elecGhostsRefiners_.fill(E, levelNumber, fillTime);
         }
 
@@ -661,7 +663,47 @@ namespace amr
 
         void synchronize(SAMRAI::hier::PatchLevel& level) override
         {
+            auto const dump_field = [&](auto const& field_name) {
+                auto& vdb    = *SAMRAI::hier::VariableDatabase::getDatabase();
+                auto context = vdb.getContext("default");
+                for (auto patch : level)
+                {
+                    auto const& layout = layoutFromPatch<GridLayoutT>(*patch);
+                    auto vdx           = vdb.getVariable(field_name);
+                    auto pdx           = patch->getPatchData(vdx, context);
+                    auto const& fd     = *dynamic_cast<FieldDataT*>(pdx.get())->getPointer();
+                    PHARE_DEBUG_FIELD(fd, layout);
+                }
+            };
+            auto const dumpeavg = [&]() {
+                dump_field("EMAvg_E_x");
+                dump_field("EMAvg_E_y");
+                dump_field("EMAvg_E_z");
+
+                dump_field("EMPred_E_x");
+                dump_field("EMPred_E_y");
+                dump_field("EMPred_E_z");
+            };
+            auto const dumpb = [&]() {
+                dump_field("EM_B_x");
+                dump_field("EM_B_y");
+                dump_field("EM_B_z");
+
+                dump_field("EMPred_B_x");
+                dump_field("EMPred_B_y");
+                dump_field("EMPred_B_z");
+            };
             PHARE_LOG_SCOPE(3, "HybridHybridMessengerStrategy::synchronize");
+            {
+                PHARE_DEBUG_SCOPE("HyHyMessStrat/before_sync/");
+                dumpb();
+                dumpeavg();
+                dump_field("rho");
+
+                dump_field("bulkVel_x");
+                dump_field("bulkVel_y");
+                dump_field("bulkVel_z");
+            }
 
             auto levelNumber = level.getLevelNumber();
             PHARE_LOG_LINE_STR("synchronizing level " + std::to_string(levelNumber));
@@ -671,6 +713,12 @@ namespace amr
             electroSynchronizers_.sync(levelNumber);
             densitySynchronizers_.sync(levelNumber);
             ionBulkVelSynchronizers_.sync(levelNumber);
+
+
+            PHARE_DEBUG_SCOPE("HyHyMessStrat/after_sync/");
+            dumpb();
+            dumpeavg();
+            dump_field("rho");
         }
 
         // after coarsening, domain nodes have been updated and therefore patch ghost nodes

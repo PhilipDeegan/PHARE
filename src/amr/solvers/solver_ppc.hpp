@@ -235,11 +235,23 @@ void SolverPPC<HybridModel, AMR_Types>::advanceLevel(hierarchy_t const& hierarch
                                                      IMessenger& fromCoarserMessenger,
                                                      double const currentTime, double const newTime)
 {
+    PHARE_DEBUG_SCOPE("SolverPPC/advanceLevel/");
     PHARE_LOG_SCOPE(1, "SolverPPC::advanceLevel");
 
     auto& modelView   = dynamic_cast<ModelViews_t&>(views);
     auto& fromCoarser = dynamic_cast<HybridMessenger&>(fromCoarserMessenger);
     auto& level       = setup_level(hierarchy, levelNumber);
+
+
+    for (auto& state : modelView)
+        for (auto& pop : state.ions)
+        {
+            pop.density().zero();
+            pop.flux().zero();
+        }
+
+
+    PHARE_DEBUG_CHECK_ALL_OVERLAPS(modelView);
 
     predictor1_(level, modelView, fromCoarser, currentTime, newTime);
 
@@ -265,6 +277,7 @@ void SolverPPC<HybridModel, AMR_Types>::predictor1_(level_t& level, ModelViews_t
                                                     Messenger& fromCoarser,
                                                     double const currentTime, double const newTime)
 {
+    PHARE_DEBUG_SCOPE("predictor1/");
     PHARE_LOG_SCOPE(1, "SolverPPC::predictor1_");
 
     TimeSetter setTime{views, newTime};
@@ -291,6 +304,9 @@ void SolverPPC<HybridModel, AMR_Types>::predictor1_(level_t& level, ModelViews_t
              views.electromagPred_E);
         setTime([](auto& state) -> auto& { return state.electromagPred.E; });
     }
+
+    PHARE_DEBUG_ALL_FIELDS(views);
+    PHARE_DEBUG_CHECK_ALL_OVERLAPS(views);
 }
 
 
@@ -299,6 +315,7 @@ void SolverPPC<HybridModel, AMR_Types>::predictor2_(level_t& level, ModelViews_t
                                                     Messenger& fromCoarser,
                                                     double const currentTime, double const newTime)
 {
+    PHARE_DEBUG_SCOPE("predictor2/");
     PHARE_LOG_SCOPE(1, "SolverPPC::predictor2_");
 
     TimeSetter setTime{views, newTime};
@@ -326,6 +343,8 @@ void SolverPPC<HybridModel, AMR_Types>::predictor2_(level_t& level, ModelViews_t
              views.electromagPred_E);
         setTime([](auto& state) -> auto& { return state.electromagPred.E; });
     }
+
+    PHARE_DEBUG_CHECK_ALL_OVERLAPS(views);
 }
 
 
@@ -336,6 +355,7 @@ void SolverPPC<HybridModel, AMR_Types>::corrector_(level_t& level, ModelViews_t&
                                                    Messenger& fromCoarser, double const currentTime,
                                                    double const newTime)
 {
+    PHARE_DEBUG_SCOPE("corrector/");
     PHARE_LOG_SCOPE(1, "SolverPPC::corrector_");
 
     auto levelNumber = level.getLevelNumber();
@@ -365,6 +385,8 @@ void SolverPPC<HybridModel, AMR_Types>::corrector_(level_t& level, ModelViews_t&
 
         fromCoarser.fillElectricGhosts(views.model().state.electromag.E, levelNumber, newTime);
     }
+
+    PHARE_DEBUG_CHECK_ALL_OVERLAPS(views);
 }
 
 
@@ -390,6 +412,7 @@ template<typename HybridModel, typename AMR_Types>
 void SolverPPC<HybridModel, AMR_Types>::average_2(level_t& level, ModelViews_t& views,
                                                   Messenger& fromCoarser, double const newTime)
 {
+    PHARE_DEBUG_SCOPE("average/2/");
     PHARE_LOG_SCOPE(1, "SolverPPC::average_");
 
     for (auto& state : views)
@@ -401,7 +424,10 @@ void SolverPPC<HybridModel, AMR_Types>::average_2(level_t& level, ModelViews_t& 
     // the following will fill E on all edges of all ghost cells, including those
     // on domain border. For level ghosts, electric field will be obtained from
     // next coarser level E average
+
+
     fromCoarser.fillElectricGhosts(electromagAvg_.E, level.getLevelNumber() + 10, newTime);
+    PHARE_DEBUG_ALL_FIELDS(views);
 }
 
 
@@ -435,8 +461,7 @@ void SolverPPC<HybridModel, AMR_Types>::moveIons_(level_t& level, ModelViews_t& 
                                                   Messenger& fromCoarser, double const currentTime,
                                                   double const newTime, core::UpdaterMode mode)
 {
-    PHARE_DEBUG_SCOPE("SolverPPC/moveIons/" + std::to_string(static_cast<std::uint16_t>(mode))
-                      + "/");
+    PHARE_DEBUG_SCOPE("moveIons/" + std::to_string(static_cast<std::uint16_t>(mode)) + "/");
     PHARE_LOG_SCOPE(1, "SolverPPC::moveIons_");
     PHARE_DEBUG_DO(_debug_log_move_ions(views);)
 
@@ -454,10 +479,10 @@ void SolverPPC<HybridModel, AMR_Types>::moveIons_(level_t& level, ModelViews_t& 
     // this needs to be done before calling the messenger
     setTime([](auto& state) -> auto& { return state.ions; });
 
+    fromCoarser.fillIonPopMomentGhosts(views.model().state.ions, level, newTime);
     fromCoarser.fillFluxBorders(views.model().state.ions, level, newTime);
     fromCoarser.fillDensityBorders(views.model().state.ions, level, newTime);
     fromCoarser.fillIonGhostParticles(views.model().state.ions, level, newTime);
-    fromCoarser.fillIonPopMomentGhosts(views.model().state.ions, level, newTime);
 
     for (auto& state : views)
         ionUpdater_.updateIons(state.ions);
@@ -468,6 +493,8 @@ void SolverPPC<HybridModel, AMR_Types>::moveIons_(level_t& level, ModelViews_t& 
     fromCoarser.fillIonMomentGhosts(views.model().state.ions, level, newTime);
 
     PHARE_DEBUG_ALL_FIELDS(views);
+
+    PHARE_DEBUG_CHECK_ALL_OVERLAPS(views);
 }
 
 

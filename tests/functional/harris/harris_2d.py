@@ -11,6 +11,8 @@ from pyphare.pharesee.run import Run
 from pyphare.simulator.simulator import Simulator, startMPI
 
 from tests.simulator import SimulatorTest
+from tests.simulator.test_advance import AdvanceTestBase
+from tests.diagnostic import dump_all_diags
 
 mpl.use("Agg")
 
@@ -19,10 +21,12 @@ cpp = cpp_lib()
 
 cells = (40, 80)
 time_step = 0.005
-final_time = 0.300
+final_time = 0.225
 timestamps = np.arange(0, final_time + time_step, time_step)
 timestamps = [0, 0.225, final_time]
 diag_dir = "phare_outputs/harris"
+
+test = AdvanceTestBase(rethrow=True)  # change to False for debugging images
 
 
 def config():
@@ -40,7 +44,11 @@ def config():
         resistivity=0.001,
         diag_options={
             "format": "phareh5",
-            "options": {"dir": diag_dir, "mode": "overwrite"},
+            "options": {
+                "dir": diag_dir,
+                "mode": "overwrite",
+                # "fine_dump_lvl_max": 10,
+            },
         },
         strict=False,
     )
@@ -128,13 +136,15 @@ def config():
         "nbr_part_per_cell": 20,
     }
 
-    ph.MaxwellianFluidModel(
+    model = ph.MaxwellianFluidModel(
         bx=bx,
         by=by,
         bz=bz,
         protons={"charge": 1, "density": density, **vvv, "init": {"seed": 12334}},
     )
     ph.ElectronModel(closure="isothermal", Te=0.0)
+
+    # dump_all_diags(model.populations, flush_every=1)
 
     for quantity in ["E", "B"]:
         ph.ElectromagDiagnostics(quantity=quantity, write_timestamps=timestamps)
@@ -146,7 +156,7 @@ def config():
     )
     ph.InfoDiagnostics(quantity="particle_count")
 
-    # ph.LoadBalancer(active=True, auto=True, mode="nppc", tol=0.05)
+    ph.LoadBalancer(active=True, auto=True, mode="nppc", tol=0.05)
 
     return sim
 
@@ -192,6 +202,25 @@ def plot(diag_dir, plot_dir):
         )
 
 
+def get_time(path, time=None, datahier=None):
+    if time is not None:
+        time = "{:.10f}".format(time)
+    from pyphare.pharesee.hierarchy import hierarchy_from
+
+    print("path", path)
+    datahier = hierarchy_from(h5_filename=path + "/EM_E.h5", times=time, hier=datahier)
+    datahier = hierarchy_from(h5_filename=path + "/EM_B.h5", times=time, hier=datahier)
+    datahier = hierarchy_from(
+        h5_filename=path + "/ions_pop_protons_density.h5", times=time, hier=datahier
+    )
+
+    return datahier
+
+
+def get_hier(path):
+    return get_time(path)
+
+
 class HarrisTest(SimulatorTest):
     def __init__(self, *args, **kwargs):
         super(HarrisTest, self).__init__(*args, **kwargs)
@@ -213,6 +242,24 @@ class HarrisTest(SimulatorTest):
             plot(diag_dir, self.plot_dir)
         cpp.mpi_barrier()
         return self
+
+    def post_advance(self, new_time):
+        if cpp.mpi_rank() == 0:
+            print("testing new time", new_time)
+            L0L1_datahier = get_hier(diag_dir)
+            extra_collections = []
+            errors = test.base_test_overlaped_fields_are_equal(L0L1_datahier, new_time)
+
+            # The test commented out, see warning in test_advance.py
+            #        errors = test.base_test_field_level_ghosts_via_subcycles_and_coarser_interpolation(L0_datahier, L0L1_datahier)
+            # if isinstance(errors, list):
+            #     extra_collections += [
+            #         {
+            #             "boxes": errors,
+            #             "facecolor": "black",
+            #         }
+            #     ]
+            # make_fig(L0L1_datahier, L0L1_diags.split("/")[-1], 1, extra_collections)
 
 
 if __name__ == "__main__":

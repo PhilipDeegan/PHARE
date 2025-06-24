@@ -2,7 +2,6 @@
 #define PHARE_CORE_DATA_FIELD_FIELD_BOX_HPP
 
 #include "core/def.hpp"
-#include "core/debug.hpp"
 #include "core/logger.hpp"
 #include "core/utilities/types.hpp"
 #include "core/utilities/box/box.hpp"
