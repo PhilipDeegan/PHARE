@@ -28,7 +28,7 @@ def dump_all_diags(pops=[], flush_every=100, timestamps=None):
     #     write_timestamps=timestamps
     # )
 
-    for quantity in ["density", "bulkVelocity", "pressure_tensor"]:
+    for quantity in ["density", "bulkVelocity"]:  # , "pressure_tensor" todo
         ph.FluidDiagnostics(
             quantity=quantity,
             write_timestamps=timestamps,
@@ -36,7 +36,7 @@ def dump_all_diags(pops=[], flush_every=100, timestamps=None):
         )
 
     for pop in pops:
-        for quantity in ["density", "flux", "pressure_tensor"]:
+        for quantity in ["density", "flux"]:  # , "pressure_tensor" todo
             ph.FluidDiagnostics(
                 quantity=quantity,
                 write_timestamps=timestamps,

@@ -84,34 +84,23 @@ namespace solver
             }
 
             // now all particles are here, we must compute moments.
-
-            for (auto& patch : level)
+            auto& rm   = *hybridModel.resourcesManager;
+            auto& ions = hybridModel.state.ions;
+            for (auto& patch : rm.enumerate(level, ions))
             {
-                auto& ions             = hybridModel.state.ions;
-                auto& resourcesManager = hybridModel.resourcesManager;
-                auto dataOnPatch       = resourcesManager->setOnPatch(*patch, ions);
-                auto layout            = amr::layoutFromPatch<GridLayoutT>(*patch);
+                auto layout = amr::layoutFromPatch<GridLayoutT>(*patch);
 
                 core::resetMoments(ions);
                 core::depositParticles(ions, layout, interpolate_, core::DomainDeposit{});
+                if (!isRootLevel(levelNumber))
+                    core::depositParticles(ions, layout, interpolate_, core::LevelGhostDeposit{});
             }
 
             hybMessenger.fillFluxBorders(hybridModel.state.ions, level, initDataTime);
             hybMessenger.fillDensityBorders(hybridModel.state.ions, level, initDataTime);
 
-
-            for (auto& patch : level)
+            for (auto& patch : rm.enumerate(level, ions))
             {
-                auto& ions             = hybridModel.state.ions;
-                auto& resourcesManager = hybridModel.resourcesManager;
-                auto dataOnPatch       = resourcesManager->setOnPatch(*patch, ions);
-                auto layout            = amr::layoutFromPatch<GridLayoutT>(*patch);
-
-                if (!isRootLevel(levelNumber))
-                {
-                    core::depositParticles(ions, layout, interpolate_, core::LevelGhostDeposit{});
-                }
-
                 ions.computeDensity();
                 ions.computeBulkVelocity();
             }

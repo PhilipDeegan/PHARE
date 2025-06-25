@@ -141,7 +141,7 @@ struct Shifter
     template<typename T, std::size_t D>
     auto make_shift_for(PHARE::core::Box<T, D> const& box) const
     {
-        auto const span = domainBox.upper;
+        auto const span = domainBox.upper + 1;
         auto const mid  = for_N<D, for_N_R_mode::make_array>([&](auto i) { return span[i] / 2; });
 
         // if constexpr (D == 1)
@@ -371,8 +371,8 @@ void check_fields(auto const& f0, auto const& f1)
     auto const layout0 = f0->gridLayout;
     auto const layout1 = f1->gridLayout;
     auto const pq      = f0->field.physicalQuantity();
-    auto const gb0     = layout0.AMRGhostBoxFor(pq);
-    auto const gb1     = layout1.AMRGhostBoxFor(pq);
+    auto const gb0     = grow(layout0.AMRGhostBoxFor(pq), -layout0.nbrGhosts());
+    auto const gb1     = grow(layout1.AMRGhostBoxFor(pq), -layout0.nbrGhosts());
 
     for (auto const& offset : shifter.make_shift_for(layout0.AMRBox()))
     {

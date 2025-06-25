@@ -144,17 +144,17 @@ def config():
     )
     ph.ElectronModel(closure="isothermal", Te=0.0)
 
-    # dump_all_diags(model.populations, flush_every=1)
+    dump_all_diags(model.populations, flush_every=1)
 
-    for quantity in ["E", "B"]:
-        ph.ElectromagDiagnostics(quantity=quantity, write_timestamps=timestamps)
-    for quantity in ["density", "bulkVelocity"]:
-        ph.FluidDiagnostics(quantity=quantity, write_timestamps=timestamps)
+    # for quantity in ["E", "B"]:
+    #     ph.ElectromagDiagnostics(quantity=quantity, write_timestamps=timestamps)
+    # for quantity in ["density", "bulkVelocity"]:
+    #     ph.FluidDiagnostics(quantity=quantity, write_timestamps=timestamps)
 
-    ph.FluidDiagnostics(
-        quantity="density", write_timestamps=timestamps, population_name="protons"
-    )
-    ph.InfoDiagnostics(quantity="particle_count")
+    # ph.FluidDiagnostics(
+    #     quantity="density", write_timestamps=timestamps, population_name="protons"
+    # )
+    # ph.InfoDiagnostics(quantity="particle_count")
 
     ph.LoadBalancer(active=True, auto=True, mode="nppc", tol=0.05)
 
@@ -237,7 +237,7 @@ class HarrisTest(SimulatorTest):
 
     def test_run(self):
         #        self.register_diag_dir_for_cleanup(diag_dir)
-        sim = Simulator(config())
+        sim = Simulator(config(), post_advance=self.post_advance)
         sim.initialize()
         self.post_advance(0)
         sim.run().reset()
@@ -248,7 +248,7 @@ class HarrisTest(SimulatorTest):
 
     def post_advance(self, new_time):
         if cpp.mpi_rank() == 0:
-            print("testing new time", new_time)
+            print("\ntesting new time", new_time)
             L0L1_datahier = get_hier(diag_dir)
             extra_collections = []
             errors = test.base_test_overlaped_fields_are_equal(L0L1_datahier, new_time)
