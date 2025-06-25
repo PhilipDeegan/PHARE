@@ -10,6 +10,7 @@
 #include <unordered_map>
 
 
+#include "amr/wrappers/hierarchy.hpp"
 #include "core/def/phare_mpi.hpp"
 
 #include <SAMRAI/algs/TimeRefinementLevelStrategy.h>
@@ -502,6 +503,7 @@ namespace solver
                             double const currentTime, double const newTime, bool const firstStep,
                             bool const lastStep, bool const regridAdvance = false) override
         {
+            PHARE_DEBUG_HIER(std::dynamic_pointer_cast<amr::Hierarchy>(hierarchy));
             PHARE_DEBUG_TIME(newTime);
             PHARE_DEBUG_SCOPE("level/" + std::to_string(level->getLevelNumber()) + "/");
             PHARE_LOG_SCOPE(3, "Multiphys::advanceLevel");

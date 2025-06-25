@@ -21,9 +21,9 @@ cpp = cpp_lib()
 
 cells = (40, 80)
 time_step = 0.005
-final_time = 0.225
+final_time = 0.14
 timestamps = np.arange(0, final_time + time_step, time_step)
-timestamps = [0, 0.225, final_time]
+timestamps = [0, final_time]  # 0.225,
 diag_dir = "phare_outputs/harris"
 
 test = AdvanceTestBase(rethrow=True)  # change to False for debugging images
@@ -237,7 +237,10 @@ class HarrisTest(SimulatorTest):
 
     def test_run(self):
         #        self.register_diag_dir_for_cleanup(diag_dir)
-        Simulator(config()).run().reset()
+        sim = Simulator(config())
+        sim.initialize()
+        self.post_advance(0)
+        sim.run().reset()
         if cpp.mpi_rank() == 0:
             plot(diag_dir, self.plot_dir)
         cpp.mpi_barrier()

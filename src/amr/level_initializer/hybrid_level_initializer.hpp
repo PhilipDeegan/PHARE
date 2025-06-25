@@ -9,6 +9,7 @@
 #include "amr/resources_manager/amr_utils.hpp"
 #include "core/data/grid/gridlayout_utils.hpp"
 #include "core/data/ions/ions.hpp"
+#include "core/debug.hpp"
 #include "core/numerics/ampere/ampere.hpp"
 #include "core/numerics/interpolator/interpolator.hpp"
 #include "core/numerics/moments/moments.hpp"
@@ -48,6 +49,9 @@ namespace solver
                                 amr::IMessenger<IPhysicalModelT>& messenger, double initDataTime,
                                 bool isRegridding) override
         {
+            PHARE_DEBUG_SCOPE("HybridLevelInitializer/initialize/" + std::to_string(levelNumber)
+                              + "/");
+
             core::Interpolator<dimension, interp_order> interpolate_;
             auto& hybridModel = static_cast<HybridModel&>(model);
             auto& level       = amr_types::getLevel(*hierarchy, levelNumber);

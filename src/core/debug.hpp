@@ -2,8 +2,11 @@
 #define PHARE_CORE_DEBUG_HPP
 
 #include "core/logger.hpp"
-#include "core/utilities/box/box.hpp"
 #include "core/utilities/types.hpp"
+#include "core/utilities/box/box.hpp"
+
+#include "amr/wrappers/hierarchy.hpp"
+
 
 #include <cassert>
 #include <sstream>
@@ -125,12 +128,67 @@ struct Debuggerino
     Debuggerino() = default;
 
     void settime(double const t) { time = t; }
+    void sethier(auto h) { hier = h; }
 
     double time            = 0;
     debug_scope* stack_ptr = nullptr;
+
+    std::shared_ptr<amr::Hierarchy> hier{nullptr};
 };
 
+struct Shifter
+{
+    template<typename T, std::size_t D>
+    auto make_shift_for(PHARE::core::Box<T, D> const& box) const
+    {
+        auto const span = domainBox.upper;
+        auto const mid  = for_N<D, for_N_R_mode::make_array>([&](auto i) { return span[i] / 2; });
 
+        // if constexpr (D == 1)
+        // {
+        //     auto shifts = PHARE::core::for_N<1, PHARE::core::for_N_R_mode::make_array>(
+        //         [&](auto i) { return PHARE::core::Point<int, D>{0}; });
+        //     PHARE::core::for_N<D>([&](auto i) {
+        //         int const shift = box.upper[i] < mid[i] ? 1 : -1;
+        //         shifts[i][i]    = span[i] * shift;
+        //     });
+
+        //     return shifts;
+        // }
+        if constexpr (D == 2)
+        {
+            auto shifts = PHARE::core::for_N<3, PHARE::core::for_N_R_mode::make_array>(
+                [&](auto i) { return PHARE::core::Point<int, D>{0, 0}; });
+            PHARE::core::for_N<D>([&](auto i) {
+                int const shift = box.upper[i] < mid[i] ? 1 : -1;
+                shifts[i][i]    = span[i] * shift;
+            });
+
+            shifts[2] = {shifts[0][0], shifts[1][1]};
+
+            return shifts;
+        }
+        // if constexpr (D == 3)
+        // {
+        //     auto shifts = PHARE::core::for_N<7, PHARE::core::for_N_R_mode::make_array>(
+        //         [&](auto i) { return PHARE::core::Point<int, D>{0, 0, 0}; });
+        //     PHARE::core::for_N<D>([&](auto i) {
+        //         int const shift = box.upper[i] < mid ? 1 : -1;
+        //         shifts[i][i]    = span * shift;
+        //     });
+
+        //     shifts[3] = {shifts[0][0], shifts[1][1], 0};
+        //     shifts[4] = {0, shifts[1][1], shifts[2][2]};
+        //     shifts[5] = {shifts[0][0], 0, shifts[2][2]};
+        //     shifts[6] = {shifts[0][0], shifts[1][1], shifts[2][2]};
+
+        //     return shifts;
+        // }
+    }
+
+
+    Box<int, DEBUG_DIM> domainBox;
+};
 
 
 struct debug_scope
@@ -297,74 +355,102 @@ void debug_all_fields(auto& views)
     }
 }
 
-void check_fields(auto const& p0, auto const& p1, auto const vid) {}
+void check_fields(auto const& f0, auto const& f1)
+{
+    auto& debugger           = Debuggerino::INSTANCE();
+    auto& scope              = *debugger.stack_ptr;
+    auto const path          = scope.full_path();
+    auto const time          = debugger.time;
+    auto const& domainBoxVec = debugger.hier->domainBox();
+    auto const domainBox     = Box<int, DEBUG_DIM>{
+        Point{ConstArray<int, DEBUG_DIM>(0)},
+        Point{for_N<DEBUG_DIM, for_N_R_mode::make_array>([&](auto i) { return domainBoxVec[i]; })}};
+    Shifter const shifter{domainBox};
+
+    auto const name    = f0->field.name();
+    auto const layout0 = f0->gridLayout;
+    auto const layout1 = f1->gridLayout;
+    auto const pq      = f0->field.physicalQuantity();
+    auto const gb0     = layout0.AMRGhostBoxFor(pq);
+    auto const gb1     = layout1.AMRGhostBoxFor(pq);
+
+    for (auto const& offset : shifter.make_shift_for(layout0.AMRBox()))
+    {
+        auto const ghostbox = shift(gb0, offset);
+
+        if (auto const overlap_ = ghostbox * gb1)
+        {
+            auto const overlap = *overlap_;
+            auto const lb0     = layout0.AMRToLocal(shift(overlap, offset * -1));
+            auto const lb1     = layout1.AMRToLocal(overlap);
+
+            auto itamr = overlap.begin();
+            auto it0   = lb0.begin();
+            auto it1   = lb1.begin();
+            for (; it0 != lb0.end(); ++it0, ++it1, ++itamr)
+            {
+                auto const v0 = f0->field(*it0);
+                auto const v1 = f1->field(*it1);
+                if (!float_equals(v0, v1))
+                {
+                    PHARE_LOG_LINE_SS("periodic fail " << path << " " << f0->field.name()
+                                                       << " time " << time);
+                    PHARE_LOG_LINE_SS(layout0.AMRBox() << " " << layout1.AMRBox());
+                    PHARE_LOG_LINE_SS((*itamr) << " " << to_string_with_precision(v0, 17) << " "
+                                               << to_string_with_precision(v1, 17));
+                }
+            }
+        }
+    }
+
+    if (auto overlap_ = gb0 * gb1)
+    {
+        auto const overlap = *overlap_;
+        auto const lb0     = layout0.AMRToLocal(overlap);
+        auto const lb1     = layout1.AMRToLocal(overlap);
+
+        auto itamr = overlap.begin();
+        auto it0   = lb0.begin();
+        auto it1   = lb1.begin();
+        for (; it0 != lb0.end(); ++it0, ++it1, ++itamr)
+        {
+            auto const v0 = f0->field(*it0);
+            auto const v1 = f1->field(*it1);
+            if (!float_equals(v0, v1))
+            {
+                PHARE_LOG_LINE_SS("fail " << path << " " << f0->field.name() << " time " << time);
+                PHARE_LOG_LINE_SS(layout0.AMRBox() << " " << layout1.AMRBox());
+                PHARE_LOG_LINE_SS((*itamr) << " " << to_string_with_precision(v0, 17) << " "
+                                           << to_string_with_precision(v1, 17));
+            }
+        }
+    }
+}
 
 void check_all_fields(auto& views)
 {
     using ResourcesManager_t = std::decay_t<decltype(*views.model().resourcesManager)>;
     using FieldData_t        = typename ResourcesManager_t::UserField_t::patch_data_type;
-    auto const& rm           = *views.model().resourcesManager;
-    auto& debugger           = Debuggerino::INSTANCE();
-    auto& scope              = *debugger.stack_ptr;
-    auto const path          = scope.full_path();
-    auto const time          = debugger.time;
 
-    auto const& states = views.states;
+    if constexpr (DEBUG_DIM == FieldData_t::dimension)
+    {
+        auto const& rm     = *views.model().resourcesManager;
+        auto& debugger     = Debuggerino::INSTANCE();
+        auto const& states = views.states;
 
-
-
-    for (auto [k, v] : rm.all_resources())
-        for (std::size_t i = 0; i < states.size() - 1; ++i)
-            for (std::size_t j = i + 1; j < states.size(); ++j)
-            {
-                auto const& p0 = *states[i].patch;
-                auto const& p1 = *states[j].patch;
-                auto const& d0 = p0.getPatchData(v.id);
-                auto const& d1 = p1.getPatchData(v.id);
-                auto f0        = dynamic_cast<FieldData_t*>(d0.get());
-                if (not f0)
-                    continue;
-
-                auto const name = f0->field.name();
-                // if (name != "rho_protons" or name != "protons_flux_x")
-                //     continue;
-
-                auto f1 = dynamic_cast<FieldData_t*>(d1.get());
-
-                auto const layout0 = f0->gridLayout;
-                auto const layout1 = f1->gridLayout;
-
-                auto const pq = f0->field.physicalQuantity();
-                // auto const gb0 = grow(layout0.AMRGhostBoxFor(pq), -layout0.nbrGhosts());
-                // auto const gb1 = grow(layout1.AMRGhostBoxFor(pq), -layout1.nbrGhosts());
-
-                auto const gb0 = layout0.AMRGhostBoxFor(pq);
-                auto const gb1 = layout1.AMRGhostBoxFor(pq);
-
-                if (auto overlap_ = gb0 * gb1)
+        for (auto [k, v] : rm.all_resources())
+            for (std::size_t i = 0; i < states.size() - 1; ++i)
+                for (std::size_t j = i + 1; j < states.size(); ++j)
                 {
-                    auto const overlap = *overlap_;
-                    auto const lb0     = layout0.AMRToLocal(overlap);
-                    auto const lb1     = layout1.AMRToLocal(overlap);
-
-                    auto itamr = overlap.begin();
-                    auto it0   = lb0.begin();
-                    auto it1   = lb1.begin();
-                    for (; it0 != lb0.end(); ++it0, ++it1, ++itamr)
-                    {
-                        auto const v0 = f0->field(*it0);
-                        auto const v1 = f1->field(*it1);
-                        if (!float_equals(v0, v1))
-                        {
-                            PHARE_LOG_LINE_SS("fail " << path << " " << f0->field.name() << " time "
-                                                      << time);
-                            PHARE_LOG_LINE_SS(layout0.AMRBox() << " " << layout1.AMRBox());
-                            PHARE_LOG_LINE_SS((*itamr) << " " << to_string_with_precision(v0, 17)
-                                                       << " " << to_string_with_precision(v1, 17));
-                        }
-                    }
+                    auto const& p0 = *states[i].patch;
+                    auto const& p1 = *states[j].patch;
+                    auto const& d0 = p0.getPatchData(v.id);
+                    auto const& d1 = p1.getPatchData(v.id);
+                    auto f0        = dynamic_cast<FieldData_t*>(d0.get());
+                    if (f0)
+                        check_fields(f0, dynamic_cast<FieldData_t*>(d1.get()));
                 }
-            }
+    }
 }
 
 } // namespace PHARE::core
@@ -377,6 +463,7 @@ void check_all_fields(auto& views)
         key                                                                                        \
     }
 #define PHARE_DEBUG_TIME(time) PHARE::core::Debuggerino::INSTANCE().settime(time)
+#define PHARE_DEBUG_HIER(hier) PHARE::core::Debuggerino::INSTANCE().sethier(hier)
 #define PHARE_DEBUG_FIELDS(...) PHARE::core::debug_if_active_fields(__VA_ARGS__)
 #define PHARE_DEBUG_FIELD(...) PHARE::core::debug_if_active_field(__VA_ARGS__)
 #define PHARE_DEBUG_ALL_FIELDS(...) PHARE::core::debug_all_fields(__VA_ARGS__)
@@ -386,6 +473,7 @@ void check_all_fields(auto& views)
 
 #define PHARE_DEBUG_SCOPE(key)
 #define PHARE_DEBUG_TIME(time)
+#define PHARE_DEBUG_HIER(hier)
 #define PHARE_DEBUG_FIELDS(...)
 #define PHARE_DEBUG_FIELD(...)
 #define PHARE_DEBUG_ALL_FIELDS(...)

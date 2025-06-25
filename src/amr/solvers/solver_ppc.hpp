@@ -243,14 +243,6 @@ void SolverPPC<HybridModel, AMR_Types>::advanceLevel(hierarchy_t const& hierarch
     auto& level       = setup_level(hierarchy, levelNumber);
 
 
-    for (auto& state : modelView)
-        for (auto& pop : state.ions)
-        {
-            pop.density().zero();
-            pop.flux().zero();
-        }
-
-
     PHARE_DEBUG_CHECK_ALL_OVERLAPS(modelView);
 
     predictor1_(level, modelView, fromCoarser, currentTime, newTime);
