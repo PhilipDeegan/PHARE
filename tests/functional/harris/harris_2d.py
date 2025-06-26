@@ -7,8 +7,11 @@ from pathlib import Path
 
 import pyphare.pharein as ph
 from pyphare.cpp import cpp_lib
-from pyphare.pharesee.run import Run
+from pyphare.core.phare_utilities import listify
 from pyphare.simulator.simulator import Simulator, startMPI
+from pyphare.pharesee.run import Run
+
+from pyphare.pharesee.hierarchy.hierarchy import format_timestamp
 
 from tests.simulator import SimulatorTest
 from tests.simulator.test_advance import AdvanceTestBase
@@ -18,15 +21,17 @@ mpl.use("Agg")
 
 cpp = cpp_lib()
 
+start_time = 0.000
 
 cells = (40, 80)
 time_step = 0.005
-final_time = 0.14
-timestamps = np.arange(0, final_time + time_step, time_step)
-timestamps = [0, final_time]  # 0.225,
+final_time = start_time + 0.225
+timestamps = np.arange(start_time, final_time + time_step, time_step)
+# timestamps = []  # 0.225,
 diag_dir = "phare_outputs/harris"
 
 test = AdvanceTestBase(rethrow=True)  # change to False for debugging images
+print("timestamps", timestamps)
 
 
 def config():
@@ -47,9 +52,15 @@ def config():
             "options": {
                 "dir": diag_dir,
                 "mode": "overwrite",
-                # "fine_dump_lvl_max": 10,
+                "fine_dump_lvl_max": 10,
             },
         },
+        # restart_options={
+        #     "dir": "checkpoints",
+        #     "mode": "overwrite",
+        #     "timestamps": timestamps,
+        #     "restart_time": start_time,
+        # },
         strict=False,
     )
 
@@ -165,9 +176,16 @@ def plot_file_for_qty(plot_dir, qty, time):
     return f"{plot_dir}/harris_{qty}_t{time}.png"
 
 
-def plot(diag_dir, plot_dir):
+def plot(diag_dir, plot_dir_, times=None):
     run = Run(diag_dir)
-    for time in timestamps:
+    print("times", times)
+    times = listify(times) if times is not None else timestamps
+
+    print("times", times)
+    for time in times:
+        plot_dir = Path(f"{plot_dir_}") / format_timestamp(time)
+        plot_dir.mkdir(parents=True, exist_ok=True)
+
         run.GetDivB(time).plot(
             filename=plot_file_for_qty(plot_dir, "divb", time),
             plot_patches=True,
@@ -200,6 +218,7 @@ def plot(diag_dir, plot_dir):
             vmin=-2,
             vmax=2,
         )
+        mpl.pyplot.close()
 
 
 def get_time(path, time=None, datahier=None):
@@ -207,7 +226,7 @@ def get_time(path, time=None, datahier=None):
         time = "{:.10f}".format(time)
     from pyphare.pharesee.hierarchy import hierarchy_from
 
-    print("path", path)
+    print("get_time", time)
     datahier = hierarchy_from(h5_filename=path + "/EM_E.h5", times=time, hier=datahier)
     datahier = hierarchy_from(h5_filename=path + "/EM_B.h5", times=time, hier=datahier)
     datahier = hierarchy_from(
@@ -217,8 +236,8 @@ def get_time(path, time=None, datahier=None):
     return datahier
 
 
-def get_hier(path):
-    return get_time(path)
+def get_hier(path, time):
+    return get_time(path, time)
 
 
 class HarrisTest(SimulatorTest):
@@ -239,18 +258,20 @@ class HarrisTest(SimulatorTest):
         #        self.register_diag_dir_for_cleanup(diag_dir)
         sim = Simulator(config(), post_advance=self.post_advance)
         sim.initialize()
-        self.post_advance(0)
+        self.post_advance(start_time)
         sim.run().reset()
-        if cpp.mpi_rank() == 0:
-            plot(diag_dir, self.plot_dir)
-        cpp.mpi_barrier()
+        # if cpp.mpi_rank() == 0:
+        #     plot(diag_dir, self.plot_dir)
+        # cpp.mpi_barrier()
         return self
 
     def post_advance(self, new_time):
+        # cpp.mpi_barrier()
         if cpp.mpi_rank() == 0:
             print("\ntesting new time", new_time)
-            L0L1_datahier = get_hier(diag_dir)
-            extra_collections = []
+            plot(diag_dir, self.plot_dir, new_time)
+            L0L1_datahier = get_hier(diag_dir, new_time)
+            # extra_collections = []
             errors = test.base_test_overlaped_fields_are_equal(L0L1_datahier, new_time)
 
             # The test commented out, see warning in test_advance.py

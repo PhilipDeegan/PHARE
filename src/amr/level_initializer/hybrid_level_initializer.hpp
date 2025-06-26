@@ -49,6 +49,8 @@ namespace solver
                                 amr::IMessenger<IPhysicalModelT>& messenger, double initDataTime,
                                 bool isRegridding) override
         {
+            PHARE_DEBUG_SET(levelNumber, levelNumber,
+                            std::dynamic_pointer_cast<amr::Hierarchy>(hierarchy));
             PHARE_DEBUG_SCOPE("HybridLevelInitializer/initialize/" + std::to_string(levelNumber)
                               + "/");
 
@@ -129,12 +131,12 @@ namespace solver
 
                     for (auto& patch : level)
                     {
-                        auto _      = hybridModel.resourcesManager->setOnPatch(*patch, B, J);
+                        auto _      = rm.setOnPatch(*patch, B, J);
                         auto layout = PHARE::amr::layoutFromPatch<GridLayoutT>(*patch);
                         auto __     = core::SetLayout(&layout, ampere_);
                         ampere_(B, J);
 
-                        hybridModel.resourcesManager->setTime(J, *patch, 0.);
+                        rm.setTime(J, *patch, 0.);
                     }
                     hybMessenger.fillCurrentGhosts(J, levelNumber, 0.);
 
@@ -144,15 +146,14 @@ namespace solver
                     for (auto& patch : level)
                     {
                         auto layout = PHARE::amr::layoutFromPatch<GridLayoutT>(*patch);
-                        auto _
-                            = hybridModel.resourcesManager->setOnPatch(*patch, B, E, J, electrons);
+                        auto _      = rm.setOnPatch(*patch, B, E, J, electrons);
                         electrons.update(layout);
                         auto& Ve = electrons.velocity();
                         auto& Ne = electrons.density();
                         auto& Pe = electrons.pressure();
                         auto __  = core::SetLayout(&layout, ohm_);
                         ohm_(Ne, Ve, Pe, B, J, E);
-                        hybridModel.resourcesManager->setTime(E, *patch, 0.);
+                        rm.setTime(E, *patch, 0.);
                     }
 
                     hybMessenger.fillElectricGhosts(E, levelNumber, 0.);
@@ -164,6 +165,8 @@ namespace solver
             // in "old" messenger temporaries.
             // NOTE :  this may probably be skipped for finest level since, TBC at some point
             hybMessenger.prepareStep(hybridModel, level, initDataTime);
+
+            PHARE_DEBUG_CHECK_LEVEL(GridLayoutT, rm, level);
         }
     };
 } // namespace solver

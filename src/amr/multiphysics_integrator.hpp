@@ -503,8 +503,8 @@ namespace solver
                             double const currentTime, double const newTime, bool const firstStep,
                             bool const lastStep, bool const regridAdvance = false) override
         {
-            PHARE_DEBUG_HIER(std::dynamic_pointer_cast<amr::Hierarchy>(hierarchy));
-            PHARE_DEBUG_TIME(newTime);
+            PHARE_DEBUG_SET(newTime, level->getLevelNumber(),
+                            std::dynamic_pointer_cast<amr::Hierarchy>(hierarchy));
             PHARE_DEBUG_SCOPE("level/" + std::to_string(level->getLevelNumber()) + "/");
             PHARE_LOG_SCOPE(3, "Multiphys::advanceLevel");
 
@@ -566,12 +566,18 @@ namespace solver
             // TODO use messengers to sync with coarser
             for (auto ilvl = finestLevel; ilvl > coarsestLevel; --ilvl)
             {
+                PHARE_DEBUG_SET(syncTime, ilvl,
+                                std::dynamic_pointer_cast<amr::Hierarchy>(hierarchy));
+
                 auto& toCoarser = getMessengerWithCoarser_(ilvl);
                 auto& fineLevel = *hierarchy->getPatchLevel(ilvl);
                 toCoarser.synchronize(fineLevel);
 
                 // recopy (patch) ghosts
                 auto iCoarseLevel = ilvl - 1;
+                PHARE_DEBUG_SET(syncTime, iCoarseLevel,
+                                std::dynamic_pointer_cast<amr::Hierarchy>(hierarchy));
+
                 auto& coarseModel = getModel_(iCoarseLevel);
                 auto& coarseLevel = *hierarchy->getPatchLevel(iCoarseLevel);
                 toCoarser.postSynchronize(coarseModel, coarseLevel, syncTime);

@@ -14,7 +14,7 @@
 
 // see std::unordered_map<...> debugging
 #if !defined(PHARE_DEBUGGERINO)
-#define PHARE_DEBUGGERINO 1
+#define PHARE_DEBUGGERINO 0
 #endif
 
 
@@ -127,13 +127,25 @@ struct Debuggerino
 
     Debuggerino() = default;
 
-    void settime(double const t) { time = t; }
-    void sethier(auto h) { hier = h; }
+    void set(double const t, int l, auto h)
+    {
+        time              = t;
+        level             = l;
+        auto domainBoxVec = h->domainBox();
 
-    double time            = 0;
+        domainBox = Box<int, DEBUG_DIM>{Point{ConstArray<int, DEBUG_DIM>(0)},
+                                        Point{for_N<DEBUG_DIM, for_N_R_mode::make_array>(
+                                            [&](auto i) { return domainBoxVec[i]; })}};
+
+        if (l)
+            domainBox.upper = (domainBox.upper + 1) * (l + 1) - 1;
+    }
+
+    double time = 0;
+    int level   = 0;
+    Box<int, DEBUG_DIM> domainBox;
+    // std::shared_ptr<amr::Hierarchy> hier{nullptr};
     debug_scope* stack_ptr = nullptr;
-
-    std::shared_ptr<amr::Hierarchy> hier{nullptr};
 };
 
 struct Shifter
@@ -357,22 +369,25 @@ void debug_all_fields(auto& views)
 
 void check_fields(auto const& f0, auto const& f1)
 {
-    auto& debugger           = Debuggerino::INSTANCE();
-    auto& scope              = *debugger.stack_ptr;
-    auto const path          = scope.full_path();
-    auto const time          = debugger.time;
-    auto const& domainBoxVec = debugger.hier->domainBox();
-    auto const domainBox     = Box<int, DEBUG_DIM>{
-        Point{ConstArray<int, DEBUG_DIM>(0)},
-        Point{for_N<DEBUG_DIM, for_N_R_mode::make_array>([&](auto i) { return domainBoxVec[i]; })}};
-    Shifter const shifter{domainBox};
+    auto& debugger  = Debuggerino::INSTANCE();
+    auto& scope     = *debugger.stack_ptr;
+    auto const path = scope.full_path();
+    auto const time = debugger.time;
+
+    Shifter const shifter{debugger.domainBox};
 
     auto const name    = f0->field.name();
     auto const layout0 = f0->gridLayout;
     auto const layout1 = f1->gridLayout;
     auto const pq      = f0->field.physicalQuantity();
-    auto const gb0     = grow(layout0.AMRGhostBoxFor(pq), -layout0.nbrGhosts());
-    auto const gb1     = grow(layout1.AMRGhostBoxFor(pq), -layout0.nbrGhosts());
+    // auto const gb0     = grow(layout0.AMRGhostBoxFor(pq), -layout0.nbrGhosts());
+    // auto const gb1     = grow(layout1.AMRGhostBoxFor(pq), -layout0.nbrGhosts());
+
+    auto const gb0 = layout0.AMRGhostBoxFor(pq);
+    auto const gb1 = layout1.AMRGhostBoxFor(pq);
+
+    if (name != "EM_B_x")
+        return;
 
     for (auto const& offset : shifter.make_shift_for(layout0.AMRBox()))
     {
@@ -453,32 +468,58 @@ void check_all_fields(auto& views)
     }
 }
 
+
+template<typename GridLayoutT>
+void check_level(auto& rm, auto& level)
+{
+    using ResourcesManager_t = std::decay_t<decltype(rm)>;
+    using FieldData_t        = typename ResourcesManager_t::UserField_t::patch_data_type;
+
+    if constexpr (DEBUG_DIM == GridLayoutT::dimension)
+    {
+        auto& debugger = Debuggerino::INSTANCE();
+
+        for (auto [k, v] : rm.all_resources())
+            for (int i = 0; i < level.getLocalNumberOfPatches() - 1; ++i)
+                for (int j = i + 1; j < level.getLocalNumberOfPatches(); ++j)
+                {
+                    auto const& p0 = *(level.getPatch(i));
+                    auto const& p1 = *(level.getPatch(j));
+                    auto const& d0 = p0.getPatchData(v.id);
+                    auto const& d1 = p1.getPatchData(v.id);
+                    auto f0        = dynamic_cast<FieldData_t*>(d0.get());
+                    if (f0)
+                        check_fields(f0, dynamic_cast<FieldData_t*>(d1.get()));
+                }
+    }
+}
+
 } // namespace PHARE::core
+
+// clang-format off
 
 #if defined(PHARE_DEBUGGERINO) and PHARE_DEBUGGERINO
 
-#define PHARE_DEBUG_SCOPE(key)                                                                     \
-    PHARE::core::debug_scope _debug_scope_                                                         \
-    {                                                                                              \
-        key                                                                                        \
-    }
-#define PHARE_DEBUG_TIME(time) PHARE::core::Debuggerino::INSTANCE().settime(time)
-#define PHARE_DEBUG_HIER(hier) PHARE::core::Debuggerino::INSTANCE().sethier(hier)
+#define PHARE_DEBUG_SCOPE(key) PHARE::core::debug_scope _debug_scope_{key}
+#define PHARE_DEBUG_SET(...) PHARE::core::Debuggerino::INSTANCE().set(__VA_ARGS__)
 #define PHARE_DEBUG_FIELDS(...) PHARE::core::debug_if_active_fields(__VA_ARGS__)
 #define PHARE_DEBUG_FIELD(...) PHARE::core::debug_if_active_field(__VA_ARGS__)
 #define PHARE_DEBUG_ALL_FIELDS(...) PHARE::core::debug_all_fields(__VA_ARGS__)
 #define PHARE_DEBUG_CHECK_ALL_OVERLAPS(...) PHARE::core::check_all_fields(__VA_ARGS__)
+#define PHARE_DEBUG_CHECK_LEVEL(GridLayoutT, rm,level) PHARE::core::check_level<GridLayoutT>(rm,level)
 
 #else // disabled
 
 #define PHARE_DEBUG_SCOPE(key)
-#define PHARE_DEBUG_TIME(time)
-#define PHARE_DEBUG_HIER(hier)
+#define PHARE_DEBUG_SET(...)
 #define PHARE_DEBUG_FIELDS(...)
 #define PHARE_DEBUG_FIELD(...)
 #define PHARE_DEBUG_ALL_FIELDS(...)
 #define PHARE_DEBUG_CHECK_ALL_OVERLAPS(...)
+#define PHARE_DEBUG_CHECK_LEVEL(...)
 
 #endif // PHARE_DEBUGGERINO
+
+// clang-format on
 
 #endif /*PHARE_CORE_DEBUG_HPP*/

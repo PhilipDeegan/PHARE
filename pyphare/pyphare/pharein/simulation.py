@@ -163,11 +163,12 @@ def check_time(**kwargs):
     start_time = kwargs.get("restart_options", {}).get("restart_time", 0)
 
     if final_and_dt:
-        time_step_nbr = int(kwargs["final_time"] / kwargs["time_step"])
-        time_step = kwargs["final_time"] / time_step_nbr
+        duration = kwargs["final_time"] - start_time
+        time_step = kwargs["time_step"]
+        time_step_nbr = int(duration / time_step)
 
     elif final_and_nsteps:
-        time_step = kwargs["final_time"] / kwargs["time_step_nbr"]
+        time_step = (kwargs["final_time"] - start_time) / kwargs["time_step_nbr"]
         time_step_nbr = kwargs["time_step_nbr"]
 
     elif nsteps_and_dt:
@@ -183,7 +184,7 @@ def check_time(**kwargs):
     return (
         time_step_nbr,
         time_step,
-        kwargs.get("final_time", start_time + time_step * time_step_nbr),
+        kwargs.get("final_time", start_time + (time_step * time_step_nbr)),
     )
 
 

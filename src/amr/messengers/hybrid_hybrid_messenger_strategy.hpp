@@ -301,6 +301,13 @@ namespace amr
 
             // computeIonMoments_(*level, model);
             // levelGhostNew will be refined in next firstStep
+
+            // if (levelNumber != rootLevelNumber)
+            magPatchGhostsRefineSchedules[levelNumber]->fillData(initDataTime);
+
+            PHARE_DEBUG_SCOPE("HyHyMessStrat/regrid/");
+
+            PHARE_DEBUG_CHECK_LEVEL(GridLayoutT, *resourcesManager_, *level);
         }
 
         std::string fineModelName() const override { return HybridModel::model_name; }
@@ -703,10 +710,13 @@ namespace amr
                 dump_field("bulkVel_x");
                 dump_field("bulkVel_y");
                 dump_field("bulkVel_z");
+
+                PHARE_DEBUG_CHECK_LEVEL(GridLayoutT, *resourcesManager_, level);
             }
 
             auto levelNumber = level.getLevelNumber();
             PHARE_LOG_LINE_STR("synchronizing level " + std::to_string(levelNumber));
+
 
             // call coarsning schedules...
             magnetoSynchronizers_.sync(levelNumber);
@@ -716,6 +726,7 @@ namespace amr
 
 
             PHARE_DEBUG_SCOPE("HyHyMessStrat/after_sync/");
+            PHARE_DEBUG_CHECK_LEVEL(GridLayoutT, *resourcesManager_, level);
             dumpb();
             dumpeavg();
             dump_field("rho");
@@ -736,6 +747,11 @@ namespace amr
 
             PHARE_LOG_LINE_STR("postSynchronize level " + std::to_string(levelNumber));
 
+            // {
+            //     PHARE_DEBUG_SCOPE("HyHyMessStrat/post_sync/before/");
+            //     PHARE_DEBUG_CHECK_LEVEL(GridLayoutT, *resourcesManager_, level);
+            // }
+
             // elecSharedNodesRefiners_.fill(hybridModel.state.electromag.E, levelNumber, time);
 
             // we fill magnetic field ghosts only on patch ghost nodes and not on level
@@ -749,6 +765,9 @@ namespace amr
             elecGhostsRefiners_.fill(hybridModel.state.electromag.E, levelNumber, time);
             rhoGhostsRefiners_.fill(levelNumber, time);
             velGhostsRefiners_.fill(hybridModel.state.ions.velocity(), levelNumber, time);
+
+            PHARE_DEBUG_SCOPE("HyHyMessStrat/post_sync/after/");
+            PHARE_DEBUG_CHECK_LEVEL(GridLayoutT, *resourcesManager_, level);
         }
 
     private:

@@ -2,8 +2,10 @@
 #define PHARE_SRC_AMR_FIELD_FIELD_DATA_HPP
 
 
+#include "core/data/grid/gridlayoutdefs.hpp"
 #include "core/logger.hpp"
 #include "core/def/phare_mpi.hpp"
+#include <SAMRAI/tbox/Dimension.h>
 #include <core/utilities/types.hpp>
 #include "core/data/field/field_box.hpp"
 
@@ -15,6 +17,7 @@
 #include <SAMRAI/hier/PatchData.h>
 #include <SAMRAI/tbox/MemoryUtilities.h>
 
+#include <cstdint>
 #include <utility>
 
 
@@ -57,6 +60,8 @@ namespace amr
          * From the freshly created GridLayout, it will create a Field with the correct
          * number of cells in each needed directions
          */
+
+
         FieldData(SAMRAI::hier::Box const& domain, SAMRAI::hier::IntVector const& ghost,
                   std::string name, GridLayoutT const& layout, PhysicalQuantity qty)
             : SAMRAI::hier::PatchData(domain, ghost)
@@ -77,6 +82,7 @@ namespace amr
             , field(name, qty, gridLayout.allocSize(qty))
             , quantity_{qty}
         {
+            static_assert(false); // DO NOT USE
         }
 
         FieldData()                            = delete;
