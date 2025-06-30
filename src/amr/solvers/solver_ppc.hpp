@@ -232,6 +232,7 @@ void SolverPPC<HybridModel, AMR_Types>::advanceLevel(hierarchy_t const& hierarch
                                                      IMessenger& fromCoarserMessenger,
                                                      double const currentTime, double const newTime)
 {
+    PHARE_DEBUG_SCOPE("SolverPPC/advanceLevel/");
     PHARE_LOG_SCOPE(1, "SolverPPC::advanceLevel");
 
     auto& modelView   = dynamic_cast<ModelViews_t&>(views);
@@ -245,7 +246,6 @@ void SolverPPC<HybridModel, AMR_Types>::advanceLevel(hierarchy_t const& hierarch
     moveIons_(level, modelView, fromCoarser, currentTime, newTime, core::UpdaterMode::domain_only);
 
     predictor2_(level, modelView, fromCoarser, currentTime, newTime);
-
 
     average_(level, modelView, fromCoarser, newTime);
 
@@ -262,6 +262,7 @@ void SolverPPC<HybridModel, AMR_Types>::predictor1_(level_t& level, ModelViews_t
                                                     Messenger& fromCoarser,
                                                     double const currentTime, double const newTime)
 {
+    PHARE_DEBUG_SCOPE("predictor1/");
     PHARE_LOG_SCOPE(1, "SolverPPC::predictor1_");
 
     TimeSetter setTime{views, newTime};
@@ -288,6 +289,9 @@ void SolverPPC<HybridModel, AMR_Types>::predictor1_(level_t& level, ModelViews_t
              views.electromagPred_E);
         setTime([](auto& state) -> auto& { return state.electromagPred.E; });
     }
+
+    PHARE_DEBUG_ALL_FIELDS(views);
+    PHARE_DEBUG_CHECK_ALL_OVERLAPS(views);
 }
 
 
@@ -296,6 +300,7 @@ void SolverPPC<HybridModel, AMR_Types>::predictor2_(level_t& level, ModelViews_t
                                                     Messenger& fromCoarser,
                                                     double const currentTime, double const newTime)
 {
+    PHARE_DEBUG_SCOPE("predictor2/");
     PHARE_LOG_SCOPE(1, "SolverPPC::predictor2_");
 
     TimeSetter setTime{views, newTime};
@@ -323,6 +328,8 @@ void SolverPPC<HybridModel, AMR_Types>::predictor2_(level_t& level, ModelViews_t
              views.electromagPred_E);
         setTime([](auto& state) -> auto& { return state.electromagPred.E; });
     }
+
+    PHARE_DEBUG_CHECK_ALL_OVERLAPS(views);
 }
 
 
@@ -333,6 +340,7 @@ void SolverPPC<HybridModel, AMR_Types>::corrector_(level_t& level, ModelViews_t&
                                                    Messenger& fromCoarser, double const currentTime,
                                                    double const newTime)
 {
+    PHARE_DEBUG_SCOPE("corrector/");
     PHARE_LOG_SCOPE(1, "SolverPPC::corrector_");
 
     auto levelNumber = level.getLevelNumber();
@@ -362,6 +370,8 @@ void SolverPPC<HybridModel, AMR_Types>::corrector_(level_t& level, ModelViews_t&
 
         fromCoarser.fillElectricGhosts(views.model().state.electromag.E, levelNumber, newTime);
     }
+
+    PHARE_DEBUG_CHECK_ALL_OVERLAPS(views);
 }
 
 
@@ -370,7 +380,7 @@ template<typename HybridModel, typename AMR_Types>
 void SolverPPC<HybridModel, AMR_Types>::average_(level_t& level, ModelViews_t& views,
                                                  Messenger& fromCoarser, double const newTime)
 {
-    PHARE_LOG_SCOPE(1, "SolverPPC::average_");
+    PHARE_LOG_SCOPE(1, "SolverPPC::average");
 
     for (auto& state : views)
     {
@@ -415,6 +425,7 @@ void SolverPPC<HybridModel, AMR_Types>::moveIons_(level_t& level, ModelViews_t& 
                                                   Messenger& fromCoarser, double const currentTime,
                                                   double const newTime, core::UpdaterMode mode)
 {
+    PHARE_DEBUG_SCOPE("moveIons/" + std::to_string(static_cast<std::uint16_t>(mode)) + "/");
     PHARE_LOG_SCOPE(1, "SolverPPC::moveIons_");
     PHARE_DEBUG_DO(_debug_log_move_ions(views);)
 
@@ -444,6 +455,10 @@ void SolverPPC<HybridModel, AMR_Types>::moveIons_(level_t& level, ModelViews_t& 
     // now Ni and Vi are calculated we can fill pure ghost nodes
     // these were not completed by the deposition of patch and levelghost particles
     fromCoarser.fillIonMomentGhosts(views.model().state.ions, level, newTime);
+
+    PHARE_DEBUG_ALL_FIELDS(views);
+
+    PHARE_DEBUG_CHECK_ALL_OVERLAPS(views);
 }
 
 
