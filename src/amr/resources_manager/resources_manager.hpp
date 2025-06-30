@@ -283,7 +283,7 @@ namespace amr
             return std::nullopt;
         }
 
-
+        auto const& all_resources() const { return nameToResourceInfo_; }
 
         ~ResourcesManager()
         {

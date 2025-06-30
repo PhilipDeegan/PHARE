@@ -11,6 +11,8 @@
 
 
 #include "core/def/phare_mpi.hpp" // IWYU pragma: keep
+#include "amr/wrappers/hierarchy.hpp"
+
 
 #include <SAMRAI/algs/TimeRefinementLevelStrategy.h>
 #include <SAMRAI/mesh/StandardTagAndInitStrategy.h>
@@ -30,6 +32,7 @@
 #include "amr/solvers/solver_mhd.hpp"
 #include "amr/solvers/solver_ppc.hpp"
 
+#include "core/debug.hpp"
 #include "core/logger.hpp"
 #include "core/utilities/algorithm.hpp"
 
@@ -502,6 +505,9 @@ namespace solver
                             double const currentTime, double const newTime, bool const firstStep,
                             bool const lastStep, bool const regridAdvance = false) override
         {
+            PHARE_DEBUG_SET(newTime, level->getLevelNumber(),
+                            std::dynamic_pointer_cast<amr::Hierarchy>(hierarchy));
+            PHARE_DEBUG_SCOPE("level/" + std::to_string(level->getLevelNumber()) + "/");
             PHARE_LOG_SCOPE(3, "Multiphys::advanceLevel");
 
             if (regridAdvance)
@@ -572,6 +578,9 @@ namespace solver
             // TODO use messengers to sync with coarser
             for (auto ilvl = finestLevel; ilvl > coarsestLevel; --ilvl)
             {
+                PHARE_DEBUG_SET(syncTime, ilvl,
+                                std::dynamic_pointer_cast<amr::Hierarchy>(hierarchy));
+
                 auto& toCoarser = getMessengerWithCoarser_(ilvl);
                 auto& fineLevel = *hierarchy->getPatchLevel(ilvl);
                 toCoarser.synchronize(fineLevel);
@@ -587,6 +596,10 @@ namespace solver
                 coarseSolver.reflux(coarseModel, coarseLevel, syncTime);
 
                 // recopy (patch) ghosts
+
+
+                PHARE_DEBUG_SET(syncTime, iCoarseLevel,
+                                std::dynamic_pointer_cast<amr::Hierarchy>(hierarchy));
                 toCoarser.postSynchronize(coarseModel, coarseLevel, syncTime);
 
                 // advancing all but the finest includes synchronization of the finer

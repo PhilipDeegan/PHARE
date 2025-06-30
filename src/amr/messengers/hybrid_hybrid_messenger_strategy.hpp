@@ -2,10 +2,9 @@
 #define PHARE_HYBRID_HYBRID_MESSENGER_STRATEGY_HPP
 
 #include "core/def.hpp"
+#include "core/debug.hpp"
 #include "core/logger.hpp"
-#include "core/data/vecfield/vecfield_component.hpp"
-#include "core/def/phare_mpi.hpp"
-
+#include "core/def/phare_mpi.hpp" // IWYU pragma: keep
 
 #include "core/hybrid/hybrid_quantities.hpp"
 #include "core/numerics/interpolator/interpolator.hpp"
@@ -42,11 +41,6 @@
 #include <cmath>
 #include <memory>
 #include <string>
-#include <utility>
-#include <iomanip>
-#include <iostream>
-#include <iterator>
-#include <cmath>
 
 
 
@@ -76,6 +70,7 @@ namespace amr
         using VectorFieldDataT  = TensorFieldData<1, GridLayoutT, GridT, core::HybridQuantity>;
         using ResourcesManagerT = HybridModel::resources_manager_type;
         using IPhysicalModel    = HybridModel::Interface;
+
 
         static constexpr std::size_t dimension   = GridLayoutT::dimension;
         static constexpr std::size_t interpOrder = GridLayoutT::interp_order;
@@ -125,9 +120,6 @@ namespace amr
             resourcesManager_->registerResources(Jold_);
             resourcesManager_->registerResources(NiOld_);
             resourcesManager_->registerResources(ViOld_);
-            resourcesManager_->registerResources(sumVec_);
-            resourcesManager_->registerResources(sumField_);
-            resourcesManager_->registerResources(sumTensor_);
         }
 
         virtual ~HybridHybridMessengerStrategy() = default;
@@ -148,9 +140,6 @@ namespace amr
             resourcesManager_->allocate(Jold_, patch, allocateTime);
             resourcesManager_->allocate(NiOld_, patch, allocateTime);
             resourcesManager_->allocate(ViOld_, patch, allocateTime);
-            resourcesManager_->allocate(sumVec_, patch, allocateTime);
-            resourcesManager_->allocate(sumField_, patch, allocateTime);
-            resourcesManager_->allocate(sumTensor_, patch, allocateTime);
         }
 
 
@@ -182,6 +171,12 @@ namespace amr
             BalgoPatchGhost.registerRefine(*b_id, *b_id, *b_id, BfieldRefineOp_,
                                            nonOverwriteInteriorTFfillPattern);
 
+            BalgoNode.registerRefine(*bx_id, *bx_id, *bx_id, BfieldNodeRefineOp_,
+                                     xVariableFillPattern);
+            BalgoNode.registerRefine(*by_id, *by_id, *by_id, BfieldNodeRefineOp_,
+                                     yVariableFillPattern);
+            BalgoNode.registerRefine(*bz_id, *bz_id, *bz_id, BfieldNodeRefineOp_,
+                                     zVariableFillPattern);
 
             BregridAlgo.registerRefine(*b_id, *b_id, *b_id, BfieldRegridOp_,
                                        overwriteInteriorTFfillPattern);
@@ -232,7 +227,8 @@ namespace amr
         {
             auto const level = hierarchy->getPatchLevel(levelNumber);
 
-
+            magSharedNodeRefineSchedules[levelNumber]
+                = BalgoNode.createSchedule(level, &magneticRefinePatchStrategy_);
 
             magPatchGhostsRefineSchedules[levelNumber]
                 = BalgoPatchGhost.createSchedule(level, &magneticRefinePatchStrategy_);
@@ -244,15 +240,12 @@ namespace amr
 
             elecGhostsRefiners_.registerLevel(hierarchy, level);
             currentGhostsRefiners_.registerLevel(hierarchy, level);
-            chargeDensityGhostsRefiners_.registerLevel(hierarchy, level);
+
+            rhoGhostsRefiners_.registerLevel(hierarchy, level);
             velGhostsRefiners_.registerLevel(hierarchy, level);
-            domainGhostPartRefiners_.registerLevel(hierarchy, level);
 
-            for (auto& refiner : popFluxBorderSumRefiners_)
-                refiner.registerLevel(hierarchy, level);
+            patchGhostPartRefiners_.registerLevel(hierarchy, level);
 
-            for (auto& refiner : popDensityBorderSumRefiners_)
-                refiner.registerLevel(hierarchy, level);
 
             // root level is not initialized with a schedule using coarser level data
             // so we don't create these schedules if root level
@@ -274,7 +267,7 @@ namespace amr
 
                 // and these for coarsening
                 electroSynchronizers_.registerLevel(hierarchy, level);
-                chargeDensitySynchronizers_.registerLevel(hierarchy, level);
+                densitySynchronizers_.registerLevel(hierarchy, level);
                 ionBulkVelSynchronizers_.registerLevel(hierarchy, level);
             }
         }
@@ -292,7 +285,7 @@ namespace amr
             auto& hybridModel = dynamic_cast<HybridModel&>(model);
             auto level        = hierarchy->getPatchLevel(levelNumber);
 
-            bool const isRegriddingL0 = levelNumber == 0 and oldLevel;
+            bool isRegriddingL0 = levelNumber == 0 and oldLevel;
 
             // Jx not used in 1D ampere and construct-init to NaN
             // therefore J needs to be set to 0 whenever SAMRAI may construct
@@ -306,6 +299,7 @@ namespace amr
             magneticRegriding_(hierarchy, level, oldLevel, hybridModel, initDataTime);
             electricInitRefiners_.regrid(hierarchy, levelNumber, oldLevel, initDataTime);
             domainParticlesRefiners_.regrid(hierarchy, levelNumber, oldLevel, initDataTime);
+            patchGhostPartRefiners_.fill(levelNumber, initDataTime);
 
 
             // we now call only levelGhostParticlesOld.fill() and not .regrid()
@@ -333,6 +327,9 @@ namespace amr
             // overlaps an old level patch border. See https://github.com/LLNL/SAMRAI/pull/293
             magPatchGhostsRefineSchedules[levelNumber]->fillData(initDataTime);
             elecPatchGhostsRefineSchedules[levelNumber]->fillData(initDataTime);
+
+            PHARE_DEBUG_SCOPE("HyHyMessStrat/regrid/");
+            PHARE_DEBUG_CHECK_LEVEL(GridLayoutT, *resourcesManager_, *level);
         }
 
         std::string fineModelName() const override { return HybridModel::model_name; }
@@ -378,6 +375,12 @@ namespace amr
             PHARE_LOG_START(3, "hybhybmessengerStrat::initLevel : interior part fill schedule");
             domainParticlesRefiners_.fill(levelNumber, initDataTime);
             PHARE_LOG_STOP(3, "hybhybmessengerStrat::initLevel : interior part fill schedule");
+            // however we need to call the ghost communicator for patch ghost particles
+            // since the interior schedules have a restriction to the interior of the patch.
+            PHARE_LOG_START(3, "hybhybmessengerStrat::initLevel : patch ghost part fill schedule");
+            patchGhostPartRefiners_.fill(levelNumber, initDataTime);
+            PHARE_LOG_STOP(3, "hybhybmessengerStrat::initLevel : patch ghost part fill schedule");
+
 
             lvlGhostPartOldRefiners_.fill(levelNumber, initDataTime);
 
@@ -410,11 +413,10 @@ namespace amr
         void fillCurrentGhosts(VecFieldT& J, level_t const& level, double const fillTime) override
         {
             PHARE_LOG_SCOPE(3, "HybridHybridMessengerStrategy::fillCurrentGhosts");
+
             setNaNsOnVecfieldGhosts(J, level);
             currentGhostsRefiners_.fill(J, level.getLevelNumber(), fillTime);
         }
-
-
 
 
         /**
@@ -432,6 +434,7 @@ namespace amr
                 for (auto& pop : ions)
                     pop.patchGhostParticles().clear();
         }
+
 
 
 
@@ -495,576 +498,617 @@ namespace amr
                     std::memcpy(ions[i].chargeDensity().data(), sumField_.data(),
                                 ions[i].chargeDensity().size() * sizeof(value_type));
             }
-        }
 
 
 
 
-        /**
-         * @brief fillIonPopMomentGhosts works on moment ghost nodes
-         *
-         * level border nodes are completed by the deposition
-         * of level ghost [old,new] particles for all populations, linear time interpolation
-         * is used to get the contribution of old/new particles
-         */
-        void fillIonPopMomentGhosts(IonsT& ions, level_t& level,
-                                    double const afterPushTime) override
-        {
-            PHARE_LOG_SCOPE(1, "HybridHybridMessengerStrategy::fillIonPopMomentGhosts");
-
-            auto alpha = timeInterpCoef_(afterPushTime, level.getLevelNumber());
-            if (level.getLevelNumber() > 0 and (alpha < 0 or alpha > 1))
+            /**
+             * @brief fillIonPopMomentGhosts works on moment ghost nodes
+             *
+             * patch border node moments are completed by the deposition of patch ghost
+             * particles for all populations level border nodes are completed by the deposition
+             * of level ghost [old,new] particles for all populations, linear time interpolation
+             * is used to get the contribution of old/new particles
+             */
+            void fillIonPopMomentGhosts(IonsT & ions, level_t & level, double const afterPushTime)
+                override
             {
-                std::cout << std::setprecision(12) << alpha << "\n";
-                throw std::runtime_error("ion moment ghost time interp coef invalid : alpha: "
-                                         + std::to_string(alpha) + " beforePushTime "
-                                         + std::to_string(afterPushTime) + " on level "
-                                         + std::to_string(level.getLevelNumber()));
-            }
-            for (auto const& patch : level)
-            {
-                auto dataOnPatch = resourcesManager_->setOnPatch(*patch, ions);
-                auto layout      = layoutFromPatch<GridLayoutT>(*patch);
+                PHARE_LOG_SCOPE(1, "HybridHybridMessengerStrategy::fillIonMomentGhosts");
 
-                for (auto& pop : ions)
+                auto alpha = timeInterpCoef_(afterPushTime, level.getLevelNumber());
+                if (level.getLevelNumber() > 0 and (alpha < 0 or alpha > 1))
                 {
-                    auto& particleDensity = pop.particleDensity();
-                    auto& chargeDensity   = pop.chargeDensity();
-                    auto& flux            = pop.flux();
-                    // first thing to do is to project patchGhostParitcles moments
+                    std::cout << std::setprecision(12) << alpha << "\n";
+                    throw std::runtime_error("ion moment ghost time interp coef invalid : alpha: "
+                                             + std::to_string(alpha) + " beforePushTime "
+                                             + std::to_string(afterPushTime) + " on level "
+                                             + std::to_string(level.getLevelNumber()));
+                }
+                for (auto const& patch : level)
+                {
+                    auto dataOnPatch = resourcesManager_->setOnPatch(*patch, ions);
+                    auto layout      = layoutFromPatch<GridLayoutT>(*patch);
 
-
-                    if (level.getLevelNumber() > 0) // no levelGhost on root level
+                    for (auto& pop : ions)
                     {
-                        // then grab levelGhostParticlesOld and levelGhostParticlesNew
-                        // and project them with alpha and (1-alpha) coefs, respectively
-                        auto& levelGhostOld = pop.levelGhostParticlesOld();
-                        interpolate_(makeRange(levelGhostOld), particleDensity, chargeDensity, flux,
-                                     layout, 1. - alpha);
+                        // first thing to do is to project patchGhostParitcles moments
+                        auto& patchGhosts     = pop.patchGhostParticles();
+                        auto& particleDensity = pop.particleDensity();
+                        auto& chargeDensity   = pop.chargeDensity();
+                        auto& flux            = pop.flux();
+                        // first thing to do is to project patchGhostParitcles moments
 
-                        auto& levelGhostNew = pop.levelGhostParticlesNew();
-                        interpolate_(makeRange(levelGhostNew), particleDensity, chargeDensity, flux,
-                                     layout, alpha);
+
+                        interpolate_(makeRange(patchGhosts), particleDensity, chargeDensity, flux,
+                                     layout);
+
+                        if (level.getLevelNumber() > 0) // no levelGhost on root level
+                        {
+                            // then grab levelGhostParticlesOld and levelGhostParticlesNew
+                            // and project them with alpha and (1-alpha) coefs, respectively
+                            auto& levelGhostOld = pop.levelGhostParticlesOld();
+                            interpolate_(makeRange(levelGhostOld), particleDensity, chargeDensity,
+                                         flux, layout, 1. - alpha);
+
+                            auto& levelGhostNew = pop.levelGhostParticlesNew();
+                            interpolate_(makeRange(levelGhostNew), particleDensity, chargeDensity,
+                                         flux, layout, alpha);
+                        }
                     }
                 }
             }
-        }
 
 
-        /* pure (patch and level) ghost nodes are filled by applying a regular ghost
-         * schedule i.e. that does not overwrite the border patch node previously well
-         * calculated from particles Note : the ghost schedule only fills the total density
-         * and bulk velocity and NOT population densities and fluxes. These partial moments
-         * are already completed by the "sum" schedules (+= on incomplete nodes)*/
-        virtual void fillIonMomentGhosts(IonsT& ions, level_t& level,
-                                         double const afterPushTime) override
-        {
-            PHARE_LOG_SCOPE(3, "HybridHybridMessengerStrategy::fillIonMomentGhosts");
-            auto& chargeDensity = ions.chargeDensity();
-            auto& velocity      = ions.velocity();
-            setNaNsOnFieldGhosts(chargeDensity, level);
-            setNaNsOnVecfieldGhosts(velocity, level);
-            chargeDensityGhostsRefiners_.fill(level.getLevelNumber(), afterPushTime);
-            velGhostsRefiners_.fill(level.getLevelNumber(), afterPushTime);
-        }
-
-        /**
-         * @brief firstStep : in the HybridHybridMessengerStrategy, the firstStep method is
-         * used to get level border ghost particles from the next coarser level. These
-         * particles are defined in the future at the time the method is called because the
-         * coarser level is ahead in time. These particles are communicated only at first
-         * step of a substepping cycle. They will be used with the levelGhostParticlesOld
-         * particles to get the moments on level border nodes. The method is does nothing if
-         * the level is the root level because the root level cannot get levelGhost from
-         * next coarser (it has none).
-         */
-        void firstStep(IPhysicalModel& /*model*/, level_t& level,
-                       std::shared_ptr<hierarchy_t> const& /*hierarchy*/, double const currentTime,
-                       double const prevCoarserTime, double const newCoarserTime) override
-        {
-            PHARE_LOG_SCOPE(3, "HybridHybridMessengerStrategy::firstStep");
-
-            auto levelNumber = level.getLevelNumber();
-            if (newCoarserTime < prevCoarserTime)
-                throw std::runtime_error(
-                    "Error : prevCoarserTime (" + std::to_string(prevCoarserTime)
-                    + ") should be < newCoarserTime (" + std::to_string(prevCoarserTime) + ")");
-
-            // root level has no levelghost particles
-            if (levelNumber != 0)
+            /* pure (patch and level) ghost nodes are filled by applying a regular ghost
+             * schedule i.e. that does not overwrite the border patch node previously well
+             * calculated from particles Note : the ghost schedule only fills the total density
+             * and bulk velocity and NOT population densities and fluxes. These partial moments
+             * are already completed by the "sum" schedules (+= on incomplete nodes)*/
+            virtual void fillIonMomentGhosts(IonsT & ions, level_t & level,
+                                             double const afterPushTime) override
             {
-                PHARE_LOG_START(3, "HybridHybridMessengerStrategy::firstStep.fill");
-                lvlGhostPartNewRefiners_.fill(levelNumber, currentTime);
-                PHARE_LOG_STOP(3, "HybridHybridMessengerStrategy::firstStep.fill");
+                PHARE_LOG_SCOPE(3, "HybridHybridMessengerStrategy::fillIonMomentGhosts");
+                auto& chargeDensity = ions.chargeDensity();
+                auto& velocity      = ions.velocity();
+                setNaNsOnFieldGhosts(chargeDensity, level);
+                setNaNsOnVecfieldGhosts(velocity, level);
+                chargeDensityGhostsRefiners_.fill(level.getLevelNumber(), afterPushTime);
 
-                // during firstStep() coarser level and current level are at the same time
-                // so 'time' is also the beforePushCoarseTime_
-                beforePushCoarseTime_[levelNumber] = prevCoarserTime;
-                afterPushCoarseTime_[levelNumber]  = newCoarserTime;
+                velGhostsRefiners_.fill(level.getLevelNumber(), afterPushTime);
             }
-        }
 
-
-        /**
-         * @brief lastStep is used to perform operations at the last step of a substepping
-         * cycle. It is called after the level is advanced. Here for hybrid-hybrid messages,
-         * the method moves levelGhostParticlesNew particles into levelGhostParticlesOld
-         * ones. Then levelGhostParticlesNew are emptied since it will be filled again at
-         * firstStep of the next substepping cycle. the new CoarseToFineOld content is then
-         * copied to levelGhostParticles so that they can be pushed during the next subcycle
-         */
-        void lastStep(IPhysicalModel& model, level_t& level) override
-        {
-            if (level.getLevelNumber() == 0)
-                return;
-
-            PHARE_LOG_SCOPE(3, "HybridHybridMessengerStrategy::lastStep");
-
-            auto& hybridModel = static_cast<HybridModel&>(model);
-            for (auto& patch : level)
+            /**
+             * @brief firstStep : in the HybridHybridMessengerStrategy, the firstStep method is
+             * used to get level border ghost particles from the next coarser level. These
+             * particles are defined in the future at the time the method is called because the
+             * coarser level is ahead in time. These particles are communicated only at first
+             * step of a substepping cycle. They will be used with the levelGhostParticlesOld
+             * particles to get the moments on level border nodes. The method is does nothing if
+             * the level is the root level because the root level cannot get levelGhost from
+             * next coarser (it has none).
+             */
+            void firstStep(IPhysicalModel& /*model*/, level_t & level,
+                           std::shared_ptr<hierarchy_t> const& /*hierarchy*/,
+                           double const currentTime, double const prevCoarserTime,
+                           double const newCoarserTime) override
             {
-                auto& ions       = hybridModel.state.ions;
-                auto dataOnPatch = resourcesManager_->setOnPatch(*patch, ions);
-                for (auto& pop : ions)
-                {
-                    auto& levelGhostParticlesOld = pop.levelGhostParticlesOld();
-                    auto& levelGhostParticlesNew = pop.levelGhostParticlesNew();
-                    auto& levelGhostParticles    = pop.levelGhostParticles();
+                PHARE_LOG_SCOPE(3, "HybridHybridMessengerStrategy::firstStep");
 
-                    std::swap(levelGhostParticlesNew, levelGhostParticlesOld);
-                    levelGhostParticlesNew.clear();
-                    levelGhostParticles = levelGhostParticlesOld;
+                auto levelNumber = level.getLevelNumber();
+                if (newCoarserTime < prevCoarserTime)
+                    throw std::runtime_error(
+                        "Error : prevCoarserTime (" + std::to_string(prevCoarserTime)
+                        + ") should be < newCoarserTime (" + std::to_string(prevCoarserTime) + ")");
+
+                // root level has no levelghost particles
+                if (levelNumber != 0)
+                {
+                    PHARE_LOG_START(3, "HybridHybridMessengerStrategy::firstStep.fill");
+                    lvlGhostPartNewRefiners_.fill(levelNumber, currentTime);
+                    PHARE_LOG_STOP(3, "HybridHybridMessengerStrategy::firstStep.fill");
+
+                    // during firstStep() coarser level and current level are at the same time
+                    // so 'time' is also the beforePushCoarseTime_
+                    beforePushCoarseTime_[levelNumber] = prevCoarserTime;
+                    afterPushCoarseTime_[levelNumber]  = newCoarserTime;
                 }
             }
-        }
 
 
-
-
-        /**
-         * @brief prepareStep is the concrete implementation of the
-         * HybridMessengerStrategy::prepareStep method For hybrid-Hybrid communications.
-         * This method copies the  density J, and the density and bulk velocity, defined at t=n.
-         * Since prepareStep() is called just before advancing the level, this operation
-         * actually saves the t=n versions of J, Ni, Vi into the messenger. When the time comes
-         * that the next finer level needs to time interpolate the electromagnetic field and
-         * current at its ghost nodes, this level will be able to interpolate at required time
-         * because the t=n Vi,Ni,J fields of previous next coarser step will be in the
-         * messenger.
-         */
-        void prepareStep(IPhysicalModel& model, level_t& level, double currentTime) override
-        {
-            PHARE_LOG_SCOPE(3, "HybridHybridMessengerStrategy::prepareStep");
-
-            auto& hybridModel = static_cast<HybridModel&>(model);
-            for (auto& patch : level)
+            /**
+             * @brief lastStep is used to perform operations at the last step of a substepping
+             * cycle. It is called after the level is advanced. Here for hybrid-hybrid messages,
+             * the method moves levelGhostParticlesNew particles into levelGhostParticlesOld
+             * ones. Then levelGhostParticlesNew are emptied since it will be filled again at
+             * firstStep of the next substepping cycle. the new CoarseToFineOld content is then
+             * copied to levelGhostParticles so that they can be pushed during the next subcycle
+             */
+            void lastStep(IPhysicalModel & model, level_t & level) override
             {
-                auto dataOnPatch = resourcesManager_->setOnPatch(
-                    *patch, hybridModel.state.electromag, hybridModel.state.J,
-                    hybridModel.state.ions, Jold_, NiOld_, ViOld_);
+                if (level.getLevelNumber() == 0)
+                    return;
 
-                resourcesManager_->setTime(Jold_, *patch, currentTime);
-                resourcesManager_->setTime(NiOld_, *patch, currentTime);
-                resourcesManager_->setTime(ViOld_, *patch, currentTime);
+                PHARE_LOG_SCOPE(3, "HybridHybridMessengerStrategy::lastStep");
 
-                auto& J  = hybridModel.state.J;
-                auto& Vi = hybridModel.state.ions.velocity();
-                auto& Ni = hybridModel.state.ions.chargeDensity();
-                auto& E  = hybridModel.state.electromag.E;
-
-                Jold_.copyData(J);
-                ViOld_.copyData(Vi);
-                NiOld_.copyData(Ni);
-            }
-        }
-
-
-
-
-        void fillRootGhosts(IPhysicalModel& model, level_t& level,
-                            double const initDataTime) override
-        {
-            auto levelNumber = level.getLevelNumber();
-            assert(levelNumber == 0);
-
-            auto& hybridModel = static_cast<HybridModel&>(model);
-
-            elecGhostsRefiners_.fill(hybridModel.state.electromag.E, levelNumber, initDataTime);
-
-            // at some point in the future levelGhostParticles could be filled with injected
-            // particles depending on the domain boundary condition.
-            //
-            // Do we need J ghosts filled here?
-            // This method is only called when root level is initialized
-            // but J ghosts are needed a priori for the laplacian when the first Ohm is
-            // calculated so I think we do, not having them here is just having the
-            // laplacian wrong on L0 borders for the initial E, which is not the end of the
-            // world...
-            //
-            // do we need moment ghosts filled here?
-            // a priori no because those are at this time only needed for coarsening, which
-            // will not happen before the first advance
-        }
-
-
-
-        void synchronize(level_t& level) override
-        {
-            PHARE_LOG_SCOPE(3, "HybridHybridMessengerStrategy::synchronize");
-
-            auto levelNumber = level.getLevelNumber();
-            PHARE_LOG_LINE_STR("synchronizing level " + std::to_string(levelNumber));
-
-            // call coarsning schedules...
-            electroSynchronizers_.sync(levelNumber);
-            chargeDensitySynchronizers_.sync(levelNumber);
-            ionBulkVelSynchronizers_.sync(levelNumber);
-        }
-
-
-        void reflux(int const coarserLevelNumber, int const fineLevelNumber,
-                    double const syncTime) override
-        {
-            refluxSchedules[fineLevelNumber]->coarsenData();
-            patchGhostRefluxedSchedules[coarserLevelNumber]->fillData(syncTime);
-        }
-
-        // after coarsening, domain nodes have been updated and therefore patch ghost nodes
-        // will probably stop having the exact same value as their overlapped neighbor
-        // domain node we thus fill ghost nodes. note that we first fill shared border nodes
-        // with the sharedNode refiners so that these shared nodes agree on their value at
-        // MPI process boundaries. then regular refiner fill are called, which fill only
-        // pure ghost nodes. note also that moments are not filled on border nodes since
-        // already OK from particle deposition
-        void postSynchronize(IPhysicalModel& model, level_t& level, double const time) override
-        {
-            auto levelNumber  = level.getLevelNumber();
-            auto& hybridModel = static_cast<HybridModel&>(model);
-
-            PHARE_LOG_LINE_STR("postSynchronize level " + std::to_string(levelNumber))
-
-
-            // we fill magnetic field ghosts only on patch ghost nodes and not on level
-            // ghosts the reason is that 1/ filling ghosts is necessary to prevent mismatch
-            // between ghost and overlaped neighboring patch domain nodes resulting from
-            // former coarsening which does not occur for level ghosts and 2/ overwriting
-            // level border with next coarser model B would invalidate divB on the first
-            // fine domain cell since its border face only received a fraction of the
-            // induction that has occured on the shared coarse face.
-            // magPatchGhostsRefineSchedules[levelNumber]->fillData(time);
-            elecGhostsRefiners_.fill(hybridModel.state.electromag.E, levelNumber, time);
-            chargeDensityGhostsRefiners_.fill(levelNumber, time);
-            velGhostsRefiners_.fill(hybridModel.state.ions.velocity(), levelNumber, time);
-        }
-
-    private:
-        void registerGhostComms_(std::unique_ptr<HybridMessengerInfo> const& info)
-        {
-            elecGhostsRefiners_.addStaticRefiners(info->ghostElectric, EfieldRefineOp_,
-                                                  info->ghostElectric,
-                                                  nonOverwriteInteriorTFfillPattern);
-
-            currentGhostsRefiners_.addTimeRefiners(info->ghostCurrent, info->modelCurrent,
-                                                   Jold_.name(), EfieldRefineOp_, vecFieldTimeOp_,
-                                                   nonOverwriteInteriorTFfillPattern);
-
-            chargeDensityGhostsRefiners_.addTimeRefiner(
-                info->modelIonDensity, info->modelIonDensity, NiOld_.name(), fieldRefineOp_,
-                fieldTimeOp_, info->modelIonDensity, defaultFieldFillPattern);
-
-
-            velGhostsRefiners_.addTimeRefiners(info->ghostBulkVelocity, info->modelIonBulkVelocity,
-                                               ViOld_.name(), vecFieldRefineOp_, vecFieldTimeOp_,
-                                               nonOverwriteInteriorTFfillPattern);
-        }
-
-
-
-
-        void registerInitComms(std::unique_ptr<HybridMessengerInfo> const& info)
-        {
-            auto b_id = resourcesManager_->getID(info->modelMagnetic);
-            BalgoInit.registerRefine(*b_id, *b_id, *b_id, BfieldRefineOp_,
-                                     overwriteInteriorTFfillPattern);
-
-            // no fill pattern given for this init
-            // will use boxgeometryvariable fillpattern, itself using the
-            // gield geometry with overwrit_interior true from SAMRAI
-            // we could set the overwriteInteriorTFfillPattern it would be the same
-            electricInitRefiners_.addStaticRefiners(info->initElectric, EfieldRefineOp_,
-                                                    info->initElectric);
-
-
-            domainParticlesRefiners_.addStaticRefiners(
-                info->interiorParticles, interiorParticleRefineOp_, info->interiorParticles);
-
-
-            lvlGhostPartOldRefiners_.addStaticRefiners(info->levelGhostParticlesOld,
-                                                       levelGhostParticlesOldOp_,
-                                                       info->levelGhostParticlesOld);
-
-
-            lvlGhostPartNewRefiners_.addStaticRefiners(info->levelGhostParticlesNew,
-                                                       levelGhostParticlesNewOp_,
-                                                       info->levelGhostParticlesNew);
-
-
-            domainGhostPartRefiners_.addStaticRefiners(
-                info->patchGhostParticles, nullptr, info->patchGhostParticles,
-                std::make_shared<ParticleDomainFromGhostFillPattern<GridLayoutT>>());
-
-
-            for (auto const& vecfield : info->ghostFlux)
-            {
-                popFluxBorderSumRefiners_.emplace_back(resourcesManager_)
-                    .addStaticRefiner(
-                        sumVec_.name(), vecfield, nullptr, sumVec_.name(),
-                        std::make_shared<
-                            TensorFieldGhostInterpOverlapFillPattern<GridLayoutT, /*rank_=*/1>>());
-            }
-
-            for (auto const& field : info->sumBorderFields)
-                popDensityBorderSumRefiners_.emplace_back(resourcesManager_)
-                    .addStaticRefiner(
-                        sumField_.name(), field, nullptr, sumField_.name(),
-                        std::make_shared<FieldGhostInterpOverlapFillPattern<GridLayoutT>>());
-        }
-
-
-
-        void registerSyncComms(std::unique_ptr<HybridMessengerInfo> const& info)
-        {
-            electroSynchronizers_.add(info->modelElectric, electricFieldCoarseningOp_,
-                                      info->modelElectric);
-
-            ionBulkVelSynchronizers_.add(info->modelIonBulkVelocity, vecFieldCoarseningOp_,
-                                         info->modelIonBulkVelocity);
-
-            chargeDensitySynchronizers_.add(info->modelIonDensity, fieldCoarseningOp_,
-                                            info->modelIonDensity);
-        }
-
-
-
-
-        void copyLevelGhostOldToPushable_(level_t& level, IPhysicalModel& model)
-        {
-            auto& hybridModel = static_cast<HybridModel&>(model);
-            for (auto& patch : level)
-            {
-                auto& ions       = hybridModel.state.ions;
-                auto dataOnPatch = resourcesManager_->setOnPatch(*patch, ions);
-                for (auto& pop : ions)
+                auto& hybridModel = static_cast<HybridModel&>(model);
+                for (auto& patch : level)
                 {
-                    auto& levelGhostParticlesOld = pop.levelGhostParticlesOld();
-                    auto& levelGhostParticles    = pop.levelGhostParticles();
+                    auto& ions       = hybridModel.state.ions;
+                    auto dataOnPatch = resourcesManager_->setOnPatch(*patch, ions);
+                    for (auto& pop : ions)
+                    {
+                        auto& levelGhostParticlesOld = pop.levelGhostParticlesOld();
+                        auto& levelGhostParticlesNew = pop.levelGhostParticlesNew();
+                        auto& levelGhostParticles    = pop.levelGhostParticles();
 
-                    levelGhostParticles = levelGhostParticlesOld;
+                        std::swap(levelGhostParticlesNew, levelGhostParticlesOld);
+                        levelGhostParticlesNew.clear();
+                        levelGhostParticles = levelGhostParticlesOld;
+                    }
                 }
             }
-        }
 
 
 
 
-        double timeInterpCoef_(double const afterPushTime, std::size_t levelNumber)
-        {
-            return (afterPushTime - beforePushCoarseTime_[levelNumber])
-                   / (afterPushCoarseTime_[levelNumber] - beforePushCoarseTime_[levelNumber]);
-        }
+            /**
+             * @brief prepareStep is the concrete implementation of the
+             * HybridMessengerStrategy::prepareStep method For hybrid-Hybrid communications.
+             * This method copies the  density J, and the density and bulk velocity, defined at
+             * t=n. Since prepareStep() is called just before advancing the level, this
+             * operation actually saves the t=n versions of J, Ni, Vi into the messenger. When
+             * the time comes that the next finer level needs to time interpolate the
+             * electromagnetic field and current at its ghost nodes, this level will be able to
+             * interpolate at required time because the t=n Vi,Ni,J fields of previous next
+             * coarser step will be in the messenger.
+             */
+            void prepareStep(IPhysicalModel & model, level_t & level, double currentTime) override
+            {
+                PHARE_LOG_SCOPE(3, "HybridHybridMessengerStrategy::prepareStep");
+
+                auto& hybridModel = static_cast<HybridModel&>(model);
+                for (auto& patch : level)
+                {
+                    auto dataOnPatch = resourcesManager_->setOnPatch(
+                        *patch, hybridModel.state.electromag, hybridModel.state.J,
+                        hybridModel.state.ions, Jold_, NiOld_, ViOld_);
+
+                    resourcesManager_->setTime(Jold_, *patch, currentTime);
+                    resourcesManager_->setTime(NiOld_, *patch, currentTime);
+                    resourcesManager_->setTime(ViOld_, *patch, currentTime);
+
+                    auto& J  = hybridModel.state.J;
+                    auto& Vi = hybridModel.state.ions.velocity();
+                    auto& Ni = hybridModel.state.ions.chargeDensity();
+                    auto& E  = hybridModel.state.electromag.E;
+
+                    Jold_.copyData(J);
+                    ViOld_.copyData(Vi);
+                    NiOld_.copyData(Ni);
+                }
+            }
 
 
 
 
-        void magneticRegriding_(std::shared_ptr<hierarchy_t> const& hierarchy,
-                                std::shared_ptr<level_t> const& level,
-                                std::shared_ptr<level_t> const& oldLevel, HybridModel& hybridModel,
-                                double const initDataTime)
-        {
-            auto magSchedule = BregridAlgo.createSchedule(
-                level, oldLevel, level->getNextCoarserHierarchyLevelNumber(), hierarchy,
-                &magneticRefinePatchStrategy_);
-            magSchedule->fillData(initDataTime);
-        }
+            void fillRootGhosts(IPhysicalModel & model, level_t & level, double const initDataTime)
+                override
+            {
+                auto levelNumber = level.getLevelNumber();
+                assert(levelNumber == 0);
 
+                auto& hybridModel = static_cast<HybridModel&>(model);
 
-        /** * @brief setNaNsFieldOnGhosts sets NaNs on the ghost nodes of the field
-         *
-         * NaNs are set on all ghost nodes, patch ghost or level ghost nodes
-         * so that the refinement operators can know nodes at NaN have not been
-         * touched by schedule copy.
-         *
-         * This is needed when the schedule copy is done before refinement
-         * as a result of FieldVariable::fineBoundaryRepresentsVariable=false
-         */
-        void setNaNsOnFieldGhosts(FieldT& field, patch_t const& patch)
-        {
-            auto const qty         = field.physicalQuantity();
-            using qty_t            = std::decay_t<decltype(qty)>;
-            using field_geometry_t = FieldGeometry<GridLayoutT, qty_t>;
+                elecSharedNodesRefiners_.fill(hybridModel.state.electromag.E, levelNumber,
+                                              initDataTime);
 
-            auto const box    = patch.getBox();
-            auto const layout = layoutFromPatch<GridLayoutT>(patch);
+                elecGhostsRefiners_.fill(hybridModel.state.electromag.E, levelNumber, initDataTime);
+                patchGhostPartRefiners_.fill(levelNumber, initDataTime);
 
-            // we need to remove the box from the ghost box
-            // to use SAMRAI::removeIntersections we do some conversions to
-            // samrai box.
-            // not gbox is a fieldBox (thanks to the layout)
-
-            auto const gbox  = layout.AMRGhostBoxFor(field.physicalQuantity());
-            auto const sgbox = samrai_box_from(gbox);
-            auto const fbox  = field_geometry_t::toFieldBox(box, qty, layout);
-
-            // we have field samrai boxes so we can now remove one from the other
-            SAMRAI::hier::BoxContainer ghostLayerBoxes{};
-            ghostLayerBoxes.removeIntersections(sgbox, fbox);
-
-            // and now finally set the NaNs on the ghost boxes
-            for (auto const& gb : ghostLayerBoxes)
-                for (auto const& index : layout.AMRToLocal(phare_box_from<dimension>(gb)))
-                    field(index) = std::numeric_limits<typename VecFieldT::value_type>::quiet_NaN();
-        }
-
-        void setNaNsOnFieldGhosts(FieldT& field, level_t const& level)
-        {
-            for (auto& patch : resourcesManager_->enumerate(level, field))
-                setNaNsOnFieldGhosts(field, *patch);
-        }
-
-        void setNaNsOnVecfieldGhosts(VecFieldT& vf, level_t const& level)
-        {
-            for (auto& patch : resourcesManager_->enumerate(level, vf))
-                for (auto& component : vf)
-                    setNaNsOnFieldGhosts(component, *patch);
-        }
-
-
-        VecFieldT Jold_{stratName + "_Jold", core::HybridQuantity::Vector::J};
-        VecFieldT ViOld_{stratName + "_VBulkOld", core::HybridQuantity::Vector::V};
-        FieldT NiOld_{stratName + "_NiOld", core::HybridQuantity::Scalar::rho};
-
-        TensorFieldT sumTensor_{"PHARE_sumTensor", core::HybridQuantity::Tensor::M};
-        VecFieldT sumVec_{"PHARE_sumVec", core::HybridQuantity::Vector::V};
-        FieldT sumField_{"PHARE_sumField", core::HybridQuantity::Scalar::rho};
+                // at some point in the future levelGhostParticles could be filled with injected
+                // particles depending on the domain boundary condition.
+                //
+                // Do we need J ghosts filled here?
+                // This method is only called when root level is initialized
+                // but J ghosts are needed a priori for the laplacian when the first Ohm is
+                // calculated so I think we do, not having them here is just having the
+                // laplacian wrong on L0 borders for the initial E, which is not the end of the
+                // world...
+                //
+                // do we need moment ghosts filled here?
+                // a priori no because those are at this time only needed for coarsening, which
+                // will not happen before the first advance
+            }
 
 
 
-        //! ResourceManager shared with other objects (like the HybridModel)
-        std::shared_ptr<ResourcesManagerT> resourcesManager_;
+            void synchronize(level_t & level) override
+            {
+                PHARE_LOG_SCOPE(3, "HybridHybridMessengerStrategy::synchronize");
+
+                auto levelNumber = level.getLevelNumber();
+                PHARE_LOG_LINE_STR("synchronizing level " + std::to_string(levelNumber));
+
+                // call coarsning schedules...
+                electroSynchronizers_.sync(levelNumber);
+                densitySynchronizers_.sync(levelNumber);
+                ionBulkVelSynchronizers_.sync(levelNumber);
+
+                PHARE_DEBUG_SCOPE("HyHyMessStrat/after_sync/");
+                PHARE_DEBUG_CHECK_LEVEL(GridLayoutT, *resourcesManager_, level);
+            }
 
 
-        int const firstLevel_;
-        std::unordered_map<std::size_t, double> beforePushCoarseTime_;
-        std::unordered_map<std::size_t, double> afterPushCoarseTime_;
+            void reflux(int const coarserLevelNumber, int const fineLevelNumber,
+                        double const syncTime) override
+            {
+                refluxSchedules[fineLevelNumber]->coarsenData();
+                patchGhostRefluxedSchedules[coarserLevelNumber]->fillData(syncTime);
+            }
 
-        core::Interpolator<dimension, interpOrder> interpolate_;
+            // after coarsening, domain nodes have been updated and therefore patch ghost nodes
+            // will probably stop having the exact same value as their overlapped neighbor
+            // domain node we thus fill ghost nodes. note that we first fill shared border nodes
+            // with the sharedNode refiners so that these shared nodes agree on their value at
+            // MPI process boundaries. then regular refiner fill are called, which fill only
+            // pure ghost nodes. note also that moments are not filled on border nodes since
+            // already OK from particle deposition
+            void postSynchronize(IPhysicalModel & model, level_t & level, double const time)
+                override
+            {
+                auto levelNumber  = level.getLevelNumber();
+                auto& hybridModel = static_cast<HybridModel&>(model);
 
-        using rm_t                    = ResourcesManagerT;
-        using RefineOperator          = SAMRAI::hier::RefineOperator;
-        using TimeInterpolateOperator = SAMRAI::hier::TimeInterpolateOperator;
+                PHARE_LOG_LINE_STR("postSynchronize level " + std::to_string(levelNumber))
 
-        // these refiners are used to initialize electromagnetic fields when creating
-        // a new level (initLevel) or regridding (regrid)
-        using InitRefinerPool             = RefinerPool<rm_t, RefinerType::InitField>;
-        using GhostRefinerPool            = RefinerPool<rm_t, RefinerType::GhostField>;
-        using InitDomPartRefinerPool      = RefinerPool<rm_t, RefinerType::InitInteriorPart>;
-        using DomainGhostPartRefinerPool  = RefinerPool<rm_t, RefinerType::ExteriorGhostParticles>;
-        using FieldGhostSumRefinerPool    = RefinerPool<rm_t, RefinerType::PatchFieldBorderSum>;
-        using VecFieldGhostSumRefinerPool = RefinerPool<rm_t, RefinerType::PatchVecFieldBorderSum>;
-        using FieldFillPattern_t          = FieldFillPattern<dimension>;
-        using TensorFieldFillPattern_t    = TensorFieldFillPattern<dimension /*, rank=1*/>;
+                magSharedNodeRefineSchedules[levelNumber]->fillData(time);
+                elecSharedNodesRefiners_.fill(hybridModel.state.electromag.E, levelNumber, time);
 
-        //! += flux on ghost box overlap incomplete population moment nodes
-        std::vector<VecFieldGhostSumRefinerPool> popFluxBorderSumRefiners_;
-        //! += density on ghost box overlap incomplete population moment nodes
-        std::vector<FieldGhostSumRefinerPool> popDensityBorderSumRefiners_;
+                // we fill magnetic field ghosts only on patch ghost nodes and not on level
+                // ghosts the reason is that 1/ filling ghosts is necessary to prevent mismatch
+                // between ghost and overlaped neighboring patch domain nodes resulting from
+                // former coarsening which does not occur for level ghosts and 2/ overwriting
+                // level border with next coarser model B would invalidate divB on the first
+                // fine domain cell since its border face only received a fraction of the
+                // induction that has occured on the shared coarse face.
+                // magPatchGhostsRefineSchedules[levelNumber]->fillData(time);
+                elecGhostsRefiners_.fill(hybridModel.state.electromag.E, levelNumber, time);
+                rhoGhostsRefiners_.fill(levelNumber, time);
+                velGhostsRefiners_.fill(hybridModel.state.ions.velocity(), levelNumber, time);
 
-        InitRefinerPool electricInitRefiners_{resourcesManager_};
+                PHARE_DEBUG_SCOPE("HyHyMessStrat/post_sync/after/");
+                PHARE_DEBUG_CHECK_LEVEL(GridLayoutT, *resourcesManager_, level);
+            }
 
+        private:
+            void registerGhostComms_(std::unique_ptr<HybridMessengerInfo> const& info)
+            {
+                auto makeKeys = [](auto const& vecFieldNames) {
+                    std::vector<std::string> keys;
+                    std::transform(std::begin(vecFieldNames), std::end(vecFieldNames),
+                                   std::back_inserter(keys),
+                                   [](auto const& d) { return d.vecName; });
+                    return keys;
+                };
 
-        SAMRAI::xfer::RefineAlgorithm BalgoPatchGhost;
-        SAMRAI::xfer::RefineAlgorithm BalgoInit;
-        SAMRAI::xfer::RefineAlgorithm BregridAlgo;
-        SAMRAI::xfer::RefineAlgorithm EalgoPatchGhost;
-        std::map<int, std::shared_ptr<SAMRAI::xfer::RefineSchedule>> magInitRefineSchedules;
-        std::map<int, std::shared_ptr<SAMRAI::xfer::RefineSchedule>> magPatchGhostsRefineSchedules;
-        std::map<int, std::shared_ptr<SAMRAI::xfer::RefineSchedule>> elecPatchGhostsRefineSchedules;
+                elecSharedNodesRefiners_.addStaticRefiners(info->ghostElectric, EfieldNodeRefineOp_,
+                                                           makeKeys(info->ghostElectric));
 
-        SAMRAI::xfer::CoarsenAlgorithm RefluxAlgo{SAMRAI::tbox::Dimension{dimension}};
-        SAMRAI::xfer::RefineAlgorithm PatchGhostRefluxedAlgo;
-        std::map<int, std::shared_ptr<SAMRAI::xfer::CoarsenSchedule>> refluxSchedules;
-        std::map<int, std::shared_ptr<SAMRAI::xfer::RefineSchedule>> patchGhostRefluxedSchedules;
+                elecGhostsRefiners_.addStaticRefiners(info->ghostElectric, EfieldRefineOp_,
+                                                      info->ghostElectric,
+                                                      nonOverwriteInteriorTFfillPattern);
 
-        //! store refiners for electric fields that need ghosts to be filled
-        GhostRefinerPool elecGhostsRefiners_{resourcesManager_};
-
-        GhostRefinerPool currentGhostsRefiners_{resourcesManager_};
-
-        // moment ghosts
-        // The border node is already complete by the deposit of ghost particles
-        // these refiners are used to fill ghost nodes, and therefore, owing to
-        // the GhostField tag, will only assign pure ghost nodes. Border nodes will
-        // be overwritten only on level borders, which does not seem to be an issue.
-        GhostRefinerPool chargeDensityGhostsRefiners_{resourcesManager_};
-        GhostRefinerPool velGhostsRefiners_{resourcesManager_};
-
-        // pool of refiners for interior particles of each population
-        // and the associated refinement operator
-        InitDomPartRefinerPool domainParticlesRefiners_{resourcesManager_};
-
-        using RefOp_ptr = std::shared_ptr<RefineOperator>;
-
-        RefOp_ptr interiorParticleRefineOp_{std::make_shared<InteriorParticleRefineOp>()};
-
-        //! store communicators for coarse to fine particles old
-        // pools of refiners to fill level ghost particles, old and new ones
-        // and their associated refinement operator
-        static auto constexpr LGRefT = RefinerType::LevelBorderParticles;
-        RefinerPool<rm_t, LGRefT> lvlGhostPartOldRefiners_{resourcesManager_};
-        RefinerPool<rm_t, LGRefT> lvlGhostPartNewRefiners_{resourcesManager_};
-        RefOp_ptr levelGhostParticlesOldOp_{std::make_shared<CoarseToFineRefineOpOld>()};
-        RefOp_ptr levelGhostParticlesNewOp_{std::make_shared<CoarseToFineRefineOpNew>()};
+                currentGhostsRefiners_.addTimeRefiners(
+                    info->ghostCurrent, info->modelCurrent, Jold_.name(), EfieldRefineOp_,
+                    vecFieldTimeOp_, nonOverwriteInteriorTFfillPattern);
 
 
-        //! to grab particle leaving neighboring patches and inject into domain
-        DomainGhostPartRefinerPool domainGhostPartRefiners_{resourcesManager_};
-
-        SynchronizerPool<rm_t> chargeDensitySynchronizers_{resourcesManager_};
-        SynchronizerPool<rm_t> ionBulkVelSynchronizers_{resourcesManager_};
-        SynchronizerPool<rm_t> electroSynchronizers_{resourcesManager_};
+                rhoGhostsRefiners_.addTimeRefiner(info->modelIonDensity, info->modelIonDensity,
+                                                  NiOld_.name(), fieldRefineOp_, fieldTimeOp_,
+                                                  info->modelIonDensity);
 
 
-        RefOp_ptr fieldRefineOp_{std::make_shared<DefaultFieldRefineOp>()};
-        RefOp_ptr vecFieldRefineOp_{std::make_shared<DefaultVecFieldRefineOp>()};
-
-        RefOp_ptr BfieldRefineOp_{std::make_shared<MagneticFieldRefineOp>()};
-        RefOp_ptr BfieldRegridOp_{std::make_shared<MagneticFieldRegridOp>()};
-        RefOp_ptr EfieldRefineOp_{std::make_shared<ElectricFieldRefineOp>()};
-        std::shared_ptr<FieldFillPattern_t> defaultFieldFillPattern
-            = std::make_shared<FieldFillPattern<dimension>>(); // stateless (mostly)
-
-        std::shared_ptr<TensorFieldFillPattern_t> nonOverwriteInteriorTFfillPattern
-            = std::make_shared<TensorFieldFillPattern<dimension /*, rank=1*/>>();
-
-        std::shared_ptr<TensorFieldFillPattern_t> overwriteInteriorTFfillPattern
-            = std::make_shared<TensorFieldFillPattern<dimension /*, rank=1*/>>(
-                /*overwrite_interior=*/true);
-
-        std::shared_ptr<TimeInterpolateOperator> fieldTimeOp_{std::make_shared<FieldTimeInterp>()};
-        std::shared_ptr<TimeInterpolateOperator> vecFieldTimeOp_{
-            std::make_shared<VecFieldTimeInterp>()};
-
-        using CoarsenOperator_ptr = std::shared_ptr<SAMRAI::hier::CoarsenOperator>;
-        CoarsenOperator_ptr fieldCoarseningOp_{std::make_shared<DefaultFieldCoarsenOp>()};
-        CoarsenOperator_ptr vecFieldCoarseningOp_{std::make_shared<DefaultVecFieldCoarsenOp>()};
-        CoarsenOperator_ptr electricFieldCoarseningOp_{std::make_shared<ElectricFieldCoarsenOp>()};
-
-        MagneticRefinePatchStrategy<ResourcesManagerT, VectorFieldDataT>
-            magneticRefinePatchStrategy_{*resourcesManager_};
-    };
+                velGhostsRefiners_.addTimeRefiners(
+                    info->ghostBulkVelocity, info->modelIonBulkVelocity, ViOld_.name(),
+                    vecFieldRefineOp_, vecFieldTimeOp_, nonOverwriteInteriorTFfillPattern);
+            }
 
 
-} // namespace amr
+
+
+            void registerInitComms(std::unique_ptr<HybridMessengerInfo> const& info)
+            {
+                auto b_id = resourcesManager_->getID(info->modelMagnetic);
+                BalgoInit.registerRefine(*b_id, *b_id, *b_id, BfieldRefineOp_,
+                                         overwriteInteriorTFfillPattern);
+
+                // no fill pattern given for this init
+                // will use boxgeometryvariable fillpattern, itself using the
+                // gield geometry with overwrit_interior true from SAMRAI
+                // we could set the overwriteInteriorTFfillPattern it would be the same
+
+                electricInitRefiners_.addStaticRefiners(info->initElectric, EfieldRefineOp_,
+                                                        info->initElectric);
+
+
+                domainParticlesRefiners_.addStaticRefiners(
+                    info->interiorParticles, interiorParticleRefineOp_, info->interiorParticles);
+
+
+                lvlGhostPartOldRefiners_.addStaticRefiners(info->levelGhostParticlesOld,
+                                                           levelGhostParticlesOldOp_,
+                                                           info->levelGhostParticlesOld);
+
+
+                lvlGhostPartNewRefiners_.addStaticRefiners(info->levelGhostParticlesNew,
+                                                           levelGhostParticlesNewOp_,
+                                                           info->levelGhostParticlesNew);
+
+
+
+                domainGhostPartRefiners_.addStaticRefiners(
+                    info->patchGhostParticles, nullptr, info->patchGhostParticles,
+                    std::make_shared<ParticleDomainFromGhostFillPattern<GridLayoutT>>());
+
+
+                for (auto const& vecfield : info->ghostFlux)
+                {
+                    popFluxBorderSumRefiners_.emplace_back(resourcesManager_)
+                        .addStaticRefiner(sumVec_.name(), vecfield, nullptr, sumVec_.name(),
+                                          std::make_shared<TensorFieldGhostInterpOverlapFillPattern<
+                                              GridLayoutT, /*rank_=*/1>>());
+                }
+
+                for (auto const& field : info->sumBorderFields)
+                    popDensityBorderSumRefiners_.emplace_back(resourcesManager_)
+                        .addStaticRefiner(
+                            sumField_.name(), field, nullptr, sumField_.name(),
+                            std::make_shared<FieldGhostInterpOverlapFillPattern<GridLayoutT>>());
+            }
+
+
+
+
+            void registerSyncComms(std::unique_ptr<HybridMessengerInfo> const& info)
+            {
+                electroSynchronizers_.add(info->modelElectric, electricFieldCoarseningOp_,
+                                          info->modelElectric);
+
+                ionBulkVelSynchronizers_.add(info->modelIonBulkVelocity, vecFieldCoarseningOp_,
+                                             info->modelIonBulkVelocity);
+
+                densitySynchronizers_.add(info->modelIonDensity, fieldCoarseningOp_,
+                                          info->modelIonDensity);
+            }
+
+
+
+
+            void copyLevelGhostOldToPushable_(level_t & level, IPhysicalModel & model)
+            {
+                auto& hybridModel = static_cast<HybridModel&>(model);
+                for (auto& patch : level)
+                {
+                    auto& ions       = hybridModel.state.ions;
+                    auto dataOnPatch = resourcesManager_->setOnPatch(*patch, ions);
+                    for (auto& pop : ions)
+                    {
+                        auto& levelGhostParticlesOld = pop.levelGhostParticlesOld();
+                        auto& levelGhostParticles    = pop.levelGhostParticles();
+
+                        levelGhostParticles = levelGhostParticlesOld;
+                    }
+                }
+            }
+
+
+
+
+            double timeInterpCoef_(double const afterPushTime, std::size_t levelNumber)
+            {
+                return (afterPushTime - beforePushCoarseTime_[levelNumber])
+                       / (afterPushCoarseTime_[levelNumber] - beforePushCoarseTime_[levelNumber]);
+            }
+
+
+
+
+            void magneticRegriding_(std::shared_ptr<hierarchy_t> const& hierarchy,
+                                    std::shared_ptr<level_t> const& level,
+                                    std::shared_ptr<level_t> const& oldLevel,
+                                    HybridModel& hybridModel, double const initDataTime)
+            {
+                auto magSchedule = BregridAlgo.createSchedule(
+                    level, oldLevel, level->getNextCoarserHierarchyLevelNumber(), hierarchy,
+                    &magneticRefinePatchStrategy_);
+                magSchedule->fillData(initDataTime);
+            }
+
+
+            /** * @brief setNaNsFieldOnGhosts sets NaNs on the ghost nodes of the field
+             *
+             * NaNs are set on all ghost nodes, patch ghost or level ghost nodes
+             * so that the refinement operators can know nodes at NaN have not been
+             * touched by schedule copy.
+             *
+             * This is needed when the schedule copy is done before refinement
+             * as a result of FieldVariable::fineBoundaryRepresentsVariable=false
+             */
+            void setNaNsOnFieldGhosts(FieldT & field, patch_t const& patch)
+            {
+                auto const qty         = field.physicalQuantity();
+                using qty_t            = std::decay_t<decltype(qty)>;
+                using field_geometry_t = FieldGeometry<GridLayoutT, qty_t>;
+
+                auto const box    = patch.getBox();
+                auto const layout = layoutFromPatch<GridLayoutT>(patch);
+
+                // we need to remove the box from the ghost box
+                // to use SAMRAI::removeIntersections we do some conversions to
+                // samrai box.
+                // not gbox is a fieldBox (thanks to the layout)
+
+                auto const gbox  = layout.AMRGhostBoxFor(field.physicalQuantity());
+                auto const sgbox = samrai_box_from(gbox);
+                auto const fbox  = field_geometry_t::toFieldBox(box, qty, layout);
+
+                // we have field samrai boxes so we can now remove one from the other
+                SAMRAI::hier::BoxContainer ghostLayerBoxes{};
+                ghostLayerBoxes.removeIntersections(sgbox, fbox);
+
+                // and now finally set the NaNs on the ghost boxes
+                for (auto const& gb : ghostLayerBoxes)
+                    for (auto const& index : layout.AMRToLocal(phare_box_from<dimension>(gb)))
+                        field(index)
+                            = std::numeric_limits<typename VecFieldT::value_type>::quiet_NaN();
+            }
+
+            void setNaNsOnFieldGhosts(FieldT & field, level_t const& level)
+            {
+                for (auto& patch : resourcesManager_->enumerate(level, field))
+                    setNaNsOnFieldGhosts(field, *patch);
+            }
+
+            void setNaNsOnVecfieldGhosts(VecFieldT & vf, level_t const& level)
+            {
+                for (auto& patch : resourcesManager_->enumerate(level, vf))
+                    for (auto& component : vf)
+                        setNaNsOnFieldGhosts(component, *patch);
+            }
+
+
+            VecFieldT Jold_{stratName + "_Jold", core::HybridQuantity::Vector::J};
+            VecFieldT ViOld_{stratName + "_VBulkOld", core::HybridQuantity::Vector::V};
+            FieldT NiOld_{stratName + "_NiOld", core::HybridQuantity::Scalar::rho};
+
+
+            //! ResourceManager shared with other objects (like the HybridModel)
+            std::shared_ptr<ResourcesManagerT> resourcesManager_;
+
+
+            int const firstLevel_;
+            std::unordered_map<std::size_t, double> beforePushCoarseTime_;
+            std::unordered_map<std::size_t, double> afterPushCoarseTime_;
+
+            core::Interpolator<dimension, interpOrder> interpolate_;
+
+            using rm_t                    = ResourcesManagerT;
+            using RefineOperator          = SAMRAI::hier::RefineOperator;
+            using TimeInterpolateOperator = SAMRAI::hier::TimeInterpolateOperator;
+
+            // these refiners are used to initialize electromagnetic fields when creating
+            // a new level (initLevel) or regridding (regrid)
+
+            using InitRefinerPool        = RefinerPool<rm_t, RefinerType::InitField>;
+            using GhostRefinerPool       = RefinerPool<rm_t, RefinerType::GhostField>;
+            using InitDomPartRefinerPool = RefinerPool<rm_t, RefinerType::InitInteriorPart>;
+            using DomainGhostPartRefinerPool
+                = RefinerPool<rm_t, RefinerType::ExteriorGhostParticles>;
+            using FieldGhostSumRefinerPool = RefinerPool<rm_t, RefinerType::PatchFieldBorderSum>;
+            using VecFieldGhostSumRefinerPool
+                = RefinerPool<rm_t, RefinerType::PatchVecFieldBorderSum>;
+            using FieldFillPattern_t       = FieldFillPattern<dimension>;
+            using TensorFieldFillPattern_t = TensorFieldFillPattern<dimension /*, rank=1*/>;
+
+            //! += flux on ghost box overlap incomplete population moment nodes
+            std::vector<VecFieldGhostSumRefinerPool> popFluxBorderSumRefiners_;
+            //! += density on ghost box overlap incomplete population moment nodes
+            std::vector<FieldGhostSumRefinerPool> popDensityBorderSumRefiners_;
+
+            InitRefinerPool electricInitRefiners_{resourcesManager_};
+
+
+            SAMRAI::xfer::RefineAlgorithm BalgoPatchGhost;
+            SAMRAI::xfer::RefineAlgorithm BalgoInit;
+            SAMRAI::xfer::RefineAlgorithm BregridAlgo;
+            SAMRAI::xfer::RefineAlgorithm EalgoPatchGhost;
+            std::map<int, std::shared_ptr<SAMRAI::xfer::RefineSchedule>> magInitRefineSchedules;
+            std::map<int, std::shared_ptr<SAMRAI::xfer::RefineSchedule>>
+                magPatchGhostsRefineSchedules;
+            std::map<int, std::shared_ptr<SAMRAI::xfer::RefineSchedule>>
+                elecPatchGhostsRefineSchedules;
+            std::map<int, std::shared_ptr<SAMRAI::xfer::RefineSchedule>>
+                magSharedNodeRefineSchedules;
+
+            SAMRAI::xfer::CoarsenAlgorithm RefluxAlgo{SAMRAI::tbox::Dimension{dimension}};
+            SAMRAI::xfer::RefineAlgorithm PatchGhostRefluxedAlgo;
+            std::map<int, std::shared_ptr<SAMRAI::xfer::CoarsenSchedule>> refluxSchedules;
+            std::map<int, std::shared_ptr<SAMRAI::xfer::RefineSchedule>>
+                patchGhostRefluxedSchedules;
+
+            //! store refiners for electric fields that need ghosts to be filled
+            SharedNodeRefinerPool elecSharedNodesRefiners_{resourcesManager_};
+            GhostRefinerPool elecGhostsRefiners_{resourcesManager_};
+
+            GhostRefinerPool currentSharedNodesRefiners_{resourcesManager_};
+            GhostRefinerPool currentGhostsRefiners_{resourcesManager_};
+
+            // moment ghosts
+            // these do not need sharedNode refiners. The reason is that
+            // the border node is already complete by the deposit of ghost particles
+            // these refiners are used to fill ghost nodes, and therefore, owing to
+            // the GhostField tag, will only assign pur ghost nodes. Border nodes will
+            // be overwritten only on level borders, which does not seem to be an issue.
+            GhostRefinerPool rhoGhostsRefiners_{resourcesManager_};
+            GhostRefinerPool velGhostsRefiners_{resourcesManager_};
+
+            // pool of refiners for interior particles of each population
+            // and the associated refinement operator
+            InitDomPartRefinerPool domainParticlesRefiners_{resourcesManager_};
+
+            using RefOp_ptr = std::shared_ptr<RefineOperator>;
+
+            RefOp_ptr interiorParticleRefineOp_{std::make_shared<InteriorParticleRefineOp>()};
+
+            //! store communicators for coarse to fine particles old
+            // pools of refiners to fill level ghost particles, old and new ones
+            // and their associated refinement operator
+            static auto constexpr LGRefT = RefinerType::LevelBorderParticles;
+            RefinerPool<rm_t, LGRefT> lvlGhostPartOldRefiners_{resourcesManager_};
+            RefinerPool<rm_t, LGRefT> lvlGhostPartNewRefiners_{resourcesManager_};
+            RefOp_ptr levelGhostParticlesOldOp_{std::make_shared<CoarseToFineRefineOpOld>()};
+            RefOp_ptr levelGhostParticlesNewOp_{std::make_shared<CoarseToFineRefineOpNew>()};
+
+
+            // this contains refiners for each population to exchange patch ghost particles
+            PatchGhostPartRefinerPool patchGhostPartRefiners_{resourcesManager_};
+
+            SynchronizerPool<rm_t> densitySynchronizers_{resourcesManager_};
+            SynchronizerPool<rm_t> ionBulkVelSynchronizers_{resourcesManager_};
+            SynchronizerPool<rm_t> electroSynchronizers_{resourcesManager_};
+
+
+            RefOp_ptr fieldRefineOp_{std::make_shared<DefaultFieldRefineOp>()};
+            RefOp_ptr vecFieldRefineOp_{std::make_shared<DefaultVecFieldRefineOp>()};
+
+            RefOp_ptr BfieldRefineOp_{std::make_shared<MagneticFieldRefineOp>()};
+            RefOp_ptr BfieldRegridOp_{std::make_shared<MagneticFieldRegridOp>()};
+            RefOp_ptr EfieldRefineOp_{std::make_shared<ElectricFieldRefineOp>()};
+
+            std::shared_ptr<TensorFieldFillPattern_t> nonOverwriteInteriorTFfillPattern
+                = std::make_shared<TensorFieldFillPattern<dimension /*, rank=1*/>>();
+
+            std::shared_ptr<TensorFieldFillPattern_t> overwriteInteriorTFfillPattern
+                = std::make_shared<TensorFieldFillPattern<dimension /*, rank=1*/>>(
+                    /*overwrite_interior=*/true);
+
+            std::shared_ptr<TimeInterpolateOperator> fieldTimeOp_{
+                std::make_shared<FieldTimeInterp>()};
+            std::shared_ptr<TimeInterpolateOperator> vecFieldTimeOp_{
+                std::make_shared<VecFieldTimeInterp>()};
+
+            using CoarsenOperator_ptr = std::shared_ptr<SAMRAI::hier::CoarsenOperator>;
+            CoarsenOperator_ptr fieldCoarseningOp_{std::make_shared<DefaultFieldCoarsenOp>()};
+            CoarsenOperator_ptr vecFieldCoarseningOp_{std::make_shared<DefaultVecFieldCoarsenOp>()};
+            CoarsenOperator_ptr electricFieldCoarseningOp_{
+                std::make_shared<ElectricFieldCoarsenOp>()};
+
+            MagneticRefinePatchStrategy<ResourcesManagerT, VectorFieldDataT>
+                magneticRefinePatchStrategy_{*resourcesManager_};
+        };
+
+
+    } // namespace amr
 
 } // namespace PHARE
 
