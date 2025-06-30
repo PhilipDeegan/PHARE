@@ -2,6 +2,7 @@
 #define PHARE_HYBRID_HYBRID_MESSENGER_STRATEGY_HPP
 
 #include "core/def.hpp"
+#include "core/debug.hpp"
 #include "core/logger.hpp"
 #include "core/def/phare_mpi.hpp"
 
@@ -321,6 +322,9 @@ namespace amr
             // overlaps an old level patch border. See https://github.com/LLNL/SAMRAI/pull/293
             magPatchGhostsRefineSchedules[levelNumber]->fillData(initDataTime);
             elecPatchGhostsRefineSchedules[levelNumber]->fillData(initDataTime);
+
+            PHARE_DEBUG_SCOPE("HyHyMessStrat/regrid/");
+            PHARE_DEBUG_CHECK_LEVEL(GridLayoutT, *resourcesManager_, *level);
         }
 
         std::string fineModelName() const override { return HybridModel::model_name; }
@@ -460,22 +464,25 @@ namespace amr
                 for (auto& pop : ions)
                 {
                     // first thing to do is to project patchGhostParitcles moments
-                    auto& patchGhosts = pop.patchGhostParticles();
-                    auto& particleDensity     = pop.particleDensity();
-                    auto& chargeDensity     = pop.chargeDensity();
-                    auto& flux        = pop.flux();
+                    auto& patchGhosts     = pop.patchGhostParticles();
+                    auto& particleDensity = pop.particleDensity();
+                    auto& chargeDensity   = pop.chargeDensity();
+                    auto& flux            = pop.flux();
 
-                    interpolate_(makeRange(patchGhosts), particleDensity, chargeDensity, flux, layout);
+                    interpolate_(makeRange(patchGhosts), particleDensity, chargeDensity, flux,
+                                 layout);
 
                     if (level.getLevelNumber() > 0) // no levelGhost on root level
                     {
                         // then grab levelGhostParticlesOld and levelGhostParticlesNew
                         // and project them with alpha and (1-alpha) coefs, respectively
                         auto& levelGhostOld = pop.levelGhostParticlesOld();
-                        interpolate_(makeRange(levelGhostOld), particleDensity, chargeDensity, flux, layout, 1. - alpha);
+                        interpolate_(makeRange(levelGhostOld), particleDensity, chargeDensity, flux,
+                                     layout, 1. - alpha);
 
                         auto& levelGhostNew = pop.levelGhostParticlesNew();
-                        interpolate_(makeRange(levelGhostNew), particleDensity, chargeDensity, flux, layout, alpha);
+                        interpolate_(makeRange(levelGhostNew), particleDensity, chargeDensity, flux,
+                                     layout, alpha);
                     }
                 }
             }
@@ -490,6 +497,7 @@ namespace amr
         virtual void fillIonMomentGhosts(IonsT& ions, SAMRAI::hier::PatchLevel& level,
                                          double const afterPushTime) override
         {
+            PHARE_LOG_SCOPE(3, "HybridHybridMessengerStrategy::fillIonMomentGhosts");
             rhoGhostsRefiners_.fill(level.getLevelNumber(), afterPushTime);
             velGhostsRefiners_.fill(level.getLevelNumber(), afterPushTime);
         }
@@ -650,6 +658,9 @@ namespace amr
             electroSynchronizers_.sync(levelNumber);
             densitySynchronizers_.sync(levelNumber);
             ionBulkVelSynchronizers_.sync(levelNumber);
+
+            PHARE_DEBUG_SCOPE("HyHyMessStrat/after_sync/");
+            PHARE_DEBUG_CHECK_LEVEL(GridLayoutT, *resourcesManager_, level);
         }
 
         // after coarsening, domain nodes have been updated and therefore patch ghost nodes
@@ -681,6 +692,9 @@ namespace amr
             elecGhostsRefiners_.fill(hybridModel.state.electromag.E, levelNumber, time);
             rhoGhostsRefiners_.fill(levelNumber, time);
             velGhostsRefiners_.fill(hybridModel.state.ions.velocity(), levelNumber, time);
+
+            PHARE_DEBUG_SCOPE("HyHyMessStrat/post_sync/after/");
+            PHARE_DEBUG_CHECK_LEVEL(GridLayoutT, *resourcesManager_, level);
         }
 
     private:
