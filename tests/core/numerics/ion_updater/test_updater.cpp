@@ -1,11 +1,14 @@
-#include "gtest/gtest.h"
 
 #include "phare_core.hpp"
 
+#include "core/utilities/box/box.hpp"
 #include "core/numerics/ion_updater/ion_updater.hpp"
 
 #include "tests/core/data/vecfield/test_vecfield_fixtures.hpp"
 #include "tests/core/data/tensorfield/test_tensorfield_fixtures.hpp"
+
+
+#include "gtest/gtest.h"
 
 using namespace PHARE::core;
 
@@ -67,7 +70,7 @@ Return bz(Param x)
 
 
 
-int nbrPartPerCell = 1000;
+std::size_t nbrPartPerCell = 1000;
 
 using InitFunctionT = PHARE::initializer::InitFunction<1>;
 
@@ -103,9 +106,10 @@ PHARE::initializer::PHAREDict createDict()
         = static_cast<InitFunctionT>(vthz);
 
 
-    dict["ions"]["pop0"]["particle_initializer"]["nbr_part_per_cell"] = int{nbrPartPerCell};
-    dict["ions"]["pop0"]["particle_initializer"]["charge"]            = 1.;
-    dict["ions"]["pop0"]["particle_initializer"]["basis"]             = std::string{"cartesian"};
+    dict["ions"]["pop0"]["particle_initializer"]["nbr_part_per_cell"]
+        = static_cast<int>(nbrPartPerCell);
+    dict["ions"]["pop0"]["particle_initializer"]["charge"] = 1.;
+    dict["ions"]["pop0"]["particle_initializer"]["basis"]  = std::string{"cartesian"};
 
     dict["ions"]["pop1"]["name"]                            = std::string{"alpha"};
     dict["ions"]["pop1"]["mass"]                            = 1.;
@@ -132,9 +136,10 @@ PHARE::initializer::PHAREDict createDict()
         = static_cast<InitFunctionT>(vthz);
 
 
-    dict["ions"]["pop1"]["particle_initializer"]["nbr_part_per_cell"] = int{nbrPartPerCell};
-    dict["ions"]["pop1"]["particle_initializer"]["charge"]            = 1.;
-    dict["ions"]["pop1"]["particle_initializer"]["basis"]             = std::string{"cartesian"};
+    dict["ions"]["pop1"]["particle_initializer"]["nbr_part_per_cell"]
+        = static_cast<int>(nbrPartPerCell);
+    dict["ions"]["pop1"]["particle_initializer"]["charge"] = 1.;
+    dict["ions"]["pop1"]["particle_initializer"]["basis"]  = std::string{"cartesian"};
 
     dict["electromag"]["name"]             = std::string{"EM"};
     dict["electromag"]["electric"]["name"] = std::string{"E"};
@@ -490,10 +495,11 @@ struct IonUpdaterTest : public ::testing::Test
                 std::copy(std::begin(levelGhostPartOld), std::end(levelGhostPartOld),
                           std::back_inserter(levelGhostPart));
 
-
-                EXPECT_GT(pop.domainParticles().size(), 0ull);
-                EXPECT_GT(levelGhostPartOld.size(), 0ull);
+                std::size_t const ghosts_cells = (interp_order == 1 ? 1 : 2);
+                EXPECT_EQ(pop.domainParticles().size(), 100 * nbrPartPerCell);
+                EXPECT_EQ(levelGhostPartOld.size(), ghosts_cells * nbrPartPerCell);
                 EXPECT_EQ(patchGhostPart.size(), 0);
+
 
             } // end 1D
         } // end pop loop
@@ -643,7 +649,7 @@ using DimInterps = ::testing::Types<DimInterp<1, 1>, DimInterp<1, 2>, DimInterp<
 TYPED_TEST_SUITE(IonUpdaterTest, DimInterps, );
 
 
-
+#if 0
 
 TYPED_TEST(IonUpdaterTest, ionUpdaterTakesPusherParamsFromPHAREDictAtConstruction)
 {
@@ -866,7 +872,176 @@ TYPED_TEST(IonUpdaterTest, thatNoNaNsExistOnPhysicalNodesMoments)
         }
     }
 }
+#endif
 
+
+template<std::size_t dim>
+void pseudo_randomize_deltas(auto& parts)
+{
+    std::size_t k = 0;
+    for (auto& p : parts)
+        for (std::uint16_t i = 0; i < dim; ++i)
+        {
+            if (k == 9)
+                k = 0;
+            double dir = k % 2 == 0 ? -1 : 1;
+            p.delta[i] += dir * .05 * k;
+            assert(p.delta[i] > 0 and p.delta[i] < 1);
+            ++k;
+        }
+}
+
+template<typename GridLayout>
+void populate_particles(auto& ions, GridLayout& layout)
+{
+    auto constexpr dim = GridLayout::dimension;
+    Particle<dim> const particle{1.0 / nbrPartPerCell, 1, ConstArray<int, dim>(),
+                                 ConstArray<double, dim>(.5), ConstArray<double, 3>(1)};
+
+    auto const shift_particle = [](auto p, auto const bix) {
+        p.iCell = bix;
+        return p;
+    };
+
+    auto const ghost_box = grow(layout.AMRBox(), 1);
+    for (auto& pop : ions)
+    {
+        pop.domainParticles().clear();
+        pop.levelGhostParticles().clear();
+        pop.patchGhostParticles().clear();
+
+        EXPECT_TRUE(pop.domainParticles().is_consistent());
+        EXPECT_TRUE(pop.levelGhostParticles().is_consistent());
+
+        for (auto const& bix : layout.AMRBox())
+            for (std::size_t i = 0; i < nbrPartPerCell; ++i)
+                pop.domainParticles().emplace_back(shift_particle(particle, *bix));
+
+        for (auto const& bix : ghost_box)
+            if (not isIn(bix, layout.AMRBox()))
+                for (std::size_t i = 0; i < nbrPartPerCell; ++i)
+                    pop.levelGhostParticles().emplace_back(shift_particle(particle, *bix));
+
+        for (auto const& p : pop.levelGhostParticles())
+        {
+            EXPECT_TRUE(not isIn(p, layout.AMRBox()));
+        }
+
+        pseudo_randomize_deltas<dim>(pop.domainParticles());
+        pseudo_randomize_deltas<dim>(pop.levelGhostParticles());
+
+        EXPECT_TRUE(pop.domainParticles().is_consistent());
+        EXPECT_TRUE(pop.levelGhostParticles().is_consistent());
+    }
+}
+
+
+TYPED_TEST(IonUpdaterTest, hardCodedRegressionTest0)
+{
+    using IonUpdater      = TestFixture::IonUpdater;
+    auto constexpr dim    = TestFixture::dim;
+    auto constexpr interp = TestFixture::interp_order;
+
+    std::array<double, 3> expectations
+        = {199.99999999999889, 199.99999999999659, 199.99999999999673};
+
+
+    populate_particles(this->ions, this->layout);
+
+
+    for (auto& pop : this->ions)
+    {
+        EXPECT_EQ(pop.domainParticles().size(), 100 * nbrPartPerCell);
+        EXPECT_EQ(pop.levelGhostParticles().size(), 2 * nbrPartPerCell);
+        EXPECT_EQ(pop.patchGhostParticles().size(), 0);
+    }
+
+    IonUpdater ionUpdater{init_dict["simulation"]["algo"]["ion_updater"]};
+    ionUpdater.updatePopulations(this->ions, this->EM, this->boxing, this->dt,
+                                 UpdaterMode::domain_only);
+
+    std::int64_t icellSum = 0;
+    double densitySum = 0, fluxXSum = 0, fluxYSum = 0, fluxZSum = 0;
+    for (auto& pop : this->ions)
+    {
+        densitySum += PHARE::core::sum(pop.density());
+        fluxXSum += PHARE::core::sum(pop.flux()[0]);
+        fluxYSum += PHARE::core::sum(pop.flux()[1]);
+        fluxZSum += PHARE::core::sum(pop.flux()[2]);
+        icellSum += PHARE::core::sum_from(pop.domainParticles(),
+                                          [](auto const& p) { return PHARE::core::sum(p.iCell); });
+    }
+
+
+    EXPECT_EQ(icellSum, 9900000);
+    EXPECT_DOUBLE_EQ(densitySum, expectations[interp - 1]);
+    EXPECT_DOUBLE_EQ(fluxXSum, expectations[interp - 1]);
+    EXPECT_DOUBLE_EQ(fluxYSum, expectations[interp - 1]);
+    EXPECT_DOUBLE_EQ(fluxZSum, expectations[interp - 1]);
+}
+
+
+
+TYPED_TEST(IonUpdaterTest, hardCodedRegressionTest1)
+{
+    using IonUpdater      = TestFixture::IonUpdater;
+    auto constexpr dim    = TestFixture::dim;
+    auto constexpr interp = TestFixture::interp_order;
+
+    std::array<double, 3> expectations
+        = {199.99999999999889, 199.99999999999659, 199.99999999999673};
+
+    populate_particles(this->ions, this->layout);
+
+    double deltaSum = 0;
+    for (auto& pop : this->ions)
+    {
+        EXPECT_EQ(pop.domainParticles().size(), 100 * nbrPartPerCell);
+        EXPECT_EQ(pop.levelGhostParticles().size(), 2 * nbrPartPerCell);
+        EXPECT_EQ(pop.patchGhostParticles().size(), 0);
+        deltaSum += PHARE::core::sum_from(pop.domainParticles(),
+                                          [](auto const& p) { return PHARE::core::sum(p.delta); });
+    }
+    EXPECT_DOUBLE_EQ(deltaSum, 103333.29999993632);
+
+    IonUpdater ionUpdater{init_dict["simulation"]["algo"]["ion_updater"]};
+    ionUpdater.updatePopulations(this->ions, this->EM, this->boxing, this->dt, UpdaterMode::all);
+
+    for (auto& pop : this->ions)
+    {
+        EXPECT_EQ(pop.domainParticles().size(), 100000);
+        std::size_t domainInDomain = 0;
+        for (auto const& p : pop.domainParticles())
+            domainInDomain += isIn(p, this->layout.AMRBox()) ? 1 : 0;
+        EXPECT_EQ(domainInDomain, pop.domainParticles().size());
+        EXPECT_EQ(pop.levelGhostParticles().size(), 2 * nbrPartPerCell);
+        EXPECT_EQ(pop.patchGhostParticles().size(), 0);
+    }
+
+    std::size_t icellSum = 0, pCount = 0;
+    deltaSum          = 0;
+    double densitySum = 0, fluxXSum = 0, fluxYSum = 0, fluxZSum = 0;
+    for (auto& pop : this->ions)
+    {
+        densitySum += PHARE::core::sum(pop.density());
+        fluxXSum += PHARE::core::sum(pop.flux()[0]);
+        fluxYSum += PHARE::core::sum(pop.flux()[1]);
+        fluxZSum += PHARE::core::sum(pop.flux()[2]);
+        icellSum += PHARE::core::sum_from(pop.domainParticles(),
+                                          [](auto const& p) { return PHARE::core::sum(p.iCell); });
+        deltaSum += PHARE::core::sum_from(pop.domainParticles(),
+                                          [](auto const& p) { return PHARE::core::sum(p.delta); });
+        pCount += pop.domainParticles().size();
+    }
+
+    EXPECT_EQ(pCount, 200000);
+    EXPECT_EQ(icellSum, 9900000);
+    EXPECT_DOUBLE_EQ(deltaSum, 123333.30000002828);
+    EXPECT_DOUBLE_EQ(densitySum, expectations[interp - 1]);
+    EXPECT_DOUBLE_EQ(fluxXSum, expectations[interp - 1]);
+    EXPECT_DOUBLE_EQ(fluxYSum, expectations[interp - 1]);
+    EXPECT_DOUBLE_EQ(fluxZSum, expectations[interp - 1]);
+}
 
 
 

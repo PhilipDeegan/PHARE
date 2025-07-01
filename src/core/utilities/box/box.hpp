@@ -154,9 +154,6 @@ struct Box
         else
             return 6;
     }
-
-
-    Box merge(Box const& that) const;
 };
 
 template<typename Type, std::size_t dim>
