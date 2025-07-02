@@ -130,9 +130,6 @@ namespace amr
         virtual void fillFluxBorders(IonsT& ions, SAMRAI::hier::PatchLevel& level,
                                      double const fillTime)
             = 0;
-        virtual void fillDensityBorders(IonsT& ions, SAMRAI::hier::PatchLevel& level,
-                                        double const fillTime)
-            = 0;
 
 
         std::string name() const { return stratname_; }
@@ -143,8 +140,10 @@ namespace amr
         template<auto rtype>
         void fill(std::string const& dst, SAMRAI::hier::PatchLevel& level, double time)
         {
-            scheduler.template fill<rtype>(dst, level, time);
+            scheduler_.template fill<rtype>(dst, level, time);
         }
+
+        auto& scheduler() { return scheduler_; }
 
     protected:
         explicit HybridMessengerStrategy(std::string stratName)
@@ -153,7 +152,7 @@ namespace amr
         }
 
         std::string stratname_;
-        RefinerScheduler scheduler;
+        RefinerScheduler scheduler_;
     };
 } // namespace amr
 } // namespace PHARE

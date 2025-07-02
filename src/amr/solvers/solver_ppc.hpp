@@ -432,10 +432,17 @@ void SolverPPC<HybridModel, AMR_Types>::moveIons_(level_t& level, ModelViews_t& 
     // this needs to be done before calling the messenger
     setTime([](auto& state) -> auto& { return state.ions; });
 
-    fromCoarser.fillFluxBorders(views.model().state.ions, level, newTime);
-    fromCoarser.fillDensityBorders(views.model().state.ions, level, newTime);
-    fromCoarser.fillIonPopMomentGhosts(views.model().state.ions, level, newTime);
-    fromCoarser.fillIonGhostParticles(views.model().state.ions, level, newTime);
+    auto& model = views.model();
+
+    fromCoarser.fillFluxBorders(model.state.ions, level, newTime);
+
+    for (std::size_t i = 0; i < model.state.ions.size(); ++i)
+        model.template fill<amr::RefinerType::PatchFieldBorderSum>(
+            "HybridModel-HybridModel_sumField" + std::to_string(i), level, newTime);
+
+
+    fromCoarser.fillIonPopMomentGhosts(model.state.ions, level, newTime);
+    fromCoarser.fillIonGhostParticles(model.state.ions, level, newTime);
 
     for (auto& state : views)
         ionUpdater_.updateIons(state.ions);

@@ -106,7 +106,19 @@ public:
     //                  ends the ResourcesUser interface
     //-------------------------------------------------------------------------
 
+
+    void scheduler(amr::RefinerScheduler& schedulr) { scheduler_ = &schedulr; }
+
+    template<auto rtype>
+    void fill(std::string const& dst, SAMRAI::hier::PatchLevel& level, double time)
+    {
+        assert(scheduler_);
+        scheduler_->template fill<rtype>(dst, level, time);
+    }
+
     std::unordered_map<std::string, std::shared_ptr<core::NdArrayVector<dimension, int>>> tags;
+
+    amr::RefinerScheduler* scheduler_ = nullptr;
 };
 
 

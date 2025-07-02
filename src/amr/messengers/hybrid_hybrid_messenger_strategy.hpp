@@ -208,11 +208,12 @@ namespace amr
             auto const level  = hierarchy->getPatchLevel(levelNumber);
             auto& ions        = hybridModel.state.ions;
 
+            hybridModel.scheduler(Super::scheduler());
             for (std::size_t i = 0; i < ions.size(); ++i)
-                Super::scheduler
+                Super::scheduler()
                     .template add<RefinerType::PatchFieldBorderSum, FieldData_t>(
                         sumField.name() + std::to_string(i), hierarchy, level,
-                        [&, i = i](double fillTime) {
+                        [=, this](double fillTime) mutable {
                             fillDensityBorders(ions, *level, fillTime, i);
                         })
                     .register_resource(
@@ -450,11 +451,7 @@ namespace amr
         }
 
 
-        void fillDensityBorders(IonsT& ions, SAMRAI::hier::PatchLevel& level,
-                                double const fillTime) override
-        {
-            throw std::runtime_error("no"); // torm
-        }
+
 
         void fillDensityBorders(IonsT& ions, SAMRAI::hier::PatchLevel& level, double const fillTime,
                                 std::size_t const i)
@@ -463,6 +460,7 @@ namespace amr
 
             // for (std::size_t i = 0; i < ions.size(); ++i)
             {
+                assert(resourcesManager_);
                 for (auto patch : resourcesManager_->enumerate(level, ions, sumField))
                 {
                     auto& pop = *(ions.begin() + i);
@@ -471,7 +469,7 @@ namespace amr
                 }
 
                 // popDensityBorderSumRefiners_[i].fill(level.getLevelNumber(), fillTime);
-                Super::scheduler.fill(sumField.name() + std::to_string(i), level, fillTime);
+                Super::scheduler().fill(sumField.name() + std::to_string(i), level, fillTime);
 
                 for (auto patch : resourcesManager_->enumerate(level, ions, sumField))
                 {

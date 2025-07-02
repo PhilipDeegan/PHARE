@@ -343,10 +343,7 @@ namespace amr
             strat_->fillFluxBorders(ions, level, fillTime);
         }
 
-        void fillDensityBorders(IonsT& ions, SAMRAI::hier::PatchLevel& level, double const fillTime)
-        {
-            strat_->fillDensityBorders(ions, level, fillTime);
-        }
+
 
         /* -------------------------------------------------------------------------
                             End HybridMessenger Interface
