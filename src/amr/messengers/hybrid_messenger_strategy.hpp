@@ -44,6 +44,7 @@ namespace amr
                            [[maybe_unused]] std::unique_ptr<IMessengerInfo> fromFinerInfo)
             = 0;
 
+        virtual void registerQuantities(IPhysicalModel& coarseModel, IPhysicalModel& fineModel) {}
 
 
         virtual std::unique_ptr<IMessengerInfo> emptyInfoFromCoarser() = 0;

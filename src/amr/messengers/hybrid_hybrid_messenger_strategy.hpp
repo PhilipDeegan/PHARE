@@ -192,6 +192,23 @@ namespace amr
             registerSyncComms(hybridInfo);
         }
 
+        void registerQuantities(IPhysicalModel& /*coarseModel*/, IPhysicalModel& fineModel) override
+        {
+            auto& hybridModel = dynamic_cast<HybridModel&>(fineModel);
+
+            auto& ions = hybridModel.state.ions;
+            for (std::size_t i = 0; i < ions.size(); ++i)
+                Super::scheduler()
+                    .template add_algorithm<RefinerType::PatchFieldBorderSum>(
+                        sumField.name(),
+                        [=, this](auto& lvl, double fillTime) mutable {
+                            fillDensityBorders(ions, lvl, fillTime, i);
+                        })
+                    .template register_resource<RefinerType::PatchFieldBorderSum>(
+                        resourcesManager_, sumField.name(), ions[i].density().name(),
+                        sumField.name(), nullptr,
+                        std::make_shared<FieldGhostInterpOverlapFillPattern<GridLayoutT>>());
+        }
 
 
         /**
@@ -205,21 +222,13 @@ namespace amr
             using FieldData_t = ResourcesManagerT::UserField_t::patch_data_type;
 
             auto& hybridModel = dynamic_cast<HybridModel&>(model);
-            auto const level  = hierarchy->getPatchLevel(levelNumber);
-            auto& ions        = hybridModel.state.ions;
+            hybridModel.scheduler(Super::scheduler()); // should be on regrid
+            auto const level = hierarchy->getPatchLevel(levelNumber);
+            auto& ions       = hybridModel.state.ions;
 
-            hybridModel.scheduler(Super::scheduler());
             for (std::size_t i = 0; i < ions.size(); ++i)
-                Super::scheduler()
-                    .template add<RefinerType::PatchFieldBorderSum, FieldData_t>(
-                        sumField.name() + std::to_string(i), hierarchy, level,
-                        [=, this](double fillTime) mutable {
-                            fillDensityBorders(ions, *level, fillTime, i);
-                        })
-                    .register_resource(
-                        resourcesManager_, sumField.name(), ions[i].density().name(),
-                        sumField.name(), nullptr,
-                        std::make_shared<FieldGhostInterpOverlapFillPattern<GridLayoutT>>());
+                Super::scheduler().template add<RefinerType::PatchFieldBorderSum, FieldData_t>(
+                    sumField.name(), hierarchy, level);
 
             registerLevel(hierarchy, levelNumber);
         }
@@ -452,34 +461,30 @@ namespace amr
 
 
 
-
+        // called per pop!
         void fillDensityBorders(IonsT& ions, SAMRAI::hier::PatchLevel& level, double const fillTime,
                                 std::size_t const i)
         {
             using value_type = FieldT::value_type;
 
-            // for (std::size_t i = 0; i < ions.size(); ++i)
+            assert(resourcesManager_);
+            for (auto patch : resourcesManager_->enumerate(level, ions, sumField))
             {
-                assert(resourcesManager_);
-                for (auto patch : resourcesManager_->enumerate(level, ions, sumField))
-                {
-                    auto& pop = *(ions.begin() + i);
-                    std::memcpy(sumField.data(), pop.density().data(),
-                                pop.density().size() * sizeof(value_type));
-                }
+                auto& pop = *(ions.begin() + i);
+                std::memcpy(sumField.data(), pop.density().data(),
+                            pop.density().size() * sizeof(value_type));
+            }
 
-                // popDensityBorderSumRefiners_[i].fill(level.getLevelNumber(), fillTime);
-                Super::scheduler().fill(sumField.name() + std::to_string(i), level, fillTime);
+            Super::scheduler().template call<RefinerType::PatchFieldBorderSum>(sumField.name(),
+                                                                               level, fillTime, i);
 
-                for (auto patch : resourcesManager_->enumerate(level, ions, sumField))
-                {
-                    auto& pop = *(ions.begin() + i);
-                    std::memcpy(pop.density().data(), sumField.data(),
-                                pop.density().size() * sizeof(value_type));
-                }
+            for (auto patch : resourcesManager_->enumerate(level, ions, sumField))
+            {
+                auto& pop = *(ions.begin() + i);
+                std::memcpy(pop.density().data(), sumField.data(),
+                            pop.density().size() * sizeof(value_type));
             }
         }
-
 
 
 

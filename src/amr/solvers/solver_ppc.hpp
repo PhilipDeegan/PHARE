@@ -438,7 +438,7 @@ void SolverPPC<HybridModel, AMR_Types>::moveIons_(level_t& level, ModelViews_t& 
 
     for (std::size_t i = 0; i < model.state.ions.size(); ++i)
         model.template fill<amr::RefinerType::PatchFieldBorderSum>(
-            "HybridModel-HybridModel_sumField" + std::to_string(i), level, newTime);
+            "HybridModel-HybridModel_sumField", level, newTime);
 
 
     fromCoarser.fillIonPopMomentGhosts(model.state.ions, level, newTime);

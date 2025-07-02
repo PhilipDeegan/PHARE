@@ -24,48 +24,73 @@ struct Scheduler
 
 struct RefinerScheduler : public Scheduler
 {
-    constexpr static std::size_t n_refiner_types = 7; //
+    constexpr static std::size_t n_refiner_types = refiner_type_enum_count(); //
     using Schedule                               = SAMRAI::xfer::RefineSchedule;
     using Algorithm                              = SAMRAI::xfer::RefineAlgorithm;
 
-
-
-    RefinerScheduler& add(std::unique_ptr<Algorithm> const& algo,
-                          std::shared_ptr<Schedule> schedule, int levelNumber)
+    struct Duo
     {
-        schedules_[levelNumber][algo.get()] = schedule;
-        return *this;
-    }
+        std::vector<std::unique_ptr<Algorithm>> a;
+        std::map<int, std::vector<std::shared_ptr<Schedule>>> s;
+        std::vector<std::function<void(SAMRAI::hier::PatchLevel&, double /*fillTime*/)>> funcs;
+    };
+
+
 
     template<auto rtype, typename Extra = void>
     RefinerScheduler& add(std::string const& dst,
                           std::shared_ptr<SAMRAI::hier::PatchHierarchy> const& hierarchy,
-                          std::shared_ptr<SAMRAI::hier::PatchLevel> const& level,
-                          std::function<void(double)> optional = {});
+                          std::shared_ptr<SAMRAI::hier::PatchLevel> const& level);
 
-    auto& add_algorithm(std::string const dst)
+
+    template<auto rtype>
+    auto& add_algorithm(std::string const& dst,
+                        std::function<void(SAMRAI::hier::PatchLevel&, double)> optional = {})
     {
-        return algos[dst].emplace_back(std::make_unique<SAMRAI::xfer::RefineAlgorithm>());
-    }
+        PHARE_LOG_LINE_SS(dst << " " << as_signed(rtype));
 
+        auto& duo = duos[dst][as_signed(rtype)];
+        duo.a.emplace_back(std::make_unique<Algorithm>());
 
-    auto& register_resource(auto& rm, auto& dst, auto& src, auto& scratch, auto&&... args)
-    {
-        auto&& [idDst, idSrc, idScrtch] = rm->getIDsList(dst, src, scratch);
-        this->add_algorithm(dst)->registerRefine(idDst, idSrc, idScrtch, args...);
+        if (bool{optional})
+            duo.funcs.emplace_back(optional);
+
+        else // else default to regular
+            duo.funcs.emplace_back(
+                [=, this](auto& lvl, double time) { call<rtype>(dst, lvl, time); });
+
+        PHARE_LOG_LINE_SS(duo.a.size());
+
         return *this;
     }
 
 
+
+    template<auto rtype>
+    auto& register_resource(auto& rm, auto& dst, auto& src, auto& scratch, auto&&... args)
+    {
+        auto&& [idDst, idSrc, idScrtch] = rm->getIDsList(dst, src, scratch);
+
+        auto& duo = duos[dst][as_signed(rtype)];
+        if (!duo.a.size())
+            add_algorithm<rtype>(dst);
+        duo.a.back()->registerRefine(idDst, idSrc, idScrtch, args...);
+        return *this;
+    }
+
+    template<auto rtype>
     auto& register_time_interpolated_resource(auto& rm, auto& dst, auto& src, auto& told,
                                               auto& tnew, auto&&... args)
     {
         auto&& [idDst, idSrc, idTold, idTnew] = rm->getIDsList(dst, src, told, tnew);
-        this->add_algorithm(dst)->registerRefine(idDst, idSrc, idTold, idTnew, idDst, args...);
+        auto& duo                             = duos[dst][as_signed(rtype)];
+        if (!duo.a.size())
+            add_algorithm<rtype>(dst);
+        duo.a.back()->registerRefine(idDst, idSrc, idTold, idTnew, idDst, args...);
         return *this;
     }
 
-
+    template<auto rtype>
     auto& register_vector_field(auto& rm, auto& dst, auto& src, auto& refOp, auto& fillPat)
     {
         return (*this)
@@ -74,7 +99,7 @@ struct RefinerScheduler : public Scheduler
             .register_resource(rm, dst.zName, src.zName, dst.zName, refOp, fillPat);
     }
 
-
+    template<auto rtype>
     auto& register_time_interpolated_vector_field(auto& rm, auto& dst, auto& src, auto& told,
                                                   auto& tnew, auto&&... args)
     {
@@ -88,69 +113,62 @@ struct RefinerScheduler : public Scheduler
     }
 
 
-    NO_DISCARD auto& findSchedule(std::unique_ptr<Algorithm> const& algo, int levelNumber) const
+
+
+    template<auto rtype>
+    void fill(std::string const& dst, SAMRAI::hier::PatchLevel& level, double const initDataTime)
     {
-        if (!schedules_.count(levelNumber))
-            throw std::runtime_error("no schedule for level " + std::to_string(levelNumber));
-
-        if (!schedules_.at(levelNumber).count(algo.get()))
-            throw std::runtime_error("Algorithm has not been registered with Communicator");
-
-        return schedules_.at(levelNumber).at(algo.get());
+        auto& duo = duos[dst][as_signed(rtype)];
+        for (auto& func : duo.funcs)
+            func(level, initDataTime);
     }
 
 
     template<auto rtype>
-    void fill(std::string const& dst, int const levelNumber, double const initDataTime)
+    void call(std::string const& dst, int const levelNumber, double const initDataTime)
     {
-        assert(bool{phare_funcs[dst][static_cast<int>(rtype)]});
-        phare_funcs[dst][static_cast<int>(rtype)](initDataTime);
+        auto& duo = duos[dst][as_signed(rtype)];
+
+        assert(duo.a.size() == duo.s[levelNumber].size());
+
+        for (std::size_t i = 0; i < duo.a.size(); ++i)
+            duo.s[levelNumber][i]->fillData(initDataTime);
     }
+
     template<auto rtype>
-    void fill(std::string const& dst, SAMRAI::hier::PatchLevel const& level,
+    void call(std::string const& dst, SAMRAI::hier::PatchLevel const& level,
               double const initDataTime)
     {
-        fill<rtype>(dst, level.getLevelNumber(), initDataTime);
+        call<rtype>(dst, level.getLevelNumber(), initDataTime);
     }
 
-
-    void fill(std::string const& dst, int const levelNumber, double const initDataTime)
+    template<auto rtype> // override for split schedules
+    void call(std::string const& dst, SAMRAI::hier::PatchLevel const& level,
+              double const initDataTime, int const idx)
     {
-        for (auto const& algo : algos[dst])
-            this->findSchedule(algo, levelNumber)->fillData(initDataTime);
-    }
-
-    void fill(std::string const& dst, SAMRAI::hier::PatchLevel const& level,
-              double const initDataTime)
-    {
-        fill(dst, level.getLevelNumber(), initDataTime);
+        duos[dst][as_signed(rtype)].s[level.getLevelNumber()][idx]->fillData(initDataTime);
     }
 
 
-    using PhareFuncs
-        = std::unordered_map<std::string,
-                             std::array<std::function<void(double /*fillTime*/)>, n_refiner_types>>;
-
-    PhareFuncs phare_funcs;
-    std::map<int, std::map<Algorithm* const, std::shared_ptr<Schedule>>> schedules_;
-    std::unordered_map<std::string, std::vector<std::unique_ptr<Algorithm>>> algos;
+    std::unordered_map<std::string, std::array<Duo, n_refiner_types>> duos;
 };
 
 
 template<auto Type, typename Extra>
-RefinerScheduler& RefinerScheduler::add(
-    std::string const& dst, std::shared_ptr<SAMRAI::hier::PatchHierarchy> const& hierarchy,
-    std::shared_ptr<SAMRAI::hier::PatchLevel> const& level, std::function<void(double)> optional)
+RefinerScheduler&
+RefinerScheduler::add(std::string const& dst,
+                      std::shared_ptr<SAMRAI::hier::PatchHierarchy> const& hierarchy,
+                      std::shared_ptr<SAMRAI::hier::PatchLevel> const& level)
 {
     auto const levelNumber = level->getLevelNumber();
-    if (bool{optional})
-        phare_funcs[dst][static_cast<int>(Type)] = optional;
-    else
-        phare_funcs[dst][static_cast<int>(Type)]
-            = [&](double time) { fill(dst, levelNumber, time); };
 
+    auto& duo = duos[dst][as_signed(Type)];
 
-    for (auto& algo : this->algos[dst])
+    PHARE_LOG_LINE_SS(dst << " " << as_signed(Type));
+    PHARE_LOG_LINE_SS(duo.a.size());
+    assert(duo.a.size());
+
+    for (auto& algo : duo.a)
     {
         // for GhostField we need schedules that take on the level where there is an
         // overlap (there is always for patches lying inside the level) and goes to
@@ -172,26 +190,23 @@ RefinerScheduler& RefinerScheduler::add(
         // data communication cycles.
         if constexpr (Type == RefinerType::GhostField)
         {
-            this->add(
-                algo,
-                algo->createSchedule(level, level->getNextCoarserHierarchyLevelNumber(), hierarchy),
-                levelNumber);
+            duo.s[levelNumber].emplace_back(algo->createSchedule(
+                level, level->getNextCoarserHierarchyLevelNumber(), hierarchy));
         }
 
         // the following schedule will only fill patch ghost nodes
         // not level border ghosts
         else if constexpr (Type == RefinerType::PatchGhostField)
         {
-            this->add(algo, algo->createSchedule(level), levelNumber);
+            duo.s[levelNumber].emplace_back(algo->createSchedule(level));
         }
 
         else if constexpr (Type == RefinerType::PatchFieldBorderSum)
         {
             static_assert(not std::is_same_v<Extra, void> && "NO!");
-            this->add(algo,
-                      algo->createSchedule(
-                          level, 0, std::make_shared<FieldBorderSumTransactionFactory<Extra>>()),
-                      levelNumber);
+
+            duo.s[levelNumber].emplace_back(algo->createSchedule(
+                level, 0, std::make_shared<FieldBorderSumTransactionFactory<Extra>>()));
         }
 
         // this createSchedule overload is used to initialize fields.
@@ -202,8 +217,8 @@ RefinerScheduler& RefinerScheduler::add(
         // but there is nothing there.
         else if constexpr (Type == RefinerType::InitField)
         {
-            this->add(algo, algo->createSchedule(level, nullptr, levelNumber - 1, hierarchy),
-                      levelNumber);
+            duo.s[levelNumber].emplace_back(
+                algo->createSchedule(level, nullptr, levelNumber - 1, hierarchy));
         }
 
 
@@ -217,11 +232,9 @@ RefinerScheduler& RefinerScheduler::add(
         // particles if the splitting from coarser levels is not deterministic.
         else if constexpr (Type == RefinerType::InitInteriorPart)
         {
-            this->add(algo,
-                      algo->createSchedule(
-                          std::make_shared<SAMRAI::xfer::PatchLevelInteriorFillPattern>(), level,
-                          nullptr, levelNumber - 1, hierarchy),
-                      levelNumber);
+            duo.s[levelNumber].emplace_back(algo->createSchedule(
+                std::make_shared<SAMRAI::xfer::PatchLevelInteriorFillPattern>(), level, nullptr,
+                levelNumber - 1, hierarchy));
         }
 
         // here we create a schedule that will refine particles from coarser level and
@@ -230,17 +243,15 @@ RefinerScheduler& RefinerScheduler::add(
         // overload as above but pass it a PatchLevelBorderFillPattern.
         else if constexpr (Type == RefinerType::LevelBorderParticles)
         {
-            this->add(
-                algo,
+            duo.s[levelNumber].emplace_back(
                 algo->createSchedule(std::make_shared<SAMRAI::xfer::PatchLevelBorderFillPattern>(),
-                                     level, nullptr, levelNumber - 1, hierarchy),
-                levelNumber);
+                                     level, nullptr, levelNumber - 1, hierarchy));
         }
 
 
         else if constexpr (Type == RefinerType::ExteriorGhostParticles)
         {
-            this->add(algo, algo->createSchedule(level), levelNumber);
+            duo.s[levelNumber].emplace_back(algo->createSchedule(level));
         }
     }
 

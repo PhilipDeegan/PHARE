@@ -94,13 +94,17 @@ namespace amr
          * @param fromCoarserInfo see IMessenger
          * @param fromFinerInfo see IMessenger
          */
+
         void registerQuantities(std::unique_ptr<IMessengerInfo> fromCoarserInfo,
                                 std::unique_ptr<IMessengerInfo> fromFinerInfo) override
         {
             strat_->registerQuantities(std::move(fromCoarserInfo), std::move(fromFinerInfo));
         }
 
-
+        void registerQuantities(IPhysicalModel& coarseModel, IPhysicalModel& fineModel) override
+        {
+            strat_->registerQuantities(coarseModel, fineModel);
+        }
 
 
         /**

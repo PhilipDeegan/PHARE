@@ -105,7 +105,7 @@ namespace amr
                                         std::unique_ptr<IMessengerInfo> fromFinerInfo)
             = 0;
 
-
+        virtual void registerQuantities(IPhysicalModel& coarseModel, IPhysicalModel& fineModel) {}
 
         /**
          * @brief registerLevel tells the messenger which level in the hierarchy data will be

@@ -94,9 +94,8 @@ namespace solver
 
             hybMessenger.fillFluxBorders(ions, level, initDataTime);
 
-            for (std::size_t i = 0; i < ions.size(); ++i)
-                hybMessenger.template fill<amr::RefinerType::PatchFieldBorderSum>(
-                    "HybridModel-HybridModel_sumField" + std::to_string(i), level, initDataTime);
+            hybMessenger.template fill<amr::RefinerType::PatchFieldBorderSum>(
+                "HybridModel-HybridModel_sumField", level, initDataTime);
 
             for (auto& patch : rm.enumerate(level, ions))
             {
