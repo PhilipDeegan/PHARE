@@ -649,8 +649,6 @@ using DimInterps = ::testing::Types<DimInterp<1, 1>, DimInterp<1, 2>, DimInterp<
 TYPED_TEST_SUITE(IonUpdaterTest, DimInterps, );
 
 
-#if 0
-
 TYPED_TEST(IonUpdaterTest, ionUpdaterTakesPusherParamsFromPHAREDictAtConstruction)
 {
     typename IonUpdaterTest<TypeParam>::IonUpdater ionUpdater{
@@ -872,8 +870,6 @@ TYPED_TEST(IonUpdaterTest, thatNoNaNsExistOnPhysicalNodesMoments)
         }
     }
 }
-#endif
-
 
 
 
