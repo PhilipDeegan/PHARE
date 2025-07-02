@@ -30,15 +30,16 @@ public:
     using Interface              = IPhysicalModel<AMR_Types>;
     using amr_types              = AMR_Types;
     using electrons_t            = Electrons;
-    using patch_t                = typename AMR_Types::patch_t;
-    using level_t                = typename AMR_Types::level_t;
+    using patch_t                = AMR_Types::patch_t;
+    using level_t                = AMR_Types::level_t;
     using gridlayout_type        = GridLayoutT;
     using electromag_type        = Electromag;
-    using vecfield_type          = typename Electromag::vecfield_type;
-    using field_type             = typename vecfield_type::field_type;
+    using vecfield_type          = Electromag::vecfield_type;
+    using field_type             = vecfield_type::field_type;
     using grid_type              = Grid_t;
     using ions_type              = Ions;
-    using particle_array_type    = typename Ions::particle_array_type;
+    using tensorfield_type       = Ions::tensorfield_type;
+    using particle_array_type    = Ions::particle_array_type;
     using resources_manager_type = amr::ResourcesManager<gridlayout_type, grid_type>;
     using ParticleInitializerFactory
         = core::ParticleInitializerFactory<particle_array_type, gridlayout_type>;
@@ -109,11 +110,15 @@ public:
 
     void scheduler(amr::RefinerScheduler& schedulr) { scheduler_ = &schedulr; }
 
-    template<auto rtype>
+    template<auto rtype> // run all
     void fill(std::string const& dst, SAMRAI::hier::PatchLevel& level, double time)
     {
-        assert(scheduler_);
         scheduler_->template fill<rtype>(dst, level, time);
+    }
+    template<auto rtype> // run one
+    void fill(std::string const& dst, SAMRAI::hier::PatchLevel& level, double time, int const idx)
+    {
+        scheduler_->template fill<rtype>(dst, level, time, idx);
     }
 
     std::unordered_map<std::string, std::shared_ptr<core::NdArrayVector<dimension, int>>> tags;

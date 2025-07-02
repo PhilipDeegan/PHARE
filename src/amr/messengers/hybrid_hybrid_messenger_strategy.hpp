@@ -80,6 +80,7 @@ namespace amr
         using IonsT             = typename HybridModel::ions_type;
         using ElectromagT       = typename HybridModel::electromag_type;
         using VecFieldT         = typename HybridModel::vecfield_type;
+        using TensorFieldT      = HybridModel::tensorfield_type;
         using GridLayoutT       = typename HybridModel::gridlayout_type;
         using FieldT            = typename VecFieldT::field_type;
         using FieldDataT        = FieldData<GridLayoutT, GridT>;
@@ -121,6 +122,7 @@ namespace amr
             resourcesManager_->registerResources(ViOld_);
             resourcesManager_->registerResources(sumVec);
             resourcesManager_->registerResources(sumField);
+            resourcesManager_->registerResources(sumTensor_);
         }
 
         virtual ~HybridHybridMessengerStrategy() = default;
@@ -143,6 +145,7 @@ namespace amr
             resourcesManager_->allocate(ViOld_, patch, allocateTime);
             resourcesManager_->allocate(sumVec, patch, allocateTime);
             resourcesManager_->allocate(sumField, patch, allocateTime);
+            resourcesManager_->allocate(sumTensor_, patch, allocateTime);
         }
 
 
@@ -197,6 +200,8 @@ namespace amr
             auto& hybridModel = dynamic_cast<HybridModel&>(fineModel);
 
             auto& ions = hybridModel.state.ions;
+
+            // pop density borders
             for (std::size_t i = 0; i < ions.size(); ++i)
                 Super::scheduler()
                     .template add_algorithm<RefinerType::PatchFieldBorderSum>(
@@ -207,6 +212,19 @@ namespace amr
                     .template register_resource<RefinerType::PatchFieldBorderSum>(
                         resourcesManager_, sumField.name(), ions[i].density().name(),
                         sumField.name(), nullptr,
+                        std::make_shared<FieldGhostInterpOverlapFillPattern<GridLayoutT>>());
+
+            // pop momentum tensor borders
+            for (std::size_t i = 0; i < ions.size(); ++i)
+                Super::scheduler()
+                    .template add_algorithm<RefinerType::PatchFieldBorderSum>(
+                        sumTensor_.name(),
+                        [=, this](auto& lvl, double fillTime) mutable {
+                            fillMomentumTensorFieldBorders(ions, lvl, fillTime, i);
+                        })
+                    .template register_resource<RefinerType::PatchFieldBorderSum>(
+                        resourcesManager_, sumTensor_.name(), ions[i].density().name(),
+                        sumTensor_.name(), nullptr,
                         std::make_shared<FieldGhostInterpOverlapFillPattern<GridLayoutT>>());
         }
 
@@ -227,8 +245,15 @@ namespace amr
             auto& ions       = hybridModel.state.ions;
 
             for (std::size_t i = 0; i < ions.size(); ++i)
+            {
+                // pop density borders
                 Super::scheduler().template add<RefinerType::PatchFieldBorderSum, FieldData_t>(
                     sumField.name(), hierarchy, level);
+
+                // pop momentum tensor borders
+                Super::scheduler().template add<RefinerType::PatchFieldBorderSum, FieldData_t>(
+                    sumTensor_.name(), hierarchy, level);
+            }
 
             registerLevel(hierarchy, levelNumber);
         }
@@ -440,7 +465,7 @@ namespace amr
             {
                 for (auto patch : resourcesManager_->enumerate(level, ions, sumVec))
                 {
-                    auto& pop = *(ions.begin() + i);
+                    auto& pop = ions[i];
                     for (std::uint8_t c = 0; c < N; ++c)
                         std::memcpy(sumVec[c].data(), pop.flux()[c].data(),
                                     pop.flux()[c].size() * sizeof(value_type));
@@ -451,7 +476,7 @@ namespace amr
 
                 for (auto patch : resourcesManager_->enumerate(level, ions, sumVec))
                 {
-                    auto& pop = *(ions.begin() + i);
+                    auto& pop = ions[i];
                     for (std::uint8_t c = 0; c < N; ++c)
                         std::memcpy(pop.flux()[c].data(), sumVec[c].data(),
                                     pop.flux()[c].size() * sizeof(value_type));
@@ -470,7 +495,7 @@ namespace amr
             assert(resourcesManager_);
             for (auto patch : resourcesManager_->enumerate(level, ions, sumField))
             {
-                auto& pop = *(ions.begin() + i);
+                auto& pop = ions[i];
                 std::memcpy(sumField.data(), pop.density().data(),
                             pop.density().size() * sizeof(value_type));
             }
@@ -480,9 +505,38 @@ namespace amr
 
             for (auto patch : resourcesManager_->enumerate(level, ions, sumField))
             {
-                auto& pop = *(ions.begin() + i);
+                auto& pop = ions[i];
                 std::memcpy(pop.density().data(), sumField.data(),
                             pop.density().size() * sizeof(value_type));
+            }
+        }
+
+
+
+        void fillMomentumTensorFieldBorders(IonsT& ions, SAMRAI::hier::PatchLevel& level,
+                                            double const fillTime, std::size_t const i)
+        {
+            auto constexpr N = core::detail::tensor_field_dim_from_rank<2>();
+            using value_type = FieldT::value_type;
+
+            assert(resourcesManager_);
+            for (auto patch : resourcesManager_->enumerate(level, ions, sumTensor_))
+            {
+                auto& pop = ions[i];
+                for (std::uint8_t c = 0; c < N; ++c)
+                    std::memcpy(sumTensor_[c].data(), pop.momentumTensor()[c].data(),
+                                pop.momentumTensor()[c].size() * sizeof(value_type));
+            }
+
+            Super::scheduler().template call<RefinerType::PatchFieldBorderSum>(sumTensor_.name(),
+                                                                               level, fillTime, i);
+
+            for (auto patch : resourcesManager_->enumerate(level, ions, sumTensor_))
+            {
+                auto& pop = ions[i];
+                for (std::uint8_t c = 0; c < N; ++c)
+                    std::memcpy(pop.momentumTensor()[c].data(), sumTensor_[c].data(),
+                                pop.momentumTensor()[c].size() * sizeof(value_type));
             }
         }
 
@@ -1046,6 +1100,7 @@ namespace amr
         VecFieldT ViOld_{stratName + "_VBulkOld", core::HybridQuantity::Vector::V};
         FieldT NiOld_{stratName + "_NiOld", core::HybridQuantity::Scalar::rho};
 
+        TensorFieldT sumTensor_{stratName + "_sumTensor", core::HybridQuantity::Tensor::M};
         VecFieldT sumVec{stratName + "_sumVec", core::HybridQuantity::Vector::V};
         FieldT sumField{stratName + "_sumField", core::HybridQuantity::Scalar::rho};
 

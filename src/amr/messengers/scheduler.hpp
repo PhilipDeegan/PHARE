@@ -115,7 +115,7 @@ struct RefinerScheduler : public Scheduler
 
 
 
-
+    // fill functions are general purpose
     template<auto rtype>
     void fill(std::string const& dst, SAMRAI::hier::PatchLevel& level, double const initDataTime)
     {
@@ -124,14 +124,21 @@ struct RefinerScheduler : public Scheduler
             func(level, initDataTime);
     }
 
+    template<auto rtype> // override for split schedules
+    void fill(std::string const& dst, SAMRAI::hier::PatchLevel& level, double const initDataTime,
+              int const idx)
+    {
+        auto& duo = duos[dst][as_signed(rtype)];
+        duo.funcs[idx](level, initDataTime);
+    }
 
+
+    // call functions deal with schedules directly - for advanced usage!
     template<auto rtype>
     void call(std::string const& dst, int const levelNumber, double const initDataTime)
     {
         auto& duo = duos[dst][as_signed(rtype)];
-
         assert(duo.a.size() == duo.s[levelNumber].size());
-
         for (std::size_t i = 0; i < duo.a.size(); ++i)
             duo.s[levelNumber][i]->fillData(initDataTime);
     }

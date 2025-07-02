@@ -75,63 +75,66 @@ void FluidDiagnosticWriter<H5Writer>::compute(DiagnosticProperties& diagnostic)
 {
     core::MomentumTensorInterpolator<dimension, interp_order> interpolator;
 
-    auto& h5Writer  = this->h5Writer_;
-    auto& modelView = h5Writer.modelView();
-    auto& ions      = modelView.getIons();
-    auto minLvl     = this->h5Writer_.minLevel;
-    auto maxLvl     = this->h5Writer_.maxLevel;
+    auto& h5Writer    = this->h5Writer_;
+    auto& modelView   = h5Writer.modelView();
+    auto& ions        = modelView.getIons();
+    auto const minLvl = this->h5Writer_.minLevel;
+    auto const maxLvl = this->h5Writer_.maxLevel;
     // compute the momentum tensor for each population that requires it
     // compute for all ions but that requires the computation of all pop
-    std::string tree{"/ions/"};
-    if (isActiveDiag(diagnostic, tree, "momentum_tensor"))
+
+    // dumps occur after the last substep but before the next first substep
+    // at this time, levelGhostPartsNew is emptied and not yet filled
+    // and the former levelGhostPartsNew has been moved to levelGhostPartsOld
+
+    if (isActiveDiag(diagnostic, "/ions/", "momentum_tensor"))
     {
-        auto computeMomentumTensor
-            = [&](GridLayout& layout, std::string patchID, std::size_t iLvel) {
-                  for (auto& pop : ions)
-                  {
-                      std::string tree{"/ions/pop/" + pop.name() + "/"};
-                      auto& pop_momentum_tensor = pop.momentumTensor();
-                      pop_momentum_tensor.zero();
+        auto interpolate = [&](GridLayout& layout, auto&&...) {
+            for (auto& pop : ions)
+            {
+                auto& pop_momentum_tensor = pop.momentumTensor();
+                pop_momentum_tensor.zero();
 
-                      // dumps occur after the last substep but before the next first substep
-                      // at this time, levelGhostPartsNew is emptied and not yet filled
-                      // and the former levelGhostPartsNew has been moved to levelGhostPartsOld
+                interpolator(pop.domainParticles(), pop_momentum_tensor, layout, pop.mass());
+                interpolator(pop.levelGhostParticlesOld(), pop_momentum_tensor, layout, pop.mass());
+            }
+        };
+        modelView.visitHierarchy(interpolate, minLvl, maxLvl);
 
-                      auto domainParts     = core::makeIndexRange(pop.domainParticles());
-                      auto levelGhostParts = core::makeIndexRange(pop.levelGhostParticlesOld());
+        for (std::size_t lvl = minLvl; lvl <= maxLvl; ++lvl)
+            for (std::size_t i = 0; i < ions.size(); ++i)
+                modelView.template fill<amr::RefinerType::PatchFieldBorderSum>(
+                    "HybridModel-HybridModel_sumTensor", lvl, h5Writer.timestamp(), i);
 
-                      interpolator(domainParts, pop_momentum_tensor, layout, pop.mass());
-                      interpolator(levelGhostParts, pop_momentum_tensor, layout, pop.mass());
-                  }
-                  ions.computeFullMomentumTensor();
-              };
-        modelView.visitHierarchy(computeMomentumTensor, minLvl, maxLvl);
+        modelView.visitHierarchy(
+            [&](auto&&...) { //
+                ions.computeFullMomentumTensor();
+            },
+            minLvl, maxLvl);
     }
     else // if not computing total momentum tensor, user may want to compute it for some pop
     {
-        for (auto& pop : ions)
+        for (std::size_t i = 0; i < ions.size(); ++i)
         {
-            std::string tree{"/ions/pop/" + pop.name() + "/"};
+            auto& pop = ions[i];
+            std::string const tree{"/ions/pop/" + pop.name() + "/"};
 
-            auto computePopMomentumTensor
-                = [&](GridLayout& layout, std::string patchID, std::size_t iLvel) {
-                      auto& pop_momentum_tensor = pop.momentumTensor();
-                      pop_momentum_tensor.zero();
+            if (!isActiveDiag(diagnostic, tree, "momentum_tensor"))
+                continue;
 
-                      // dumps occur after the last substep but before the next first substep
-                      // at this time, levelGhostPartsNew is emptied and not yet filled
-                      // and the former levelGhostPartsNew has been moved to levelGhostPartsOld
+            auto computePopMomentumTensor = [&](GridLayout& layout, auto&&...) {
+                auto& pop_momentum_tensor = pop.momentumTensor();
+                pop_momentum_tensor.zero();
 
-                      auto domainParts     = core::makeIndexRange(pop.domainParticles());
-                      auto levelGhostParts = core::makeIndexRange(pop.levelGhostParticlesOld());
+                interpolator(pop.domainParticles(), pop_momentum_tensor, layout, pop.mass());
+                interpolator(pop.levelGhostParticlesOld(), pop_momentum_tensor, layout, pop.mass());
+            };
 
-                      interpolator(domainParts, pop_momentum_tensor, layout, pop.mass());
-                      interpolator(levelGhostParts, pop_momentum_tensor, layout, pop.mass());
-                  };
-            if (isActiveDiag(diagnostic, tree, "momentum_tensor"))
-            {
-                modelView.visitHierarchy(computePopMomentumTensor, minLvl, maxLvl);
-            }
+            modelView.visitHierarchy(computePopMomentumTensor, minLvl, maxLvl);
+
+            for (std::size_t lvl = minLvl; lvl <= maxLvl; ++lvl)
+                modelView.template fill<amr::RefinerType::PatchFieldBorderSum>(
+                    "HybridModel-HybridModel_sumTensor", lvl, h5Writer.timestamp(), i);
         }
     }
 }

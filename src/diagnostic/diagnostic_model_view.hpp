@@ -53,6 +53,12 @@ public:
 
     NO_DISCARD auto& getIons() const { return model_.state.ions; }
 
+    template<auto rtype>
+    void fill(std::string const& dst, int const level, double time, int const idx)
+    {
+        model_.template fill<rtype>(dst, *hierarchy_.getPatchLevel(level), time, idx);
+    }
+
 
     template<typename Action>
     void visitHierarchy(Action&& action, int minLevel = 0, int maxLevel = 0)
