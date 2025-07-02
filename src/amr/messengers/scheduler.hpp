@@ -56,8 +56,9 @@ struct RefinerScheduler : public Scheduler
             duo.funcs.emplace_back(optional);
 
         else // else default to regular
-            duo.funcs.emplace_back(
-                [=, this](auto& lvl, double time) { call<rtype>(dst, lvl, time); });
+            duo.funcs.emplace_back([=, this](auto& lvl, double time) {
+                (*this).template call<rtype>(dst, lvl, time);
+            });
 
         PHARE_LOG_LINE_SS(duo.a.size());
 
