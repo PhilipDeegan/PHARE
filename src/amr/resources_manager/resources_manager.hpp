@@ -325,7 +325,7 @@ namespace amr
             auto const Fn = [&](auto& key) {
                 if (auto const id = getID(key))
                     return *id;
-                throw std::runtime_error("bad key");
+                throw std::runtime_error("bad key: " + key);
             };
             return std::array{Fn(keys)...};
         }
