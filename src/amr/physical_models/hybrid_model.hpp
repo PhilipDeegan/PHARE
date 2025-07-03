@@ -110,15 +110,10 @@ public:
 
     void scheduler(amr::RefinerScheduler& schedulr) { scheduler_ = &schedulr; }
 
-    template<auto rtype> // run all
-    void fill(std::string const& dst, SAMRAI::hier::PatchLevel& level, double time)
+    template<auto rtype>
+    void fill(std::string const& dst, auto& level, double time, auto&&... args)
     {
-        scheduler_->template fill<rtype>(dst, level, time);
-    }
-    template<auto rtype> // run one
-    void fill(std::string const& dst, SAMRAI::hier::PatchLevel& level, double time, int const idx)
-    {
-        scheduler_->template fill<rtype>(dst, level, time, idx);
+        scheduler_->template fill<rtype>(dst, level, time, args...);
     }
 
     std::unordered_map<std::string, std::shared_ptr<core::NdArrayVector<dimension, int>>> tags;

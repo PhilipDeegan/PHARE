@@ -54,9 +54,16 @@ public:
     NO_DISCARD auto& getIons() const { return model_.state.ions; }
 
     template<auto rtype>
-    void fill(std::string const& dst, int const level, double time, int const idx)
+    void fill(std::string const& dst, auto&& lvl, double time, int const idx)
     {
-        model_.template fill<rtype>(dst, *hierarchy_.getPatchLevel(level), time, idx);
+        model_.template fill<rtype>(dst, lvl, time, idx);
+    }
+
+    template<typename Action>
+    void onLevels(Action&& action, int minlvl = 0, int maxlvl = 0)
+    {
+        for (int ilvl = minlvl; ilvl < hierarchy_.getNumberOfLevels() && ilvl <= maxlvl; ++ilvl)
+            action(*hierarchy_.getPatchLevel(ilvl));
     }
 
 

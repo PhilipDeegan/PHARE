@@ -87,30 +87,31 @@ void FluidDiagnosticWriter<H5Writer>::compute(DiagnosticProperties& diagnostic)
     // at this time, levelGhostPartsNew is emptied and not yet filled
     // and the former levelGhostPartsNew has been moved to levelGhostPartsOld
 
+    auto const fill_schedules = [&](auto& lvl) {
+        for (std::size_t i = 0; i < ions.size(); ++i)
+            modelView.template fill<amr::RefinerType::PatchFieldBorderSum>(
+                "HybridModel-HybridModel_sumTensor", lvl, h5Writer.timestamp(), i);
+    };
+
+    auto const interpolate_pop = [&](auto& pop, auto& layout, auto&&...) {
+        auto& pop_momentum_tensor = pop.momentumTensor();
+        pop_momentum_tensor.zero();
+        interpolator(pop.domainParticles(), pop_momentum_tensor, layout, pop.mass());
+        interpolator(pop.levelGhostParticlesOld(), pop_momentum_tensor, layout, pop.mass());
+    };
+
     if (isActiveDiag(diagnostic, "/ions/", "momentum_tensor"))
     {
-        auto interpolate = [&](GridLayout& layout, auto&&...) {
+        auto const interpolate = [&](auto& layout, auto&&...) {
             for (auto& pop : ions)
-            {
-                auto& pop_momentum_tensor = pop.momentumTensor();
-                pop_momentum_tensor.zero();
-
-                interpolator(pop.domainParticles(), pop_momentum_tensor, layout, pop.mass());
-                interpolator(pop.levelGhostParticlesOld(), pop_momentum_tensor, layout, pop.mass());
-            }
+                interpolate_pop(pop, layout);
         };
         modelView.visitHierarchy(interpolate, minLvl, maxLvl);
 
-        for (std::size_t lvl = minLvl; lvl <= maxLvl; ++lvl)
-            for (std::size_t i = 0; i < ions.size(); ++i)
-                modelView.template fill<amr::RefinerType::PatchFieldBorderSum>(
-                    "HybridModel-HybridModel_sumTensor", lvl, h5Writer.timestamp(), i);
+        modelView.onLevels(fill_schedules, minLvl, maxLvl);
 
-        modelView.visitHierarchy(
-            [&](auto&&...) { //
-                ions.computeFullMomentumTensor();
-            },
-            minLvl, maxLvl);
+        modelView.visitHierarchy( //
+            [&](auto&&...) { ions.computeFullMomentumTensor(); }, minLvl, maxLvl);
     }
     else // if not computing total momentum tensor, user may want to compute it for some pop
     {
@@ -122,19 +123,11 @@ void FluidDiagnosticWriter<H5Writer>::compute(DiagnosticProperties& diagnostic)
             if (!isActiveDiag(diagnostic, tree, "momentum_tensor"))
                 continue;
 
-            auto computePopMomentumTensor = [&](GridLayout& layout, auto&&...) {
-                auto& pop_momentum_tensor = pop.momentumTensor();
-                pop_momentum_tensor.zero();
+            auto const interpolate = [&](auto& layout, auto&&...) { interpolate_pop(pop, layout); };
 
-                interpolator(pop.domainParticles(), pop_momentum_tensor, layout, pop.mass());
-                interpolator(pop.levelGhostParticlesOld(), pop_momentum_tensor, layout, pop.mass());
-            };
+            modelView.visitHierarchy(interpolate, minLvl, maxLvl);
 
-            modelView.visitHierarchy(computePopMomentumTensor, minLvl, maxLvl);
-
-            for (std::size_t lvl = minLvl; lvl <= maxLvl; ++lvl)
-                modelView.template fill<amr::RefinerType::PatchFieldBorderSum>(
-                    "HybridModel-HybridModel_sumTensor", lvl, h5Writer.timestamp(), i);
+            modelView.onLevels(fill_schedules, minLvl, maxLvl);
         }
     }
 }

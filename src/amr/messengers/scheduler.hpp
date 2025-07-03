@@ -47,8 +47,6 @@ struct RefinerScheduler : public Scheduler
     auto& add_algorithm(std::string const& dst,
                         std::function<void(SAMRAI::hier::PatchLevel&, double)> optional = {})
     {
-        PHARE_LOG_LINE_SS(dst << " " << as_signed(rtype));
-
         auto& duo = duos[dst][as_signed(rtype)];
         duo.a.emplace_back(std::make_unique<Algorithm>());
 
@@ -59,8 +57,6 @@ struct RefinerScheduler : public Scheduler
             duo.funcs.emplace_back([=, this](auto& lvl, double time) {
                 (*this).template call<rtype>(dst, lvl, time);
             });
-
-        PHARE_LOG_LINE_SS(duo.a.size());
 
         return *this;
     }
@@ -180,9 +176,6 @@ RefinerScheduler::add(std::string const& dst,
     auto const levelNumber = level->getLevelNumber();
 
     auto& duo = duos[dst][as_signed(Type)];
-
-    PHARE_LOG_LINE_SS(dst << " " << as_signed(Type));
-    PHARE_LOG_LINE_SS(duo.a.size());
     assert(duo.a.size());
 
     for (auto& algo : duo.a)
