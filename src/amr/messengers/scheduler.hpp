@@ -92,25 +92,34 @@ struct RefinerScheduler : public Scheduler
     }
 
     template<auto rtype>
-    auto& register_vector_field(auto& rm, auto& dst, auto& src, auto& refOp, auto& fillPat)
+    auto& register_vector_field(auto& rm, auto& dst, auto& src, auto&& refOp, auto&& fillPat)
     {
-        return (*this)
-            .register_resource(rm, dst.xName, src.xName, dst.xName, refOp, fillPat)
-            .register_resource(rm, dst.yName, src.yName, dst.yName, refOp, fillPat)
-            .register_resource(rm, dst.zName, src.zName, dst.zName, refOp, fillPat);
+        register_resource<rtype>(rm, dst.xName, src.xName, dst.xName, refOp, fillPat);
+        register_resource<rtype>(rm, dst.yName, src.yName, dst.yName, refOp, fillPat);
+        register_resource<rtype>(rm, dst.zName, src.zName, dst.zName, refOp, fillPat);
+        return *this;
+    }
+
+    template<auto rtype>
+    auto& register_tensor_field(auto& rm, auto& dst, auto& src, auto&& fillPat)
+    {
+        for (std::size_t i = 0; i < dst.componentNames().size(); ++i)
+            register_resource<rtype>(rm, dst.componentNames()[i], src.componentNames()[i],
+                                     dst.componentNames()[i], /*refOp*/ nullptr, fillPat);
+        return *this;
     }
 
     template<auto rtype>
     auto& register_time_interpolated_vector_field(auto& rm, auto& dst, auto& src, auto& told,
                                                   auto& tnew, auto&&... args)
     {
-        return (*this)
-            .register_time_interpolated_resource(rm, dst.xName, src.xName, told.xName, tnew.xName,
-                                                 args...)
-            .register_time_interpolated_resource(rm, dst.yName, src.yName, told.yName, tnew.yName,
-                                                 args...)
-            .register_time_interpolated_resource(rm, dst.zName, src.zName, told.zName, tnew.zName,
-                                                 args...);
+        register_time_interpolated_resource<rtype>(rm, dst.xName, src.xName, told.xName, tnew.xName,
+                                                   args...);
+        register_time_interpolated_resource<rtype>(rm, dst.yName, src.yName, told.yName, tnew.yName,
+                                                   args...);
+        register_time_interpolated_resource<rtype>(rm, dst.zName, src.zName, told.zName, tnew.zName,
+                                                   args...);
+        return *this;
     }
 
 

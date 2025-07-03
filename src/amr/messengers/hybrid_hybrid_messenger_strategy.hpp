@@ -198,20 +198,19 @@ namespace amr
         void registerQuantities(IPhysicalModel& /*coarseModel*/, IPhysicalModel& fineModel) override
         {
             auto& hybridModel = dynamic_cast<HybridModel&>(fineModel);
-
-            auto& ions = hybridModel.state.ions;
+            auto& rm          = resourcesManager_;
+            auto& ions        = hybridModel.state.ions;
 
             // pop density borders
             for (std::size_t i = 0; i < ions.size(); ++i)
                 Super::scheduler()
                     .template add_algorithm<RefinerType::PatchFieldBorderSum>(
                         sumField.name(),
-                        [=, this](auto& lvl, double fillTime) mutable {
+                        [=, this](auto& lvl, auto fillTime) mutable {
                             fillDensityBorders(ions, lvl, fillTime, i);
                         })
                     .template register_resource<RefinerType::PatchFieldBorderSum>(
-                        resourcesManager_, sumField.name(), ions[i].density().name(),
-                        sumField.name(), nullptr,
+                        rm, sumField.name(), ions[i].density().name(), sumField.name(), nullptr,
                         std::make_shared<FieldGhostInterpOverlapFillPattern<GridLayoutT>>());
 
             // pop momentum tensor borders
@@ -219,12 +218,11 @@ namespace amr
                 Super::scheduler()
                     .template add_algorithm<RefinerType::PatchFieldBorderSum>(
                         sumTensor_.name(),
-                        [=, this](auto& lvl, double fillTime) mutable {
+                        [=, this](auto& lvl, auto fillTime) mutable {
                             fillMomentumTensorFieldBorders(ions, lvl, fillTime, i);
                         })
-                    .template register_resource<RefinerType::PatchFieldBorderSum>(
-                        resourcesManager_, sumTensor_.name(), ions[i].density().name(),
-                        sumTensor_.name(), nullptr,
+                    .template register_tensor_field<RefinerType::PatchFieldBorderSum>(
+                        rm, sumTensor_, ions[i].momentumTensor(),
                         std::make_shared<FieldGhostInterpOverlapFillPattern<GridLayoutT>>());
         }
 
