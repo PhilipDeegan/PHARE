@@ -67,7 +67,8 @@ auto constexpr allocator()
             else if constexpr (CompileOptions::WithMknGpu)
             {
                 PHARE_WITH_MKN_GPU(
-                    return Allocator<allocator_mode, mkn::kul::HugePageAllocator<Type>>{};)
+                    return Allocator<allocator_mode,
+                                     mkn::kul::NonConstructingHugePageAllocator<Type>>{};)
             }
             else
             {
