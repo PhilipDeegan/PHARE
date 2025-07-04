@@ -134,7 +134,6 @@ namespace core
                 }
             }
 
-
             inverseMeshSize_[0] = 1. / meshSize_[0];
             if constexpr (dimension > 1)
             {
@@ -1149,6 +1148,34 @@ namespace core
 
 
 
+        // essentially box form of allocSize(...)
+        template<typename Field>
+        Box<std::uint32_t, dimension> ghostBoxFor(Field const& field) const
+        {
+            return _BoxFor(field, [&](auto const& centering, auto const direction) {
+                return this->ghostStartToEnd(centering, direction);
+            });
+        }
+
+
+
+        template<typename Field>
+        auto AMRGhostBoxFor(Field const& field) const
+        {
+            auto const centerings = centering(field);
+            auto const growBy     = [&]() {
+                std::array<int, dimension> arr;
+                for (std::uint8_t i = 0; i < dimension; ++i)
+                    arr[i] = nbrGhosts(centerings[i]);
+                return arr;
+            }();
+            auto ghostBox = grow(AMRBox_, growBy);
+            for (std::uint8_t i = 0; i < dimension; ++i)
+                ghostBox.upper[i] += (centerings[i] == QtyCentering::primal) ? 1 : 0;
+            return ghostBox;
+        }
+
+
 
         template<typename Field, typename Fn>
         void evalOnBox(Field& field, Fn&& fn) const
@@ -1203,6 +1230,30 @@ namespace core
                     }
                 }
             }
+        }
+
+
+        template<typename Field, typename Fn>
+        auto _BoxFor(Field const& field, Fn startToEnd) const
+        {
+            std::array<std::uint32_t, dimension> lower, upper;
+
+            auto const [ix0, ix1] = startToEnd(field, Direction::X);
+            lower[0]              = ix0;
+            upper[0]              = ix1;
+            if constexpr (dimension > 1)
+            {
+                auto const [iy0, iy1] = startToEnd(field, Direction::Y);
+                lower[1]              = iy0;
+                upper[1]              = iy1;
+            }
+            if constexpr (dimension == 3)
+            {
+                auto const [iz0, iz1] = startToEnd(field, Direction::Z);
+                lower[2]              = iz0;
+                upper[2]              = iz1;
+            }
+            return Box<std::uint32_t, dimension>{lower, upper};
         }
 
 
@@ -1318,12 +1369,17 @@ namespace core
 
         /**
          * @brief nbrDualGhosts_ returns the number of ghost nodes on each side for dual quantities.
-         * The formula is based only on the interpolation order, whch means only particle-mesh
-         * interactions constrain the number of dual ghost nodes.
+         * It is obtained using the required number of ghost for the interpolation ((interp_order +
+         * 1) / 2), to which we add one for the patchghost for particles that may leave the cells,
+         * and we then take the closest even number. This is because we are using the Toth and Roe
+         * (2002) formulas for magnetic refinement, so we want to have on refinement full coarse
+         * cell below the fine grid, which odd number of ghost nodes would not allow.
          */
         NO_DISCARD std::uint32_t constexpr static nbrDualGhosts_()
         {
-            return (interp_order + 1) / 2 + nbrParticleGhosts();
+            static_assert(interp_order > 0 and interp_order < 4);
+            constexpr auto ghosts = std::array{2, 4, 4};
+            return ghosts[interp_order - 1];
         }
 
 
@@ -1507,7 +1563,6 @@ namespace core
         std::array<std::array<std::uint32_t, dimension>, 2> physicalEndIndexTable_;
         std::array<std::array<std::uint32_t, dimension>, 2> ghostEndIndexTable_;
         Box<int, dimension> AMRBox_;
-
 
         // this constexpr initialization only works if primal==0 and dual==1
         // this is defined in gridlayoutdefs.hpp don't change it because these

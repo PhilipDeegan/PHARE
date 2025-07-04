@@ -54,6 +54,21 @@ public:
     NO_DISCARD auto& getIons() const { return model_.state.ions; }
 
 
+    void fillPopMomTensor(auto& lvl, auto const time, auto const idx)
+    {
+        model_.template fill<amr::RefinerType::PatchFieldBorderSum>(
+            "HybridModel-HybridModel_sumTensor", lvl, time, idx);
+    }
+
+
+    template<typename Action>
+    void onLevels(Action&& action, int minlvl = 0, int maxlvl = 0)
+    {
+        for (int ilvl = minlvl; ilvl < hierarchy_.getNumberOfLevels() && ilvl <= maxlvl; ++ilvl)
+            action(*hierarchy_.getPatchLevel(ilvl));
+    }
+
+
     template<typename Action>
     void visitHierarchy(Action&& action, int minLevel = 0, int maxLevel = 0)
     {

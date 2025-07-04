@@ -1,16 +1,15 @@
 #ifndef PHARE_CORE_DATA_GRID_GRID_BASE_HPP
 #define PHARE_CORE_DATA_GRID_GRID_BASE_HPP
 
-#include <array>
-#include <cstddef>
-#include <cassert>
-#include <string>
-#include <utility>
-#include <vector>
-#include <algorithm>
 
 #include "core/def.hpp"
 #include "core/data/field/field.hpp"
+
+
+#include <array>
+#include <string>
+#include <cstddef>
+#include <cassert>
 
 namespace PHARE::core
 {
@@ -35,7 +34,6 @@ public:
 
 
     Grid()                              = delete;
-    Grid(Grid const& source)            = delete;
     Grid(Grid&& source)                 = default;
     Grid& operator=(Grid&& source)      = delete;
     Grid& operator=(Grid const& source) = delete;
@@ -45,7 +43,6 @@ public:
         : Super{dims...}
         , name_{name}
         , qty_{qty}
-        , field_{name, qty, Super::data(), Super::shape()}
     {
         static_assert(sizeof...(Dims) == dimension, "Invalid dimension");
     }
@@ -55,7 +52,6 @@ public:
         : Super{dims}
         , name_{name}
         , qty_{qty}
-        , field_{name, qty, Super::data(), Super::shape()}
     {
     }
 
@@ -64,7 +60,13 @@ public:
         : Super{layout.allocSize(qty)}
         , name_{name}
         , qty_{qty}
-        , field_{name, qty, Super::data(), Super::shape()}
+    {
+    }
+
+    Grid(Grid const& source) // let field_ default
+        : Super{source.shape()}
+        , name_{source.name()}
+        , qty_{source.physicalQuantity()}
     {
     }
 
@@ -87,23 +89,8 @@ public:
 private:
     std::string name_{"No Name"};
     PhysicalQuantity qty_;
-    field_type field_;
+    field_type field_{name_, qty_, Super::data(), Super::shape()};
 };
-
-
-
-
-template<typename NdArrayImpl, typename PhysicalQuantity>
-void average(Grid<NdArrayImpl, PhysicalQuantity> const& f1,
-             Grid<NdArrayImpl, PhysicalQuantity> const& f2,
-             Grid<NdArrayImpl, PhysicalQuantity>& avg)
-{
-    std::transform(std::begin(f1), std::end(f1), std::begin(f2), std::begin(avg),
-                   std::plus<double>());
-
-    std::transform(std::begin(avg), std::end(avg), std::begin(avg),
-                   [](double x) { return x * 0.5; });
-}
 
 
 

@@ -254,6 +254,9 @@ namespace core
         NO_DISCARD bool sameMasses() const { return sameMasses_; }
 
 
+        auto& operator[](std::size_t const i) { return populations_[i]; }
+        auto& operator[](std::size_t const i) const { return populations_[i]; }
+
     private:
         bool allSameMass_() const
         {
@@ -278,5 +281,7 @@ namespace core
     };
 } // namespace core
 } // namespace PHARE
+
+
 
 #endif
