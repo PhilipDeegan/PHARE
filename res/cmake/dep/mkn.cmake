@@ -10,3 +10,5 @@ include_directories(${CMAKE_CURRENT_SOURCE_DIR}/subprojects/mkn/gpu/inc)
 # add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/subprojects/nvcccl)
 # set (PHARE_BASE_LIBS ${PHARE_BASE_LIBS} CUB::CUB Thrust::Thrust)
 
+# thread pool
+phare_github_get_or_update(bstp ${CMAKE_CURRENT_SOURCE_DIR}/subprojects/bstp bshoshany/thread-pool master)
