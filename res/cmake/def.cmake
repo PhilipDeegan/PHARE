@@ -205,12 +205,12 @@ if (test AND ${PHARE_EXEC_LEVEL_MIN} GREATER 0) # 0 = no tests
     endfunction(add_phare_test)
 
     function(add_python3_test name file directory)
-      add_test(NAME py3_${name} COMMAND mpirun -n ${PHARE_MPI_PROCS} ${PHARE_MPIRUN_POSTFIX} python3 -u ${file} WORKING_DIRECTORY ${directory})
+      add_test(NAME py3_${name} COMMAND mpirun -n ${PHARE_MPI_PROCS} ${PHARE_MPIRUN_POSTFIX} ${Python_EXECUTABLE} -u ${file} WORKING_DIRECTORY ${directory})
       set_exe_paths_(py3_${name})
     endfunction(add_python3_test)
 
     function(add_mpi_python3_test N name file directory)
-      add_test(NAME py3_${name}_mpi_n_${N} COMMAND mpirun -n ${N} ${PHARE_MPIRUN_POSTFIX} python3 ${file} WORKING_DIRECTORY ${directory})
+      add_test(NAME py3_${name}_mpi_n_${N} COMMAND mpirun -n ${N} ${PHARE_MPIRUN_POSTFIX} ${Python_EXECUTABLE} ${file} WORKING_DIRECTORY ${directory})
       set_exe_paths_(py3_${name}_mpi_n_${N})
     endfunction(add_mpi_python3_test)
 
@@ -233,25 +233,6 @@ if (test AND ${PHARE_EXEC_LEVEL_MIN} GREATER 0) # 0 = no tests
   endfunction(add_phare_build_test)
 
 
-  if(DEFINED GTEST_ROOT)
-    set(GTEST_ROOT ${GTEST_ROOT} CACHE PATH "Path to googletest")
-    find_package(GTest REQUIRED)
-    set(GTEST_LIBS GTest::GTest GTest::Main)
-  else()
-    set(GTEST_ROOT ${CMAKE_CURRENT_SOURCE_DIR}/subprojects/googletest)
-
-    if (NOT EXISTS ${GTEST_ROOT})
-      execute_process(COMMAND ${Git} clone https://github.com/google/googletest ${GTEST_ROOT})
-    endif()
-
-    add_subdirectory(subprojects/googletest)
-    set(GTEST_INCLUDE_DIRS
-      $<BUILD_INTERFACE:${gtest_SOURCE_DIR}/include>
-      $<BUILD_INTERFACE:${gmock_SOURCE_DIR}/include>)
-    set(GTEST_LIBS gtest gmock)
-
-  endif()
-
   function(phare_exec level target exe directory)
     if(${level} GREATER_EQUAL ${PHARE_EXEC_LEVEL_MIN} AND ${level} LESS_EQUAL ${PHARE_EXEC_LEVEL_MAX})
       add_test(NAME ${target} COMMAND ${exe} WORKING_DIRECTORY ${directory})
@@ -273,7 +254,7 @@ if (test AND ${PHARE_EXEC_LEVEL_MIN} GREATER 0) # 0 = no tests
       else()
         add_test(
             NAME py3_${target}_mpi_n_${N}
-            COMMAND mpirun -n ${N} ${PHARE_MPIRUN_POSTFIX} python3 -u ${file} ${CLI_ARGS}
+            COMMAND mpirun -n ${N} ${PHARE_MPIRUN_POSTFIX} ${Python_EXECUTABLE} -u ${file} ${CLI_ARGS}
             WORKING_DIRECTORY ${directory})
         set_exe_paths_(py3_${target}_mpi_n_${N})
       endif()

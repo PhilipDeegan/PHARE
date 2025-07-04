@@ -1,20 +1,18 @@
 #ifndef _PHARE_CORE_DATA_FIELD_INITIAZILIZERS_FIELD_USER_INITIALIZER_HPP_
 #define _PHARE_CORE_DATA_FIELD_INITIAZILIZERS_FIELD_USER_INITIALIZER_HPP_
 
-#include "core/utilities/span.hpp"
-#include "initializer/data_provider.hpp"
+
+#include "core/data/grid/grid_tiles.hpp"
 
 #include <tuple>
-#include <memory>
 
 namespace PHARE::core
 {
+
 class FieldUserFunctionInitializer
 {
-public:
-    template<typename Field, typename GridLayout>
-    void static initialize(Field& field, GridLayout const& layout,
-                           initializer::InitFunction<GridLayout::dimension> const& init)
+    template<typename Field, typename GridLayout, typename InitFunction>
+    void static _initialize(Field& field, GridLayout const& layout, InitFunction const& init)
     {
         auto const indices = layout.ghostStartToEndIndices(field, /*includeEnd=*/true);
         auto const coords  = layout.template indexesToCoordVectors</*WithField=*/true>(
@@ -22,14 +20,29 @@ public:
                 return gridLayout.fieldNodeCoordinates(field_, gridLayout.origin(), args...);
             });
 
-        std::shared_ptr<Span<double>> gridPtr // keep grid data alive
-            = std::apply([&](auto&... args) { return init(args...); }, coords);
-        Span<double>& grid = *gridPtr;
+        // keep grid data alive
+        auto grid = std::apply([&](auto const&... args) { return init(args...); }, coords);
+        assert(field.size() == grid->size());
 
         for (std::size_t cell_idx = 0; cell_idx < indices.size(); cell_idx++)
-            std::apply([&](auto&... args) { field(args...) = grid[cell_idx]; }, indices[cell_idx]);
+            std::apply([&](auto&... args) { field(args...) = (*grid)[cell_idx]; },
+                       indices[cell_idx]);
+    }
+
+public:
+    template<typename Field, typename GridLayout, typename InitFunction>
+    void static initialize(Field& field, GridLayout const& layout, InitFunction const& init)
+    {
+        auto constexpr static is_field_tile_set = is_field_tile_set_v<Field>;
+
+        if constexpr (is_field_tile_set)
+            for (auto& tile : field())
+                _initialize(tile(), tile.layout(), init);
+        else
+            _initialize(field, layout, init);
     }
 };
+
 
 } // namespace PHARE::core
 
