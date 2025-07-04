@@ -5,7 +5,9 @@
 
 import unittest
 import itertools
+import numpy as np
 import matplotlib
+
 from pyphare.cpp import supported_particle_layouts
 from ddt import data, ddt, unpack
 from tests.simulator.test_initialization import InitializationTest

@@ -231,7 +231,7 @@ struct IonUpdaterTest : public ::testing::Test,
     GridLayout const layout{{0.1}, {100u}, {{0.}}};
 
     // assumes no level ghost cells
-    Boxing_t const boxing{layout, {grow(layout.AMRBox(), GridLayout::nbrParticleGhosts())}};
+    Boxing_t const boxing{layout, {layout}};
     std::unordered_map<std::string, Boxing_t> const levelBoxing{{"patch_id", boxing}};
 
     static_assert(std::is_same_v<Electromag, typename UsableElectromag_t::Super>);
