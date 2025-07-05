@@ -41,6 +41,7 @@ def config():
             "options": {"dir": diag_dir, "mode": "overwrite"},
         },
         strict=True,
+        tag_buffer=3,
     )
 
     def density(x, y):
