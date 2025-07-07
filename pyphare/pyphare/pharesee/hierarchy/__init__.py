@@ -37,6 +37,6 @@ def hierarchy_from(
         return hierarchy_fromh5(h5_filename, times, hier, **kwargs)
 
     if simulator is not None and qty is not None:
-        return hierarchy_from_sim(simulator, qty, pop=pop)
+        return hierarchy_from_sim(simulator, qty, pop=pop, hier=hier)
 
     raise ValueError("can't make hierarchy")

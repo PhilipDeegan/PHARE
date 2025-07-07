@@ -107,6 +107,12 @@ public:
         return path + "/" + core::to_string_fixed_width(timestamp, precision, width);
     }
 
+    auto modelForLevel(int level) const
+    {
+        assert(level < static_cast<int>(modelPerLevel_.size()));
+        return modelPerLevel_[level];
+    }
+
 protected:
     template<std::size_t dimension>
     Hierarchy(initializer::PHAREDict const& dict,
@@ -122,6 +128,7 @@ private:
     std::vector<int> const domainBox_;
     std::vector<double> const origin_;
     std::vector<std::string> boundaryConditions_;
+    std::vector<std::string> modelPerLevel_;
 };
 
 
@@ -215,6 +222,8 @@ Hierarchy::Hierarchy(initializer::PHAREDict const& dict,
     , origin_(origin.data(), origin.data() + dimension)
     , boundaryConditions_(boundaryConditions.data(), boundaryConditions.data() + dimension)
 {
+    for (int i = 0; i < getMaxNumberOfLevels(); ++i)
+        modelPerLevel_.emplace_back("Hybrid");
 }
 
 

@@ -1,30 +1,33 @@
 #ifndef PHARE_PYTHON_PATCH_LEVEL_HPP
 #define PHARE_PYTHON_PATCH_LEVEL_HPP
 
-#include <array>
+#include "phare_solver.hpp"
+#include "python3/patch_data.hpp"
+
+
+#include <string>
 #include <cstring>
 #include <cstddef>
-#include <string>
-#include <utility>
-#include "phare_solver.hpp"
+
 
 
 namespace PHARE::pydata
 {
-template<std::size_t dim, std::size_t interpOrder, std::size_t nbrRefPart>
-class PatchLevel
+
+template<typename Model, typename Enable = void>
+class PatchLevel;
+
+
+template<typename Model>
+class PatchLevel<Model, std::enable_if_t<solver::is_hybrid_model_v<Model>>>
 {
 public:
-    static constexpr std::size_t dimension     = dim;
-    static constexpr std::size_t interp_order  = interpOrder;
-    static constexpr std::size_t nbRefinedPart = nbrRefPart;
+    using Model_t                             = Model;
+    using GridLayout                          = Model_t::gridlayout_type;
+    static constexpr std::size_t dimension    = GridLayout::dimension;
+    static constexpr std::size_t interp_order = GridLayout::interpOrder;
 
-    using PHARESolverTypes = solver::PHARE_Types<dimension, interp_order, nbRefinedPart>;
-    using HybridModel      = typename PHARESolverTypes::HybridModel_t;
-
-    using GridLayout = typename HybridModel::gridlayout_type;
-
-    PatchLevel(amr::Hierarchy& hierarchy, HybridModel& model, std::size_t lvl)
+    PatchLevel(amr::Hierarchy& hierarchy, Model& model, std::size_t lvl)
         : lvl_(lvl)
         , hierarchy_{hierarchy}
         , model_{model}
@@ -155,19 +158,19 @@ public:
     }
 
 
-    auto getB(std::string componentName)
+    auto getB(std::string const& componentName)
     {
-        std::vector<PatchData<std::vector<double>, dimension>> patchDatas;
+        std::vector<PatchData<py_array_t<double>, dimension>> patchDatas;
 
         auto& B = model_.state.electromag.B;
 
         auto visit = [&](GridLayout& grid, std::string patchID, std::size_t /*iLevel*/) {
             auto compo = PHARE::core::Components::componentMap().at(componentName);
-            setPatchDataFromField(patchDatas.emplace_back(), B.getComponent(compo), grid, patchID);
+            setPyPatchDataFromField(patchDatas.emplace_back(), B.getComponent(compo), grid,
+                                    patchID);
         };
 
-        PHARE::amr::visitLevel<GridLayout>(*hierarchy_.getPatchLevel(lvl_),
-                                           *model_.resourcesManager, visit, B);
+        amr::visitLevel<GridLayout>(level_, *model_.resourcesManager, visit, B);
 
         return patchDatas;
     }
@@ -175,13 +178,14 @@ public:
 
     auto getE(std::string componentName)
     {
-        std::vector<PatchData<std::vector<double>, dimension>> patchDatas;
+        std::vector<PatchData<py_array_t<double>, dimension>> patchDatas;
 
         auto& E = model_.state.electromag.E;
 
         auto visit = [&](GridLayout& grid, std::string patchID, std::size_t /*iLevel*/) {
             auto compo = PHARE::core::Components::componentMap().at(componentName);
-            setPatchDataFromField(patchDatas.emplace_back(), E.getComponent(compo), grid, patchID);
+            setPyPatchDataFromField(patchDatas.emplace_back(), E.getComponent(compo), grid,
+                                    patchID);
         };
 
         PHARE::amr::visitLevel<GridLayout>(*hierarchy_.getPatchLevel(lvl_),
@@ -194,13 +198,14 @@ public:
 
     auto getVi(std::string componentName)
     {
-        std::vector<PatchData<std::vector<double>, dimension>> patchDatas;
+        std::vector<PatchData<py_array_t<double>, dimension>> patchDatas;
 
         auto& V = model_.state.ions.velocity();
 
         auto visit = [&](GridLayout& grid, std::string patchID, std::size_t /*iLevel*/) {
             auto compo = PHARE::core::Components::componentMap().at(componentName);
-            setPatchDataFromField(patchDatas.emplace_back(), V.getComponent(compo), grid, patchID);
+            setPyPatchDataFromField(patchDatas.emplace_back(), V.getComponent(compo), grid,
+                                    patchID);
         };
 
         PHARE::amr::visitLevel<GridLayout>(*hierarchy_.getPatchLevel(lvl_),
@@ -301,8 +306,35 @@ public:
 private:
     std::size_t lvl_;
     amr::Hierarchy& hierarchy_;
-    HybridModel& model_;
+    Model_t& model_;
+    amr::SAMRAI_Types::level_t& level_ = *hierarchy_.getPatchLevel(lvl_);
 };
+
+
+template<typename Model>
+class PatchLevel<Model, std::enable_if_t<solver::is_mhd_model_v<Model>>>
+{
+public:
+    using Model_t = Model;
+    // using GridLayout                          = Model_t::gridlayout_type;
+    // static constexpr std::size_t dimension    = GridLayout::dimension;
+    // static constexpr std::size_t interp_order = GridLayout::interpOrder;
+
+
+    PatchLevel(amr::Hierarchy& hierarchy, Model& model, std::size_t const lvl)
+        : lvl_(lvl)
+        , hierarchy_{hierarchy}
+        , model_{model}
+    {
+    }
+
+private:
+    std::size_t lvl_;
+    amr::Hierarchy& hierarchy_;
+    Model_t& model_;
+    amr::SAMRAI_Types::level_t& level_ = *hierarchy_.getPatchLevel(lvl_);
+};
+
 
 
 } // namespace PHARE::pydata

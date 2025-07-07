@@ -57,11 +57,12 @@ if venv_path is not None:
     sys.path = sys.path + pythonpath
 
 
-def NO_GUI():
+def NO_GUI(force=False):
     """prevents issues when command line only and no desktop etc"""
     import matplotlib as mpl
 
-    mpl.use("Agg")
+    if force or not os.environ.get("DISPLAY"):
+        mpl.use("Agg")
 
 
 def getSimulation():
