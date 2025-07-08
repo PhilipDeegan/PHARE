@@ -154,7 +154,6 @@ struct ElectronsFixture
     GridND ionChargeDensity, ionMassDensity, protonParticleDensity, protonChargeDensity;
 
     UsableVecField<dim> B, J, F, Ve, Vi;
-    UsableTensorField<dim> M, protons_M;
 
     GridND Nibuffer, NiProtons, Pe, Te;
 
@@ -238,6 +237,8 @@ struct ElectronsFixture
         , Te{"Te", HybridQuantity::Scalar::P, layout.allocSize(HybridQuantity::Scalar::P)}
         , fluxCompute{ions, J}
         , electrons{dict["electrons"], fluxCompute, B}
+        , ions{_ions(F, ionChargeDensity, ionMassDensity, protonParticleDensity,
+                     protonChargeDensity, Vi, ionTensor, protonTensor, pack)}
     {
         /* TODO explain why... we have 2 flux computer : 1 is the flux computer and the same is a
          * copy in the pressure closure */
