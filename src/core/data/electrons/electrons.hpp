@@ -5,7 +5,7 @@
 #include "core/utilities/variants.hpp"
 #include "core/hybrid/hybrid_quantities.hpp"
 #include "core/data/grid/gridlayout_utils.hpp"
-#include "core/data/grid/gridlayoutdefs.hpp"  // TODO : needed ?
+#include "core/data/grid/gridlayoutdefs.hpp" // TODO : needed ?
 #include "core/data/vecfield/vecfield_component.hpp"
 #include "core/data/field/initializers/field_user_initializer.hpp"
 
@@ -324,14 +324,16 @@ private:
     template<typename Field, typename VecField>
     void P_Eq_(GridLayout const& layout, VecField const& Ve, Field const& Te, auto&... ijk) const
     {
-        Te(ijk...) = Te(ijk...) + dt_ * ( advection_(layout, Ve, Te, ijk...)
-                                        + compression_(layout, Ve, Te, ijk...) );
+        Te(ijk...)
+            = Te(ijk...)
+              + dt_ * (advection_(layout, Ve, Te, ijk...) + compression_(layout, Ve, Te, ijk...));
     }
 
     template<typename Field, typename VecField>
-    auto advection_(GridLayout const& layout, VecField const& Ve, Field const& Te, auto&... ijk) const
+    auto advection_(GridLayout const& layout, VecField const& Ve, Field const& Te,
+                    auto&... ijk) const
     {
-        auto l_ = layout;  // TODO so that it is non const
+        auto l_ = layout; // TODO so that it is non const
 
         // Both Ve and Te are primal on Yee, that is with the same centering
         // Hence, using 'derivOnSameCentering' guarantee that all the terms involved
@@ -340,7 +342,7 @@ private:
         auto gradT_X   = l_.template derivOnSameCentering<Direction::X>(Te, {ijk...});
 
         if constexpr (dim == 1)
-            return Vx(ijk...)*gradT_X;
+            return Vx(ijk...) * gradT_X;
 
         else
         {
@@ -348,13 +350,13 @@ private:
             auto gradT_Y   = l_.template derivOnSameCentering<Direction::Y>(Te, {ijk...});
 
             if constexpr (dim == 2)
-                return Vx(ijk...)*gradT_X + Vy(ijk...)*gradT_Y;
+                return Vx(ijk...) * gradT_X + Vy(ijk...) * gradT_Y;
             else
             {
                 auto const& Vz = Ve(Component::Z);
                 auto gradT_Z   = l_.template derivOnSameCentering<Direction::Z>(Te, {ijk...});
 
-                return Vx(ijk...)*gradT_X + Vy(ijk...)*gradT_Y + Vz(ijk...)*gradT_Z;
+                return Vx(ijk...) * gradT_X + Vy(ijk...) * gradT_Y + Vz(ijk...) * gradT_Z;
             }
         }
     }
@@ -362,9 +364,10 @@ private:
 
 
     template<typename Field, typename VecField>
-    auto compression_(GridLayout const& layout, VecField const& Ve, Field const& Te, auto&... ijk) const
+    auto compression_(GridLayout const& layout, VecField const& Ve, Field const& Te,
+                      auto&... ijk) const
     {
-        auto l_ = layout;  // TODO so that it is non const
+        auto l_ = layout; // TODO so that it is non const
 
         // Both Ve and Te are primal on Yee, that is with the same centering
         // Hence, using 'derivOnSameCentering' guarantee that all the terms involved
@@ -381,19 +384,16 @@ private:
             auto gradV_Y   = l_.template derivOnSameCentering<Direction::Y>(Vx, {ijk...});
 
             if constexpr (dim == 2)
-                return (gamma_ - 1) * Te(ijk...) * ( gradV_X + gradV_Y );
+                return (gamma_ - 1) * Te(ijk...) * (gradV_X + gradV_Y);
             else
             {
                 auto const& Vz = Ve(Component::Z);
                 auto gradV_Z   = l_.template derivOnSameCentering<Direction::Z>(Vz, {ijk...});
 
-                return (gamma_ - 1) * Te(ijk...) * ( gradV_X + gradV_Y + gradV_Z );
+                return (gamma_ - 1) * Te(ijk...) * (gradV_X + gradV_Y + gradV_Z);
             }
         }
     }
-
-
-
 };
 
 
@@ -544,7 +544,10 @@ public:
 
     void computeDensity() { fluxComput_.computeDensity(); }
     void computeBulkVelocity(GridLayout const& layout) { fluxComput_.computeBulkVelocity(layout); }
-    void computePressure(GridLayout const& layout, double const dt) { pressureClosure_->computePressure(layout, dt); }
+    void computePressure(GridLayout const& layout, double const dt)
+    {
+        pressureClosure_->computePressure(layout, dt);
+    }
 
 private:
     initializer::PHAREDict dict_;
