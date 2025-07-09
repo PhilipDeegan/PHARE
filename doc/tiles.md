@@ -67,7 +67,6 @@
 
 
 
-
 <br /><br /><br /><br /><br /><br /><br /><br /><br /><br /><br /><br />
 <br /><br /><br /><br /><br /><br /><br /><br /><br /><br /><br /><br />
 
@@ -124,9 +123,9 @@
 <br />
 
 
-https://github.com/PhilipDeegan/PHARE/blob/mkn/tests/functional/harris/harris_2d.py#L216
+https://github.com/PhilipDeegan/PHARE/blob/d20bd65ea118d910110a6f616a4729a193977f5d/tests/functional/harris/harris_2d.py#L216
 
-
+https://github.com/PhilipDeegan/PHARE/actions
 
 <br /><br /><br /><br /><br /><br /><br /><br /><br /><br /><br /><br />
 <br /><br /><br /><br /><br /><br /><br /><br /><br /><br /><br /><br />
@@ -228,6 +227,11 @@ https://github.com/PhilipDeegan/PHARE/blob/mkn/tests/functional/harris/harris_2d
     ParticleArrays
       Arbitrary Storage and Layouts
       Allows for case by case Impls/Optimizations
+
+https://github.com/PhilipDeegan/PHARE/blob/d20bd65ea118d910110a6f616a4729a193977f5d/src/core/data/particles/particle_array_def.hpp#L17-L27
+
+https://github.com/PhilipDeegan/PHARE/blob/d20bd65ea118d910110a6f616a4729a193977f5d/src/core/def/phare_config.hpp#L59-L63
+
 <br />
 
     TileSets
@@ -238,23 +242,28 @@ https://github.com/PhilipDeegan/PHARE/blob/mkn/tests/functional/harris/harris_2d
 
     ParticleArrayTileSet
       Maps ParticleArrays to tiles
+
 <br />
 
     CPU Threading
       ThreadPools for a given task
       Multi-Stage threaded job executor for updater/boris
-       can also use threadpools per job
+       Can also use threadpools
+
 <br />
 
     GPU
       Multi-Stage threaded job executor for updater/boris
-       Kernel per patch, with a block per tile, blocksize==warpsize, iterates
+       Kernel per patch, block per tile, blocksize==warpsize, iterates
+
 <br />
 
     Atomics
       Particle To Mesh
       Particle Leaving/Entering tiles
+
 <br />
+
     Multi-Stage threaded job executor
       Implicit synchronisations between jobs
        Such that, the next job only runs when the previous is finished
@@ -317,4 +326,13 @@ https://github.com/PhilipDeegan/PHARE/blob/mkn/tests/functional/harris/harris_2d
 
 ## their completion level and decide for a plan to discuss them in detail.
 
-  Thoughts?
+  `what remains to be done` - `where we are` == `completion level`
+
+<br />
+
+  plan to make a plan...
+
+
+<br /><br /><br /><br /><br /><br /><br /><br /><br /><br /><br /><br />
+<br /><br /><br /><br /><br /><br /><br /><br /><br /><br /><br /><br />
+
