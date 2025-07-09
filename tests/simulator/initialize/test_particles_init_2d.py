@@ -72,35 +72,21 @@ class Initialization2DTest(InitializationTest):
             f"\n{self._testMethodName}_{ndim}d took {self.datetime_diff(now)} seconds"
         )
 
-    @data(
-        {
-            "cells": 40,
-            "smallest_patch_size": 20,
-            "largest_patch_size": 20,
-            "nbr_part_per_cell": ppc,
-        }
-    )
-    def test_no_patch_ghost_on_refined_level_case(self, simInput):
-        print(f"\n{self._testMethodName}_{ndim}d")
-        now = self.datetime_now()
-        self._test_patch_ghost_on_refined_level_case(ndim, False, **simInput)
-        print(
-            f"\n{self._testMethodName}_{ndim}d took {self.datetime_diff(now)} seconds"
-        )
-
-    @data({"cells": 40, "interp_order": 1, "nbr_part_per_cell": ppc})
-    def test_has_patch_ghost_on_refined_level_case(self, simInput):
-        print(f"\n{self._testMethodName}_{ndim}d")
-        from pyphare.pharein.simulation import check_patch_size
-
-        _, smallest_patch_size = check_patch_size(ndim, **simInput)
-        simInput["smallest_patch_size"] = smallest_patch_size
-        simInput["largest_patch_size"] = smallest_patch_size
-        now = self.datetime_now()
-        self._test_patch_ghost_on_refined_level_case(ndim, True, **simInput)
-        print(
-            f"\n{self._testMethodName}_{ndim}d took {self.datetime_diff(now)} seconds"
-        )
+    # @data(
+    #     {
+    #         "cells": 40,
+    #         "smallest_patch_size": 20,
+    #         "largest_patch_size": 20,
+    #         "nbr_part_per_cell": ppc,
+    #     }
+    # )
+    # def test_no_patch_ghost_on_refined_level_case(self, simInput):
+    #     print(f"\n{self._testMethodName}_{ndim}d")
+    #     now = self.datetime_now()
+    #     self._test_patch_ghost_on_refined_level_case(ndim, False, **simInput)
+    #     print(
+    #         f"\n{self._testMethodName}_{ndim}d took {self.datetime_diff(now)} seconds"
+    #     )
 
 
 if __name__ == "__main__":

@@ -1,3 +1,4 @@
+// IWYU pragma: private, include "amr/data/particles/refine/split.hpp"
 /*
 Splitting reference material can be found @
   https://github.com/PHAREHUB/PHARE/wiki/SplitPattern
@@ -6,11 +7,13 @@ Splitting reference material can be found @
 #ifndef PHARE_SPLIT_3D_HPP
 #define PHARE_SPLIT_3D_HPP
 
+#include "core/utilities/types.hpp"
+#include "core/utilities/point/point.hpp"
+
+#include "splitter.hpp"
+
 #include <array>
 #include <cstddef>
-#include "core/utilities/point/point.hpp"
-#include "core/utilities/types.hpp"
-#include "splitter.hpp"
 
 namespace PHARE::amr
 {
@@ -165,7 +168,7 @@ struct Splitter<DimConst<3>, InterpConst<1>, RefinedParticlesConst<27>>
 {
     constexpr Splitter()
         : SplitPattern_3_1_27_Dispatcher{
-            {weight[0]}, {weight[1], delta[0]}, {weight[1], delta[0]}, {weight[1], delta[0]}}
+              {weight[0]}, {weight[1], delta[0]}, {weight[1], delta[0]}, {weight[1], delta[0]}}
     {
     }
 
@@ -225,7 +228,7 @@ struct Splitter<DimConst<3>, InterpConst<2>, RefinedParticlesConst<27>>
 {
     constexpr Splitter()
         : SplitPattern_3_2_27_Dispatcher{
-            {weight[0]}, {weight[1], delta[0]}, {weight[1], delta[0]}, {weight[1], delta[0]}}
+              {weight[0]}, {weight[1], delta[0]}, {weight[1], delta[0]}, {weight[1], delta[0]}}
     {
     }
 
@@ -238,6 +241,7 @@ struct Splitter<DimConst<3>, InterpConst<2>, RefinedParticlesConst<27>>
 /****************************** INTERP == 3 *******************************/
 /**************************************************************************/
 using SplitPattern_3_3_6_Dispatcher = PatternDispatcher<PinkPattern<DimConst<3>>>;
+
 
 template<>
 struct Splitter<DimConst<3>, InterpConst<3>, RefinedParticlesConst<6>>
@@ -257,6 +261,7 @@ struct Splitter<DimConst<3>, InterpConst<3>, RefinedParticlesConst<6>>
 /**************************************************************************/
 using SplitPattern_3_3_12_Dispatcher = PatternDispatcher<LimePattern<DimConst<3>>>;
 
+
 template<>
 struct Splitter<DimConst<3>, InterpConst<3>, RefinedParticlesConst<12>>
     : public ASplitter<DimConst<3>, InterpConst<3>, RefinedParticlesConst<12>>,
@@ -272,6 +277,7 @@ struct Splitter<DimConst<3>, InterpConst<3>, RefinedParticlesConst<12>>
 };
 
 
+
 /**************************************************************************/
 using SplitPattern_3_3_27_Dispatcher
     = PatternDispatcher<BlackPattern<DimConst<3>>, PinkPattern<DimConst<3>>,
@@ -284,7 +290,7 @@ struct Splitter<DimConst<3>, InterpConst<3>, RefinedParticlesConst<27>>
 {
     constexpr Splitter()
         : SplitPattern_3_3_27_Dispatcher{
-            {weight[0]}, {weight[1], delta[0]}, {weight[1], delta[0]}, {weight[1], delta[0]}}
+              {weight[0]}, {weight[1], delta[0]}, {weight[1], delta[0]}, {weight[1], delta[0]}}
     {
     }
 

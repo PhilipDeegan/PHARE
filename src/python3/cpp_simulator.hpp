@@ -1,30 +1,35 @@
 #ifndef PHARE_PYTHON_CPP_SIMULATOR_HPP
 #define PHARE_PYTHON_CPP_SIMULATOR_HPP
 
-#include <vector>
-#include <cstddef>
 
-#include "core/def/phare_mpi.hpp"
-
-#include "core/utilities/mpi_utils.hpp"
-#include "core/data/particles/particle.hpp"
-#include "core/utilities/meta/meta_utilities.hpp"
-#include "amr/wrappers/hierarchy.hpp"
 #include "phare/phare.hpp"
+
+
+#include "core/def/phare_mpi.hpp" // IWYU pragma: keep
+#include "core/def/phare_config.hpp"
+
+#include "core/utilities/types.hpp"
+#include "core/utilities/mpi_utils.hpp"
+
+#include "amr/wrappers/hierarchy.hpp"
 #include "simulator/simulator.hpp"
 
-#include "python3/pybind_def.hpp"
-#include "pybind11/stl.h"
-#include "pybind11/numpy.h"
-#include "pybind11/chrono.h"
-#include "pybind11/complex.h"
-#include "pybind11/functional.h"
+#include "pybind11/stl.h"         // IWYU pragma: keep
+#include "pybind11/numpy.h"       // IWYU pragma: keep
+#include "pybind11/chrono.h"      // IWYU pragma: keep
+#include "pybind11/complex.h"     // IWYU pragma: keep
+#include "pybind11/functional.h"  // IWYU pragma: keep
+#include "python3/pybind_def.hpp" // IWYU pragma: keep
 
 #include "python3/particles.hpp"
 #include "python3/patch_data.hpp"
 #include "python3/patch_level.hpp"
 #include "python3/data_wrangler.hpp"
 
+#include "menum/include/magic_enum/magic_enum_utility.hpp"
+
+
+#include <cstddef>
 
 
 namespace py = pybind11;
@@ -47,15 +52,15 @@ void declarePatchData(py::module& m, std::string key)
 template<std::size_t dim>
 void declareDim(py::module& m)
 {
-    using CP         = core::ContiguousParticles<dim>;
-    std::string name = "ContiguousParticles_" + std::to_string(dim);
+    using CP         = core::SoAParticleArray<dim>;
+    std::string name = "ParticleArray_SOA_" + std::to_string(dim);
     py::class_<CP, std::shared_ptr<CP>>(m, name.c_str())
         .def(py::init<std::size_t>())
-        .def_readwrite("iCell", &CP::iCell)
-        .def_readwrite("delta", &CP::delta)
-        .def_readwrite("weight", &CP::weight)
-        .def_readwrite("charge", &CP::charge)
-        .def_readwrite("v", &CP::v)
+        .def_readwrite("iCell", &CP::iCell_)
+        .def_readwrite("delta", &CP::delta_)
+        .def_readwrite("weight", &CP::weight_)
+        .def_readwrite("charge", &CP::charge_)
+        .def_readwrite("v", &CP::v_)
         .def("size", &CP::size);
 
     name = "PatchData" + name;
@@ -83,12 +88,13 @@ void declare_etc(py::module& m)
     constexpr auto dim           = _dim{}();
     constexpr auto interp        = _interp{}();
     constexpr auto nbRefinedPart = _nbRefinedPart{}();
+    constexpr auto opts          = SimOpts::make(dim, interp, nbRefinedPart);
 
     std::string type_string = "_" + std::to_string(dim) + "_" + std::to_string(interp) + "_"
                               + std::to_string(nbRefinedPart);
 
-    using Sim        = Simulator<dim, interp, nbRefinedPart>;
-    using DW         = DataWrangler<dim, interp, nbRefinedPart>;
+    using Sim        = Simulator<opts>;
+    using DW         = DataWrangler<opts>;
     std::string name = "DataWrangler" + type_string;
     py::class_<DW, std::shared_ptr<DW>>(m, name.c_str())
         .def(py::init<std::shared_ptr<Sim> const&, std::shared_ptr<amr::Hierarchy> const&>())
@@ -97,7 +103,7 @@ void declare_etc(py::module& m)
         .def("getPatchLevel", &DW::getPatchLevel)
         .def("getNumberOfLevels", &DW::getNumberOfLevels);
 
-    using PL = PatchLevel<dim, interp, nbRefinedPart>;
+    using PL = PatchLevel<opts>;
     name     = "PatchLevel_" + type_string;
 
     py::class_<PL, std::shared_ptr<PL>>(m, name.c_str())
@@ -134,17 +140,21 @@ void declare_etc(py::module& m)
     m.def(name.c_str(), splitPyArrayParticles<_Splitter>);
 }
 
-template<typename _dim, typename _interp, typename _nbRefinedPart>
+template<typename _dim, typename _interp, typename _nbRefinedPart, auto layout_mode,
+         auto allocator_mode>
 void declare_sim(py::module& m)
 {
     constexpr auto dim           = _dim{}();
     constexpr auto interp        = _interp{}();
     constexpr auto nbRefinedPart = _nbRefinedPart{}();
+    constexpr auto opts          = SimOpts{dim, interp, layout_mode, allocator_mode, nbRefinedPart};
 
     std::string type_string = "_" + std::to_string(dim) + "_" + std::to_string(interp) + "_"
-                              + std::to_string(nbRefinedPart);
+                              + std::to_string(nbRefinedPart) + "_"
+                              + std::to_string(magic_enum::enum_integer(layout_mode)) + "_"
+                              + std::to_string(magic_enum::enum_integer(allocator_mode));
 
-    using Sim        = Simulator<dim, interp, nbRefinedPart>;
+    using Sim        = Simulator<opts>;
     std::string name = "Simulator" + type_string;
     declareSimulator<Sim>(
         py::class_<Sim, std::shared_ptr<Sim>>(m, name.c_str())
@@ -156,20 +166,43 @@ void declare_sim(py::module& m)
 
     name = "make_simulator" + type_string;
     m.def(name.c_str(), [](std::shared_ptr<PHARE::amr::Hierarchy> const& hier) {
-        return std::shared_ptr<Sim>{std::move(makeSimulator<dim, interp, nbRefinedPart>(hier))};
+        return std::shared_ptr<Sim>{std::move(makeSimulator<Sim>(hier))};
     });
 }
 
-template<typename Dimension, typename InterpOrder, typename... NbRefinedParts>
-void declare_all(py::module& m, std::tuple<Dimension, InterpOrder, NbRefinedParts...> const&)
+template<typename _dim, typename _interp, typename _nbRefinedPart, auto layout_mode,
+         auto allocator_mode>
+constexpr bool valid_simulator()
+{
+    using enum AllocatorMode;
+    using enum core::LayoutMode;
+
+    return _dim{}() < 3                                    //
+           and core::any_in(layout_mode, AoSMapped, AoSTS) //
+           and core::any_in(allocator_mode, CPU);
+}
+
+template<typename Dim, typename Interp, typename... NbRefinedParts>
+void declare_all(py::module& m, std::tuple<Dim, Interp, NbRefinedParts...> const&)
 {
     core::apply(std::tuple<NbRefinedParts...>{}, [&](auto& nbRefinedPart) {
-        declare_sim<Dimension, InterpOrder, std::decay_t<decltype(nbRefinedPart)>>(m);
-        declare_etc<Dimension, InterpOrder, std::decay_t<decltype(nbRefinedPart)>>(m);
+        using NbRefinedPart_t = std::decay_t<decltype(nbRefinedPart)>;
+
+        magic_enum::enum_for_each<core::LayoutMode>([&](auto layout_mode) {
+            magic_enum::enum_for_each<AllocatorMode>([&](auto allocator_mode) {
+                if constexpr (valid_simulator<Dim, Interp, NbRefinedPart_t, layout_mode(),
+                                              allocator_mode()>())
+                {
+                    declare_sim<Dim, Interp, NbRefinedPart_t, layout_mode(), allocator_mode()>(m);
+                }
+            });
+        });
+
+        declare_etc<Dim, Interp, NbRefinedPart_t>(m);
     });
 }
 
-void declare_essential(py::module& m)
+void inline declare_essential(py::module& m)
 {
     py::class_<SamraiLifeCycle, std::shared_ptr<SamraiLifeCycle>>(m, "SamraiLifeCycle")
         .def(py::init<>())
@@ -189,7 +222,7 @@ void declare_essential(py::module& m)
 
 // https://stackoverflow.com/a/51061314/795574
 // ASAN detects leaks by default, even in system/third party libraries
-inline const char* __asan_default_options()
+inline char const* __asan_default_options()
 {
     return "detect_leaks=0";
 }

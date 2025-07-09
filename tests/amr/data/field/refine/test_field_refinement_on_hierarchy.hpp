@@ -42,6 +42,10 @@ using namespace PHARE::amr;
  * root level, and finally the refine interpolation between root level
  * and the level 1
  */
+// template<typename GridLayoutT, typename FieldT,
+//          typename PhysicalQuantity
+//          = std::decay_t<decltype(std::declval<FieldT>().physicalQuantity())>>
+
 template<typename GridLayoutT, typename FieldT,
          typename PhysicalQuantity = decltype(std::declval<FieldT>().physicalQuantity())>
 class BasicHierarchy

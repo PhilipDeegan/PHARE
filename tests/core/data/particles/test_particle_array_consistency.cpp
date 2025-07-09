@@ -12,8 +12,8 @@
 
 namespace PHARE::core
 {
-std::size_t static constexpr cells = 3;
-std::size_t static constexpr ppc   = 10;
+std::uint32_t static constexpr cells = 3;
+std::size_t static constexpr ppc     = 10;
 
 
 template<std::size_t dim, typename ICell>
@@ -42,7 +42,7 @@ struct ParticleArrayConsistencyTest : public ::testing::Test
     auto constexpr static dim    = ParticleArray_::dimension;
     auto constexpr static interp = 1;
 
-    using GridLayout_t    = TestGridLayout<typename PHARE_Types<dim, interp>::GridLayout_t>;
+    using GridLayout_t = TestGridLayout<typename PHARE_Types<SimOpts{dim, interp}>::GridLayout_t>;
     using ParticleArray_t = ParticleArray_;
 
     GridLayout_t layout{cells};
