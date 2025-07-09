@@ -1,9 +1,8 @@
 #ifndef MOMENTS_HPP
 #define MOMENTS_HPP
 
-#include <iterator>
 
-#include "core/numerics/interpolator/interpolator.hpp"
+#include <type_traits>
 
 
 namespace PHARE
@@ -25,18 +24,13 @@ namespace core
     {
     };
 
-    struct PatchGhostDeposit
-    {
-    };
     struct LevelGhostDeposit
     {
     };
 
 
-    template<typename Ions, typename GridLayout, typename DepositTag>
-    void depositParticles(Ions& ions, GridLayout& layout,
-                          Interpolator<GridLayout::dimension, GridLayout::interp_order> interpolate,
-                          DepositTag)
+    template<typename Ions, typename GridLayout, typename Interpolater_t, typename DepositTag>
+    void depositParticles(Ions& ions, GridLayout& layout, Interpolater_t interpolate, DepositTag)
     {
         for (auto& pop : ions)
         {
@@ -48,11 +42,7 @@ namespace core
                 auto& partArray = pop.domainParticles();
                 interpolate(partArray, density, flux, layout);
             }
-            else if constexpr (std::is_same_v<DepositTag, PatchGhostDeposit>)
-            {
-                auto& partArray = pop.patchGhostParticles();
-                interpolate(partArray, density, flux, layout);
-            }
+
             else if constexpr (std::is_same_v<DepositTag, LevelGhostDeposit>)
             {
                 auto& partArray = pop.levelGhostParticlesOld();

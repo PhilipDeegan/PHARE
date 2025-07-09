@@ -3,16 +3,14 @@
 
 #include "core/def/phare_mpi.hpp"
 
-#include <SAMRAI/hier/RefineOperator.h>
-#include <SAMRAI/mesh/StandardTagAndInitStrategy.h>
-#include <SAMRAI/xfer/RefineAlgorithm.h>
-
-#include "amr/data/field/field_data.hpp"
-#include "core/data/grid/gridlayout.hpp"
-#include "core/data/grid/gridlayoutdefs.hpp"
 #include "core/utilities/constants.hpp"
+#include "amr/data/field/field_data.hpp"
 #include "core/utilities/point/point.hpp"
+#include "core/data/grid/gridlayoutdefs.hpp"
 
+#include <SAMRAI/hier/RefineOperator.h>
+#include <SAMRAI/xfer/RefineAlgorithm.h>
+#include <SAMRAI/mesh/StandardTagAndInitStrategy.h>
 #include "SAMRAI/xfer/BoxGeometryVariableFillPattern.h"
 
 #include <map>
@@ -179,13 +177,25 @@ public:
 
                     if constexpr (dim == 1)
                     {
-                        std::uint32_t gsi_X = layout.ghostStartIndex(field, Direction::X);
-                        std::uint32_t gei_X = layout.ghostEndIndex(field, Direction::X);
-
-                        for (std::uint32_t ix = gsi_X; ix <= gei_X; ++ix)
+                        if constexpr (PHARE::core::is_field_tile_set_v<FieldT>)
                         {
-                            auto position = layout.fieldNodeCoordinates(field, layout.origin(), ix);
-                            field(ix)     = affineFill(position, dataId);
+                            for (auto& tile : field())
+                                for (auto const& bix :
+                                     tile.layout().ghostBoxFor(field.physicalQuantity()))
+                                {
+                                    auto position = tile.layout().fieldNodeCoordinates(
+                                        tile(), tile.layout().origin(), bix.as_signed());
+                                    tile()(*bix) = affineFill(position, dataId);
+                                }
+                        }
+                        else
+                        {
+                            for (auto const& bix : layout.ghostBoxFor(field.physicalQuantity()))
+                            {
+                                auto position = layout.fieldNodeCoordinates(field, layout.origin(),
+                                                                            bix.as_signed());
+                                field(*bix)   = affineFill(position, dataId);
+                            }
                         }
                     }
                     if constexpr (dim == 2)
