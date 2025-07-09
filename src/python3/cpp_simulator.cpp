@@ -1,9 +1,27 @@
 
+
+#include "core/utilities/thread_pool.hpp"
+
 #include "python3/cpp_simulator.hpp"
 
 #if !defined(PHARE_CPP_MOD_NAME)
 #define PHARE_CPP_MOD_NAME cpp
 #endif
+
+namespace PHARE::py
+{
+
+auto static const n_threads = core::get_env_as("PHARE_THREADS_PER_POOL", std::size_t{1});
+
+// static init!
+bool static const premain = []() {
+    core::ThreadPool::threads_per_pool = n_threads;
+    core::ThreadPool::INSTANCE(); // init!
+    return true;
+}();
+
+} // namespace PHARE::py
+
 
 namespace py = pybind11;
 
