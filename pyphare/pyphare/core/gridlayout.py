@@ -44,6 +44,7 @@ yee_centering = {
         "Pyz": "primal",
         "Pzz": "primal",
         "tags": "dual",
+        "value": "primal",
     },
     "y": {
         "Bx": "dual",
@@ -79,6 +80,7 @@ yee_centering = {
         "Pyz": "primal",
         "Pzz": "primal",
         "tags": "dual",
+        "value": "primal",
     },
     "z": {
         "Bx": "dual",
@@ -114,6 +116,7 @@ yee_centering = {
         "Pyz": "primal",
         "Pzz": "primal",
         "tags": "dual",
+        "value": "primal",
     },
 }
 yee_centering_lower = {
@@ -205,6 +208,7 @@ class GridLayout(object):
             "Fx",
             "Fy",
             "Fz",
+            "value",
         ]
 
         self.yeeCentering = YeeCentering()

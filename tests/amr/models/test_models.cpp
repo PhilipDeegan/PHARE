@@ -138,11 +138,9 @@ PHARE::initializer::PHAREDict createDict()
 
 TEST(AHybridModel, fillsHybridMessengerInfo)
 {
-    std::shared_ptr<ResourcesManagerT> resourcesManagerHybrid{
-        std::make_shared<ResourcesManagerT>()};
+    std::unique_ptr<HybridModelT> hybridModel{std::make_unique<HybridModelT>(createDict())};
 
-    std::unique_ptr<HybridModelT> hybridModel{
-        std::make_unique<HybridModelT>(createDict(), resourcesManagerHybrid)};
+    std::shared_ptr<ResourcesManagerT> resourcesManagerHybrid = hybridModel->resourcesManager;
 
 
 

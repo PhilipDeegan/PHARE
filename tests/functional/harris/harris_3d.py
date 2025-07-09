@@ -9,18 +9,16 @@ from pyphare.pharesee.run import Run
 from pyphare.simulator.simulator import Simulator
 from pyphare.simulator.simulator import startMPI
 
-os.environ["PHARE_SCOPE_TIMING"] = "0"  # turn on scope timing
-
 
 ph.NO_GUI()
 cpp = cpp_lib()
-startMPI()
+
 
 cells = (50, 50, 50)
 dl = (0.2, 0.2, 0.2)
 
-diag_outputs = "phare_outputs/test/harris/3d"
-time_step_nbr = 1000
+diag_outputs = "phare_outputs/test/harris/3dts"
+time_step_nbr = 10
 time_step = 0.001
 final_time = time_step * time_step_nbr
 
@@ -157,7 +155,7 @@ def plot(diag_dir):
             plot_patches=True,
         )
         for c in ["x", "y", "z"]:
-            run.GetB(time).plot(
+            run.GetB(time, all_primal=False).plot(
                 filename=plot_file_for_qty(f"b{c}", time),
                 qty=f"B{c}",
                 plot_patches=True,
@@ -172,21 +170,14 @@ def plot(diag_dir):
 
 
 def main():
-    Simulator(config()).run()
+    # Simulator(config()).run()
+    Simulator(config()).setup(layout=3).initialize().run()
 
-    # TODO3D nico : I removed the plot because the hierarchy plot3d has been removed
-    # TODO3D we need to find a way to plot the data
-
-    # if cpp.mpi_rank() == 0:
-    #     plot(diag_outputs)
-    # try:
-    #     from tools.python3 import plotting as m_plotting
-
-    #     m_plotting.plot_run_timer_data(diag_outputs, cpp.mpi_rank())
-    # except ImportError:
-    #     print("Phlop not found - install with: `pip install phlop`")
+    if cpp.mpi_rank() == 0:
+        plot(diag_outputs)
     cpp.mpi_barrier()
 
 
 if __name__ == "__main__":
+    startMPI()
     main()

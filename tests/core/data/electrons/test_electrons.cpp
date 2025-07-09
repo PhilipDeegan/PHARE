@@ -23,7 +23,7 @@
 
 using namespace PHARE::core;
 
-const double Te = 0.12;
+double const Te = 0.12;
 
 
 
@@ -148,8 +148,8 @@ struct ElectronsTest : public ::testing::Test
 
     Electromag<VecFieldND> electromag;
 
-    UsableVecField<dim> J, F, Ve, Vi;
-    UsableTensorField<dim> M, protons_M;
+    UsableVecField<GridYee> J, F, Ve, Vi;
+    UsableTensorField<GridYee> M, protons_M;
 
     GridND Nibuffer, NiProtons, Pe;
 
@@ -204,17 +204,14 @@ struct ElectronsTest : public ::testing::Test
         auto&& emm = std::get<0>(electrons.getCompileTimeResourcesViewList());
         auto&& fc  = std::get<0>(emm.getCompileTimeResourcesViewList());
 
-
         Ve.set_on(std::get<0>(fc.getCompileTimeResourcesViewList()));
-
 
         auto&& pc          = std::get<1>(emm.getCompileTimeResourcesViewList());
         auto const& [_, P] = pc.getCompileTimeResourcesViewList();
         P.setBuffer(&Pe);
 
-        auto const& [Jx, Jy, Jz]    = J();
-        auto const& [Vix, Viy, Viz] = Vi();
-
+        auto& [Jx, Jy, Jz]    = J();
+        auto& [Vix, Viy, Viz] = Vi();
 
         if constexpr (dim == 1)
         {
@@ -423,7 +420,6 @@ TYPED_TEST(ElectronsTest, ThatElectronsVelocityEqualIonVelocityMinusJ)
     auto& layout    = this->layout;
 
     electrons.update(layout);
-
     auto& Ne = electrons.density();
 
     auto check = [&layout](auto const& Vecomp, auto const& Vicomp, auto const& Jcomp,

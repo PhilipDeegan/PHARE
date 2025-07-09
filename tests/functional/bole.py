@@ -1,4 +1,8 @@
-#!/usr/bin/env python3
+#
+#
+#
+
+
 import os
 import sys
 import numpy as np
@@ -12,28 +16,27 @@ from pyphare.simulator.simulator import startMPI
 
 np.set_printoptions(threshold=sys.maxsize)
 
-os.environ["PHARE_SCOPE_TIMING"] = "0"  # turn on scope timing
-
 
 ph.NO_GUI()
 cpp = cpp_lib()
-startMPI()
+
 
 cells = (100, 100, 100)
+# cells = (10, 10, 10)
 dl = (0.1, 0.1, 0.1)
 
-
+start_time = 0.2
 name = "bowler"
 diag_outputs = f"phare_outputs/test/{name}"
 time_step_nbr = 1
 time_step = 0.001
-final_time = time_step * time_step_nbr
+final_time = time_step * time_step_nbr + start_time
 
-timestamps = [0, final_time]
-if time_step_nbr > 50:
-    dump_step = 1
-    nbr_dump_step = final_time / dump_step
-    timestamps = dump_step * np.arange(nbr_dump_step + 1)
+timestamps = []
+# if time_step_nbr > 50:
+#     dump_step = 1
+#     nbr_dump_step = final_time / dump_step
+#     timestamps = dump_step * np.arange(nbr_dump_step + 1)
 
 print("timestamps=", timestamps)
 plot_dir = Path(f"{diag_outputs}_plots")
@@ -42,6 +45,7 @@ plot_dir.mkdir(parents=True, exist_ok=True)
 
 def config():
     sim = ph.Simulation(
+        # largest_patch_size=50,
         time_step=time_step,
         time_step_nbr=time_step_nbr,
         dl=dl,
@@ -54,6 +58,12 @@ def config():
             "format": "phareh5",
             "options": {"dir": diag_outputs, "mode": "overwrite"},
         },
+        # restart_options={
+        #     "dir": "checkpoints",
+        #     "mode": "overwrite",
+        #     "timestamps": [final_time],
+        #     "restart_time": start_time,
+        # },
     )
 
     def density(x, y, z):
@@ -64,9 +74,9 @@ def config():
         L = sim.simulation_domain()[0]
         mid = L / 2
 
-        X = (x - mid).reshape(lx, ly, lz)
-        Y = (y - mid).reshape(lx, ly, lz)
-        Z = (z - mid).reshape(lx, ly, lz)
+        X = x - mid  # .reshape(lx, ly, lz)
+        Y = y - mid  # .reshape(lx, ly, lz)
+        Z = z - mid  # .reshape(lx, ly, lz)
 
         U, V, W = -X, -Y, -Z
 
@@ -82,14 +92,21 @@ def config():
         radius = L * 0.4
         diff = 0.2
 
-        # outer mask
-        mask = X**2 + Y**2 + Z**2 <= (radius + diff) ** 2
-        U[~mask] = 0
-        V[~mask] = 0
-        W[~mask] = 0
+        # # outer mask
+        # mask = X**2 + Y**2 + Z**2 <= (radius + diff) ** 2
+        # U[~mask] = 0
+        # V[~mask] = 0
+        # W[~mask] = 0
 
-        # inner mask
-        mask = X**2 + Y**2 + Z**2 >= (radius - diff) ** 2
+        # # inner mask
+        # mask = X**2 + Y**2 + Z**2 >= (radius - diff) ** 2
+        # U[~mask] = 0
+        # V[~mask] = 0
+        # W[~mask] = 0
+
+        # anything outside the horizontal middle plane = 0
+        # mask = np.abs(Y) < 5  # & (X**2 + Z**2 >= (radius - diff) ** 2)
+        mask = np.abs(Y) < 5 & (X**2 + Z**2 <= radius**2)
         U[~mask] = 0
         V[~mask] = 0
         W[~mask] = 0
@@ -101,13 +118,14 @@ def config():
         return U, V, W
 
     def bx(x, y, z):
-        return b(x, y, z, cells[0] + 5, cells[0] + 4, cells[0] + 4)
+        return b(x, y, z, cells[0] + 5, cells[0] + 4, cells[0] + 4)[0]
 
     def by(x, y, z):
-        return b(x, y, z, cells[0] + 4, cells[0] + 5, cells[0] + 4)
+        return 0
+        # return b(x, y, z, cells[0] + 4, cells[0] + 5, cells[0] + 4)[1]
 
     def bz(x, y, z):
-        return b(x, y, z, cells[0] + 4, cells[0] + 4, cells[0] + 5)
+        return b(x, y, z, cells[0] + 4, cells[0] + 4, cells[0] + 5)[2]
 
     def vxyz(x, y, z):
         return 0.0
@@ -119,7 +137,7 @@ def config():
     vvv = {
         **{f"vbulk{c}": vxyz for c in C},
         **{f"vth{c}": vthxyz for c in C},
-        "nbr_part_per_cell": 50,
+        "nbr_part_per_cell": 100,
     }
     protons = {
         "charge": 1,
@@ -131,14 +149,14 @@ def config():
     ph.MaxwellianFluidModel(bx=bx, by=by, bz=bz, protons=protons)
     ph.ElectronModel(closure="isothermal", Te=0.0)
 
-    for quantity in ["density", "bulkVelocity"]:
-        ph.FluidDiagnostics(quantity=quantity, write_timestamps=timestamps)
-    ph.FluidDiagnostics(
-        quantity="density", write_timestamps=timestamps, population_name="protons"
-    )
-    for quantity in ["E", "B"]:
-        ph.ElectromagDiagnostics(quantity=quantity, write_timestamps=timestamps)
-    ph.InfoDiagnostics(quantity="particle_count")  # defaults all coarse time steps
+    # for quantity in ["density", "bulkVelocity"]:
+    #     ph.FluidDiagnostics(quantity=quantity, write_timestamps=timestamps)
+    # ph.FluidDiagnostics(
+    #     quantity="density", write_timestamps=timestamps, population_name="protons"
+    # )
+    # for quantity in ["E", "B"]:
+    #     ph.ElectromagDiagnostics(quantity=quantity, write_timestamps=timestamps)
+    # ph.InfoDiagnostics(quantity="particle_count")  # defaults all coarse time steps
 
     return sim
 
@@ -170,6 +188,12 @@ def plot(diag_dir):
                 qty=f"B{c}",
                 plot_patches=True,
             )
+        for c in ["x", "y", "z"]:
+            run.GetE(time, all_primal=False).plot(
+                filename=plot_file_for_qty(f"e{c}", time),
+                qty=f"E{c}",
+                plot_patches=True,
+            )
         # run.GetJ(time).plot(
         #     filename=plot_file_for_qty("jz", time),
         #     qty="Jz",
@@ -180,7 +204,8 @@ def plot(diag_dir):
 
 
 def main():
-    Simulator(config()).run()
+    # Simulator(config()).run()
+    Simulator(config()).setup(layout=3).initialize().run()
 
     if cpp.mpi_rank() == 0:
         plot(diag_outputs)
@@ -188,4 +213,5 @@ def main():
 
 
 if __name__ == "__main__":
+    startMPI()
     main()
