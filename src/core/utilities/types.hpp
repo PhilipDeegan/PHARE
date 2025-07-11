@@ -226,7 +226,7 @@ namespace core
 
     NO_DISCARD inline std::optional<std::string> get_env(std::string const& key)
     {
-        if (const char* val = std::getenv(key.c_str()))
+        if (char const* val = std::getenv(key.c_str()))
             return std::string{val};
         return std::nullopt;
     }
@@ -416,6 +416,20 @@ template<std::uint16_t N, typename Apply>
 constexpr auto apply_N(Apply&& f)
 {
     return apply_N(f, std::make_integer_sequence<std::uint16_t, N>{});
+}
+
+template<std::uint16_t N, std::uint16_t... Ns, typename Fn>
+void permute_Ns(Fn fn, auto&&... args)
+{
+    for_N<N>([&](auto i) {
+        constexpr auto S = sizeof...(Ns);
+
+        if constexpr (S == 0)
+            fn(args..., i);
+
+        else
+            permute_Ns<Ns...>(fn, args..., i);
+    });
 }
 
 enum class for_N_R_mode {

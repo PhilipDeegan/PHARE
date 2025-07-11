@@ -33,6 +33,7 @@ void declareSimulator(PyClass&& sim)
         .def("dump", &Simulator::dump, py::arg("timestamp"), py::arg("timestep"));
 }
 
+
 template<typename Dimension, typename InterpOrder, typename NbRefinedPart,
          template<template<typename> typename, typename> typename TimeIntegrator,
          template<typename, typename> typename Reconstruction, typename SlopeLimiter,
@@ -54,7 +55,7 @@ class Registerer
     using DW  = DataWrangler<dim, interp, nbRefinedPart, MHDTimeStepper_t>;
 
 public:
-    static constexpr void declare_etc(py::module& m, std::string const& full_type)
+    auto& declare_etc(py::module& m)
     {
         std::string name = "DataWrangler" + full_type;
 
@@ -90,9 +91,11 @@ public:
             .def("getFy", &PL::getFy)
             .def("getFz", &PL::getFz)
             .def("getParticles", &PL::getParticles, py::arg("userPopName") = "all");
+
+        return *this;
     }
 
-    static constexpr void declare_sim(py::module& m, std::string const& full_type)
+    auto& declare_sim(py::module& m)
     {
         std::string name = "Simulator" + full_type;
 
@@ -109,7 +112,11 @@ public:
             return std::shared_ptr<Sim>{
                 std::move(makeSimulator<dim, interp, nbRefinedPart, MHDTimeStepper_t>(hier))};
         });
+
+        return *this;
     }
+
+    std::string full_type;
 };
 
 } // namespace PHARE::pydata
