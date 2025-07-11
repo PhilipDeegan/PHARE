@@ -8,6 +8,8 @@
 #include <variant>
 #include <stdexcept>
 
+
+
 namespace PHARE::core
 {
 template<typename T>
@@ -124,7 +126,6 @@ auto get_from_variants(auto& variants, Args&... args)
 {
     return std::forward_as_tuple(get_from_variants(variants, args)...);
 }
-
 
 
 } // namespace PHARE::core

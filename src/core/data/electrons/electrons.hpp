@@ -4,14 +4,13 @@
 #include "core/def.hpp"
 #include "core/utilities/variants.hpp"
 #include "core/hybrid/hybrid_quantities.hpp"
+#include "core/data/grid/gridlayoutdefs.hpp"
 #include "core/data/grid/gridlayout_utils.hpp"
-#include "core/data/grid/gridlayoutdefs.hpp"  // TODO : needed ?
 #include "core/data/vecfield/vecfield_component.hpp"
 #include "core/data/field/initializers/field_user_initializer.hpp"
 
 #include "initializer/data_provider.hpp"
 
-#include "core/utilities/index/index.hpp"
 
 
 #include <memory>
@@ -19,6 +18,8 @@
 
 namespace PHARE::core
 {
+
+
 template<typename Ions>
 class StandardHybridElectronFluxComputer
 {
@@ -63,7 +64,7 @@ public:
             throw std::runtime_error("Error, cannot return density because "
                                      "StandardHybridElectronFluxComputer is not usable");
 
-        return ions_.density();
+        return ions_.chargeDensity();
     }
 
     NO_DISCARD Field& density()
@@ -72,7 +73,7 @@ public:
             throw std::runtime_error("Error, cannot return density because "
                                      "StandardHybridElectronFluxComputer is not usable");
 
-        return ions_.density();
+        return ions_.chargeDensity();
     }
 
     NO_DISCARD VecField& velocity()
@@ -143,7 +144,6 @@ public:
     //-------------------------------------------------------------------------
     //                  start the ResourcesUser interface
     //-------------------------------------------------------------------------
-
 
     NO_DISCARD virtual bool isUsable() const { return core::isUsable(Pe_, flux_); }
 
@@ -234,17 +234,6 @@ public:
     {
     }
 
-    NO_DISCARD auto getCompileTimeResourcesViewList() const
-    {
-        return std::forward_as_tuple(this->flux_, this->Pe_);
-    }
-
-    NO_DISCARD auto getCompileTimeResourcesViewList()
-    {
-        return std::forward_as_tuple(this->flux_, this->Pe_);
-    }
-
-
     void initialize(GridLayout const& layout) override {}
 
     void computePressure(GridLayout const& /*layout*/, double const /* dt */) override
@@ -290,7 +279,6 @@ public:
         , gamma_{dict["pressure_closure"]["Gamma"].template to<double>()}
         , Pe_init_{dict["pressure_closure"]["Pe"].template to<initializer::InitFunction<dim>>()}
     {
-        Field Te_{"Te", HybridQuantity::Scalar::P};
         resources.emplace_back(Te_);
     }
 
@@ -308,17 +296,15 @@ public:
 
         auto const& N_ = this->flux_.density();
         auto const& V_ = this->flux_.velocity();
-        Field Te_      = get_as_ref_or_throw<Field>(resources);
 
+        auto& Te = get_from_variants(resources, Te_);
 
-        Field Te_ = get_as_ref_or_throw<Field>(resources);
-
-        std::transform(this->Pe_.begin(), this->Pe_.end(), N_.begin(), Te_.begin(),
+        std::transform(this->Pe_.begin(), this->Pe_.end(), N_.begin(), Te.begin(),
                        [](auto p, auto n) { return p / n; });
 
         this->dt_ = dt;
 
-        layout.evalOnBox(Te_, [&](auto&... ijk) mutable { P_Eq_(layout, V_, Te_, ijk...); });
+        layout.evalOnBox(Te, [&](auto&... ijk) mutable { P_Eq_(layout, V_, Te, ijk...); });
 
 
         // std::transform(std::begin(Ne_), std::end(Ne_), std::begin(this->Pe_),
@@ -330,20 +316,22 @@ private:
     double const gamma_ = 5. / 3.;
     double dt_;
     initializer::InitFunction<dim> Pe_init_;
-
+    Field Te_{"Te", HybridQuantity::Scalar::P};
 
 
     template<typename Field, typename VecField>
     void P_Eq_(GridLayout const& layout, VecField const& Ve, Field const& Te, auto&... ijk) const
     {
-        Te(ijk...) = Te(ijk...) + dt_ * ( advection_(layout, Ve, Te, ijk...)
-                                        + compression_(layout, Ve, Te, ijk...) );
+        Te(ijk...)
+            = Te(ijk...)
+              + dt_ * (advection_(layout, Ve, Te, ijk...) + compression_(layout, Ve, Te, ijk...));
     }
 
     template<typename Field, typename VecField>
-    auto advection_(GridLayout const& layout, VecField const& Ve, Field const& Te, auto&... ijk) const
+    auto advection_(GridLayout const& layout, VecField const& Ve, Field const& Te,
+                    auto&... ijk) const
     {
-        auto l_ = layout;  // TODO so that it is non const
+        auto l_ = layout; // TODO so that it is non const
 
         // Both Ve and Te are primal on Yee, that is with the same centering
         // Hence, using 'derivOnSameCentering' guarantee that all the terms involved
@@ -352,7 +340,7 @@ private:
         auto gradT_X   = l_.template derivOnSameCentering<Direction::X>(Te, {ijk...});
 
         if constexpr (dim == 1)
-            return Vx(ijk...)*gradT_X;
+            return Vx(ijk...) * gradT_X;
 
         else
         {
@@ -360,13 +348,13 @@ private:
             auto gradT_Y   = l_.template derivOnSameCentering<Direction::Y>(Te, {ijk...});
 
             if constexpr (dim == 2)
-                return Vx(ijk...)*gradT_X + Vy(ijk...)*gradT_Y;
+                return Vx(ijk...) * gradT_X + Vy(ijk...) * gradT_Y;
             else
             {
                 auto const& Vz = Ve(Component::Z);
                 auto gradT_Z   = l_.template derivOnSameCentering<Direction::Z>(Te, {ijk...});
 
-                return Vx(ijk...)*gradT_X + Vy(ijk...)*gradT_Y + Vz(ijk...)*gradT_Z;
+                return Vx(ijk...) * gradT_X + Vy(ijk...) * gradT_Y + Vz(ijk...) * gradT_Z;
             }
         }
     }
@@ -374,9 +362,10 @@ private:
 
 
     template<typename Field, typename VecField>
-    auto compression_(GridLayout const& layout, VecField const& Ve, Field const& Te, auto&... ijk) const
+    auto compression_(GridLayout const& layout, VecField const& Ve, Field const& Te,
+                      auto&... ijk) const
     {
-        auto l_ = layout;  // TODO so that it is non const
+        auto l_ = layout; // TODO so that it is non const
 
         // Both Ve and Te are primal on Yee, that is with the same centering
         // Hence, using 'derivOnSameCentering' guarantee that all the terms involved
@@ -393,19 +382,16 @@ private:
             auto gradV_Y   = l_.template derivOnSameCentering<Direction::Y>(Vx, {ijk...});
 
             if constexpr (dim == 2)
-                return (gamma_ - 1) * Te(ijk...) * ( gradV_X + gradV_Y );
+                return (gamma_ - 1) * Te(ijk...) * (gradV_X + gradV_Y);
             else
             {
                 auto const& Vz = Ve(Component::Z);
                 auto gradV_Z   = l_.template derivOnSameCentering<Direction::Z>(Vz, {ijk...});
 
-                return (gamma_ - 1) * Te(ijk...) * ( gradV_X + gradV_Y + gradV_Z );
+                return (gamma_ - 1) * Te(ijk...) * (gradV_X + gradV_Y + gradV_Z);
             }
         }
     }
-
-
-
 };
 
 
@@ -438,25 +424,6 @@ public:
         resources.emplace_back(B);
     }
 
-
-    NO_DISCARD auto getCompileTimeResourcesViewList() const
-    {
-        return std::forward_as_tuple(this->flux_, B_, this->Pe_);
-    }
-
-    NO_DISCARD auto getCompileTimeResourcesViewList()
-    {
-        return std::forward_as_tuple(this->flux_, B_, this->Pe_);
-    }
-
-    NO_DISCARD bool isUsable() const override
-    {
-        return this->Pe_.isUsable() and this->flux_.isUsable();
-    }
-
-    NO_DISCARD bool isSettable() const override { return this->Pe_.isSettable(); }
-
-
     void initialize(GridLayout const& layout) override
     {
         FieldUserFunctionInitializer::initialize(this->Pe_, layout, Pe_init_);
@@ -476,7 +443,6 @@ public:
 
 private:
     double const gamma_ = 5. / 3.;
-    VecField B_;
     initializer::InitFunction<dim> Pe_init_;
 };
 
@@ -545,8 +511,7 @@ public:
     // pressureClosure needs also to be settable ?
     NO_DISCARD bool isSettable() const
     {
-        return fluxComput_.isSettable() /*and B_.isSettable()*/
-               and pressureClosure_->isSettable();
+        return fluxComput_.isSettable() /*and B_.isSettable()*/ and pressureClosure_->isSettable();
     }
 
     NO_DISCARD auto getCompileTimeResourcesViewList() const
@@ -577,7 +542,10 @@ public:
 
     void computeDensity() { fluxComput_.computeDensity(); }
     void computeBulkVelocity(GridLayout const& layout) { fluxComput_.computeBulkVelocity(layout); }
-    void computePressure(GridLayout const& layout, double const dt) { pressureClosure_->computePressure(layout, dt); }
+    void computePressure(GridLayout const& layout, double const dt)
+    {
+        pressureClosure_->computePressure(layout, dt);
+    }
 
 private:
     initializer::PHAREDict dict_;
