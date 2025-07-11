@@ -13,14 +13,15 @@
 #include <core/hybrid/hybrid_quantities.hpp>
 #include <core/utilities/types.hpp>
 
+#include <core/hybrid/hybrid_quantities.hpp>
+#include <core/utilities/types.hpp>
+
 #include <SAMRAI/tbox/SAMRAIManager.h>
 #include <SAMRAI/tbox/SAMRAI_MPI.h>
 
 #include "gtest/gtest.h"
 
 #include <string>
-#include <utility>
-#include <vector>
 
 
 #include "tests/initializer/init_functions.hpp"
@@ -278,7 +279,6 @@ INSTANTIATE_TYPED_TEST_SUITE_P(testResourcesManager, aResourceUserCollection, My
 
 
 
-
 struct FieldResource
 {
     NO_DISCARD auto getCompileTimeResourcesViewList() { return std::forward_as_tuple(rho); }
@@ -293,6 +293,7 @@ struct VecFieldResource
     VecField1D B{"B", HybridQuantity::Vector::B};
 };
 
+
 struct ResourceUser
 {
     using Resources = std::variant<FieldResource>;
@@ -303,9 +304,9 @@ struct ResourceUser
 
     auto get() { return get_as_tuple_or_throw<FieldResource, FieldResource>(resources); }
 
-
     std::vector<Resources> resources;
 };
+
 
 
 TEST(usingResources, test_variants_helpers)
@@ -350,6 +351,7 @@ TEST(usingResources, test_variants_resource_helpers)
 }
 
 
+
 TEST(usingResourcesManager, test_variants)
 {
     ResourceUser resourceUser;
@@ -391,6 +393,7 @@ TEST(usingResourcesManager, test_variants)
 
             auto resources = resourceUser.get();
             EXPECT_EQ(resources[1]->rho.data()[4], 5);
+
 
             ++checks;
         }

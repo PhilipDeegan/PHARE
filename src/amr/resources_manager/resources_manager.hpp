@@ -448,7 +448,12 @@ namespace amr
                 static_assert(has_sub_resources_v<ResourcesView>);
 
                 handle_sub_resources( //
+<<<<<<< HEAD
                     [&](auto&&... args) { this->setResources_(args...); }, obj, patch);
+=======
+                    [&](auto&&... args) { this->setResources_(args...); }, obj, nullOrResourcePtr,
+                    patch);
+>>>>>>> 66c26c49 (initial variant support for resource manager)
             }
         }
 

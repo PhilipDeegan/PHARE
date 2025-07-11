@@ -155,6 +155,7 @@ struct ElectronsFixture
 
     GridND Nibuffer, NiProtons, Pe, Te;
 
+
     ParticleArray_t domainParticles{layout.AMRBox()};
     ParticleArray_t patchGhostParticles = domainParticles;
     ParticleArray_t levelGhostParticles = domainParticles;
@@ -240,6 +241,7 @@ struct ElectronsFixture
         initialize_variant_resources(pc);
         pe.setBuffer(&Pe);
         EXPECT_TRUE(pc.isUsable());
+
 
         auto const& [Jx, Jy, Jz]    = J();
         auto const& [Vix, Viy, Viz] = Vi();
@@ -615,6 +617,22 @@ TEST(ElectronsFactoryTest, ThatConstThingsAreAsExpectedForCGL)
 
     auto& B = pc.B();
     EXPECT_TRUE(B.isUsable());
+}
+
+
+TEST(ElectronsFactoryTest, ThatConstThingsAreAsExpectedForPolytropic)
+{
+    auto dict = createDict<1>();
+
+    dict["electrons"]["pressure_closure"]["name"] = std::string{"polytropic"};
+
+    ElectronsFixture<std::pair<DimConst<1>, InterpConst<1>>> fixture{dict};
+
+    auto&& emm     = std::get<0>(fixture.electrons.getCompileTimeResourcesViewList());
+    auto const& pc = std::get<1>(emm.getCompileTimeResourcesViewList());
+
+    auto& Te = pc.Te();
+    EXPECT_TRUE(Te.isUsable());
 }
 
 
