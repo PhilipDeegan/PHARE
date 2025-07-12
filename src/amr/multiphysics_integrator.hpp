@@ -409,21 +409,27 @@ namespace solver
         }
 
 
-
+        std::map<int, int> level_regrid_index_{{0, 0}, {1, 0}, {2, 0}, {3, 0}};
         void applyGradientDetector(std::shared_ptr<SAMRAI::hier::PatchHierarchy> const& hierarchy,
                                    int const levelNumber, double const /*error_data_time*/,
                                    int const tag_index, bool const /*initialTime*/,
                                    bool const /*usesRichardsonExtrapolationToo*/) override
         {
-            PHARE_LOG_LINE_STR("apply gradient detector on level " + std::to_string(levelNumber));
-
-            auto level = hierarchy->getPatchLevel(levelNumber);
-            for (auto& patch : *level)
+            if (level_regrid_index_[levelNumber] == 0)
             {
-                auto& model  = getModel_(levelNumber);
-                auto& tagger = getTagger_(levelNumber);
-                tagger.tag(model, *patch, tag_index);
+                PHARE_LOG_LINE_STR("apply gradient detector on level "
+                                   + std::to_string(levelNumber));
+
+                auto level = hierarchy->getPatchLevel(levelNumber);
+                for (auto& patch : *level)
+                {
+                    auto& model  = getModel_(levelNumber);
+                    auto& tagger = getTagger_(levelNumber);
+                    tagger.tag(model, *patch, tag_index);
+                }
+                level_regrid_index_[levelNumber] = 5;
             }
+            --level_regrid_index_[levelNumber];
         }
 
 
@@ -436,7 +442,7 @@ namespace solver
 
 
         void initializeLevelIntegrator(
-            const std::shared_ptr<SAMRAI::mesh::GriddingAlgorithmStrategy>& /*griddingAlg*/)
+            std::shared_ptr<SAMRAI::mesh::GriddingAlgorithmStrategy> const& /*griddingAlg*/)
             override
         {
         }
@@ -557,7 +563,7 @@ namespace solver
         standardLevelSynchronization(std::shared_ptr<SAMRAI::hier::PatchHierarchy> const& hierarchy,
                                      int const coarsestLevel, int const finestLevel,
                                      double const syncTime,
-                                     const std::vector<double>& /*oldTimes*/) override
+                                     std::vector<double> const& /*oldTimes*/) override
         {
             // TODO use messengers to sync with coarser
             for (auto ilvl = finestLevel; ilvl > coarsestLevel; --ilvl)

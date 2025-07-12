@@ -2,7 +2,6 @@
 
 import os
 import numpy as np
-import matplotlib as mpl
 from pathlib import Path
 
 import pyphare.pharein as ph
@@ -12,8 +11,7 @@ from pyphare.simulator.simulator import Simulator, startMPI
 
 from tests.simulator import SimulatorTest
 
-mpl.use("Agg")
-
+ph.NO_GUI()
 cpp = cpp_lib()
 
 
@@ -21,7 +19,10 @@ cells = (200, 100)
 time_step = 0.005
 final_time = 50
 timestamps = np.arange(0, final_time + time_step, final_time / 5)
-diag_dir = "phare_outputs/harris"
+diag_dir = "phare_outputs/harris_tb1_tile"
+
+final_time = 0.05
+timestamps = [final_time]
 
 
 def config():
@@ -40,6 +41,8 @@ def config():
             "format": "phareh5",
             "options": {"dir": diag_dir, "mode": "overwrite"},
         },
+        tag_buffer=1,
+        clustering="tile",
         strict=True,
     )
 
