@@ -111,12 +111,14 @@ auto& get_from_variants(auto& variants, Type& arg)
     while (start < variants.size())
     {
         if (auto& res = get_as_ref_or_throw<Type>(variants, start); res.name() == arg.name())
-            return res;
+            break;
         ++start;
     }
 
     if (start == variants.size())
         std::runtime_error("Required name not found in variants: " + arg.name());
+
+    return get_as_ref_or_throw<Type>(variants, start);
 }
 
 

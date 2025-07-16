@@ -243,7 +243,7 @@ public:
         if (!this->Pe_.isUsable())
             throw std::runtime_error("Error - isothermal closure is not usable");
 
-        auto const& Ne_ = this->flux_.chargeDensity();
+        auto const& Ne_ = this->flux_.density();
         std::transform(std::begin(Ne_), std::end(Ne_), std::begin(this->Pe_),
                        [this](auto n) { return n * T0_; });
     }
