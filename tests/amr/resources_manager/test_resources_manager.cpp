@@ -375,11 +375,7 @@ TEST(usingResourcesManager, test_variants)
             auto dataOnPatch = resourcesManager.setOnPatch(*patch, resourceUser);
             auto&& [r0, r1]  = resourceUser.get();
             r1.rho.data()[4] = 5;
-
-            auto dataOnPatch            = resourcesManager.setOnPatch(*patch, resourceUser);
-            auto resources              = resourceUser.get();
-            resources[1]->rho.data()[4] = 5;
-
+            
             ++patches;
         }
 
@@ -390,10 +386,6 @@ TEST(usingResourcesManager, test_variants)
             auto dataOnPatch = resourcesManager.setOnPatch(*patch, resourceUser);
             auto&& [r0, r1]  = resourceUser.get();
             EXPECT_EQ(r1.rho.data()[4], 5);
-
-            auto resources = resourceUser.get();
-            EXPECT_EQ(resources[1]->rho.data()[4], 5);
-
 
             ++checks;
         }
