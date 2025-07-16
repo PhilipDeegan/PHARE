@@ -347,7 +347,7 @@ TEST(usingResources, test_variants_resource_helpers)
     }
     auto [rho, B] = get_from_variants(resources, rho_, B_);
     EXPECT_EQ(rho.name(), "rho");
-    EXPECT_EQ(B.name(), "EM_B");
+    EXPECT_EQ(B.name(), "B");
 }
 
 
