@@ -24,7 +24,7 @@ from pyphare.simulator.simulator import Simulator
 from tests.diagnostic import all_timestamps
 from tests.simulator import SimulatorTest, diff_boxes
 
-# cpp = cpp_lib()
+cpp = cpp_lib()
 
 
 @ddt
@@ -421,7 +421,7 @@ class AdvanceTestBase(SimulatorTest):
     ):
         time_step_nbr = 10
         time_step = 0.001
-
+        cells = kwargs.get("cells", 120)
         n_particles = ppc * (cells**ndim)
 
         datahier = self.getHierarchy(

@@ -22,7 +22,7 @@ from pyphare.simulator.simulator import Simulator
 
 from tests.simulator import SimulatorTest
 
-# cpp = cpp_lib()
+cpp = cpp_lib()
 
 
 @ddt
