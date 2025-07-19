@@ -2,7 +2,7 @@ import unittest
 import numpy as np
 from ddt import ddt
 
-from pyphare.cpp import cpp_lib
+from pyphare import cpp
 import pyphare.core.box as boxm
 from pyphare.core.box import Box
 from pyphare.core.box import amr_to_local
@@ -23,8 +23,6 @@ from pyphare.pharesee.hierarchy.hierarchy_utils import merge_particles
 from pyphare.simulator.simulator import Simulator
 from tests.diagnostic import all_timestamps
 from tests.simulator import SimulatorTest, diff_boxes
-
-# cpp = cpp_lib()
 
 
 @ddt
@@ -421,7 +419,7 @@ class AdvanceTestBase(SimulatorTest):
     ):
         time_step_nbr = 10
         time_step = 0.001
-
+        cells = kwargs.get("cells", 120)
         n_particles = ppc * (cells**ndim)
 
         datahier = self.getHierarchy(
@@ -750,7 +748,7 @@ class AdvanceTestBase(SimulatorTest):
         return successful_test_nbr
 
     def _test_field_level_ghosts_via_subcycles_and_coarser_interpolation(
-        self, ndim, interp_order, refinement_boxes
+        self, ndim, interp_order, refinement_boxes, **kwargs
     ):
         """
         This test intends to check that level ghost field values during substeps
@@ -806,6 +804,7 @@ class AdvanceTestBase(SimulatorTest):
                 time_step=0.001,
                 model_init={"seed": rando},
                 diag_outputs=diag_dir,
+                **kwargs,
             )
 
         L0_datahier = _getHier(f"L0_diags")
@@ -844,8 +843,6 @@ class AdvanceTestBase(SimulatorTest):
 
         time_step_nbr = 5
         time_step = 0.001
-
-        out = "domain_particles"
 
         rando = 1183932801
         # rando = 9628442582  # random.randint(0, int(1e10))

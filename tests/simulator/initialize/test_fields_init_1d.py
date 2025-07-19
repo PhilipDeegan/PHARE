@@ -19,7 +19,7 @@ interp_orders = [1, 2, 3]
 def permute():
     return [
         dict(
-            dim=ndim,
+            ndim=ndim,
             interp_order=interp_order,
             sim_setup_kwargs=dict(layout=layout),
         )

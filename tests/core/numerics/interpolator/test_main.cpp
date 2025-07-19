@@ -765,17 +765,19 @@ struct ACollectionOfParticles_3d : public ::testing::Test
 {
     static constexpr auto interp_order = Interpolator::interp_order;
     static constexpr std::size_t dim   = 3;
+    constexpr static PHARE::SimOpts opts{dim, interp_order};
+
     static constexpr std::uint32_t nx = 15, ny = 15, nz = 15;
     static constexpr int start = 0, end = 5;
     constexpr static auto safeLayer = static_cast<int>(1 + ghostWidthForParticles<interp_order>());
 
-    using PHARE_TYPES      = PHARE::core::PHARE_Types<dim, interp_order>;
+    using PHARE_TYPES      = PHARE::core::PHARE_Types<opts>;
     using ParticleArray_t  = typename PHARE_TYPES::ParticleArray_t;
     using GridLayout_t     = typename PHARE_TYPES::GridLayout_t;
     using Grid_t           = typename PHARE_TYPES::Grid_t;
-    using UsableVecFieldND = UsableVecField<dim>;
+    using UsableVecFieldND = UsableVecField<GridLayout_t>;
 
-    GridLayout_t layout{ConstArray<double, dim>(.1), {nx, ny}, ConstArray<double, dim>(0)};
+    GridLayout_t layout{ConstArray<double, dim>(.1), {nx, ny, nz}, ConstArray<double, dim>(0)};
     ParticleArray_t particles;
     Grid_t rho;
     UsableVecFieldND v;
@@ -795,13 +797,13 @@ struct ACollectionOfParticles_3d : public ::testing::Test
             for (int j = start; j < end; j++)
                 for (int k = start; k < end; k++)
                 {
-                    auto& part  = particles.emplace_back();
-                    part.iCell  = {i, j, k};
-                    part.delta  = ConstArray<double, dim>(.5);
-                    part.weight = weight;
-                    part.v[0]   = +2.;
-                    part.v[1]   = -1.;
-                    part.v[2]   = +1.;
+                    auto& part    = particles.emplace_back();
+                    part.iCell()  = {i, j, k};
+                    part.delta()  = ConstArray<double, dim>(.5);
+                    part.weight() = weight;
+                    part.v()[0]   = +2.;
+                    part.v()[1]   = -1.;
+                    part.v()[2]   = +1.;
                 }
 
         interpolator(particles, rho, v, layout);

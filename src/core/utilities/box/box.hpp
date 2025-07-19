@@ -288,6 +288,15 @@ template<typename T, std::size_t s>
 Box(Point<T, s> lower, Point<T, s> upper) -> Box<T, s>;
 
 
+template<typename Particle, typename Type>
+NO_DISCARD auto _PHARE_ALL_FN_ isIn(Particle const& particle,
+                                    Box<Type, Particle::dimension> const& box)
+    -> decltype(isIn(particle.iCell(), box), bool())
+{
+    return isIn(particle.iCell(), box);
+}
+
+
 /** This overload of isIn does the same as the one below but takes only
  * one box.
  */
@@ -309,22 +318,7 @@ NO_DISCARD bool isIn(Point_t<Type, SIZE> const& point, Box<Type, SIZE> const& bo
     return false;
 }
 
-template<typename Particle, typename Type>
-NO_DISCARD bool isIn(Particle const& particle, Box<Type, Particle::dimension> const& box)
-{
-    return isIn(particle.iCell, box);
-}
 
-
-
-
-template<typename Particle, typename Type>
-NO_DISCARD auto _PHARE_ALL_FN_ isIn(Particle const& particle,
-                                    Box<Type, Particle::dimension> const& box)
-    -> decltype(isIn(particle.iCell(), box), bool())
-{
-    return isIn(particle.iCell(), box);
-}
 
 
 /** this overload of isIn takes a Point and a Container of boxes
@@ -356,13 +350,6 @@ bool isIn(ICell<T, S> const& icell, BoxContainer const& boxes) _PHARE_ALL_FN_
     return false;
 }
 
-
-
-template<typename... Args>
-NO_DISCARD auto isIn(Args const&&... args) _PHARE_ALL_FN_
-{
-    return isIn(args...);
-}
 
 
 template<template<typename, std::size_t> typename Point, typename Type, std::size_t SIZE>

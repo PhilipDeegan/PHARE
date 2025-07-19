@@ -4,7 +4,7 @@ import unittest
 import numpy as np
 from ddt import ddt
 
-from pyphare.cpp import cpp_lib
+from pyphare import cpp
 from pyphare.core.box import nDBox
 from pyphare.core.phare_utilities import assert_fp_any_all_close
 from pyphare.pharein import ElectronModel, MaxwellianFluidModel
@@ -21,8 +21,6 @@ from pyphare.pharesee.particles import aggregate as aggregate_particles
 from pyphare.simulator.simulator import Simulator
 
 from tests.simulator import SimulatorTest
-
-# cpp = cpp_lib()
 
 
 @ddt
@@ -253,24 +251,18 @@ class InitializationTest(SimulatorTest):
                 )
             return mom_hier
 
-    def _test_B_is_as_provided_by_user(self, dim, interp_order, ppc=100, **kwargs):
+    def _test_B_is_as_provided_by_user(self, ndim, interp_order, **kwargs):
         print(
             "test_B_is_as_provided_by_user : dim  {} interp_order : {}".format(
-                dim, interp_order
+                ndim, interp_order
             )
         )
         now = self.datetime_now()
         hier = self.getHierarchy(
-            dim,
-            interp_order,
-            refinement_boxes=None,
-            qty="b",
-            nbr_part_per_cell=ppc,
-            diag_outputs=f"test_b/{dim}/{interp_order}/{self.ddt_test_id()}",
-            **kwargs,
+            ndim, interp_order, refinement_boxes=None, qty="b", **kwargs
         )
         print(
-            f"\n{self._testMethodName}_{dim}d init took {self.datetime_diff(now)} seconds"
+            f"\n{self._testMethodName}_{ndim}d init took {self.datetime_diff(now)} seconds"
         )
         now = self.datetime_now()
 
@@ -301,18 +293,18 @@ class InitializationTest(SimulatorTest):
                 xby = by_pd.x[:]
                 xbz = bz_pd.x[:]
 
-                if dim == 1:
+                if ndim == 1:
                     # discrepancy in 1d for some reason : https://github.com/PHAREHUB/PHARE/issues/580
                     assert_fp_any_all_close(bx, bx_fn(xbx), atol=1e-15, rtol=0)
                     assert_fp_any_all_close(by, by_fn(xby), atol=1e-15, rtol=0)
                     assert_fp_any_all_close(bz, bz_fn(xbz), atol=1e-15, rtol=0)
 
-                if dim >= 2:
+                if ndim >= 2:
                     ybx = bx_pd.y[:]
                     yby = by_pd.y[:]
                     ybz = bz_pd.y[:]
 
-                if dim == 2:
+                if ndim == 2:
                     xbx, ybx = [
                         a.flatten() for a in np.meshgrid(xbx, ybx, indexing="ij")
                     ]
@@ -331,7 +323,7 @@ class InitializationTest(SimulatorTest):
                         bz, bz_fn(xbz, ybz).reshape(bz.shape), atol=1e-16, rtol=0
                     )
 
-                if dim == 3:
+                if ndim == 3:
                     zbx = bx_pd.z[:]
                     zby = by_pd.z[:]
                     zbz = bz_pd.z[:]
@@ -356,13 +348,15 @@ class InitializationTest(SimulatorTest):
                         bz, bz_fn(xbz, ybz, zbz).reshape(bz.shape), atol=1e-16, rtol=0
                     )
 
-        print(f"\n{self._testMethodName}_{dim}d took {self.datetime_diff(now)} seconds")
+        print(
+            f"\n{self._testMethodName}_{ndim}d took {self.datetime_diff(now)} seconds"
+        )
 
-    def _test_bulkvel_is_as_provided_by_user(self, dim, interp_order, **kwargs):
+    def _test_bulkvel_is_as_provided_by_user(self, ndim, interp_order, **kwargs):
         hier = self.getHierarchy(
-            dim,
+            ndim,
             interp_order,
-            {"L0": {"B0": nDBox(dim, 10, 19)}},
+            {"L0": {"B0": nDBox(ndim, 10, 19)}},
             "moments",
             beam=True,
             **kwargs,
@@ -392,10 +386,10 @@ class InitializationTest(SimulatorTest):
                 nbrGhosts = layout.nbrGhosts(
                     interp_order, centering
                 )  # primal in all directions
-                select = tuple([slice(nbrGhosts, -nbrGhosts) for i in range(dim)])
+                select = tuple([slice(nbrGhosts, -nbrGhosts) for i in range(ndim)])
 
                 def domain(patch_data):
-                    if dim == 1:
+                    if ndim == 1:
                         return patch_data.dataset[select]
                     return patch_data.dataset[:].reshape(
                         patch.box.shape + (nbrGhosts * 2) + 1
@@ -578,7 +572,6 @@ class InitializationTest(SimulatorTest):
     def _test_nbr_particles_per_cell_is_as_provided(
         self, ndim, interp_order, ppc=100, **kwargs
     ):
-        ddt_test_id = self.ddt_test_id()
         datahier = self.getHierarchy(
             ndim,
             interp_order,

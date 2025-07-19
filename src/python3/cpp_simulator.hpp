@@ -177,9 +177,8 @@ constexpr bool valid_simulator()
     using enum AllocatorMode;
     using enum core::LayoutMode;
 
-    return _dim{}() < 3                                    //
-           and core::any_in(layout_mode, AoSMapped, AoSTS) //
-           and core::any_in(allocator_mode, CPU);
+    // _dim{}() < 3 and
+    return core::any_in(layout_mode, AoSMapped, AoSTS) and core::any_in(allocator_mode, CPU);
 }
 
 template<typename Dim, typename Interp, typename... NbRefinedParts>
