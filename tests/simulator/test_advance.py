@@ -419,8 +419,8 @@ class AdvanceTestBase(SimulatorTest):
     ):
         time_step_nbr = 10
         time_step = 0.001
-        cells = kwargs.get("cells", 120)
-        n_particles = ppc * (cells**ndim)
+        kwargs["cells"] = kwargs.get("cells", 120)
+        n_particles = ppc * (kwargs["cells"] ** ndim)
 
         datahier = self.getHierarchy(
             ndim,
@@ -429,7 +429,6 @@ class AdvanceTestBase(SimulatorTest):
             time_step=time_step,
             time_step_nbr=time_step_nbr,
             nbr_part_per_cell=ppc,
-            cells=cells,
             **kwargs,
         )
 

@@ -37,10 +37,8 @@ def make_cpp_simulator(
 ):
     if SCOPE_TIMING:
         mon.timing_setup(cpp_lib)
-
     make_sim = f"make_simulator_{dim}_{interp}_{nbrRefinedPart}_{layout}_{allocator}"
     print("make_sim", make_sim)
-    # assert make_sim == "make_simulator_1_1_2_1_0"
     return getattr(cpp_lib, make_sim)(hier)
 
 

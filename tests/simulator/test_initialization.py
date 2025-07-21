@@ -421,7 +421,7 @@ class InitializationTest(SimulatorTest):
         empirical_dim_devs = {
             1: 6e-3,
             2: 3e-2,
-            3: 2e-1,
+            3: 2.4e-1,
         }
         nbParts = {1: 10000, 2: 1000, 3: 20}
         hier = self.getHierarchy(

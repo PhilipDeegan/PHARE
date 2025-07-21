@@ -13,7 +13,7 @@ property:
   # HDF5_INC: /opt/mpi/rocm_hdf5/include
   # HDF5_PTH: /opt/mpi/rocm_hdf5/lib
 
-  # debian
+  # # debian
   # HDF5_INC: /usr/include/hdf5/openmpi
   # HDF5_PTH: /usr/lib/x86_64-linux-gnu/hdf5/openmpi
 

@@ -4,21 +4,11 @@
 #include "core/def/phare_config.hpp"
 #include "core/utilities/meta/meta_utilities.hpp"
 #include "core/data/particles/particle_array_def.hpp"
+
 #include <cstddef>
 
 namespace PHARE
 {
-consteval auto as_ce(auto e)
-{
-    return e;
-}
-
-consteval auto to_ce(auto e)
-{
-    return std::integral_constant<int, as_ce(0)>{};
-}
-
-
 
 
 struct SimOpts

@@ -2,7 +2,7 @@
 #define PHARE_SRC_AMR_DATA_PARTICLES_PARTICLES_DATA_HPP
 
 
-#include "core/def/phare_mpi.hpp" // IWYU: pragma keep
+#include "core/def/phare_mpi.hpp" // IWYU pragma: keep
 
 // #include "core/def.hpp"
 // #include "core/logger.hpp"

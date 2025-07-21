@@ -23,10 +23,12 @@ def per_interp(dic):
 
 
 @ddt
-class AdvanceTest(AdvanceTestBase):
+class Advance3DTest(AdvanceTestBase):
     @data(*interp_orders)
     def test_L0_particle_number_conservation(self, interp):
-        self._test_L0_particle_number_conservation(ndim, interp, ppc=ppc, cells=30)
+        self._test_L0_particle_number_conservation(
+            ndim, interp, refinement_boxes={}, ppc=ppc, cells=30
+        )
 
     @data(
         *per_interp(({"L0": {"B0": Box3D(10, 14)}})),

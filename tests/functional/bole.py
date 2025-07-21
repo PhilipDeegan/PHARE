@@ -1,4 +1,8 @@
-#!/usr/bin/env python3
+#
+#
+#
+
+
 import os
 import sys
 import numpy as np
@@ -12,14 +16,13 @@ from pyphare.simulator.simulator import startMPI
 
 np.set_printoptions(threshold=sys.maxsize)
 
-os.environ["PHARE_SCOPE_TIMING"] = "0"  # turn on scope timing
-
 
 ph.NO_GUI()
 cpp = cpp_lib()
-startMPI()
+
 
 cells = (100, 100, 100)
+cells = (10, 10, 10)
 dl = (0.1, 0.1, 0.1)
 
 
@@ -54,6 +57,12 @@ def config():
             "format": "phareh5",
             "options": {"dir": diag_outputs, "mode": "overwrite"},
         },
+        # restart_options={
+        #     "dir": "checkpoints",
+        #     "mode": "overwrite",
+        #     "timestamps": [0, final_time],
+        #     # "restart_time": start_time,
+        # },
     )
 
     def density(x, y, z):
@@ -64,9 +73,9 @@ def config():
         L = sim.simulation_domain()[0]
         mid = L / 2
 
-        X = (x - mid).reshape(lx, ly, lz)
-        Y = (y - mid).reshape(lx, ly, lz)
-        Z = (z - mid).reshape(lx, ly, lz)
+        X = x - mid  # .reshape(lx, ly, lz)
+        Y = y - mid  # .reshape(lx, ly, lz)
+        Z = z - mid  # .reshape(lx, ly, lz)
 
         U, V, W = -X, -Y, -Z
 
@@ -82,14 +91,21 @@ def config():
         radius = L * 0.4
         diff = 0.2
 
-        # outer mask
-        mask = X**2 + Y**2 + Z**2 <= (radius + diff) ** 2
-        U[~mask] = 0
-        V[~mask] = 0
-        W[~mask] = 0
+        # # outer mask
+        # mask = X**2 + Y**2 + Z**2 <= (radius + diff) ** 2
+        # U[~mask] = 0
+        # V[~mask] = 0
+        # W[~mask] = 0
 
-        # inner mask
-        mask = X**2 + Y**2 + Z**2 >= (radius - diff) ** 2
+        # # inner mask
+        # mask = X**2 + Y**2 + Z**2 >= (radius - diff) ** 2
+        # U[~mask] = 0
+        # V[~mask] = 0
+        # W[~mask] = 0
+
+        # anything outside the horizontal middle plane = 0
+        # mask = np.abs(Y) < 5  # & (X**2 + Z**2 >= (radius - diff) ** 2)
+        mask = np.abs(Y) < 5 & (X**2 + Z**2 <= radius**2)
         U[~mask] = 0
         V[~mask] = 0
         W[~mask] = 0
@@ -101,13 +117,14 @@ def config():
         return U, V, W
 
     def bx(x, y, z):
-        return b(x, y, z, cells[0] + 5, cells[0] + 4, cells[0] + 4)
+        return b(x, y, z, cells[0] + 5, cells[0] + 4, cells[0] + 4)[0]
 
     def by(x, y, z):
-        return b(x, y, z, cells[0] + 4, cells[0] + 5, cells[0] + 4)
+        return 0
+        # return b(x, y, z, cells[0] + 4, cells[0] + 5, cells[0] + 4)[1]
 
     def bz(x, y, z):
-        return b(x, y, z, cells[0] + 4, cells[0] + 4, cells[0] + 5)
+        return b(x, y, z, cells[0] + 4, cells[0] + 4, cells[0] + 5)[2]
 
     def vxyz(x, y, z):
         return 0.0
@@ -181,6 +198,7 @@ def plot(diag_dir):
 
 def main():
     Simulator(config()).run()
+    # Simulator(config()).setup(layout=3).initialize().run()
 
     if cpp.mpi_rank() == 0:
         plot(diag_outputs)
@@ -188,4 +206,5 @@ def main():
 
 
 if __name__ == "__main__":
+    startMPI()
     main()
