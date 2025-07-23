@@ -14,7 +14,7 @@ void select_particles(Src const& src, Dst& dst, box_t const& box)
 
     std::string_view constexpr static FN_ID = "select_particles,";
     auto constexpr function_id              = join_string_views_v<FN_ID, Dst::type_id>;
-    PHARE_LOG_SCOPE(1, function_id);
+    PHARE_LOG_SCOPE(3, function_id);
 
     Selector::select(src, dst, box);
 }
@@ -28,7 +28,7 @@ void select_particles(Src const& src, Dst& dst, box_t const& box, Transformer&& 
 
     std::string_view constexpr static FN_ID = "select_transformed_particles,";
     auto constexpr function_id              = join_string_views_v<FN_ID, Dst::type_id>;
-    PHARE_LOG_SCOPE(1, function_id);
+    PHARE_LOG_SCOPE(3, function_id);
 
     Selector::select(src, dst, box, transformer);
 }

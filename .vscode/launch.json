@@ -1,0 +1,83 @@
+{
+
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "(gdb) Launch",
+            "type": "cppdbg",
+            "request": "launch",
+            "program":"${workspaceFolder}/bin/test_core/phare",
+            // "program":"${workspaceFolder}/bin/test_diagnostics/phare",
+            // "program":"${workspaceFolder}/build/tests/amr/data/field/refine/test_field_refinement_on_hierarchy",
+             
+            // "program":"./bin/test_amr/phare",
+            "args" : [],
+            // "program": "/opt/py/py/bin/python3",
+            // "args": ["-Oum", "tests.simulator.advance.test_fields_advance_1d", "Advance1DTest.test_field_coarsening_via_subcycles_02"],
+            // "args": ["-Oum", "tests.simulator.advance.test_particles_advance_1d", "Advance1DTest.test_domain_particles_on_refined_level_2"],
+            // "args": ["-Oum", "tests.simulator.initialize.test_particles_init_1d", "Initialization1DTest.test_levelghostparticles_have_correct_split_from_coarser_particle_02"],
+            // "args": ["-Oum", "tests.simulator.initialize.test_particles_init_1d", "Initialization1DTest.test_levelghostparticles_have_correct_split_from_coarser_particle_02"],
+            // "args": ["tests/simulator/advance/test_fields_advance_1d.py"],
+            // "args": ["tests/functional/harris/harris_2d.py"],
+            "stopAtEntry": false,
+            "environment": [],
+            "externalConsole": false,
+            "cwd" : "${workspaceFolder}",
+            // "cwd" : "${workspaceFolder}/tests/diagnostic",
+            "MIMode": "gdb",
+            "setupCommands": [
+                { 
+                    "description": "Additional libs",
+                    "text": "set env PHARE_LOG=NONE",
+                },
+                { 
+                    "description": "Additional libs",
+                    "text": "set env LD_PRELOAD=/usr/lib64/libasan.so.8",
+                },
+                { 
+                    "description": "Additional libs",
+                    "text": "set env OMPI_MCA_memory=^patcher",
+                },
+                {
+                    "description": "Enable pretty-printing for gdb",
+                    "text": "-enable-pretty-printing",
+                    "ignoreFailures": true
+                },
+                {
+                    "description": "Set Disassembly Flavor to Intel",
+                    "text": "-gdb-set disassembly-flavor intel",
+                    "ignoreFailures": true
+                }
+            ]
+        },
+        {
+            "name": "Python C++ Debugger",
+            "type": "pythoncpp",
+            "request": "launch",
+            "pythonLaunchName": "Python: Current File",
+            "cppAttachName": "(gdb) Attach"
+        },
+        {
+            "name": "(gdb) Attach",
+            "type": "cppdbg",
+            "request": "attach",
+            "program": "/opt/py/py/bin/python3",
+            "processId": "",
+            "MIMode": "gdb",
+            "setupCommands": [
+                {
+                    "description": "Enable pretty-printing for gdb",
+                    "text": "-enable-pretty-printing",
+                    "ignoreFailures": true
+                }
+            ]
+        },
+        {
+            "name": "Python: Current File",
+            "type": "python",
+            "request": "launch",
+            "program": "${file}",
+            "console": "integratedTerminal"
+        }
+    ]
+}

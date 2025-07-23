@@ -10,6 +10,7 @@
 #include "core/data/tiles/tile_set.hpp"
 #include "core/data/tiles/tile_set_traversal.hpp"
 
+
 #include <tuple>
 #include <string>
 #include <cstddef>
@@ -291,58 +292,26 @@ public:
 
     void sync_inner_ghosts()
     {
-        // for (std::size_t ti = 0; ti < super().size(); ++ti)
-        // {
-        //     auto& t0 = super()[ti];
-        //     traverse_tile_neighbours(super(), t0, [&](auto& t1) {
-        //         if (auto const t0_overlap = t0.ghost_box() * t1.field_box())
-        //             for (auto const& bix : *t0_overlap)
-        //             {
-        //                 auto const& t0_lix = (bix - t0.ghost_box().lower).as_unsigned();
-        //                 auto const& t1_lix = (bix - t1.ghost_box().lower).as_unsigned();
-        //                 t0()(t0_lix)       = t1()(t1_lix);
-        //             }
-
-        //         if (auto const t1_overlap = t1.ghost_box() * t0.field_box())
-        //             for (auto const& bix : *t1_overlap)
-        //             {
-        //                 auto const& t0_lix = (bix - t0.ghost_box().lower).as_unsigned();
-        //                 auto const& t1_lix = (bix - t1.ghost_box().lower).as_unsigned();
-        //                 t1()(t1_lix)       = t0()(t0_lix);
-        //             }
-        //     });
-        // }
-
-
-        // for (std::size_t ti = 0; ti < super().size(); ++ti)
-        // {
-        //     auto& t0 = super()[ti];
-        //     for (auto& neigh : t0.links())
-        //     {
-        //         PHARE_LOG_LINE_SS(neigh);
-        //         if (neigh)
+        // KUL_DBG_FUNC_ENTER
+        // PHARE_LOG_LINE_SS("");
+        // visit_tile_neighbours(super(), [](auto& t0, auto& t1) {
+        //     //
+        //     if (auto const t0_overlap = t0.ghost_box() * t1.field_box())
+        //         for (auto const& bix : *t0_overlap)
         //         {
-        //             auto& t1 = *neigh;
-        //             //
-        //             if (auto const t0_overlap = t0.ghost_box() * t1.field_box())
-        //                 for (auto const& bix : *t0_overlap)
-        //                 {
-        //                     auto const& t0_lix = (bix - t0.ghost_box().lower).as_unsigned();
-        //                     auto const& t1_lix = (bix - t1.ghost_box().lower).as_unsigned();
-        //                     t0()(t0_lix)       = t1()(t1_lix);
-        //                 }
-
-        //             if (auto const t1_overlap = t1.ghost_box() * t0.field_box())
-        //                 for (auto const& bix : *t1_overlap)
-        //                 {
-        //                     auto const& t0_lix = (bix - t0.ghost_box().lower).as_unsigned();
-        //                     auto const& t1_lix = (bix - t1.ghost_box().lower).as_unsigned();
-        //                     t1()(t1_lix)       = t0()(t0_lix);
-        //                 }
-        //             //
+        //             auto const& t0_lix = (bix - t0.ghost_box().lower).as_unsigned();
+        //             auto const& t1_lix = (bix - t1.ghost_box().lower).as_unsigned();
+        //             t0()(t0_lix)       = t1()(t1_lix);
         //         }
-        //     }
-        // }
+
+        //     // if (auto const t1_overlap = t1.ghost_box() * t0.field_box())
+        //     //     for (auto const& bix : *t1_overlap)
+        //     //     {
+        //     //         auto const& t0_lix = (bix - t0.ghost_box().lower).as_unsigned();
+        //     //         auto const& t1_lix = (bix - t1.ghost_box().lower).as_unsigned();
+        //     //         t1()(t1_lix)       = t0()(t0_lix);
+        //     //     }
+        // });
 
         for (std::size_t ti0 = 0; ti0 < super().size() - 1; ++ti0)
         {
@@ -471,7 +440,6 @@ public:
         View::setBuffer(this);
         assert(View::isUsable());
         assert((**this)[0]().data());
-        // PHARE_LOG_LINE_SS(layout_.AMRBox());
     }
 
     GridTileSet(GridTileSet const& that)

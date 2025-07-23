@@ -68,6 +68,7 @@ struct TensorField
     TensorField(std::array<Field_t, N> const& components) _PHARE_ALL_FN_ : components_{components}
     {
     }
+    TensorField(std::array<Field_t, N>& components) _PHARE_ALL_FN_ : components_{components} {}
 
     TensorField(TensorField const& source) _PHARE_ALL_FN_            = default;
     TensorField(TensorField&& source) _PHARE_ALL_FN_                 = default;

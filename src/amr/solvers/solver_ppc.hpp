@@ -1,16 +1,17 @@
 #ifndef PHARE_SOLVER_PPC_HPP
 #define PHARE_SOLVER_PPC_HPP
 
-#include "core/data/electromag/electromag.hpp"
-#include "core/data/tensorfield/tensorfield.hpp"
-#include "core/def/phare_mpi.hpp"
+#include "core/def/phare_mpi.hpp" // IWYU pragma: keep
+
 
 #include "core/numerics/ohm/ohm.hpp"
 #include "core/utilities/algorithm.hpp"
 #include "core/numerics/ampere/ampere.hpp"
 #include "core/data/vecfield/vecfield.hpp"
 #include "core/numerics/faraday/faraday.hpp"
+#include "core/data/electromag/electromag.hpp"
 #include "core/data/grid/gridlayout_utils.hpp"
+#include "core/data/tensorfield/tensorfield.hpp"
 #include "core/numerics/ion_updater/ion_updaters.hpp"
 #include "core/data/particles/particle_array_def.hpp"
 #include "core/numerics/ion_updater/ion_updater_def.hpp"
@@ -18,11 +19,10 @@
 
 
 #include "amr/solvers/solver.hpp"
-#include "amr/solvers/solver_ppc_model_view.hpp"
-
 #include "amr/messengers/hybrid_messenger.hpp"
-#include "amr/messengers/hybrid_messenger_info.hpp"
 #include "amr/resources_manager/amr_utils.hpp"
+#include "amr/solvers/solver_ppc_model_view.hpp"
+#include "amr/messengers/hybrid_messenger_info.hpp"
 
 #include <SAMRAI/hier/Patch.h>
 
@@ -41,7 +41,7 @@ auto make_selection_boxes_for(auto const& hierarchy, auto& level)
     std::unordered_map<std::string, Boxing_t> levelBoxing;
     for (auto const& patch : level)
         if (auto [it, suc] = levelBoxing.try_emplace(
-                amr::to_string(patch->getGlobalId()),
+                core::to_string(patch->getGlobalId()),
                 Boxing_t{amr::layoutFromPatch<GridLayout>(*patch),
                          amr::makeNonLevelGhostBoxFor<GridLayout>(*patch, hierarchy)});
             !suc)
@@ -383,6 +383,7 @@ void SolverPPC<HybridModel, AMR_Types>::corrector_(level_t& level, ModelViews_t&
              views.electromag_E);
         setTime([](auto& state) -> auto& { return state.electromag.E; });
 
+        PHARE_LOG_SCOPE(1, "SolverPPC::corrector_.ohm-fill");
         fromCoarser.fillElectricGhosts(views.model().state.electromag.E, levelNumber, newTime);
     }
 }
@@ -461,7 +462,7 @@ void SolverPPC<HybridModel, AMR_Types>::moveIons_(level_t& level, ModelViews_t& 
         for (auto& state : views)
             ionUpdater_.updatePopulations(
                 state.ions, state.electromagAvg,
-                levelBoxing.at(amr::to_string(state.patch->getGlobalId())), dt, mode);
+                levelBoxing.at(core::to_string(state.patch->getGlobalId())), dt, mode);
 
     else
         ionUpdater_.updatePopulations(views, levelBoxing, dt, mode);

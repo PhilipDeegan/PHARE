@@ -65,7 +65,7 @@ def run_permutation(patches, cells, ppc):
         cmd = "python3 -O tests/functional/harris/harris_2d.py"
         subprocess.run(shlex.split(cmd), check=True, env=env)
 
-    shutil.copy(".phare_times.0.txt", f"{times_dir}/scope_times.txt")
+    # shutil.copy(".phare_times.0.txt", f"{times_dir}/scope_times.txt")
     return times_dir
 
 

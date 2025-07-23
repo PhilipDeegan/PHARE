@@ -26,6 +26,7 @@ FILE="tests/core/data/particles/test_particles_partitioning.cpp"
 FILE="tests/core/data/particles/test_particles_AoSTS.cpp"
 FILE="tests/core/data/grid/test_grid_tile_set.cpp"
 FILE="tests/core/numerics/ion_updater/test_multi_updater.cpp"
+FILE="tests/core/numerics/ohm/test_tileset_ohm.cpp"
 TEST=" -M ${FILE} "
 CARGS="${CARGS} $(mkn_get_opts)"
 

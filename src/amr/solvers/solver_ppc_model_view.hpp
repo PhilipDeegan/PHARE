@@ -1,8 +1,8 @@
 #ifndef PHARE_SOLVER_SOLVER_PPC_MODEL_VIEW_HPP
 #define PHARE_SOLVER_SOLVER_PPC_MODEL_VIEW_HPP
 
-#include "core/data/grid/grid_tiles.hpp"
 #include "core/numerics/ohm/ohm.hpp"
+#include "core/data/grid/grid_tiles.hpp"
 #include "core/numerics/ampere/ampere.hpp"
 #include "core/numerics/faraday/faraday.hpp"
 

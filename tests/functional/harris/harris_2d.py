@@ -213,4 +213,4 @@ class HarrisTest(SimulatorTest):
 if __name__ == "__main__":
     startMPI()
     # HarrisTest().test_run().tearDown()
-    Simulator(config()).setup(layout=3).initialize().run()
+    Simulator(config()).setup().initialize().run()

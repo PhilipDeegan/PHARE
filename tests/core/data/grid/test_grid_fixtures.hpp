@@ -23,7 +23,7 @@ EqualityReport compare_fields(GridTileSet<T0s...> const& ref, Grid<T1s...> const
 
     auto tmp = cmp;
     tmp.zero();
-    reduce_into(tmp, ref);
+    reduce_single(tmp, ref);
     return compare_fields(*tmp, *cmp, diff);
 }
 
@@ -39,7 +39,7 @@ EqualityReport compare_fields(Grid<T0s...> const& ref, GridTileSet<T1s...> const
 
     auto tmp = ref;
     tmp.zero();
-    reduce_into(tmp, cmp);
+    reduce_single(tmp, cmp);
     return compare_fields(*ref, *tmp, diff);
 }
 

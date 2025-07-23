@@ -63,7 +63,6 @@ public:
 
     static void reset()
     {
-        // PHARE_WITH_PHLOP(phlop::threaded::ScopeTimerMan::reset());
         PHARE::initializer::PHAREDictHandler::INSTANCE().stop();
         SAMRAI::tbox::SAMRAIManager::shutdown();
         SAMRAI::tbox::SAMRAIManager::startup();

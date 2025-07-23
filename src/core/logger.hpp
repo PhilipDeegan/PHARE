@@ -6,7 +6,7 @@
 #include <utility>
 
 #if !defined(PHARE_LOG_LEVEL)
-#define PHARE_LOG_LEVEL 2 // 0 == off
+#define PHARE_LOG_LEVEL 3 // 0 == off
 #endif
 
 namespace PHARE

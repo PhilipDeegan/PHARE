@@ -9,7 +9,22 @@
 
 namespace PHARE::core
 {
+struct OhmSingleTransformerDAO
+{
+    double const eta           = 0;
+    double const nu            = 0.0001;
+    HyperMode const hyper_mode = HyperMode::constant;
 
+    static auto FROM(initializer::PHAREDict const& dict)
+    {
+        return OhmSingleTransformerDAO{
+            dict["resistivity"].template to<double>(),
+            dict["hyper_resistivity"].template to<double>(),
+            cppdict::get_value(dict, "hyper_mode", std::string{"constant"}) == "constant"
+                ? HyperMode::constant
+                : HyperMode::spatial};
+    }
+};
 
 class OhmSingleTransformer
 {
@@ -20,12 +35,15 @@ class OhmSingleTransformer
     }
 
 public:
-    explicit OhmSingleTransformer(initializer::PHAREDict const& dict)
-        : eta_{dict["resistivity"].template to<double>()}
-        , nu_{dict["hyper_resistivity"].template to<double>()}
-        , hyper_mode{cppdict::get_value(dict, "hyper_mode", std::string{"constant"}) == "constant"
-                         ? HyperMode::constant
-                         : HyperMode::spatial}
+    OhmSingleTransformer(OhmSingleTransformerDAO const& dao = {})
+        : eta_{dao.eta}
+        , nu_{dao.nu}
+        , hyper_mode{dao.hyper_mode}
+    {
+    }
+
+    OhmSingleTransformer(initializer::PHAREDict const& dict)
+        : OhmSingleTransformer{OhmSingleTransformerDAO::FROM(dict)}
     {
     }
 
@@ -33,6 +51,7 @@ public:
     void operator()(GridLayout const& layout, Field const& n, VecField const& Ve, Field const& Pe,
                     VecField const& B, VecField const& J, VecField& Enew)
     {
+        PHARE_LOG_SCOPE(2, "OhmSingleTransformer");
         using core_type = Ohm_ref<GridLayout>;
 
         if constexpr (is_field_tile_set_v<Field>)
@@ -48,6 +67,7 @@ public:
                                                                      tt<V_t>(J, tidx), Enw);
             }
             // ?
+            PHARE_LOG_SCOPE(2, "OhmSingleTransformer::sync");
             for (std::uint8_t i = 0; i < 3; ++i)
                 Enew[i].sync_inner_ghosts();
         }

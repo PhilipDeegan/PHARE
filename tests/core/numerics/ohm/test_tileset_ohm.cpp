@@ -1,17 +1,22 @@
 //  tests/core/numerics/ohm/test_tileset_ohm.cpp
 //
 // #define PHARE_UNDEF_ASSERT
-#include "tests/core/data/field/test_field_fixtures.hpp"
 #define PHARE_SKIP_MPI_IN_CORE
+
+#include "core/logger.hpp"    // scope timing
+#include "core/def/phlop.hpp" // scope timing
+
 
 #include "core/def/phare_config.hpp"
 
 #include "core/utilities/types.hpp"
 #include "core/numerics/ohm/ohm.hpp"
+#include "core/numerics/ohm/omg.hpp"
 #include "core/data/grid/grid_tiles.hpp"
 #include "core/hybrid/hybrid_quantities.hpp"
 #include "core/data/particles/particle_array_def.hpp"
 
+#include "tests/core/data/field/test_field_fixtures.hpp"
 #include "tests/core/data/gridlayout/test_gridlayout.hpp"
 #include "tests/core/data/vecfield/test_vecfield_fixtures.hpp"
 #include "tests/core/data/electromag/test_electromag_fixtures.hpp"
@@ -29,7 +34,7 @@ double static constexpr eta = 1;
 double static constexpr nu  = 1;
 
 // RUNTIME ENV VAR OVERRIDES
-auto static const cells = get_env_as("PHARE_CELLS", std::uint32_t{4});
+auto static const cells = get_env_as("PHARE_CELLS", std::uint32_t{22});
 
 static ::BS::thread_pool pool{4};
 
@@ -56,24 +61,39 @@ void cmp_do(Patch& patch)
 
     auto constexpr tile_accessor = [](auto& ts, auto const ti) { return ts[ti]; };
 
-    pool.detach_task([&]() {
-        auto const n_tiles = patch.em.B[0]().size();
-        for (std::uint16_t ti = 0; ti < n_tiles; ++ti)
-        {
-            auto const n = *patch.n[ti];
-            auto const P = *patch.P[ti];
-            auto const V = patch.V.template as<VecField_vt>(tile_accessor, ti);
-            auto const J = patch.J.template as<VecField_vt>(tile_accessor, ti);
-            auto const B = patch.em.B.template as<VecField_vt>(tile_accessor, ti);
-            auto ENew    = patch.emNew.E.template as<VecField_vt>(tile_accessor, ti);
+    OhmSingleTransformer{{eta, nu}}(patch.layout, *patch.n, *patch.V, *patch.P, *patch.em.B,
+                                    *patch.J, *patch.emNew.E);
 
-            pool.detach_task([=, layout = patch.em.E[0][ti].layout()]() mutable {
-                Ohm_ref<GridLayout_t>{layout, eta, nu}(n, V, P, B, J, ENew);
-            });
-        }
-    });
+    // auto const n_tiles = patch.em.B[0]().size();
+    // for (std::uint16_t ti = 0; ti < n_tiles; ++ti)
+    // {
+    //     auto const n = *patch.n[ti];
+    //     auto const V = patch.V.template as<VecField_vt>(tile_accessor, ti);
+    //     auto const P = *patch.P[ti];
+    //     auto const B = patch.em.B.template as<VecField_vt>(tile_accessor, ti);
+    //     auto const J = patch.J.template as<VecField_vt>(tile_accessor, ti);
+    //     auto ENew    = patch.emNew.E.template as<VecField_vt>(tile_accessor, ti);
+    //     ohm(patch.em.E[0][ti].layout(), n, V, P, B, J, ENew);
+    // }
 
-    pool.wait();
+    // pool.detach_task([&]() {
+    //     auto const n_tiles = patch.em.B[0]().size();
+    //     for (std::uint16_t ti = 0; ti < n_tiles; ++ti)
+    //     {
+    //         auto const n = *patch.n[ti];
+    //         auto const P = *patch.P[ti];
+    //         auto const V = patch.V.template as<VecField_vt>(tile_accessor, ti);
+    //         auto const J = patch.J.template as<VecField_vt>(tile_accessor, ti);
+    //         auto const B = patch.em.B.template as<VecField_vt>(tile_accessor, ti);
+    //         auto ENew    = patch.emNew.E.template as<VecField_vt>(tile_accessor, ti);
+
+    //         pool.detach_task([=, layout = patch.em.E[0][ti].layout()]() mutable {
+    //             Ohm_ref<GridLayout_t>{layout, eta, nu}(n, V, P, B, J, ENew);
+    //         });
+    //     }
+    // });
+
+    // pool.wait();
 }
 
 
@@ -97,6 +117,12 @@ void compare(GridLayout_t const& layout, R& ref, C& cmp)
         auto const eq = compare_fields(ref.emNew.E[c], cmp.emNew.E[c]);
         PHARE_LOG_LINE_SS(eq.why());
         EXPECT_TRUE(eq) << "Failure for E New: " << eq.why();
+    }
+
+    for (std::size_t c = 0; c < n_components; ++c)
+    {
+        auto const sum = sum_field(cmp.emNew.E[c]);
+        PHARE_LOG_LINE_SS(sum);
     }
 }
 
@@ -147,8 +173,6 @@ struct OhmTileTest : public ::testing::Test
             V.fill(.001);
             n.fill(.001);
             P.fill(.001);
-            // PHARE_LOG_LINE_SS(em.B);
-            // PHARE_LOG_LINE_SS(em.E);
         }
 
         GridLayout_t layout;
@@ -233,6 +257,9 @@ TYPED_TEST(OhmTileTest, dispatch)
 
 int main(int argc, char** argv)
 {
+    PHARE_WITH_PHLOP(phlop::threaded::ScopeTimerMan::INSTANCE().init();)
     ::testing::InitGoogleTest(&argc, argv);
-    return RUN_ALL_TESTS();
+    auto const ret = RUN_ALL_TESTS();
+    PHARE_WITH_PHLOP(phlop::threaded::ScopeTimerMan::reset();)
+    return ret;
 }

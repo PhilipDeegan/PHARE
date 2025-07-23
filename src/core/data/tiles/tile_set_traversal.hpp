@@ -193,6 +193,48 @@ void traverse_tile_neighbours(TileSet_t& tileset, Tile_t& tile, Fn fn)
         throw std::runtime_error("TODO");
 }
 
+template<typename TileSet_t>
+void visit_tile_neighbours(TileSet_t& ts, auto fn)
+{
+    using Tile   = TileSet_t::value_type;
+    using TileFn = std::function<void(Tile&)>;
+
+    if constexpr (TileSet_t::dimension < 3)
+        throw std::runtime_error("TODO");
+
+    TileFn const doX = [&](auto& t0) {
+        traverse_tile_neighbours(ts, t0, [&](auto& t1) { fn(t0, t1); });
+
+        // for (std::uint8_t i = 1; i < t0.links().size(); ++i)
+        //     if (auto li = t0.link(i))
+        //         fn(t0, *li);
+        if (auto l0 = t0.link(0))
+        {
+            // fn(t0, *l0);
+            doX(*l0);
+        }
+    };
+    TileFn const doY = [&](auto& t0) {
+        doX(t0);
+
+        if constexpr (TileSet_t::dimension > 1)
+            if (auto l1 = t0.link(1))
+                doY(*l1);
+    };
+    TileFn const doZ = [&](auto& t0) {
+        doY(t0);
+
+        if constexpr (TileSet_t::dimension == 3)
+            if (auto l3 = t0.link(3))
+                doZ(*l3);
+    };
+
+
+    doZ(ts[0]);
+}
+
+
+
 } // namespace PHARE::core
 
 
