@@ -159,8 +159,77 @@ struct DimDict<2>
     }
 };
 
+
+template<>
+struct DimDict<3>
+{
+    static constexpr uint8_t dim = 3;
+    static void set(PHARE::initializer::PHAREDict& dict)
+    {
+        using namespace PHARE::initializer::test_fn::func_3d; // density/etc are here
+        dict["simulation"]["algo"]["pusher"]["name"] = std::string{"modified_boris"};
+
+        dict["ions"]["pop0"]["particle_initializer"]["density"]
+            = static_cast<InitFunctionT<dim>>(density);
+
+        dict["ions"]["pop0"]["particle_initializer"]["init"]["seed"]
+            = std::optional<std::size_t>(1337);
+
+        dict["ions"]["pop0"]["particle_initializer"]["bulk_velocity_x"]
+            = static_cast<InitFunctionT<dim>>(vx);
+
+        dict["ions"]["pop0"]["particle_initializer"]["bulk_velocity_y"]
+            = static_cast<InitFunctionT<dim>>(vy);
+
+        dict["ions"]["pop0"]["particle_initializer"]["bulk_velocity_z"]
+            = static_cast<InitFunctionT<dim>>(vz);
+
+        dict["ions"]["pop0"]["particle_initializer"]["thermal_velocity_x"]
+            = static_cast<InitFunctionT<dim>>(vthx);
+
+        dict["ions"]["pop0"]["particle_initializer"]["thermal_velocity_y"]
+            = static_cast<InitFunctionT<dim>>(vthy);
+
+        dict["ions"]["pop0"]["particle_initializer"]["thermal_velocity_z"]
+            = static_cast<InitFunctionT<dim>>(vthz);
+
+        dict["ions"]["pop1"]["particle_initializer"]["density"]
+            = static_cast<InitFunctionT<dim>>(density);
+
+        dict["ions"]["pop1"]["particle_initializer"]["init"]["seed"]
+            = std::optional<std::size_t>(7113);
+
+        dict["ions"]["pop1"]["particle_initializer"]["bulk_velocity_x"]
+            = static_cast<InitFunctionT<dim>>(vx);
+
+        dict["ions"]["pop1"]["particle_initializer"]["bulk_velocity_y"]
+            = static_cast<InitFunctionT<dim>>(vy);
+
+        dict["ions"]["pop1"]["particle_initializer"]["bulk_velocity_z"]
+            = static_cast<InitFunctionT<dim>>(vz);
+
+        dict["ions"]["pop1"]["particle_initializer"]["thermal_velocity_x"]
+            = static_cast<InitFunctionT<dim>>(vthx);
+
+        dict["ions"]["pop1"]["particle_initializer"]["thermal_velocity_y"]
+            = static_cast<InitFunctionT<dim>>(vthy);
+
+        dict["ions"]["pop1"]["particle_initializer"]["thermal_velocity_z"]
+            = static_cast<InitFunctionT<dim>>(vthz);
+
+        dict["electromag"]["magnetic"]["initializer"]["x_component"]
+            = static_cast<InitFunctionT<dim>>(bx);
+        dict["electromag"]["magnetic"]["initializer"]["y_component"]
+            = static_cast<InitFunctionT<dim>>(by);
+        dict["electromag"]["magnetic"]["initializer"]["z_component"]
+            = static_cast<InitFunctionT<dim>>(bz);
+
+        dict["simulation"]["algo"]["ion_updater"]["pusher"]["name"] = std::string{"modified_boris"};
+    }
+};
+
 template<uint8_t dimension>
-PHARE::initializer::PHAREDict createDict()
+PHARE::initializer::PHAREDict createDict(int const ppc = 100)
 {
     PHARE::initializer::PHAREDict dict;
 
@@ -174,7 +243,7 @@ PHARE::initializer::PHAREDict createDict()
     dict["ions"]["pop0"]["mass"]                         = 1.;
     dict["ions"]["pop0"]["particle_initializer"]["name"] = std::string{"maxwellian"};
 
-    dict["ions"]["pop0"]["particle_initializer"]["nbr_part_per_cell"] = int{100};
+    dict["ions"]["pop0"]["particle_initializer"]["nbr_part_per_cell"] = ppc;
     dict["ions"]["pop0"]["particle_initializer"]["charge"]            = -1.;
     dict["ions"]["pop0"]["particle_initializer"]["basis"]             = std::string{"cartesian"};
 
@@ -182,7 +251,7 @@ PHARE::initializer::PHAREDict createDict()
     dict["ions"]["pop1"]["mass"]                         = 1.;
     dict["ions"]["pop1"]["particle_initializer"]["name"] = std::string{"maxwellian"};
 
-    dict["ions"]["pop1"]["particle_initializer"]["nbr_part_per_cell"] = int{100};
+    dict["ions"]["pop1"]["particle_initializer"]["nbr_part_per_cell"] = ppc;
     dict["ions"]["pop1"]["particle_initializer"]["charge"]            = -1.;
     dict["ions"]["pop1"]["particle_initializer"]["basis"]             = std::string{"cartesian"};
 
@@ -207,7 +276,7 @@ public:
         int const ratio, short unsigned const dimension,
         SAMRAI::mesh::StandardTagAndInitStrategy* tagStrat,
         std::shared_ptr<SAMRAI::algs::TimeRefinementLevelStrategy> const& integratorStrat,
-        std::string const& inputConfigFile)
+        std::string const& inputConfigFile, int ppc = 100)
         : inputDatabase_{SAMRAI::tbox::InputManager::getManager()->parseInputFile(inputConfigFile)}
         , patchHierarchyDatabase_{inputDatabase_->getDatabase("PatchHierarchy")}
         , dimension_{dimension}
@@ -277,7 +346,8 @@ struct AfullHybridBasicHierarchy
         = HybridHybridMessengerStrategy<HybridModelT,
                                         typename Phare_solver_Types::RefinementParams>;
 
-    AfullHybridBasicHierarchy(std::string const& inputConfigFile)
+    AfullHybridBasicHierarchy(std::string const& inputConfigFile, int ppc = 100)
+        : dict{{createDict<dim>(ppc)}}
     {
         hybridModel->resourcesManager->registerResources(*hybridModel);
 
@@ -289,7 +359,7 @@ struct AfullHybridBasicHierarchy
                                                           inputConfigFile);
     }
 
-    PHARE::initializer::PHAREDict dict{createDict<dim>()};
+    PHARE::initializer::PHAREDict dict;
     SAMRAI::tbox::SAMRAI_MPI mpi{MPI_COMM_WORLD};
 
     std::shared_ptr<HybridModelT> hybridModel{std::make_shared<HybridModelT>(dict)};

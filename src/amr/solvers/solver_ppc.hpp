@@ -372,6 +372,7 @@ void SolverPPC<HybridModel, AMR_Types>::corrector_(level_t& level, ModelViews_t&
         PHARE_LOG_SCOPE(1, "SolverPPC::corrector_.ampere");
         ampere_(views.layouts, views.electromag_B, views.J);
         setTime([](auto& state) -> auto& { return state.J; });
+        PHARE_LOG_SCOPE(1, "SolverPPC::corrector_.ampere-fill");
         fromCoarser.fillCurrentGhosts(views.model().state.J, levelNumber, newTime);
     }
 
