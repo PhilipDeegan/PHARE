@@ -2,12 +2,12 @@
 #define PHARE_DEFAULT_FIELD_COARSENER_HPP
 
 
-#include "core/def/phare_mpi.hpp"
+#include "core/def/phare_mpi.hpp" // IWYU pragma: keep
 
 #include "core/def.hpp"
-#include "core/data/grid/gridlayoutdefs.hpp"
 #include "core/utilities/constants.hpp"
 #include "core/utilities/point/point.hpp"
+#include "core/data/grid/gridlayoutdefs.hpp"
 
 #include "amr/data/field/coarsening/field_coarsen_index_weight.hpp"
 #include "amr/resources_manager/amr_utils.hpp"
@@ -18,6 +18,10 @@
 #include <array>
 
 
+namespace PHARE::amr
+{
+
+}
 
 namespace PHARE
 {
@@ -146,8 +150,11 @@ namespace amr
         }
 
 
+        void coarsen() const {}
 
-    private:
+
+
+    protected:
         //! precompute the indexes and weights to use to coarsen fine values onto a coarse node
         FieldCoarsenIndexesAndWeights<dimension> indexesAndWeights_;
         SAMRAI::hier::Box const sourceBox_;
@@ -155,6 +162,43 @@ namespace amr
     };
 } // namespace amr
 } // namespace PHARE
+
+
+namespace PHARE::amr
+{
+
+
+
+template<std::size_t rank, std::size_t dimension>
+class DefaultTensorFieldCoarsener : public DefaultFieldCoarsener<dimension>
+{
+    using Super = DefaultFieldCoarsener<dimension>;
+
+    void super(auto&&... args) { static_cast<Super&>(*this)(args...); }
+
+public:
+    DefaultTensorFieldCoarsener(std::array<core::QtyCentering, dimension> const& centering,
+                                SAMRAI::hier::Box const& sourceBox,
+                                SAMRAI::hier::Box const& destinationBox,
+                                SAMRAI::hier::IntVector const& ratio)
+        : Super{centering, sourceBox, destinationBox, ratio}
+    {
+    }
+
+    template<typename FieldT>
+    void operator()(FieldT const& fineField, FieldT& coarseField,
+                    core::Point<int, dimension> const& coarseIndex)
+    {
+        super(fineField, coarseField, coarseIndex);
+    }
+};
+
+
+template<std::size_t dimension>
+using DefaultVecFieldCoarsener = DefaultTensorFieldCoarsener<1, dimension>;
+
+
+} // namespace PHARE::amr
 
 
 #endif
