@@ -1,8 +1,6 @@
 #ifndef PHARE_TENSOR_FIELD_RESOURCE_HPP
 #define PHARE_TENSOR_FIELD_RESOURCE_HPP
 
-#include "amr/data/field/field_data.hpp"
-#include "amr/data/field/field_variable.hpp"
 #include "amr/data/tensorfield/tensor_field_data.hpp"
 #include "amr/data/tensorfield/tensor_field_variable.hpp"
 

@@ -102,6 +102,9 @@ namespace amr
         using ElectricFieldRefineOp   = VecFieldRefineOp<ElectricFieldRefiner<dimension>>;
         using FieldTimeInterp         = FieldLinearTimeInterpolate<GridLayoutT, GridT>;
 
+        using VecFieldTimeInterp
+            = VecFieldLinearTimeInterpolate<GridLayoutT, GridT, core::HybridQuantity>;
+
         template<typename Policy>
         using FieldCoarsenOp = FieldCoarsenOperator<GridLayoutT, GridT, Policy>;
 
@@ -110,7 +113,7 @@ namespace amr
             = VecFieldCoarsenOperator<GridLayoutT, GridT, Policy, core::HybridQuantity>;
 
         using MagneticCoarsenOp        = VecFieldCoarsenOp<MagneticFieldCoarsener<dimension>>;
-        using DefaultFieldCoarsenOp    = VecFieldCoarsenOp<DefaultFieldCoarsener<dimension>>;
+        using DefaultFieldCoarsenOp    = FieldCoarsenOp<DefaultFieldCoarsener<dimension>>;
         using DefaultVecFieldCoarsenOp = VecFieldCoarsenOp<DefaultVecFieldCoarsener<dimension>>;
 
     public:
@@ -752,7 +755,7 @@ namespace amr
                                                   info->ghostElectric);
 
             currentGhostsRefiners_.addTimeRefiners(info->ghostCurrent, info->modelCurrent,
-                                                   Jold_.name(), EfieldRefineOp_, fieldTimeOp_);
+                                                   Jold_.name(), EfieldRefineOp_, vecFieldTimeOp_);
 
             rhoGhostsRefiners_.addTimeRefiner(info->modelIonDensity, info->modelIonDensity,
                                               NiOld_.name(), fieldRefineOp_, fieldTimeOp_,
@@ -760,7 +763,7 @@ namespace amr
 
 
             velGhostsRefiners_.addTimeRefiners(info->ghostBulkVelocity, info->modelIonBulkVelocity,
-                                               ViOld_.name(), vecFieldRefineOp_, fieldTimeOp_);
+                                               ViOld_.name(), vecFieldRefineOp_, vecFieldTimeOp_);
         }
 
 
@@ -1152,6 +1155,8 @@ namespace amr
             = std::make_shared<FieldFillPattern<dimension>>(); // stateless (mostly)
 
         std::shared_ptr<TimeInterpolateOperator> fieldTimeOp_{std::make_shared<FieldTimeInterp>()};
+        std::shared_ptr<TimeInterpolateOperator> vecFieldTimeOp_{
+            std::make_shared<VecFieldTimeInterp>()};
 
         using CoarsenOperator_ptr = std::shared_ptr<SAMRAI::hier::CoarsenOperator>;
         CoarsenOperator_ptr fieldCoarseningOp_{std::make_shared<DefaultFieldCoarsenOp>()};
