@@ -2,15 +2,14 @@
 #define PHARE_CORE_DATA_FIELD_FIELD_BASE_HPP
 
 #include "core/def.hpp"
-#include "core/data/ndarray/ndarray_view.hpp"
 #include "core/def/phare_config.hpp"
+#include "core/data/ndarray/ndarray_view.hpp"
 
 
 #include <array>
-#include <cmath>
-#include <stdexcept>
 #include <string>
 #include <cstddef>
+#include <stdexcept>
 
 
 namespace PHARE::core
@@ -21,8 +20,8 @@ struct FieldOpts
     using physical_quantity_type = PhysicalQuantity;
     using value_type             = Data_t;
 
-    std::size_t dim;
-    AllocatorMode alloc_mode;
+    std::size_t dimension;
+    AllocatorMode alloc_mode = AllocatorMode::CPU;
 };
 
 
@@ -32,19 +31,20 @@ namespace PHARE::core::basic
 {
 
 template<auto opts> // NO STRINGS OR STD LIB!
-class Field : public NdArrayView<opts.dim, typename decltype(opts)::value_type>
+class Field : public NdArrayView<opts.dimension, typename decltype(opts)::value_type>
 {
     using FieldOpts = decltype(opts);
 
 public:
     using physical_quantity_type     = FieldOpts::physical_quantity_type;
     using value_type                 = typename FieldOpts::value_type;
-    using Super                      = NdArrayView<opts.dim, value_type>;
+    using Super                      = NdArrayView<opts.dimension, value_type>;
     auto constexpr static alloc_mode = opts.alloc_mode;
-    auto constexpr static dimension  = opts.dim;
+    auto constexpr static dimension  = opts.dimension;
 
     Field(physical_quantity_type qty, value_type* data = nullptr,
-          std::array<std::uint32_t, opts.dim> const& dims = ConstArray<std::uint32_t, opts.dim>())
+          std::array<std::uint32_t, opts.dimension> const& dims
+          = ConstArray<std::uint32_t, opts.dimension>())
         : Super{data, dims}
         , qty_{qty}
     {
@@ -253,11 +253,11 @@ inline std::ostream& operator<<(std::ostream& out, basic::Field<opts> const& f)
 {
     // out << f.name() << std::endl;
 
-    if constexpr (opts.dim == 1)
+    if constexpr (opts.dimension == 1)
         print_1d_field(out, f);
-    if constexpr (opts.dim == 2)
+    if constexpr (opts.dimension == 2)
         print_2d_field(out, f);
-    if constexpr (opts.dim == 3)
+    if constexpr (opts.dimension == 3)
         print_3d_field(out, f);
 
     return out;

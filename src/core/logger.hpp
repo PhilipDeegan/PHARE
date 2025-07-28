@@ -1,6 +1,7 @@
 #ifndef PHARE_CORE_LOGGER_HPP
 #define PHARE_CORE_LOGGER_HPP
 
+#include <format>
 #include <cstdint>
 #include <string>
 #include <utility>
@@ -12,7 +13,7 @@
 namespace PHARE
 {
 constexpr static std::uint8_t LOG_LEVEL = PHARE_LOG_LEVEL;
-}
+} // namespace PHARE
 
 #if !defined(NDEBUG) || defined(PHARE_FORCE_DEBUG_DO) || defined(PHARE_FORCE_LOG_LINE)
 #include <sstream>
@@ -68,6 +69,35 @@ struct scope_log
     int i;
     std::string key;
 };
+
+
+struct ScopeTimer
+{
+    std::string key;
+    std::size_t start_time = now();
+
+    ~ScopeTimer()
+    {
+        std::cout << std::format("{:%Y-%m-%d-%H:%M:%S}", std::chrono::system_clock::now())
+                  << " PHARE SCOPE TIMER: " << key << " time: " << (now() - start_time) / 1e6
+                  << " ms" << std::endl;
+    }
+
+    std::uint64_t static now()
+    {
+        return std::chrono::duration_cast<std::chrono::nanoseconds>(
+                   std::chrono::steady_clock::now().time_since_epoch())
+            .count();
+    }
+};
+
+
 } // namespace PHARE
+
+#if !defined(NDEBUG) || defined(PHARE_FORCE_DEBUG_DO) || defined(PHARE_FORCE_LOG_LINE)
+#define PHARE_FN_TIMER(key) PHARE::ScopeTimer __phare_scope##__line__(key)
+#else
+#define PHARE_FN_TIMER(key) // noop
+#endif                      //
 
 #endif /* PHARE_CORE_LOGGER_H */

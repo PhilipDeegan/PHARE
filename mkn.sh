@@ -28,6 +28,7 @@ FILE="tests/core/numerics/ion_updater/test_multi_updater.cpp"
 FILE="tests/core/numerics/ohm/test_tileset_ohm.cpp"
 FILE="tools/bench/amr/data/field/schedules/bench_field_schedules.cpp"
 FILE="tests/amr/data/field/test_fields_schedules.cpp"
+FILE="tests/core/data/field/test_field_overlaps.cpp"
 TEST=" -M ${FILE} "
 CARGS="${CARGS} $(mkn_get_opts)"
 

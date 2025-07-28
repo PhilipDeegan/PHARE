@@ -32,7 +32,7 @@ NO_DISCARD auto phare_box_from(SAMRAI::hier::Box const& box)
 }
 
 template<std::size_t dim>
-NO_DISCARD auto phare_lcl_box_from(SAMRAI::hier::Box const& box)
+NO_DISCARD auto as_unsigned_phare_box(SAMRAI::hier::Box const& box)
 {
     auto const& amr_box = phare_box_from<dim>(box);
     return PHARE::core::Box<std::uint32_t, dim>{core::Point{amr_box.lower}.as_unsigned(),

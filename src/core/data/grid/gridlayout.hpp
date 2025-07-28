@@ -896,6 +896,8 @@ namespace core
         NO_DISCARD std::string layoutName() const { return GridLayoutImpl::layoutName_; }
 
 
+
+
         /**
          * @brief returns the centering of a scalar hybrid quantity in each directions
          */
@@ -914,6 +916,11 @@ namespace core
         centering(HybridQuantity::Vector hybridQuantity) _PHARE_ALL_FN_
         {
             return GridLayoutImpl::centering(hybridQuantity);
+        }
+
+        NO_DISCARD constexpr static auto centering(auto const& hasQuantity) _PHARE_ALL_FN_
+        {
+            return centering(hasQuantity.physicalQuantity());
         }
 
 

@@ -380,10 +380,10 @@ namespace amr
 
             core::FieldBox<Grid_t>{
                 fieldDestination, gridLayout,
-                phare_lcl_box_from<dimension>(AMRToLocal(intersectBox, destinationBox))}
+                as_unsigned_phare_box<dimension>(AMRToLocal(intersectBox, destinationBox))}
                 .template op<Operator>(core::FieldBox<Grid_t const>{
                     source.field, source.gridLayout,
-                    phare_lcl_box_from<dimension>(AMRToLocal(intersectBox, sourceBox))});
+                    as_unsigned_phare_box<dimension>(AMRToLocal(intersectBox, sourceBox))});
         }
 
 
@@ -433,11 +433,11 @@ namespace amr
 
                         if (!intersectionBox.empty())
                             core::FieldBox{dst, gridLayout,
-                                           phare_lcl_box_from<dimension>(
+                                           as_unsigned_phare_box<dimension>(
                                                AMRToLocal(intersectionBox, destinationBox))}
                                 .template op<Operator>(
                                     core::FieldBox{source.field, source.gridLayout,
-                                                   phare_lcl_box_from<dimension>(AMRToLocal(
+                                                   as_unsigned_phare_box<dimension>(AMRToLocal(
                                                        intersectionBox, transformedSource))}
                                         .offset(offset));
                     }

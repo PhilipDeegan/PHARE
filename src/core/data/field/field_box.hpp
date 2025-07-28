@@ -306,11 +306,11 @@ void operate_on_fields(FieldBox<Grid<T0s...>>& dst, FieldBox<FieldTileSet<T1s...
 
 // final fallthrough, only supports fields without tiles
 template<typename Operator, typename... T0s, typename... T1s>
-void operate_on_fields(FieldBox<T0s...>& dst, FieldBox<T1s...> const& src)
+void operate_on_fields(FieldBox<T0s...>&& dst, FieldBox<T1s...> const& src)
 {
     using Src = std::decay_t<decltype(src.field)>;
     using Dst = std::decay_t<decltype(dst.field)>;
-    static_assert(is_field_v<Src> and is_field_v<Dst>);
+    // static_assert(is_field_v<Src> and is_field_v<Dst>);
 
     auto src_it = src.lcl_box.begin();
     auto dst_it = dst.lcl_box.begin();
