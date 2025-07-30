@@ -122,13 +122,6 @@ struct BoxSpan
 };
 
 
-std::uint64_t static now()
-{
-    return std::chrono::duration_cast<std::chrono::nanoseconds>(
-               std::chrono::steady_clock::now().time_since_epoch())
-        .count();
-}
-
 template<typename Array_t>
 auto make_box_span(Box<std::uint32_t, dim> const box, Array_t& arr)
 {
@@ -141,6 +134,13 @@ auto make_box_span(Box<std::uint32_t, dim> const box, Array_t const& arr)
     return BoxSpan{box, arr};
 }
 
+
+std::uint64_t static now()
+{
+    return std::chrono::duration_cast<std::chrono::nanoseconds>(
+               std::chrono::steady_clock::now().time_since_epoch())
+        .count();
+}
 
 struct Timer
 {

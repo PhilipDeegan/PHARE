@@ -33,18 +33,6 @@ LoadBalancer
 }
 StandardTagAndInitialize
 {
-    at_0
-    {
-        cycle = 0
-        tag_0
-        {
-            tagging_method = "REFINE_BOXES"
-            level_0
-            {
-                boxes = [ (20, 20) , (24,24)]
-            }
-        }
-    }
 }
 GriddingAlgorithm
 {
@@ -55,5 +43,5 @@ TimeRefinementIntegrator
     end_time    =   1.0
     max_integrator_steps    =   20
     regrid_interval = 1
-    tag_buffer =  10,10
+    tag_buffer =  0,0
 }

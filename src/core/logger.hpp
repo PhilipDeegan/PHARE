@@ -95,7 +95,7 @@ struct ScopeTimer
 } // namespace PHARE
 
 #if !defined(NDEBUG) || defined(PHARE_FORCE_DEBUG_DO) || defined(PHARE_FORCE_LOG_LINE)
-#define PHARE_FN_TIMER(key) PHARE::ScopeTimer __phare_scope##__line__(key)
+#define PHARE_FN_TIMER(key) PHARE::ScopeTimer PHARE_STR_CAT(__phare_scope_, __LINE__)(key)
 #else
 #define PHARE_FN_TIMER(key) // noop
 #endif                      //

@@ -6,8 +6,8 @@
             "name": "(gdb) Launch",
             "type": "cppdbg",
             "request": "launch",
-            "program":"${workspaceFolder}/bin/test_core/phare",
-            // "program":"${workspaceFolder}/bin/test_diagnostics/phare",
+            // "program":"${workspaceFolder}/bin/test_core/phare",
+            "program":"${workspaceFolder}/bin/test_diagnostics/phare",
             // "program":"${workspaceFolder}/build/tests/amr/data/field/refine/test_field_refinement_on_hierarchy",
              
             // "program":"./bin/test_amr/phare",

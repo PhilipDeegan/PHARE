@@ -44,7 +44,7 @@ public:
         auto constexpr static alloc_mode = ParticleArray_t::alloc_mode;
 
 
-        PHARE_LOG_SCOPE(2, "Interpolating::particleToMesh");
+        PHARE_LOG_SCOPE(3, "Interpolating::particleToMesh");
 
         using enum LayoutMode;
         if constexpr (any_in(Particles::layout_mode, AoSTS))

@@ -29,6 +29,7 @@ FILE="tests/core/numerics/ohm/test_tileset_ohm.cpp"
 FILE="tools/bench/amr/data/field/schedules/bench_field_schedules.cpp"
 FILE="tests/amr/data/field/test_fields_schedules.cpp"
 FILE="tests/core/data/field/test_field_overlaps.cpp"
+FILE="tests/amr/data/field/test_L0_fields_schedules.cpp"
 TEST=" -M ${FILE} "
 CARGS="${CARGS} $(mkn_get_opts)"
 

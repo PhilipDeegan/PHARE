@@ -6,6 +6,7 @@
 #include "core/def.hpp"
 #include "core/utilities/span.hpp"
 #include "core/utilities/types.hpp"
+#include "core/data/field/field.hpp"
 #include "core/utilities/box/box.hpp"
 #include "core/data/tiles/tile_set.hpp"
 #include "core/data/tiles/tile_set_traversal.hpp"
@@ -440,6 +441,7 @@ public:
         View::setBuffer(this);
         assert(View::isUsable());
         assert((**this)[0]().data());
+        // ptr = &TileOverlaps_t::getOrCreatePatch(layout_, *this);
     }
 
     GridTileSet(GridTileSet const& that)
@@ -452,6 +454,7 @@ public:
         View::setBuffer(this);
         assert((**this)[0]().data());
         assert(View::isUsable());
+        // ptr = &TileOverlaps_t::getOrCreatePatch(layout_, *this);
     }
 
     GridTileSet(GridTileSet&&) = default;
@@ -505,6 +508,8 @@ private:
     std::string name_;
     GridLayout_t layout_;
     std::uint32_t max_tile_size_;
+
+    // FieldTileOverlaps<field_opts>::Level::Patch* ptr = nullptr;
 };
 
 

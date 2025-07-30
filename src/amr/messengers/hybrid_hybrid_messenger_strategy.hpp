@@ -352,7 +352,7 @@ namespace amr
         void fillIonGhostParticles(IonsT& ions, SAMRAI::hier::PatchLevel& level,
                                    double const fillTime) override
         {
-            PHARE_LOG_SCOPE(1, "HybridHybridMessengerStrategy::fillIonGhostParticles");
+            PHARE_LOG_SCOPE(2, "HybridHybridMessengerStrategy::fillIonGhostParticles");
 
             domainGhostPartRefiners_.fill(level.getLevelNumber(), fillTime);
 
@@ -369,24 +369,37 @@ namespace amr
         void fillFluxBorders(IonsT& ions, SAMRAI::hier::PatchLevel& level,
                              double const fillTime) override
         {
+            PHARE_LOG_SCOPE(2, "HybridHybridMessengerStrategy::fillFluxBorders");
+
             auto constexpr N = core::detail::tensor_field_dim_from_rank<1>();
 
             for (std::size_t i = 0; i < ions.size(); ++i)
             {
-                for (auto patch : resourcesManager_->enumerate(level, ions, scratch_vecfield))
                 {
-                    auto& pop = *(ions.begin() + i);
-                    for (std::uint8_t c = 0; c < N; ++c)
-                        core::reduce_into(scratch_vecfield[c], pop.flux()[c]);
+                    PHARE_LOG_SCOPE(2,
+                                    "HybridHybridMessengerStrategy::fillFluxBorders::reduce_into");
+                    for (auto patch : resourcesManager_->enumerate(level, ions, scratch_vecfield))
+                    {
+                        auto& pop = *(ions.begin() + i);
+                        for (std::uint8_t c = 0; c < N; ++c)
+                            core::reduce_into(scratch_vecfield[c], pop.flux()[c]);
+                    }
                 }
 
-                popFluxBorderSumRefiners_[i].fill(level.getLevelNumber(), fillTime);
-
-                for (auto patch : resourcesManager_->enumerate(level, ions, scratch_vecfield))
                 {
-                    auto& pop = *(ions.begin() + i);
-                    for (std::uint8_t c = 0; c < N; ++c)
-                        core::copy_fields(pop.flux()[c], scratch_vecfield[c]);
+                    PHARE_LOG_SCOPE(2, "HybridHybridMessengerStrategy::fillFluxBorders::schedule");
+                    popFluxBorderSumRefiners_[i].fill(level.getLevelNumber(), fillTime);
+                }
+
+                {
+                    PHARE_LOG_SCOPE(2,
+                                    "HybridHybridMessengerStrategy::fillFluxBorders::copy_fields");
+                    for (auto patch : resourcesManager_->enumerate(level, ions, scratch_vecfield))
+                    {
+                        auto& pop = *(ions.begin() + i);
+                        for (std::uint8_t c = 0; c < N; ++c)
+                            core::copy_fields(pop.flux()[c], scratch_vecfield[c]);
+                    }
                 }
             }
         }
@@ -396,6 +409,8 @@ namespace amr
         void fillDensityBorders(IonsT& ions, SAMRAI::hier::PatchLevel& level,
                                 double const fillTime) override
         {
+            PHARE_LOG_SCOPE(2, "HybridHybridMessengerStrategy::fillDensityBorders");
+
             for (std::size_t i = 0; i < ions.size(); ++i)
             {
                 for (auto patch : resourcesManager_->enumerate(level, ions, scratch_field))
