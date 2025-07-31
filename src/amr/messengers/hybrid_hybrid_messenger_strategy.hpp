@@ -379,11 +379,8 @@ namespace amr
                     PHARE_LOG_SCOPE(2,
                                     "HybridHybridMessengerStrategy::fillFluxBorders::reduce_into");
                     for (auto patch : resourcesManager_->enumerate(level, ions, scratch_vecfield))
-                    {
-                        auto& pop = *(ions.begin() + i);
                         for (std::uint8_t c = 0; c < N; ++c)
-                            core::reduce_into(scratch_vecfield[c], pop.flux()[c]);
-                    }
+                            core::reduce_into(scratch_vecfield[c], ions[i].flux()[c]);
                 }
 
                 {
@@ -395,11 +392,8 @@ namespace amr
                     PHARE_LOG_SCOPE(2,
                                     "HybridHybridMessengerStrategy::fillFluxBorders::copy_fields");
                     for (auto patch : resourcesManager_->enumerate(level, ions, scratch_vecfield))
-                    {
-                        auto& pop = *(ions.begin() + i);
                         for (std::uint8_t c = 0; c < N; ++c)
-                            core::copy_fields(pop.flux()[c], scratch_vecfield[c]);
-                    }
+                            core::copy_fields(ions[i].flux()[c], scratch_vecfield[c]);
                 }
             }
         }
@@ -414,18 +408,12 @@ namespace amr
             for (std::size_t i = 0; i < ions.size(); ++i)
             {
                 for (auto patch : resourcesManager_->enumerate(level, ions, scratch_field))
-                {
-                    auto& pop = *(ions.begin() + i);
-                    core::reduce_into(scratch_field, pop.density());
-                }
+                    core::reduce_into(scratch_field, ions[i].density());
 
                 popDensityBorderSumRefiners_[i].fill(level.getLevelNumber(), fillTime);
 
                 for (auto patch : resourcesManager_->enumerate(level, ions, scratch_field))
-                {
-                    auto& pop = *(ions.begin() + i);
-                    core::copy_fields(pop.density(), scratch_field);
-                }
+                    core::copy_fields(ions[i].density(), scratch_field);
             }
         }
 

@@ -30,6 +30,7 @@ FILE="tools/bench/amr/data/field/schedules/bench_field_schedules.cpp"
 FILE="tests/amr/data/field/test_fields_schedules.cpp"
 FILE="tests/core/data/field/test_field_overlaps.cpp"
 FILE="tests/amr/data/field/test_L0_fields_schedules.cpp"
+FILE="tests/core/data/utilities/box/test_box_span.cpp"
 TEST=" -M ${FILE} "
 CARGS="${CARGS} $(mkn_get_opts)"
 

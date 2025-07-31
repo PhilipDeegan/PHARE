@@ -61,18 +61,17 @@ struct FieldTileOverlaps
             struct Tile
             {
                 Tile(auto& field_tile)
-                    : domain_slabs{make_const_box_span(
-                          field_tile.layout().domainBoxFor(field_tile()), field_tile())}
-                    , ghost_slabs{make_const_box_span(field_tile.layout().ghostBoxFor(field_tile()),
-                                                      field_tile())}
+                    : domain_slabs{make_box_span(field_tile.layout().domainBoxFor(field_tile()))}
+                    , ghost_slabs{make_box_span(field_tile.layout().ghostBoxFor(field_tile()))}
                 {
                 }
 
-                BoxSpan<basic::Field<opts> const> domain_slabs, ghost_slabs;
+                BoxSpan<opts.dimension> domain_slabs, ghost_slabs;
                 std::vector<Overlap> overlaps{};
             };
 
-            NO_DISCARD auto& operator[](std::size_t const& i) { return tiles[i]; }
+            NO_DISCARD auto& operator[](std::size_t const i) { return tiles[i]; }
+            NO_DISCARD auto& operator[](std::size_t const i) const { return tiles[i]; }
             NO_DISCARD auto begin() { return tiles.begin(); }
             NO_DISCARD auto begin() const { return tiles.begin(); }
             NO_DISCARD auto end() { return tiles.end(); }

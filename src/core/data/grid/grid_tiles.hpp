@@ -233,7 +233,7 @@ public:
 
         using vec_helper = PHARE::Vector<type, alloc_mode>;
         for (auto& tile : *this)
-            vec_helper::fill(tile().data(), tile().size(), 1e-16); // 1e-16 NAN!
+            vec_helper::fill(tile().data(), tile().size(), 0 /*1e-16*/); // 1e-16 NAN!
     }
 
 

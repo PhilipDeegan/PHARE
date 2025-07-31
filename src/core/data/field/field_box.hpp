@@ -2,7 +2,7 @@
 #define PHARE_CORE_DATA_FIELD_FIELD_BOX_HPP
 
 
-#include "core/def.hpp"
+// #include "core/def.hpp"
 #include "core/data/grid/grid.hpp"
 #include "core/utilities/types.hpp"
 #include "core/data/field/field.hpp"
@@ -428,11 +428,24 @@ void copy_fields(FieldTileSet<T0s...>& dst, basic::Field<opts> const& src)
     PHARE_LOG_SCOPE(3, "copy_fields<FieldTileSet,basic::Field>");
 
     assert(dst().size());
-    auto const layout = dst()[0].layout().copy_as(dst.box());
+    auto const patch_layout = dst()[0].layout().copy_as(dst.box());
 
-    for (auto& tile : dst)
-        FieldBox{tile(), tile.layout(), tile.ghost_box()}.op(
-            FieldBox{src, layout, tile.ghost_box()});
+    using FieldOverlaps     = FieldTileOverlaps<opts>;
+    auto const& field_patch = FieldOverlaps::getOrCreatePatch(patch_layout, dst);
+
+    for (std::size_t i = 0; i < dst().size(); ++i)
+    {
+        auto& tile = dst()[i];
+        for (auto const& slab : field_patch[i].ghost_slabs)
+            for (auto const& [dst_lcl_point, row_size] : slab)
+            {
+                auto const& amr_point     = tile.layout().localToAMR(dst_lcl_point);
+                auto const& src_lcl_point = patch_layout.AMRToLocal(amr_point);
+                auto* src_start           = &src(src_lcl_point);
+                auto* dst_start           = &tile(dst_lcl_point);
+                std::copy(src_start, src_start + row_size, dst_start);
+            }
+    }
 }
 
 
@@ -555,57 +568,31 @@ template<typename Operator, typename Grid_t, typename GridTiles_t>
 auto& reduce_into_(GridTiles_t const& tiles, Grid_t& grid)
 {
     PHARE_LOG_SCOPE(3, "reduce_into<GridTileSet,Grid>");
-
-    auto const pq      = tiles.physicalQuantity();
-    auto const get_box = [&](auto const& tile) { return tile.layout().AMRGhostBoxFor(pq); };
+    auto constexpr static dim        = Grid_t::dimension;
+    auto constexpr static field_opts = FieldOpts<HybridQuantity::Scalar, double>{dim};
 
     grid.reshape(tiles.shape());
     grid.zero();
     assert(sum_field(grid) == 0);
 
     auto const& patch_layout = tiles[0].layout().copy_as(tiles.box());
-
-    auto constexpr static dim        = Grid_t::dimension;
-    auto constexpr static field_opts = FieldOpts<HybridQuantity::Scalar, double>{dim};
-    using FieldOverlaps              = FieldTileOverlaps<field_opts>;
-    auto& field_patch                = FieldOverlaps::getOrCreatePatch(patch_layout, tiles);
+    using FieldOverlaps      = FieldTileOverlaps<field_opts>;
+    auto const& field_patch  = FieldOverlaps::getOrCreatePatch(patch_layout, tiles);
 
     for (std::size_t i = 0; i < tiles().size(); ++i)
     {
-        auto const& tile     = tiles()[i];
-        auto const& tile_box = tile.layout().AMRGhostBoxFor(pq);
-        auto const& slabs    = field_patch[i].ghost_slabs;
-
-        for (auto slabit = slabs.begin(); slabit != slabs.end(); ++slabit)
-        {
-            auto const rows = *slabit;
-
-            for (auto rowit = rows.begin(); rowit != rows.end(); ++rowit)
+        auto const& tile = tiles()[i];
+        for (auto const& slab : field_patch[i].ghost_slabs)
+            for (auto const& [src_lcl_point, row_size] : slab)
             {
-                auto const& row_data  = *rowit;
-                auto const& src_start = &row_data[0];
-
-                auto const& src_lcl_point = rowit.point();
-                auto const& src_amr_point = tile.layout().localToAMR(src_lcl_point);
-                auto const& dst_lcl_point = patch_layout.AMRToLocal(src_amr_point);
-
-                auto* dst_start = &grid(dst_lcl_point);
-                // std::copy(src_start, src_start + row_data.size(), dst_start);
-
-                for (std::uint16_t i = 0; i < row_data.size(); ++i)
-                    Operator{*(dst_start + i)}(*(src_start + i));
+                auto const& src_start     = &tile()(src_lcl_point);
+                auto const& amr_point     = tile.layout().localToAMR(src_lcl_point);
+                auto const& dst_lcl_point = patch_layout.AMRToLocal(amr_point);
+                auto* dst_start           = &grid(dst_lcl_point);
+                for (std::uint16_t j = 0; j < row_size; ++j)
+                    Operator{*(dst_start + j)}(*(src_start + j));
             }
-        }
     }
-
-
-    // for (auto const& tile : tiles())
-    // {
-    //     auto const& tile_layout = tile.layout();
-    //     auto const& tile_box    = get_box(tile);
-    //     FieldBox{grid, patch_layout, patch_layout.AMRToLocal(tile_box)}. //
-    //         template op<Operator>(core::FieldBox{tile(), tile_layout, tile_box});
-    // }
 
     return grid;
 }

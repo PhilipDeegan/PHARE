@@ -23,7 +23,7 @@
 namespace PHARE::amr
 {
 
-static constexpr std::size_t ppc = 2;
+static constexpr std::size_t ppc = 5;
 
 
 template<SimOpts _opts>
@@ -107,16 +107,17 @@ TYPED_TEST(FieldScheduleHierarchyTest, testing_hyhy_schedules)
     for (auto patch : rm.enumerate(*lvl0, ions))
     {
         auto const layout = PHARE::amr::layoutFromPatch<GridLayout_t>(*patch);
+        resetMoments(ions);
+        core::depositParticles(ions, layout, interpolate, core::DomainDeposit{});
         if constexpr (TestParam::opts.layout_mode == LayoutMode::AoSTS)
         {
             for (auto const& pop : ions)
             {
                 setup_field(layout, pop.density());
                 setup_vecfield(layout, pop.flux());
+                PHARE_LOG_LINE_SS(sum_field(reduce(pop.density())));
             }
         }
-        resetMoments(ions);
-        core::depositParticles(ions, layout, interpolate, core::DomainDeposit{});
     }
 
     PHARE_FN_TIMER("FieldScheduleHierarchyTest::testing_hyhy_schedules::schedules");
