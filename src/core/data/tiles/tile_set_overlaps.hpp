@@ -9,6 +9,7 @@
 #include "core/data/tiles/tile_set.hpp"
 #include "core/data/ndarray/ndarray_vector.hpp"
 
+#include <type_traits>
 #include <unordered_set>
 
 
@@ -121,14 +122,16 @@ auto make_nd_span_set_for_qty(GridLayout_t const& layout, auto const pq)
 
 
 template<typename TileSet_t, typename GridLayout_t>
-auto make_nd_span_set_from(TileSet_t& tiles, GridLayout_t const& layout, auto const ghostboxer)
+auto make_nd_span_set_from(TileSet_t& tiles, GridLayout_t const& layout, auto&& ghostboxer)
 {
+    static_assert(not std::is_const_v<std::remove_reference_t<decltype(tiles)>>);
     auto constexpr static dim      = GridLayout_t::dimension;
-    auto constexpr static is_const = std::is_const_v<TileSet_t>;
+    auto constexpr static is_const = std::is_const_v<decltype(tiles)>;
     using value_type               = TileSet_t::value_type;
-    using Tile_t                   = std::conditional_t<is_const, value_type const, value_type>;
-    using NdArrViewer              = NdArrayViewer<dim>;
+    using Tile_t      = value_type; // std::conditional_t<is_const, value_type const, value_type>;
+    using NdArrViewer = NdArrayViewer<dim>;
 
+    static_assert(not std::is_const_v<Tile_t>);
     assert(tiles.size());
 
     auto const amr_ghost_box = ghostboxer(layout.AMRBox());
@@ -140,11 +143,12 @@ auto make_nd_span_set_from(TileSet_t& tiles, GridLayout_t const& layout, auto co
 
     NdArrayVector<dim, std::size_t> tiles_per_cell{patch_ghost_box.shape()};
 
-    auto const map = [&](auto const fn) {
-        for (auto& tile : tiles)
+    auto map = [&](auto&& fn) {
+        static_assert(not std::is_const_v<decltype(tiles)>);
+        for (Tile_t& tile : tiles)
             for (auto const& bix : lcl_box(tile))
                 fn(&tile, bix);
-        for (auto& tile : tiles)
+        for (Tile_t& tile : tiles)
             for (auto& box : ghostboxer(tile).remove(tile))
                 for (auto const& bix : lcl_box(box))
                     fn(&tile, bix);
@@ -165,7 +169,7 @@ auto make_nd_span_set_from(TileSet_t& tiles, GridLayout_t const& layout, auto co
 
     tiles_per_cell.zero();
 
-    map([&](auto* tile, auto const& bix) {
+    map([&](Tile_t* tile, auto const& bix) {
         auto const idx = NdArrViewer::idx(patch_ghost_box.shape(), *bix);
         spanset.vec[spanset.displs[idx] + tiles_per_cell(bix)] = tile;
         ++tiles_per_cell(bix);
@@ -202,6 +206,7 @@ auto make_particle_nd_span_set_from(TileSet_t& tiles, GridLayout_t const& layout
     });
 }
 
+
 template<std::size_t dim, typename T>
 auto unique_tiles_for(NdSpanSet<dim, T> const& spanset, Box<std::uint32_t, dim> const& box)
 {
@@ -213,6 +218,8 @@ auto unique_tiles_for(NdSpanSet<dim, T> const& spanset, Box<std::uint32_t, dim> 
 
     return tiles;
 }
+
+
 template<std::size_t dim, typename T>
 auto unique_tiles_for(NdSpanSet<dim, T> const& spanset, Point<std::uint32_t, dim> const& point)
 {

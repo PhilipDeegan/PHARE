@@ -928,6 +928,15 @@ auto zip(Args&&... args)
 }
 
 
+template<typename T>
+struct DekayT
+{
+    T t;
+    using value_type = std::decay_t<decltype(t)>;
+};
+
+template<typename T>
+DekayT(T t) -> DekayT<T>;
 
 
 } // namespace PHARE::core

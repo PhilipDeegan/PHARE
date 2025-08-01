@@ -142,7 +142,7 @@ void operate_on_fields(FieldBox<GridTileSet<GridLayout_t, Args...>>& dst,
                        FieldBox<GridTileSet<GridLayout_t, Args...> const> const& src)
     requires(is_field_border_sum_op_v<Operator>)
 {
-    PHARE_LOG_SCOPE(3, "operate_on_fields_border_sum<GridTileSet,GridTileSet>");
+    PHARE_LOG_SCOPE(2, "operate_on_fields_border_sum<GridTileSet,GridTileSet>");
 
     auto const pq = dst.field.physicalQuantity();
     assert(src.field.physicalQuantity() == pq);
@@ -187,7 +187,7 @@ template<typename Operator, typename GridLayout_t, typename... Args>
 void operate_on_fields(FieldBox<GridTileSet<GridLayout_t, Args...>>& dst,
                        FieldBox<GridTileSet<GridLayout_t, Args...> const> const& src)
 {
-    PHARE_LOG_SCOPE(3, "operate_on_fields<GridTileSet,GridTileSet>");
+    PHARE_LOG_SCOPE(2, "operate_on_fields<GridTileSet,GridTileSet>");
 
     auto constexpr plus_equals
         = std::is_same_v<Operator, PlusEquals<typename Operator::value_type>>;
@@ -230,7 +230,7 @@ void operate_on_fields(FieldBox<GridTileSet<GridLayout_t, Args...>>& dst,
 template<typename Operator, typename... T0s, typename... T1s>
 void operate_on_fields(FieldBox<GridTileSet<T0s...>>& dst, FieldBox<T1s...> const& src)
 {
-    PHARE_LOG_SCOPE(3, "operate_on_fields<GridTileSet,T1s...>");
+    PHARE_LOG_SCOPE(2, "operate_on_fields<GridTileSet,T1s...>");
 
     using Src = std::decay_t<decltype(src.field)>;
     static_assert(is_field_v<Src>);
@@ -265,7 +265,7 @@ template<typename Operator, typename... T0s, typename... T1s>
 void operate_on_fields(FieldBox<Grid<T0s...>>& dst, FieldBox<GridTileSet<T1s...> const> const& src)
     requires(is_field_border_sum_op_v<Operator>)
 {
-    PHARE_LOG_SCOPE(3, "operate_on_fields_border_sum<Grid,GridTileSet>");
+    PHARE_LOG_SCOPE(2, "operate_on_fields_border_sum<Grid,GridTileSet>");
 
     auto const pq         = dst.field.physicalQuantity();
     auto const dst_layout = src.field.layout().copy_as(dst.amr_box);
@@ -425,13 +425,13 @@ void copy_fields(FieldTileSet<T0s...>& dst, FieldTileSet<T1s...> const& src)
 template<typename... T0s, auto opts>
 void copy_fields(FieldTileSet<T0s...>& dst, basic::Field<opts> const& src)
 {
-    PHARE_LOG_SCOPE(3, "copy_fields<FieldTileSet,basic::Field>");
+    PHARE_LOG_SCOPE(2, "copy_fields<FieldTileSet,basic::Field>");
 
     assert(dst().size());
-    auto const patch_layout = dst()[0].layout().copy_as(dst.box());
-
-    using FieldOverlaps     = FieldTileOverlaps<opts>;
-    auto const& field_patch = FieldOverlaps::getOrCreatePatch(patch_layout, dst);
+    auto const& patch_layout = dst()[0].layout().copy_as(dst.box());
+    using GridLayout_t       = std::decay_t<decltype(patch_layout)>;
+    using FieldOverlaps_t    = FieldTileOverlaps<GridLayout_t, opts>;
+    auto const& field_patch  = FieldOverlaps_t::getQuantity(patch_layout, dst);
 
     for (std::size_t i = 0; i < dst().size(); ++i)
     {
@@ -531,6 +531,7 @@ auto& reduce_single_(Grid_t const& grid, GridTiles_t& tiles)
     return grid;
 }
 
+
 template<typename Dst, typename Src>
 void reduce_single(Dst& dst, Src const& src)
 {
@@ -545,6 +546,7 @@ void reduce_single(Dst& dst, Src const& src)
     }
 }
 
+
 template<typename Tiles>
 auto reduce_single(Tiles const& input)
     requires(is_field_tile_set_v<Tiles>)
@@ -554,6 +556,7 @@ auto reduce_single(Tiles const& input)
     reduce_single(grid, input);
     return grid;
 }
+
 
 template<typename Tiles>
 auto& reduce_single(Tiles const& input)
@@ -567,17 +570,18 @@ auto& reduce_single(Tiles const& input)
 template<typename Operator, typename Grid_t, typename GridTiles_t>
 auto& reduce_into_(GridTiles_t const& tiles, Grid_t& grid)
 {
-    PHARE_LOG_SCOPE(3, "reduce_into<GridTileSet,Grid>");
-    auto constexpr static dim        = Grid_t::dimension;
-    auto constexpr static field_opts = FieldOpts<HybridQuantity::Scalar, double>{dim};
+    PHARE_LOG_SCOPE(2, "reduce_into<GridTileSet,Grid>");
+    auto constexpr static dim  = Grid_t::dimension;
+    auto constexpr static opts = FieldOpts<HybridQuantity::Scalar, double>{dim};
 
     grid.reshape(tiles.shape());
     grid.zero();
     assert(sum_field(grid) == 0);
 
     auto const& patch_layout = tiles[0].layout().copy_as(tiles.box());
-    using FieldOverlaps      = FieldTileOverlaps<field_opts>;
-    auto const& field_patch  = FieldOverlaps::getOrCreatePatch(patch_layout, tiles);
+    using GridLayout_t       = std::decay_t<decltype(patch_layout)>;
+    using FieldOverlaps_t    = FieldTileOverlaps<GridLayout_t, opts>;
+    auto const& field_patch  = FieldOverlaps_t::getQuantity(patch_layout, tiles);
 
     for (std::size_t i = 0; i < tiles().size(); ++i)
     {
@@ -631,8 +635,8 @@ auto& reduce(Tiles const& input)
 }
 
 
-template<auto opts>
-void FieldTileOverlaps<opts>::sync_inner_ghosts(auto& field, auto const& overlaps_per_tile)
+template<typename GL, auto opts>
+void FieldTileOverlaps<GL, opts>::sync_inner_ghosts(auto& field, auto const& overlaps_per_tile)
 {
     using value_type = decltype(opts)::value_type;
 

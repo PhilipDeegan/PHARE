@@ -70,18 +70,18 @@ PHARE_WITH_MKN_GPU(
 
 TYPED_TEST_SUITE(FieldScheduleHierarchyTest, FieldDatas, );
 
-
-void setup_field(auto const& layout, auto const& field)
+template<typename GridLayout_t>
+void setup_field(GridLayout_t const& layout, auto& field)
 {
     auto constexpr static dim        = std::decay_t<decltype(field)>::dimension;
     auto constexpr static field_opts = FieldOpts<HybridQuantity::Scalar, double>{dim};
-    using FieldOverlaps              = FieldTileOverlaps<field_opts>;
-    FieldOverlaps::getOrCreatePatch(layout, field);
+    using FieldOverlaps              = FieldTileOverlaps<GridLayout_t, field_opts>;
+    FieldOverlaps::getOrCreateQuantity(layout, field);
 }
 
-void setup_vecfield(auto const& layout, auto const& vecfield)
+void setup_vecfield(auto const& layout, auto& vecfield)
 {
-    for (auto const& field : vecfield)
+    for (auto& field : vecfield)
         setup_field(layout, field);
 }
 
@@ -111,7 +111,7 @@ TYPED_TEST(FieldScheduleHierarchyTest, testing_hyhy_schedules)
         core::depositParticles(ions, layout, interpolate, core::DomainDeposit{});
         if constexpr (TestParam::opts.layout_mode == LayoutMode::AoSTS)
         {
-            for (auto const& pop : ions)
+            for (auto& pop : ions)
             {
                 setup_field(layout, pop.density());
                 setup_vecfield(layout, pop.flux());

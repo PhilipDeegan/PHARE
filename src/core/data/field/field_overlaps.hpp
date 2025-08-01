@@ -2,13 +2,16 @@
 #define PHARE_CORE_DATA_FIELD_FIELD_OVERLAPS_HPP
 
 
+// #include "core/data/grid/gridlayout.hpp"
 #include "core/def.hpp"
 #include "core/utilities/types.hpp"
 #include "core/data/field/field.hpp"
 #include "core/utilities/box/box.hpp"
+#include "core/data/grid/grid_tiles.hpp"
 // #include "core/data/field/field_box.hpp"
 // #include "core/data/grid/grid_tiles.hpp"
 #include "core/utilities/box/box_span.hpp"
+#include "core/data/tiles/tile_set_overlaps.hpp"
 
 
 #include <vector>
@@ -22,20 +25,32 @@ namespace PHARE::core
 {
 
 
-template<auto opts>
+template<typename GridLayout_, auto opts>
 struct FieldTileOverlaps
 {
+    using Field_t     = basic::Field<opts>;
+    using FieldTile_t = FieldTile<GridLayout_, Field_t>;
+    using Quantity    = decltype(opts)::physical_quantity_type;
+
+
     // when you're sure it should exist
-    static auto& getPatch(auto const& layout)
+    static auto& getQuantity(auto const& layout, Quantity const& pq)
     {
-        return levels.at(layout.levelNumber()).patches.at(to_string(layout.AMRBox()));
+        return levels.at(layout.levelNumber()).patches.at(to_string(layout.AMRBox())).at(pq);
+    }
+    // when you're sure it should exist
+    template<typename Tiles>
+    static auto& getQuantity(auto const& layout, Tiles const& tiles)
+        requires(has_physicalQuantity_v<Tiles>)
+    {
+        return getQuantity(layout, tiles.physicalQuantity());
     }
 
     // when you're not sure it should exist
-    static auto& getOrCreatePatch(auto const& layout, auto const& field);
+    static auto& getOrCreateQuantity(auto const& layout, auto& field);
 
 
-    static auto build_inner_tile_overlaps(auto const& field);
+    static auto build_inner_tile_overlaps(auto& field);
     static void sync_inner_ghosts(auto& field, auto const& overlaps);
     static void reset(int lvl) { levels[lvl].clear(); }
     static void reset() { levels.clear(); }
@@ -43,14 +58,14 @@ struct FieldTileOverlaps
 
     struct Overlap
     {
-        Overlap(auto _src, auto const d, auto const s)
+        Overlap(auto _src, auto const& d, auto const& s)
             : src{_src}
             , lcl_dst{d}
             , lcl_src{s}
         {
         }
 
-        basic::Field<opts> const* const src;
+        Field_t const* const src;
         Box<std::uint32_t, opts.dimension> lcl_dst, lcl_src;
     };
 
@@ -58,6 +73,8 @@ struct FieldTileOverlaps
     {
         struct Patch
         {
+            using TileSpan_t = NdSpanSet<opts.dimension, FieldTile_t*>;
+
             struct Tile
             {
                 Tile(auto& field_tile)
@@ -70,6 +87,12 @@ struct FieldTileOverlaps
                 std::vector<Overlap> overlaps{};
             };
 
+            Patch(auto const& layout, auto& field)
+                : tile_span{make_qty_nd_span_set_from(field, layout, field.physicalQuantity())}
+            {
+                static_assert(not std::is_const_v<decltype(field)>);
+            }
+
             NO_DISCARD auto& operator[](std::size_t const i) { return tiles[i]; }
             NO_DISCARD auto& operator[](std::size_t const i) const { return tiles[i]; }
             NO_DISCARD auto begin() { return tiles.begin(); }
@@ -77,19 +100,24 @@ struct FieldTileOverlaps
             NO_DISCARD auto end() { return tiles.end(); }
             NO_DISCARD auto end() const { return tiles.end(); }
 
+            TileSpan_t tile_span;
             std::vector<Tile> tiles{};
         };
 
-        std::map<std::string, Patch> patches{};
+        std::map<std::string, std::map<Quantity, Patch>> patches{};
     };
 
     static inline std::map<int, Level> levels{};
 };
 
 
-template<auto opts>
-auto& FieldTileOverlaps<opts>::getOrCreatePatch(auto const& layout, auto const& field)
+template<typename GL, auto opts>
+auto& FieldTileOverlaps<GL, opts>::getOrCreateQuantity(auto const& layout, auto& field)
 {
+    static_assert(not std::is_const_v<decltype(field)>);
+
+    using Patch_t = Level::Patch;
+
     if (!levels.count(layout.levelNumber()))
         levels.try_emplace(layout.levelNumber());
 
@@ -98,21 +126,24 @@ auto& FieldTileOverlaps<opts>::getOrCreatePatch(auto const& layout, auto const& 
     if (!level.patches.count(patch_key))
         level.patches.try_emplace(patch_key);
 
-    auto& patch = level.patches.at(patch_key);
+    auto& patch_map = level.patches.at(patch_key);
+    if (!patch_map.count(field.physicalQuantity()))
+        patch_map.try_emplace(field.physicalQuantity(), Patch_t{layout, field});
+
+    auto& patch = patch_map.at(field.physicalQuantity());
     if (!patch.tiles.size())
         patch.tiles = build_inner_tile_overlaps(field);
 
     return patch;
 }
 
-template<auto opts>
-auto FieldTileOverlaps<opts>::build_inner_tile_overlaps(auto const& field)
+template<typename GL, auto opts>
+auto FieldTileOverlaps<GL, opts>::build_inner_tile_overlaps(auto& field)
 {
-    using TileOverlap = FieldTileOverlaps<opts>::Level::Patch::Tile;
+    using TileOverlap = Level::Patch::Tile;
 
     std::vector<TileOverlap> tiles;
     tiles.reserve(field().size());
-
 
     for (auto& tile : field())
         tiles.emplace_back(tile);

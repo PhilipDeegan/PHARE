@@ -4,6 +4,7 @@
 #include "core/def.hpp"
 #include "core/def/phare_config.hpp"
 #include "core/data/ndarray/ndarray_view.hpp"
+#include "core/utilities/meta/meta_utilities.hpp"
 
 
 #include <array>
@@ -14,6 +15,21 @@
 
 namespace PHARE::core
 {
+template<typename T, typename Attempt = void>
+struct has_physicalQuantity : std::false_type
+{
+};
+
+template<typename T>
+struct has_physicalQuantity<T,
+                            core::tryToInstanciate<decltype(std::declval<T>().physicalQuantity())>>
+    : std::true_type
+{
+};
+template<typename T>
+auto constexpr has_physicalQuantity_v = has_physicalQuantity<T>::value;
+
+
 template<typename PhysicalQuantity, typename Data_t = double>
 struct FieldOpts
 {

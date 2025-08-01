@@ -169,12 +169,13 @@ struct FieldTileSetter
 
 namespace PHARE::core::basic
 {
-template<typename GridLayout_t, typename Grid_t, typename Field_t>
-class FieldTileSet : public FieldTileSetter<GridLayout_t, Grid_t, Field_t>::value_type
+template<typename GridLayout_, typename Grid_t, typename Field_t>
+class FieldTileSet : public FieldTileSetter<GridLayout_, Grid_t, Field_t>::value_type
 {
-    using local_types = FieldTileSetter<GridLayout_t, Grid_t, Field_t>;
+    using local_types = FieldTileSetter<GridLayout_, Grid_t, Field_t>;
 
 public:
+    using GridLayout_t               = GridLayout_;
     using grid_type                  = Grid_t;
     using field_type                 = Field_t;
     using Super                      = local_types::value_type;
@@ -441,7 +442,7 @@ public:
         View::setBuffer(this);
         assert(View::isUsable());
         assert((**this)[0]().data());
-        // ptr = &TileOverlaps_t::getOrCreatePatch(layout_, *this);
+        // ptr = &TileOverlaps_t::getOrCreateQuantity(layout_, *this);
     }
 
     GridTileSet(GridTileSet const& that)
@@ -454,7 +455,7 @@ public:
         View::setBuffer(this);
         assert((**this)[0]().data());
         assert(View::isUsable());
-        // ptr = &TileOverlaps_t::getOrCreatePatch(layout_, *this);
+        // ptr = &TileOverlaps_t::getOrCreateQuantity(layout_, *this);
     }
 
     GridTileSet(GridTileSet&&) = default;

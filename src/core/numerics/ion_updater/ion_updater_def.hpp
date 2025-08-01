@@ -157,11 +157,12 @@ struct UpdaterTileSetSelectionBoxing : public UpdaterSelectionBoxing<GridLayout>
     }
 
 
-    std::array<BoxSpanSet_t, field_quantities_count()> fieldings = field_quantities(Super::layout);
-    BoxSpanSet_t particles{make_nd_span_set_from(Super::layout, [](auto const& layout) {
-        return box_from_zero_to_upper_minus_one(
-            *grow(layout.AMRBox(), GridLayout_t::nbrParticleGhosts()).shape().as_unsigned());
-    })};
+    // std::array<BoxSpanSet_t, field_quantities_count()> fieldings =
+    // field_quantities(Super::layout); BoxSpanSet_t particles{make_nd_span_set_from(Super::layout,
+    // [](auto const& layout) {
+    //     return box_from_zero_to_upper_minus_one(
+    //         *grow(layout.AMRBox(), GridLayout_t::nbrParticleGhosts()).shape().as_unsigned());
+    // })};
 };
 
 

@@ -33,18 +33,7 @@ namespace PHARE
 {
 namespace core
 {
-    template<typename T, typename Attempt = void>
-    struct has_physicalQuantity : std::false_type
-    {
-    };
 
-    template<typename T>
-    struct has_physicalQuantity<
-        T, core::tryToInstanciate<decltype(std::declval<T>().physicalQuantity())>> : std::true_type
-    {
-    };
-    template<typename T>
-    auto constexpr has_physicalQuantity_v = has_physicalQuantity<T>::value;
 
 
 
