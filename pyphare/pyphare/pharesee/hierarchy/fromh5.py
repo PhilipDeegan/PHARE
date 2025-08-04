@@ -15,13 +15,13 @@ from ...core.phare_utilities import (
 )
 from ...core.gridlayout import GridLayout
 from .hierarchy_utils import field_qties
-import h5py
+
 from pathlib import Path
 from pyphare.core.phare_utilities import listify
 
 
 h5_time_grp_key = "t"
-particle_files_patterns = ("domain", "patchGhost", "levelGhost")
+particle_files_patterns = ("domain", "levelGhost")
 
 
 def get_all_available_quantities_from_h5(filepath, time=0, exclude=["tags"], hier=None):
@@ -129,6 +129,8 @@ def h5_filename_from(diagInfo):
 
 
 def get_times_from_h5(filepath, as_float=True):
+    import h5py  # see doc/conventions.md section 2.1.1
+
     f = h5py.File(filepath, "r")
     if as_float:
         times = np.array(sorted([float(s) for s in list(f[h5_time_grp_key].keys())]))
@@ -136,22 +138,6 @@ def get_times_from_h5(filepath, as_float=True):
         times = list(f[h5_time_grp_key].keys())
     f.close()
     return times
-
-
-def create_from_all_times(time, hier):
-    return time is None and hier is None
-
-
-def create_from_times(times, hier):
-    return times is not None and hier is None
-
-
-def load_all_times(time, hier):
-    return time is None and hier is not None
-
-
-def load_one_time(time, hier):
-    return time is not None and hier is not None
 
 
 def patch_levels_from_h5(h5f, time, selection_box=None):
@@ -216,6 +202,7 @@ def add_time_from_h5(hier, filepath, time, **kwargs):
     # add times to 'hier'
     # we may have a different selection box for that time as for already existing times
     # but we need to keep them, per time
+    import h5py  # see doc/conventions.md section 2.1.1
 
     h5f = h5py.File(filepath, "r")
     selection_box = kwargs.get("selection_box", None)
@@ -239,6 +226,8 @@ def add_data_from_h5(hier, filepath, time):
     if not hier.has_time(time):
         raise ValueError("time does not exist in hierarchy")
 
+    import h5py  # see doc/conventions.md section 2.1.1
+
     h5f = h5py.File(filepath, "r")
 
     # force using the hierarchy selection box at that time if existing
@@ -260,6 +249,8 @@ def new_from_h5(filepath, times, **kwargs):
     # loads all datasets from the filepath h5 file as patchdatas
     # we authorize user to pass only one selection box for all times
     # but in this case they're all the same
+    import h5py  # see doc/conventions.md section 2.1.1
+
     selection_box = kwargs.get("selection_box", [None] * len(times))
     if none_iterable(selection_box) and all_iterables(times):
         selection_box = [selection_box] * len(times)
@@ -289,6 +280,22 @@ def new_from_h5(filepath, times, **kwargs):
     )
 
     return hier
+
+
+def create_from_all_times(time, hier):
+    return time is None and hier is None
+
+
+def create_from_times(times, hier):
+    return times is not None and hier is None
+
+
+def load_all_times(time, hier):
+    return time is None and hier is not None
+
+
+def load_one_time(time, hier):
+    return time is not None and hier is not None
 
 
 def hierarchy_fromh5(h5_filename, time=None, hier=None, silent=True, **kwargs):

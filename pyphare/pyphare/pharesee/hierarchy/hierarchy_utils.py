@@ -93,23 +93,13 @@ def merge_particles(hierarchy):
                     (pdname, pd) for pdname, pd in pdatas.items() if "domain" in pdname
                 ][0]
 
-                pghost_pdatas = [
-                    (pdname, pd)
-                    for pdname, pd in pdatas.items()
-                    if "patchGhost" in pdname
-                ]
                 lghost_pdatas = [
                     (pdname, pd)
                     for pdname, pd in pdatas.items()
                     if "levelGhost" in pdname
                 ]
 
-                pghost_pdata = pghost_pdatas[0] if pghost_pdatas else None
                 lghost_pdata = lghost_pdatas[0] if lghost_pdatas else None
-
-                if pghost_pdata is not None:
-                    domain_pdata[1].dataset.add(pghost_pdata[1].dataset)
-                    del pdatas[pghost_pdata[0]]
 
                 if lghost_pdata is not None:
                     domain_pdata[1].dataset.add(lghost_pdata[1].dataset)
@@ -210,8 +200,12 @@ def is_root_lvl(patch_level):
     return patch_level.level_number == 0
 
 
-def quantidic(ilvl, wrangler):
-    pl = wrangler.getPatchLevel(ilvl)
+def quantidic_mhd(ilvl, wrangler):
+    raise RuntimeError("todo")
+
+
+def quantidic_hybrid(ilvl, wrangler):
+    pl = wrangler.getHybridPatchLevel(ilvl)
 
     return {
         "density": pl.getDensity,
@@ -231,6 +225,15 @@ def quantidic(ilvl, wrangler):
     }
 
 
+def quantidic(ilvl, wrangler, model="Hybrid"):
+    assert model in ["Hybrid", "MHD"]
+
+    if model == "MHD":
+        return quantidic_mhd(ilvl, wrangler)
+
+    return quantidic_hybrid(ilvl, wrangler)
+
+
 def isFieldQty(qty):
     return qty in (
         "density",
@@ -243,6 +246,9 @@ def isFieldQty(qty):
         "EM_E_x",
         "EM_E_y",
         "EM_E_z",
+        "Vi_x",
+        "Vi_y",
+        "Vi_z",
         "flux_x",
         "flux_y",
         "flux_z",
