@@ -23,7 +23,54 @@ TEST(BoxSpanTest, test_range_loop)
     EXPECT_EQ(elements, 10 * 10 * 10);
 }
 
-TEST(BoxSpanTest, test_iter_loop)
+
+
+TEST(BoxSpanTest, test_iter_loop_dim1)
+{
+    std::size_t static constexpr dim = 1;
+    Box<std::uint32_t, dim> box{{0}, {9}};
+    std::size_t elements = 0;
+
+    auto const& slabs = make_box_span(box);
+
+    for (auto slabit = slabs.begin(); slabit != slabs.end(); ++slabit)
+    {
+        auto const& slab = *slabit;
+
+        for (auto rowit = slab.begin(); rowit != slab.end(); ++rowit)
+        {
+            auto const& [start, size] = *rowit;
+
+            elements += size;
+        }
+    }
+
+    EXPECT_EQ(elements, 10);
+}
+
+TEST(BoxSpanTest, test_iter_loop_dim2)
+{
+    std::size_t static constexpr dim = 2;
+    Box<std::uint32_t, dim> box{{0, 0}, {9, 9}};
+    std::size_t elements = 0;
+
+    auto const& slabs = make_box_span(box);
+
+    for (auto slabit = slabs.begin(); slabit != slabs.end(); ++slabit)
+    {
+        auto const& slab = *slabit;
+
+        for (auto rowit = slab.begin(); rowit != slab.end(); ++rowit)
+        {
+            auto const& [start, size] = *rowit;
+            elements += size;
+        }
+    }
+
+    EXPECT_EQ(elements, 10 * 10);
+}
+
+TEST(BoxSpanTest, test_iter_loop_dim3)
 {
     std::size_t static constexpr dim = 3;
     Box<std::uint32_t, dim> box{{0, 0, 0}, {9, 9, 9}};

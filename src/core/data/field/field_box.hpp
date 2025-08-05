@@ -265,6 +265,7 @@ template<typename Operator, typename... T0s, typename... T1s>
 void operate_on_fields(FieldBox<Grid<T0s...>>& dst, FieldBox<GridTileSet<T1s...> const> const& src)
     requires(is_field_border_sum_op_v<Operator>)
 {
+    // USED IN BORDER SUM SCHEDULES FOR TILES!
     PHARE_LOG_SCOPE(2, "operate_on_fields_border_sum<Grid,GridTileSet>");
 
     auto const pq         = dst.field.physicalQuantity();
@@ -274,6 +275,28 @@ void operate_on_fields(FieldBox<Grid<T0s...>>& dst, FieldBox<GridTileSet<T1s...>
     auto const dst_selection_box = shift(dst_layout.localToAMR(dst.lcl_box), src.offset_ * -1);
     assert(src_selection_box == dst_selection_box);
 
+#if 0 // new impl WIP
+    auto constexpr static dim  = FieldBox<Grid<T0s...>>::dimension;
+    auto constexpr static opts = FieldOpts<HybridQuantity::Scalar, double>{dim};
+
+    auto const& patch_layout = src.field()[0].layout().copy_as(src.field.box());
+    using GridLayout_t       = std::decay_t<decltype(patch_layout)>;
+    using FieldOverlaps_t    = FieldTileOverlaps<GridLayout_t, opts>;
+    auto const& field_patch  = FieldOverlaps_t::getQuantity(patch_layout, src.field);
+
+    auto const& tile_span = field_patch.tile_span;
+
+    for(auto const src_lix : src.lcl_box){
+
+        for(auto const* src_tile :  tile_span.cells(src_lix)){
+            //
+
+            //
+        }
+    }
+#endif
+
+    // #if 0 // old impl
     for (auto const& src_tile : src.field())
     {
         auto const src_tile_ghost_box = get_box(src_tile);
@@ -290,6 +313,7 @@ void operate_on_fields(FieldBox<Grid<T0s...>>& dst, FieldBox<GridTileSet<T1s...>
                 Operator{dst.field(*dst_it)}(src_tile()(*src_it));
         }
     }
+    // #endif
 }
 
 template<typename Operator, typename... T0s, typename... T1s>
@@ -441,10 +465,12 @@ void copy_fields(FieldTileSet<T0s...>& dst, basic::Field<opts> const& src)
 
     for (std::size_t i = 0; i < dst().size(); ++i)
     {
+        // PHARE_LOG_LINE_SS("");
         auto& tile = dst()[i];
         for (auto const& slab : field_patch[i].ghost_slabs)
             for (auto const& [dst_lcl_point, row_size] : slab)
             {
+                // PHARE_LOG_LINE_SS(dst_lcl_point);
                 auto const& amr_point     = tile.layout().localToAMR(dst_lcl_point);
                 auto const& src_lcl_point = patch_layout.AMRToLocal(amr_point);
                 auto* src_start           = &src(src_lcl_point);
