@@ -21,6 +21,9 @@ endfunction(phare_github_get_or_update)
 include("${PHARE_PROJECT_DIR}/res/cmake/dep/cppdict.cmake")
 add_subdirectory(subprojects/cppdict)
 
+# HighFive
+include("${PHARE_PROJECT_DIR}/res/cmake/dep/highfive.cmake")
+
 # SAMRAI build option
 include("${PHARE_PROJECT_DIR}/res/cmake/dep/samrai.cmake")
 
@@ -34,8 +37,6 @@ include("${PHARE_PROJECT_DIR}/res/cmake/dep/caliper.cmake")
 include("${PHARE_PROJECT_DIR}/res/cmake/dep/pybind.cmake")
 
 
-# HighFive
-include("${PHARE_PROJECT_DIR}/res/cmake/dep/highfive.cmake")
 
 # Phlop
 include("${PHARE_PROJECT_DIR}/res/cmake/dep/phlop.cmake")
