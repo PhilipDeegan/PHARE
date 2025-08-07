@@ -74,31 +74,12 @@ struct Box
 
     void grow(Type const& size)
     {
-<<<<<<< HEAD
-        for (auto& c : lower)
-        {
-            c -= size;
-        }
-        for (auto& c : upper)
-        {
-            c += size;
-        }
-=======
         lower -= size;
         upper += size;
     }
 
-    template<typename Size>
-    auto& grow(std::array<Size, dim> const& size)
-    {
-        lower -= size;
-        upper += size;
-        return *this;
->>>>>>> 5a000526 (debuggerino)
-    }
-
-    template<typename Size>
-    auto& grow(std::array<Size, dim> const& size)
+    template<template<typename, std::size_t> typename Point_t>
+    auto& grow(Point_t<Type, dim> const& size)
     {
         lower -= size;
         upper += size;
@@ -218,6 +199,20 @@ Box(Point<T, s> lower, Point<T, s> upper) -> Box<T, s>;
 
 
 
+
+bool point_on_line(auto& pos, auto& lower, auto& upper)
+{
+    return pos >= lower && pos <= upper;
+}
+bool inline point_in_box(auto& point, auto& box)
+{
+    bool is = true;
+    for (auto i = 0u; i < point.size(); ++i)
+        is &= point_on_line(point[i], box.lower[i], box.upper[i]);
+    return is;
+}
+
+
 template<typename Particle, typename Type>
 NO_DISCARD auto isIn(Particle const& particle, Box<Type, Particle::dimension> const& box)
     -> decltype(isIn(particle.iCell, box), bool())
@@ -228,22 +223,14 @@ NO_DISCARD auto isIn(Particle const& particle, Box<Type, Particle::dimension> co
 /** This overload of isIn does the same as the one above but takes only
  * one box.
  */
+
 template<template<typename, std::size_t> typename Point, typename Type, std::size_t SIZE>
 NO_DISCARD bool isIn(Point<Type, SIZE> const& point, Box<Type, SIZE> const& box)
 {
-    auto isIn1D = [](auto const pos, auto const lower, auto const upper) {
-        return pos >= lower && pos <= upper;
-    };
-
-    bool pointInBox = true;
-
-    for (auto iDim = 0u; iDim < SIZE; ++iDim)
-        pointInBox = pointInBox && isIn1D(point[iDim], box.lower[iDim], box.upper[iDim]);
-    if (pointInBox)
-        return pointInBox;
-
-    return false;
+    return point_in_box(point, box);
 }
+
+
 
 /** this overload of isIn takes a Point and a Container of boxes
  * and returns true if the Point is at least in one of the boxes.
@@ -252,63 +239,17 @@ NO_DISCARD bool isIn(Point<Type, SIZE> const& point, Box<Type, SIZE> const& box)
 template<typename Point, typename BoxContainer, is_iterable<BoxContainer> = dummy::value>
 bool isIn(Point const& point, BoxContainer const& boxes)
 {
-    if (boxes.size() == 0)
-        return false;
-
-
     static_assert(std::is_same<typename Point::value_type,
                                typename BoxContainer::value_type::value_type>::value,
                   "Box and Point should have the same data type");
 
-
-    auto isIn1D = [](typename Point::value_type pos, typename Point::value_type lower,
-                     typename Point::value_type upper) { return pos >= lower && pos <= upper; };
-
     for (auto const& box : boxes)
-    {
-        bool pointInBox = true;
-
-        for (auto iDim = 0u; iDim < Point::dimension; ++iDim)
-        {
-            pointInBox = pointInBox && isIn1D(point[iDim], box.lower[iDim], box.upper[iDim]);
-        }
-        if (pointInBox)
-            return pointInBox;
-    }
+        if (point_in_box(point, box))
+            return true;
 
     return false;
 }
 
-<<<<<<< HEAD
-template<typename Particle, typename Type>
-NO_DISCARD auto isIn(Particle const& particle, Box<Type, Particle::dimension> const& box)
-    -> decltype(isIn(particle.iCell, box), bool())
-{
-    return isIn(particle.iCell, box);
-}
-
-/** This overload of isIn does the same as the one above but takes only
- * one box.
- */
-template<template<typename, std::size_t> typename Point, typename Type, std::size_t SIZE>
-NO_DISCARD bool isIn(Point<Type, SIZE> const& point, Box<Type, SIZE> const& box)
-{
-    auto isIn1D = [](auto const pos, auto const lower, auto const upper) {
-        return pos >= lower && pos <= upper;
-    };
-
-    bool pointInBox = true;
-
-    for (auto iDim = 0u; iDim < SIZE; ++iDim)
-        pointInBox = pointInBox && isIn1D(point[iDim], box.lower[iDim], box.upper[iDim]);
-    if (pointInBox)
-        return pointInBox;
-
-    return false;
-}
-=======
-
->>>>>>> 5a000526 (debuggerino)
 
 
 
