@@ -260,7 +260,7 @@ class HarrisTest(SimulatorTest):
             )
         cpp.mpi_barrier()
 
-    def plot_dir():
+    def plot_dir(self):
         plt_dir = Path(f"{diag_dir}_plots") / str(cpp.mpi_size())
         plt_dir.mkdir(parents=True, exist_ok=True)
         return plt_dir
