@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 
-
+import os
 import numpy as np
 from pathlib import Path
 
@@ -10,17 +10,19 @@ from pyphare.pharesee.run import Run
 from pyphare.simulator.simulator import Simulator, startMPI
 
 from tests.simulator import SimulatorTest
+from tests.simulator.test_advance import AdvanceTestBase
 
 ph.NO_GUI()
 
+debug = os.environ.get("PHARE_DEBUG_HARRIS", "0") == "1"
+test = AdvanceTestBase(rethrow=True) if debug else None
 cpp = cpp_lib()
-
-
 cells = (200, 100)
 time_step = 0.005
 final_time = 50
-timestamps = np.arange(0, final_time + time_step, final_time / 5)
+timestamps = np.arange(0, final_time + time_step, final_time / 100)
 diag_dir = "phare_outputs/harris"
+print("timestamps", timestamps)
 
 
 def config():
@@ -39,8 +41,13 @@ def config():
             "format": "phareh5",
             "options": {"dir": diag_dir, "mode": "overwrite"},
         },
+        restart_options={
+            "dir": "checkpoints",
+            "mode": "overwrite",
+            "timestamps": timestamps,
+            # "restart_time": 0,
+        },
         strict=True,
-        nesting_buffer=1,
     )
 
     def density(x, y):
@@ -144,7 +151,7 @@ def config():
             quantity=quantity, write_timestamps=timestamps, population_name="protons"
         )
 
-    ph.InfoDiagnostics(quantity="particle_count")
+    ph.InfoDiagnostics(quantity="particle_count", write_timestamps=timestamps)
 
     ph.LoadBalancer(active=True, auto=True, mode="nppc", tol=0.05)
 
@@ -200,6 +207,17 @@ def plot(diag_dir, plot_dir):
         )
 
 
+def get_time(path, time=None, datahier=None):
+    if time is not None:
+        time = "{:.10f}".format(time)
+    from pyphare.pharesee.hierarchy import hierarchy_from
+
+    datahier = hierarchy_from(h5_filename=path + "/EM_E.h5", times=time, hier=datahier)
+    datahier = hierarchy_from(h5_filename=path + "/EM_B.h5", times=time, hier=datahier)
+
+    return datahier
+
+
 class HarrisTest(SimulatorTest):
     def __init__(self, *args, **kwargs):
         super(HarrisTest, self).__init__(*args, **kwargs)
@@ -214,13 +232,22 @@ class HarrisTest(SimulatorTest):
 
     def test_run(self):
         self.register_diag_dir_for_cleanup(diag_dir)
-        Simulator(config()).run().reset()
+        post_advance = self.post_advance if debug else None
+        Simulator(config(), post_advance=post_advance).run().reset()
         if cpp.mpi_rank() == 0:
             plot_dir = Path(f"{diag_dir}_plots") / str(cpp.mpi_size())
             plot_dir.mkdir(parents=True, exist_ok=True)
             plot(diag_dir, plot_dir)
         cpp.mpi_barrier()
         return self
+
+    def post_advance(self, new_time):
+        print("post_advance(self, new_time)", new_time)
+        if cpp.mpi_rank() == 0:
+            test.base_test_overlaped_fields_are_equal(
+                get_time(diag_dir, new_time), new_time
+            )
+        cpp.mpi_barrier()
 
 
 if __name__ == "__main__":

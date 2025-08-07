@@ -932,7 +932,8 @@ class Simulation(object):
                 * "overwrite" - will overwrite existing files
 
             * **restart_time** (``float``) time at which to restart the simulation (default=0)
-            * **timestamps** (``list``) list of timestamps at which to restart the simulation
+            * **timestamps** (``list``) list of timestamps at which to save restart files of the simulation
+            * **elapsed_timestamps** (``list``) list of timestamps in seconds from the start of the simulation to save restart files of the simulation
 
     Misc:
 
