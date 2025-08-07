@@ -251,7 +251,6 @@ class HarrisTest(SimulatorTest):
 
     def post_advance(self, new_time):
         if cpp.mpi_rank() == 0:
-            print("post_advance(self, new_time)", new_time)
             plot_time(new_time, diag_dir, self.plot_dir())
             test.base_test_overlaped_fields_are_equal(
                 get_time(diag_dir, new_time), new_time
