@@ -215,6 +215,10 @@ def plot_time(time, diag_dir, plot_dir):
         vmax=1.5,
     )
 
+    import matplotlib
+
+    matplotlib.pyplot.close()
+
 
 def plot(diag_dir, plot_dir):
     for time in timestamps:
