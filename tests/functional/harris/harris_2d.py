@@ -15,12 +15,15 @@ from tests.simulator.test_advance import AdvanceTestBase
 ph.NO_GUI()
 
 debug = os.environ.get("PHARE_DEBUG_HARRIS", "0") == "1"
-test = AdvanceTestBase(rethrow=False) if debug else None
+test = AdvanceTestBase(rethrow=True) if debug else None
 cpp = cpp_lib()
 cells = (200, 100)
 time_step = 0.005
-final_time = 50
-timestamps = np.arange(0, final_time + time_step, final_time / 100)
+final_time = 1
+# timestamps = np.arange(0, final_time + time_step, final_time / 100)
+nbr_dump_step = int(final_time / time_step) + 1
+timestamps = time_step * np.arange(nbr_dump_step)
+
 diag_dir = "phare_outputs/harris"
 
 
@@ -45,12 +48,12 @@ def config():
             "format": "phareh5",
             "options": {"dir": diag_dir, "mode": "overwrite"},
         },
-        restart_options={
-            "dir": "checkpoints",
-            "mode": "overwrite",
-            "timestamps": timestamps,
-            # "restart_time": 0,
-        },
+        # restart_options={
+        #     "dir": "checkpoints",
+        #     "mode": "overwrite",
+        #     "timestamps": timestamps,
+        #     # "restart_time": 0,
+        # },
         strict=True,
     )
 
@@ -257,7 +260,7 @@ class HarrisTest(SimulatorTest):
             )
         cpp.mpi_barrier()
 
-    def plot_dir(self):
+    def plot_dir():
         plt_dir = Path(f"{diag_dir}_plots") / str(cpp.mpi_size())
         plt_dir.mkdir(parents=True, exist_ok=True)
         return plt_dir
