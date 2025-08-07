@@ -166,49 +166,54 @@ def plot_file_for_qty(plot_dir, qty, time):
     return f"{plot_dir}/harris_{qty}_t{time}.png"
 
 
-def plot(diag_dir, plot_dir):
-    run = Run(diag_dir)
+def plot_time(time, diag_dir, plot_dir):
     pop_name = "protons"
+    run = Run(diag_dir)
+
+    run.GetDivB(time).plot(
+        filename=plot_file_for_qty(plot_dir, "divb", time),
+        plot_patches=True,
+        vmin=1e-11,
+        vmax=2e-10,
+    )
+    run.GetRanks(time).plot(
+        filename=plot_file_for_qty(plot_dir, "Ranks", time), plot_patches=True
+    )
+    run.GetN(time, pop_name=pop_name).plot(
+        filename=plot_file_for_qty(plot_dir, "N", time), plot_patches=True
+    )
+    for c in ["x", "y", "z"]:
+        run.GetB(time).plot(
+            filename=plot_file_for_qty(plot_dir, f"b{c}", time),
+            plot_patches=True,
+            qty=f"{c}",
+        )
+    run.GetJ(time).plot(
+        filename=plot_file_for_qty(plot_dir, "jz", time),
+        qty="z",
+        plot_patches=True,
+        vmin=-2,
+        vmax=2,
+    )
+    run.GetPressure(time, pop_name=pop_name).plot(
+        filename=plot_file_for_qty(plot_dir, "Pxx", time),
+        qty=pop_name + "_Pxx",
+        plot_patches=True,
+        vmin=0,
+        vmax=2.7,
+    )
+    run.GetPressure(time, pop_name=pop_name).plot(
+        filename=plot_file_for_qty(plot_dir, "Pzz", time),
+        qty=pop_name + "_Pzz",
+        plot_patches=True,
+        vmin=0,
+        vmax=1.5,
+    )
+
+
+def plot(diag_dir, plot_dir):
     for time in timestamps:
-        run.GetDivB(time).plot(
-            filename=plot_file_for_qty(plot_dir, "divb", time),
-            plot_patches=True,
-            vmin=1e-11,
-            vmax=2e-10,
-        )
-        run.GetRanks(time).plot(
-            filename=plot_file_for_qty(plot_dir, "Ranks", time), plot_patches=True
-        )
-        run.GetN(time, pop_name=pop_name).plot(
-            filename=plot_file_for_qty(plot_dir, "N", time), plot_patches=True
-        )
-        for c in ["x", "y", "z"]:
-            run.GetB(time).plot(
-                filename=plot_file_for_qty(plot_dir, f"b{c}", time),
-                plot_patches=True,
-                qty=f"{c}",
-            )
-        run.GetJ(time).plot(
-            filename=plot_file_for_qty(plot_dir, "jz", time),
-            qty="z",
-            plot_patches=True,
-            vmin=-2,
-            vmax=2,
-        )
-        run.GetPressure(time, pop_name=pop_name).plot(
-            filename=plot_file_for_qty(plot_dir, "Pxx", time),
-            qty=pop_name + "_Pxx",
-            plot_patches=True,
-            vmin=0,
-            vmax=2.7,
-        )
-        run.GetPressure(time, pop_name=pop_name).plot(
-            filename=plot_file_for_qty(plot_dir, "Pzz", time),
-            qty=pop_name + "_Pzz",
-            plot_patches=True,
-            vmin=0,
-            vmax=1.5,
-        )
+        plot_time(time, diag_dir, plot_dir)
 
 
 def get_time(path, time=None, datahier=None):
@@ -239,20 +244,24 @@ class HarrisTest(SimulatorTest):
         self.register_diag_dir_for_cleanup(diag_dir)
         post_advance = self.post_advance if debug else None
         Simulator(config(), post_advance=post_advance).run().reset()
-        if cpp.mpi_rank() == 0:
-            plot_dir = Path(f"{diag_dir}_plots") / str(cpp.mpi_size())
-            plot_dir.mkdir(parents=True, exist_ok=True)
-            plot(diag_dir, plot_dir)
+        if not post_advance and cpp.mpi_rank() == 0:
+            plot(diag_dir, self.plot_dir())
         cpp.mpi_barrier()
         return self
 
     def post_advance(self, new_time):
         if cpp.mpi_rank() == 0:
             print("post_advance(self, new_time)", new_time)
+            plot_time(new_time, diag_dir, self.plot_dir())
             test.base_test_overlaped_fields_are_equal(
                 get_time(diag_dir, new_time), new_time
             )
         cpp.mpi_barrier()
+
+    def plot_dir():
+        plt_dir = Path(f"{diag_dir}_plots") / str(cpp.mpi_size())
+        plt_dir.mkdir(parents=True, exist_ok=True)
+        return plt_dir
 
 
 if __name__ == "__main__":
