@@ -15,14 +15,18 @@ from tests.simulator.test_advance import AdvanceTestBase
 ph.NO_GUI()
 
 debug = os.environ.get("PHARE_DEBUG_HARRIS", "0") == "1"
-test = AdvanceTestBase(rethrow=True) if debug else None
+test = AdvanceTestBase(rethrow=False) if debug else None
 cpp = cpp_lib()
 cells = (200, 100)
 time_step = 0.005
 final_time = 50
 timestamps = np.arange(0, final_time + time_step, final_time / 100)
 diag_dir = "phare_outputs/harris"
-print("timestamps", timestamps)
+
+
+def print_summary():  # after mpi initialized
+    if cpp.mpi_rank() == 0:
+        print("timestamps", timestamps)
 
 
 def config():
@@ -231,6 +235,7 @@ class HarrisTest(SimulatorTest):
         ph.global_vars.sim = None
 
     def test_run(self):
+        print_summary()
         self.register_diag_dir_for_cleanup(diag_dir)
         post_advance = self.post_advance if debug else None
         Simulator(config(), post_advance=post_advance).run().reset()
@@ -242,8 +247,8 @@ class HarrisTest(SimulatorTest):
         return self
 
     def post_advance(self, new_time):
-        print("post_advance(self, new_time)", new_time)
         if cpp.mpi_rank() == 0:
+            print("post_advance(self, new_time)", new_time)
             test.base_test_overlaped_fields_are_equal(
                 get_time(diag_dir, new_time), new_time
             )
