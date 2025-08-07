@@ -166,7 +166,9 @@ def config():
 
 
 def plot_file_for_qty(plot_dir, qty, time):
-    return f"{plot_dir}/harris_{qty}_t{time}.png"
+    qty_dir = plot_dir / "harris_" / qty
+    qty_dir.mkdir(parents=True, exist_ok=True)
+    return f"{qty_dir}/t{time}.png"
 
 
 def plot_time(time, diag_dir, plot_dir):
