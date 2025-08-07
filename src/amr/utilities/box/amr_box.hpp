@@ -62,8 +62,16 @@ struct Box : public PHARE::core::Box<Type, dim>
     using Super::lower;
     using Super::upper;
 
-    Box(auto&&... args)
-        : Super{args...}
+    Box() = default;
+
+    Box(std::array<Type, dim> _lower, std::array<Type, dim> _upper)
+        : Super{core::Point{_lower}, core::Point{_upper}}
+    {
+    }
+
+    template<typename T, std::size_t s>
+    Box(core::Point<T, s> _lower, core::Point<T, s> _upper)
+        : Super{_lower, _upper}
     {
     }
 

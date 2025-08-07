@@ -105,7 +105,7 @@ struct Debuggerino
 {
     static Debuggerino& INSTANCE();
 
-    Debuggerino() = default;
+    Debuggerino() { PHARE_LOG_LINE_SS("PHARE::Debuggerino ACTIVE"); };
 
     void set(double const t, int l, auto h)
     {
