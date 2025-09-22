@@ -2,12 +2,20 @@
 #define PHARE_FIELD_DATA_COARSEN_HPP
 
 #include "core/def/phare_mpi.hpp" // IWYU pragma: keep
+
+#include "core/data/grid/grid_tiles.hpp"
 #include "core/utilities/constants.hpp"
 #include "core/utilities/point/point.hpp"
 #include "amr/data/tensorfield/tensor_field_data.hpp"
 
 #include "amr/data/field/field_data.hpp"
 #include "amr/utilities/box/amr_box.hpp"
+#include "amr/data/field/field_geometry.hpp"
+
+#include "default_field_coarsener.hpp"
+
+#include "amr/utilities/box/amr_box.hpp"
+#include "amr/data/field/field_data.hpp"
 #include "amr/data/field/field_geometry.hpp"
 
 #include "default_field_coarsener.hpp"
@@ -57,7 +65,7 @@ namespace amr
         FieldCoarsenOperator(FieldCoarsenOperator const&)            = delete;
         FieldCoarsenOperator(FieldCoarsenOperator&&)                 = delete;
         FieldCoarsenOperator& operator=(FieldCoarsenOperator const&) = delete;
-        FieldCoarsenOperator&& operator=(FieldCoarsenOperator&&)     = delete;
+        FieldCoarsenOperator& operator=(FieldCoarsenOperator&&)      = delete;
 
 
         virtual ~FieldCoarsenOperator() = default;
@@ -127,10 +135,40 @@ namespace amr
             auto coarseLayout          = FieldGeometryT::layoutFromBox(coarseBox, destLayout);
             auto coarseFieldBox        = FieldGeometryT::toFieldBox(coarseBox, qty, coarseLayout);
             auto const intersectionBox = destGBox * coarseFieldBox;
-            // We can now create the coarsening operator
-            FieldCoarsenerPolicy coarsener{destLayout.centering(qty), srcGBox, destGBox, ratio};
 
-            coarsen_field(destinationField, sourceField, intersectionBox, coarsener);
+            auto const box = phare_box_from<dimension>(intersectionBox);
+
+            if constexpr (core::is_field_tile_set_v<FieldT>)
+            {
+                for (auto& dst_tile : destinationField())
+                {
+                    auto const dst_box = dst_tile.ghost_box();
+                    if (auto const dst_overlap = dst_box * box)
+                    {
+                        for (auto const& src_tile : sourceField())
+                        {
+                            auto const src_box = src_tile.field_box();
+                            if (auto const src_overlap = src_box * refine_box(box))
+                            {
+                                if (auto const& overlap = *dst_overlap * coarsen_box(*src_overlap))
+                                {
+                                    FieldCoarsenerPolicy coarsener{
+                                        destLayout.centering(qty),
+                                        samrai_box_from(src_tile.ghost_box()),
+                                        samrai_box_from(dst_tile.ghost_box()), ratio};
+
+                                    coarsen_field(dst_tile(), src_tile(), *overlap, coarsener);
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            else // not tile_set field
+            {
+                FieldCoarsenerPolicy coarsener{destLayout.centering(qty), srcGBox, destGBox, ratio};
+                coarsen_field(destinationField, sourceField, intersectionBox, coarsener);
+            }
         }
     };
 } // namespace amr

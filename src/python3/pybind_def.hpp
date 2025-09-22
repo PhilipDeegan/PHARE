@@ -1,15 +1,17 @@
 #ifndef PHARE_PYTHON_PYBIND_DEF_HPP
 #define PHARE_PYTHON_PYBIND_DEF_HPP
 
-#include <tuple>
-#include <cassert>
-#include <cstdint>
-#include <stdexcept>
 
 #include "core/utilities/span.hpp"
 
 #include "pybind11/stl.h"
 #include "pybind11/numpy.h"
+
+
+#include <tuple>
+#include <cassert>
+#include <cstdint>
+
 
 
 namespace PHARE::pydata
@@ -34,7 +36,6 @@ std::size_t ndSize(PyArrayInfo const& ar_info)
                            std::multiplies<std::size_t>());
 }
 
-
 template<typename T>
 class __attribute__((visibility("hidden"))) PyArrayWrapper : public core::Span<T>
 {
@@ -57,12 +58,30 @@ std::shared_ptr<core::Span<T>> makePyArrayWrapper(py_array_t<T> const& array)
     return std::make_shared<PyArrayWrapper<T>>(array);
 }
 
+
 template<typename T>
-core::Span<T> makeSpan(py_array_t<T> const& py_array)
+std::shared_ptr<core::Span<T>> makePySpan(py_array_t<T> const& py_array)
+{
+    auto ar_info = py_array.request();
+    assert(ar_info.ptr);
+    return std::make_shared<core::Span<T>>(static_cast<T*>(ar_info.ptr), ndSize(ar_info));
+}
+
+template<typename T>
+core::Span<T> makeSpan(py_array_t<T>& py_array)
 {
     auto ar_info = py_array.request();
     assert(ar_info.ptr);
     return {static_cast<T*>(ar_info.ptr), ndSize(ar_info)};
+}
+
+
+template<typename T>
+core::Span<T const> makeSpan(py_array_t<T> const& py_array)
+{
+    auto ar_info = py_array.request();
+    assert(ar_info.ptr);
+    return {static_cast<T const*>(ar_info.ptr), ndSize(ar_info)};
 }
 
 

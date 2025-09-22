@@ -7,8 +7,7 @@ import numpy as np
 from datetime import datetime
 
 import pyphare.pharein as ph
-from pyphare.pharein import ElectronModel
-from pyphare.core.box import Box
+from pyphare.core.phare_utilities import np_array_ify
 
 
 def parse_cli_args(pop_from_sys=True):
@@ -33,28 +32,28 @@ class NoOverwriteDict(dict):
             return super(NoOverwriteDict, self).__setitem__(k, v)
 
 
-def basicSimulatorArgs(dim: int, interp: int, **kwargs):
+def basicSimulatorArgs(ndim: int, interp: int, **kwargs):
     from pyphare.pharein.simulation import valid_refined_particle_nbr
     from pyphare.pharein.simulation import check_patch_size
+    from pyphare.core.phare_utilities import np_array_ify
 
-    cells = kwargs.get("cells", [20 for i in range(dim)])
-    if not isinstance(cells, (list, tuple)):
-        cells = [cells] * dim
+    cells = np_array_ify(kwargs.get("cells", 20), ndim)
 
-    _, smallest_patch_size = check_patch_size(dim, interp_order=interp, cells=cells)
-    dl = [1.0 / v for v in cells]
-    b0 = [[3] * dim, [8] * dim]
+    _, smallest_patch_size = check_patch_size(ndim, interp_order=interp, cells=cells)
+    dl = 1.0 / cells
+    b0 = [[3] * ndim, [8] * ndim]
+
     args = {
         "interp_order": interp,
         "smallest_patch_size": smallest_patch_size,
-        "largest_patch_size": [20] * dim,
+        "largest_patch_size": [20] * ndim,
         "time_step_nbr": 1000,
         "final_time": 1.0,
-        "boundary_types": ["periodic"] * dim,
+        "boundary_types": ["periodic"] * ndim,
         "cells": cells,
         "dl": dl,
         "refinement_boxes": {"L0": {"B0": b0}},
-        "refined_particle_nbr": valid_refined_particle_nbr[dim][interp][0],
+        "refined_particle_nbr": valid_refined_particle_nbr[ndim][interp][0],
         "diag_options": {},
         "nesting_buffer": 0,
         "strict": True,
@@ -62,7 +61,8 @@ def basicSimulatorArgs(dim: int, interp: int, **kwargs):
     for k, v in kwargs.items():
         if k in args:
             args[k] = v
-
+    args["cells"] = np_array_ify(args["cells"], ndim)
+    args["dl"] = np_array_ify(args["dl"], ndim)
     return args
 
 
@@ -126,19 +126,19 @@ def defaultPopulationSettings(sim, density_fn, vbulk_fn):
     }
 
 
-def makeBasicModel(extra_pops={}):
+def makeBasicModel(extra_pops={}, ppc=100):
     sim = ph.global_vars.sim
     _density_fn_periodic = globals()["density_" + str(sim.ndim) + "d_periodic"]
 
     pops = {
         "protons": {
             **defaultPopulationSettings(sim, _density_fn_periodic, fn_periodic),
-            "nbr_part_per_cell": 100,
+            "nbr_part_per_cell": ppc,
             "init": {"seed": 1337},
         },
         "alpha": {
             **defaultPopulationSettings(sim, _density_fn_periodic, fn_periodic),
-            "nbr_part_per_cell": 100,
+            "nbr_part_per_cell": ppc,
             "init": {"seed": 13337},
         },
     }
@@ -164,12 +164,14 @@ def populate_simulation(dim, interp, **input):
     if "diags_fn" in input:
         input["diags_fn"](model)
 
-    ElectronModel(closure="isothermal", Te=0.12)
+    ph.ElectronModel(closure="isothermal", Te=0.12)
 
     return simulation
 
 
 def diff_boxes(slice1, slice2, box, atol=None):
+    from pyphare.core.box import Box
+
     if atol is not None:
         ignore = np.isclose(slice1, slice2, atol=atol, rtol=0)
 
@@ -252,11 +254,14 @@ class SimulatorTest(unittest.TestCase):
         self._outcome = result
         super().run(result)
 
-    def unique_diag_dir_for_test_case(self, base_path, ndim, interp, post_path=""):
+    def unique_diag_dir_for_test_case(
+        self, base_path, ndim, interp, sim_setup_kwargs={}, post_path=""
+    ):
         from pyphare.cpp import cpp_lib
 
+        layout = sim_setup_kwargs.get("layout", 1)
         cpp = cpp_lib()
-        return f"{base_path}/{self._testMethodName}/{cpp.mpi_size()}/{ndim}/{interp}/{post_path}"
+        return f"{base_path}/{self._testMethodName}/{cpp.mpi_size()}/{ndim}/{interp}/{layout}/{post_path}"
 
     def clean_up_diags_dirs(self):
         from pyphare.cpp import cpp_lib

@@ -512,6 +512,8 @@ def check_restart_options(**kwargs):
     restart_options = kwargs.get("restart_options", None)
 
     if restart_options is not None:
+        import pyphare.pharein.restarts as restarts
+
         for key in restart_options.keys():
             if key not in valid_keys:
                 raise ValueError(
@@ -530,6 +532,12 @@ def check_restart_options(**kwargs):
             raise ValueError(
                 f"Invalid restart mode {mode}, valid modes are {valid_modes}"
             )
+
+        # if "restart_time" in restart_options:
+        #     if restart_options["restart_time"] == "auto":
+        #         restart_options["restart_time"] = restarts.get_restart_time(
+        #             restart_options["dir"]
+        #         )
 
     return restart_options
 

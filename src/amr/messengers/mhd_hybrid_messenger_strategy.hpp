@@ -19,7 +19,7 @@ namespace amr
         using IPhysicalModel = typename HybridModel::Interface;
 
     public:
-        static std::string const stratName;
+        static std::string inline const stratName = "MHDModel-HybridModel";
 
         MHDHybridMessengerStrategy(
             std::shared_ptr<typename MHDModel::resources_manager_type> mhdResourcesManager,
@@ -161,9 +161,7 @@ namespace amr
         Electromag EM_old_{stratName + "_EM_old"};
     };
 
-    template<typename MHDModel, typename HybridModel>
-    std::string const MHDHybridMessengerStrategy<MHDModel, HybridModel>::stratName
-        = "MHDModel-HybridModel";
+
 
 } // namespace amr
 } // namespace PHARE

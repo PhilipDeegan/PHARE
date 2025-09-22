@@ -10,8 +10,9 @@ void updater_routine(benchmark::State& state)
 {
     constexpr std::uint32_t cells   = 30;
     constexpr std::uint32_t n_parts = 1e7;
+    auto static constexpr opts      = PHARE::SimOpts{dim, interp};
 
-    using PHARE_Types   = core::PHARE_Types<dim, interp>;
+    using PHARE_Types   = core::PHARE_Types<opts>;
     using GridLayout_t  = TestGridLayout<typename PHARE_Types::GridLayout_t>;
     using Electromag_t  = core::UsableElectromag<dim>;
     using ParticleArray = typename PHARE_Types::ParticleArray_t;
@@ -30,6 +31,7 @@ void updater_routine(benchmark::State& state)
         = std::vector<Particle_t>(n_parts, core::bench::particle<dim>());
     core::bench::disperse(patch_particles.domain_particles, 0, cells - 1);
     std::sort(patch_particles.domain_particles);
+
     auto particles_copy = patch_particles.domain_particles; // tmp storage between update modes
 
     initializer::PHAREDict dict;
