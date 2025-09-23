@@ -22,6 +22,8 @@ void interpolate(benchmark::State& state)
     PHARE::core::UsableVecField<dim> flux{"F", layout, PHARE::core::HybridQuantity::Vector::V};
     Grid_t rho{"rho", PHARE::core::HybridQuantity::Scalar::rho,
                layout.allocSize(PHARE::core::HybridQuantity::Scalar::rho)};
+    Grid_t rho_c{"rho", PHARE::core::HybridQuantity::Scalar::rho,
+                 layout.allocSize(PHARE::core::HybridQuantity::Scalar::rho)};
 
     PHARE::core::bench::disperse(particles, 0, cells - 1);
 
@@ -32,7 +34,7 @@ void interpolate(benchmark::State& state)
             interpolator(particle, em, layout);
 
         // particleToMesh
-        interpolator(particles, rho, flux, layout);
+        interpolator(particles, rho, rho_c, flux, layout);
     }
 }
 
