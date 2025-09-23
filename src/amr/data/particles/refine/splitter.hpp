@@ -1,15 +1,18 @@
 #ifndef PHARE_SPLITTER_HPP
 #define PHARE_SPLITTER_HPP
 
+#include "core/utilities/types.hpp"
+#include "core/utilities/point/point.hpp"
+
+#include "amr/amr_constants.hpp"
+
 #include <array>
 #include <cmath>
 #include <tuple>
 #include <cassert>
-#include <cstdint>
 #include <cstddef>
-#include "core/utilities/types.hpp"
-#include "core/utilities/point/point.hpp"
-#include "amr/amr_constants.hpp"
+
+
 
 namespace PHARE::amr
 {
@@ -57,7 +60,7 @@ public:
     inline void operator()(Particle const& coarsePartOnRefinedGrid, Particles& refinedParticles,
                            std::size_t idx = 0) const
     {
-        dispatch_(coarsePartOnRefinedGrid, refinedParticles, idx);
+        dispatch(coarsePartOnRefinedGrid, refinedParticles, idx);
     }
 
     std::tuple<Patterns...> patterns{};

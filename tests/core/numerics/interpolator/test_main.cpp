@@ -765,12 +765,14 @@ struct ACollectionOfParticles_3d : public ::testing::Test
     GridLayout_t layout{ConstArray<double, dim>(.1), {nx, ny}, ConstArray<double, dim>(0)};
     ParticleArray_t particles;
     Grid_t rho;
+    Grid_t rho_c;
     UsableVecFieldND v;
     Interpolator interpolator;
 
     ACollectionOfParticles_3d()
         : particles{grow(layout.AMRBox(), safeLayer)}
         , rho{"field", HybridQuantity::Scalar::rho, nx, ny, nz}
+        , rho_c{"field", HybridQuantity::Scalar::rho, nx, ny, nz}
         , v{"v", layout, HybridQuantity::Vector::V}
     {
         double weight = [](auto const& meshSize) {
@@ -791,7 +793,7 @@ struct ACollectionOfParticles_3d : public ::testing::Test
                     part.v[2]   = +1.;
                 }
 
-        interpolator(particles, rho, v, layout);
+        interpolator(particles, rho, rho_c, v, layout);
     }
 };
 TYPED_TEST_SUITE_P(ACollectionOfParticles_3d);

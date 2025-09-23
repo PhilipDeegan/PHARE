@@ -2,22 +2,18 @@
 #define PHARE_PARTICLES_DATA_SPLIT_HPP
 
 
+#include "core/def.hpp"
 #include "core/def/phare_mpi.hpp" // IWYU pragma: keep
 
-#include "core/def.hpp"
-#include "amr/data/particles/particles_data.hpp"
-#include "amr/resources_manager/amr_utils.hpp"
-#include "split.hpp"
-#include "core/utilities/constants.hpp"
-#include "phare_core.hpp"
 #include "amr/amr_constants.hpp"
+#include "amr/data/particles/particles_data.hpp"
 
-#include <SAMRAI/geom/CartesianPatchGeometry.h>
 #include <SAMRAI/hier/Box.h>
-#include <SAMRAI/hier/RefineOperator.h>
 #include <SAMRAI/pdat/CellOverlap.h>
+#include <SAMRAI/hier/RefineOperator.h>
+#include <SAMRAI/geom/CartesianPatchGeometry.h>
 
-#include <functional>
+#include "split.hpp" // IWYU pragma: keep
 
 
 namespace PHARE
