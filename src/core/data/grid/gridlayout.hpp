@@ -1384,9 +1384,9 @@ namespace core
          */
         NO_DISCARD std::uint32_t constexpr static nbrDualGhosts_()
         {
-            static_assert(interp_order > 0 and interp_order < 4);
-            constexpr auto ghosts = std::array{2, 4, 4};
-            return ghosts[interp_order - 1];
+            // static_assert(interp_order > 0 and interp_order < 4);
+            // constexpr auto ghosts = std::array{3, 4, 4};
+            return 4; // ghosts[interp_order - 1];
         }
 
 
