@@ -1,18 +1,16 @@
 #ifndef PHARE_CORE_DATA_PARTICLES_PARTICLE_HPP
 #define PHARE_CORE_DATA_PARTICLES_PARTICLE_HPP
 
-#include <array>
-#include <random>
-#include <iomanip>
-#include <iostream>
-#include <algorithm>
-#include <type_traits>
-#include <iostream>
 
 #include "core/def.hpp"
 #include "core/utilities/point/point.hpp"
-#include "core/utilities/span.hpp"
-#include "core/utilities/types.hpp"
+
+
+#include <array>
+#include <random>
+#include <iostream>
+#include <algorithm>
+#include <type_traits>
 
 
 namespace PHARE::core

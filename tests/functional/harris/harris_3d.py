@@ -1,62 +1,75 @@
 #!/usr/bin/env python3
-import os
+
 import numpy as np
-from pathlib import Path
 
 import pyphare.pharein as ph
 from pyphare.cpp import cpp_lib
-from pyphare.pharesee.run import Run
+
 from pyphare.simulator.simulator import Simulator
 from pyphare.simulator.simulator import startMPI
-
-os.environ["PHARE_SCOPE_TIMING"] = "0"  # turn on scope timing
 
 
 ph.NO_GUI()
 cpp = cpp_lib()
-startMPI()
 
-cells = (50, 50, 50)
-dl = (0.2, 0.2, 0.2)
+start_time = 0.0
 
-diag_outputs = "phare_outputs/test/harris/3d"
-time_step_nbr = 1000
-time_step = 0.001
-final_time = time_step * time_step_nbr
-
+cells = (200, 100, 50)
+dl = (0.4, 0.4, 0.4)
+diag_outputs = "."
+time_step = 0.005
+final_time = 100
 timestamps = [0, final_time]
-if time_step_nbr > 100:
-    dt = 100 * time_step
-    nt = final_time / dt + 1
-    timestamps = dt * np.arange(nt)
 
-plot_dir = Path(f"{diag_outputs}_plots")
-plot_dir.mkdir(parents=True, exist_ok=True)
+hs = hour_seconds = 3600.0
+elapsed_restart_timestamps = [hs * 3, hs * 6, hs * 9, hs * 12, hs * 15]
+
+
+def diag_timestamps():
+    dt = 200.0 * time_step
+    nt = (final_time - start_time) / dt
+    return start_time + dt * np.arange(nt)
+
+
+timestamps = diag_timestamps()
 
 
 def config():
+    L = 0.5
+
     sim = ph.Simulation(
+        # dry_run=1,
         time_step=time_step,
-        time_step_nbr=time_step_nbr,
-        dl=dl,
+        final_time=final_time,
         cells=cells,
+        dl=dl,
         refinement="tagging",
-        max_nbr_levels=2,
-        hyper_resistivity=0.001,
+        max_nbr_levels=3,
+        nesting_buffer=1,
+        clustering="tile",
+        tag_buffer="10",
+        tagging_threshold=0.4,
+        hyper_resistivity=0.008,
+        hyper_mode="constant",
         resistivity=0.001,
         diag_options={
             "format": "phareh5",
-            "options": {"dir": diag_outputs, "mode": "overwrite"},
+            "options": {"dir": ".", "mode": "overwrite"},
         },
-        # strict=True,
+        restart_options={
+            "dir": "checkpoints",
+            "mode": "overwrite",
+            "elapsed_timestamps": elapsed_restart_timestamps,
+            # "restart_time":start_time
+        },
     )
 
     def density(x, y, z):
-        L = sim.simulation_domain()[1]
+        Ly = sim.simulation_domain()[1]
         return (
-            0.2
-            + 1.0 / np.cosh((y - L * 0.3) / 0.5) ** 2
-            + 1.0 / np.cosh((y - L * 0.7) / 0.5) ** 2
+            0.4
+            + 1.0 / np.cosh((y - Ly * 0.3) / L) ** 2
+            + 1.0 / np.cosh((y - Ly * 0.7) / L) ** 2
         )
 
     def S(y, y0, l):
@@ -65,123 +78,104 @@ def config():
     def by(x, y, z):
         Lx = sim.simulation_domain()[0]
         Ly = sim.simulation_domain()[1]
-        w1 = 0.2
-        w2 = 1.0
+        sigma = 1.0
+        dB = 0.1
         x0 = x - 0.5 * Lx
         y1 = y - 0.3 * Ly
         y2 = y - 0.7 * Ly
-        w3 = np.exp(-(x0 * x0 + y1 * y1) / (w2 * w2))
-        w4 = np.exp(-(x0 * x0 + y2 * y2) / (w2 * w2))
-        w5 = 2.0 * w1 / w2
-        return (w5 * x0 * w3) + (-w5 * x0 * w4)
+        dBy1 = 2 * dB * x0 * np.exp(-(x0**2 + y1**2) / (sigma) ** 2)
+        dBy2 = -2 * dB * x0 * np.exp(-(x0**2 + y2**2) / (sigma) ** 2)
+        return dBy1 + dBy2
 
     def bx(x, y, z):
         Lx = sim.simulation_domain()[0]
         Ly = sim.simulation_domain()[1]
-        w1 = 0.2
-        w2 = 1.0
+        sigma = 1.0
+        dB = 0.1
         x0 = x - 0.5 * Lx
         y1 = y - 0.3 * Ly
         y2 = y - 0.7 * Ly
-        w3 = np.exp(-(x0 * x0 + y1 * y1) / (w2 * w2))
-        w4 = np.exp(-(x0 * x0 + y2 * y2) / (w2 * w2))
-        w5 = 2.0 * w1 / w2
+        dBx1 = -2 * dB * y1 * np.exp(-(x0**2 + y1**2) / (sigma) ** 2)
+        dBx2 = 2 * dB * y2 * np.exp(-(x0**2 + y2**2) / (sigma) ** 2)
         v1 = -1
         v2 = 1.0
-        return (
-            v1
-            + (v2 - v1) * (S(y, Ly * 0.3, 0.5) - S(y, Ly * 0.7, 0.5))
-            + (-w5 * y1 * w3)
-            + (+w5 * y2 * w4)
-        )
+        return v1 + (v2 - v1) * (S(y, Ly * 0.3, L) - S(y, Ly * 0.7, L)) + dBx1 + dBx2
 
     def bz(x, y, z):
-        return 0.1
+        return 0.0
 
     def b2(x, y, z):
         return bx(x, y, z) ** 2 + by(x, y, z) ** 2 + bz(x, y, z) ** 2
 
     def T(x, y, z):
-        K = 1
+        K = 0.7
         temp = 1.0 / density(x, y, z) * (K - b2(x, y, z) * 0.5)
         assert np.all(temp > 0)
         return temp
 
-    def vxyz(x, y, z):
+    def vx(x, y, z):
         return 0.0
 
-    def vthxyz(x, y, z):
+    def vy(x, y, z):
+        return 0.0
+
+    def vz(x, y, z):
+        return 0.0
+
+    def vthx(x, y, z):
         return np.sqrt(T(x, y, z))
 
-    C = "xyz"
-    vvv = {
-        **{f"vbulk{c}": vxyz for c in C},
-        **{f"vth{c}": vthxyz for c in C},
-        "nbr_part_per_cell": 50,
-    }
-    protons = {"charge": 1, "density": density, **vvv, "init": {"seed": 12334}}
-    ph.MaxwellianFluidModel(bx=bx, by=by, bz=bz, protons=protons)
-    ph.ElectronModel(closure="isothermal", Te=0.0)
+    def vthy(x, y, z):
+        return np.sqrt(T(x, y, z))
 
-    for quantity in ["density", "bulkVelocity"]:
-        ph.FluidDiagnostics(quantity=quantity, write_timestamps=timestamps)
-    ph.FluidDiagnostics(
-        quantity="density", write_timestamps=timestamps, population_name="protons"
+    def vthz(x, y, z):
+        return np.sqrt(T(x, y, z))
+
+    vvv = {
+        "vbulkx": vx,
+        "vbulky": vy,
+        "vbulkz": vz,
+        "vthx": vthx,
+        "vthy": vthy,
+        "vthz": vthz,
+        "nbr_part_per_cell": 100,
+    }
+
+    ph.MaxwellianFluidModel(
+        bx=bx,
+        by=by,
+        bz=bz,
+        protons={
+            "charge": 1,
+            "density": density,
+            **vvv,
+            "init": {"seed": cpp.mpi_rank() + 12},
+        },
     )
+
+    ph.ElectronModel(closure="isothermal", Te=0.0)
+    ph.LoadBalancer(active=True, mode="nppc", tol=0.05, every=1000)
+
+    pop = "protons"
+    ph.FluidDiagnostics(quantity="bulkVelocity", write_timestamps=timestamps)
+    ph.FluidDiagnostics(
+        quantity="density", write_timestamps=timestamps, population_name=pop
+    )
+
     for quantity in ["E", "B"]:
         ph.ElectromagDiagnostics(quantity=quantity, write_timestamps=timestamps)
-    ph.InfoDiagnostics(quantity="particle_count")  # defaults all coarse time steps
+
+    # timestamps = 23.0 + np.arange(100) * sim.time_step
+    # for name in ["domain", "levelGhost"]:
+    #     ph.ParticleDiagnostics(
+    #         quantity=name, write_timestamps=timestamps, population_name="protons"
+    #     )
+
+    ph.InfoDiagnostics(quantity="particle_count", write_timestamps=timestamps)
 
     return sim
 
 
-def plot_file_for_qty(qty, time):
-    return f"{plot_dir}/harris_{qty}_t{time}.png"
-
-
-def plot(diag_dir):
-    run = Run(diag_dir)
-    for time in timestamps:
-        # run.GetDivB(time).plot(
-        #     filename=plot_file_for_qty("divb", time),
-        #     plot_patches=True,
-        #     vmin=1e-11,
-        #     vmax=2e-10,
-        # )
-        # run.GetRanks(time).plot(
-        #     filename=plot_file_for_qty("Ranks", time),
-        #     plot_patches=True,
-        # )
-        run.GetN(time, pop_name="protons").plot(
-            filename=plot_file_for_qty("N", time),
-            plot_patches=True,
-        )
-        for c in ["x", "y", "z"]:
-            run.GetB(time).plot(
-                filename=plot_file_for_qty(f"b{c}", time),
-                qty=f"B{c}",
-                plot_patches=True,
-            )
-        # run.GetJ(time).plot(
-        #     filename=plot_file_for_qty("jz", time),
-        #     qty="Jz",
-        #     plot_patches=True,
-        #     vmin=-2,
-        #     vmax=2,
-        # )
-
-
-def main():
-    Simulator(config()).run()
-
-    # TODO3D nico : I removed the plot because the hierarchy plot3d has been removed
-    # TODO3D we need to find a way to plot the data
-
-    # if cpp.mpi_rank() == 0:
-    #     plot(diag_outputs)
-
-    cpp.mpi_barrier()
-
-
 if __name__ == "__main__":
-    main()
+    startMPI()
+    Simulator(config(), print_one_line=False).run()
