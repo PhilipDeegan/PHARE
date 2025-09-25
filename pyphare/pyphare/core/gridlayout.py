@@ -225,7 +225,7 @@ class GridLayout(object):
         return self.centering[direction][quantity]
 
     def particleGhostNbr(self, interp_order):
-        return 1 if interp_order == 1 else 2
+        return 2  # 1 if interp_order == 1 else 2
 
     # The total number of ghosts is obtained using the required number of ghost for the interpolation
     # ((interp_order + 1) / 2), to which we add one for the patchghost for particles that may leave
@@ -233,10 +233,10 @@ class GridLayout(object):
     # (2002) formulas for magnetic refinement, so we want to have on refinement full coarse
     # cell below the fine grid, which odd number of ghost nodes would not allow.
     def nbrGhosts(self, interpOrder, centering):
-        if self.field_ghosts_nbr == -1:
-            nGhosts = int((interpOrder + 1) / 2) + self.particleGhostNbr(interpOrder)
-            return nGhosts if nGhosts % 2 == 0 else nGhosts + 1
-        return self.field_ghosts_nbr
+        # if self.field_ghosts_nbr == -1:
+        #     nGhosts = int((interpOrder + 1) / 2) + self.particleGhostNbr(interpOrder)
+        #     return nGhosts if nGhosts % 2 == 0 else nGhosts + 1
+        return 4  # self.field_ghosts_nbr
 
     def nbrGhostsPrimal(self, interpOrder):
         return self.nbrGhosts(interpOrder, "primal")
