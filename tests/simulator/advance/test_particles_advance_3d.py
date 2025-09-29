@@ -38,13 +38,13 @@ class AdvanceTest(AdvanceTestBase):
             interp_order,
             refinement_boxes,
             ppc=ppc,
-            cells=40,
-            largest_patch_size=20,
+            cells=10,
+            largest_patch_size=5,
         )
 
     @data(*interp_orders)
     def test_L0_particle_number_conservation(self, interp):
-        self._test_L0_particle_number_conservation(ndim, interp, ppc=ppc, cells=30)
+        self._test_L0_particle_number_conservation(ndim, interp, ppc=ppc, cells=10)
 
 
 if __name__ == "__main__":

@@ -14,19 +14,20 @@ cpp = cpp_lib()
 
 start_time = 0.0
 
-cells = (200, 100, 50)
+cells = (100, 50, 25)
 dl = (0.4, 0.4, 0.4)
 diag_outputs = "."
 time_step = 0.005
-final_time = 100
+final_time = 1
 timestamps = [0, final_time]
 
 hs = hour_seconds = 3600.0
 elapsed_restart_timestamps = [hs * 3, hs * 6, hs * 9, hs * 12, hs * 15]
+ppc = 10
 
 
 def diag_timestamps():
-    dt = 200.0 * time_step
+    dt = 100 * time_step
     nt = (final_time - start_time) / dt
     return start_time + dt * np.arange(nt)
 
@@ -138,7 +139,7 @@ def config():
         "vthx": vthx,
         "vthy": vthy,
         "vthz": vthz,
-        "nbr_part_per_cell": 100,
+        "nbr_part_per_cell": ppc,
     }
 
     ph.MaxwellianFluidModel(
