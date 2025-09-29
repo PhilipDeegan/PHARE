@@ -16,9 +16,9 @@ start_time = 0.0
 
 cells = (100, 50, 25)
 dl = (0.4, 0.4, 0.4)
-diag_outputs = "."
-time_step = 0.005
-final_time = 1
+diag_outputs = "phare_outputs/harris_3d"
+time_step = 0.002
+final_time = 10
 timestamps = [0, final_time]
 
 hs = hour_seconds = 3600.0
@@ -27,7 +27,7 @@ ppc = 10
 
 
 def diag_timestamps():
-    dt = 100 * time_step
+    dt = 1000 * time_step
     nt = (final_time - start_time) / dt
     return start_time + dt * np.arange(nt)
 
@@ -57,12 +57,12 @@ def config():
             "format": "phareh5",
             "options": {"dir": ".", "mode": "overwrite"},
         },
-        restart_options={
-            "dir": "checkpoints",
-            "mode": "overwrite",
-            "elapsed_timestamps": elapsed_restart_timestamps,
-            # "restart_time":start_time
-        },
+        # restart_options={
+        #     "dir": "checkpoints",
+        #     "mode": "overwrite",
+        #     "elapsed_timestamps": elapsed_restart_timestamps,
+        #     # "restart_time":start_time
+        # },
     )
 
     def density(x, y, z):
