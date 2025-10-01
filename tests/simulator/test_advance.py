@@ -317,7 +317,7 @@ class AdvanceTestBase(SimulatorTest):
                     # involving linear/spatial interpolations and so on where
                     # rounding errors may occur.... setting atol to 5.5e-15
                     assert_fp_any_all_close(slice1, slice2, atol=5.5e-15, rtol=0)
-                    checks += 1
+                    success_test_nbr += 1
                 except AssertionError as e:
                     import matplotlib.pyplot as plt
                     from matplotlib.patches import Rectangle
