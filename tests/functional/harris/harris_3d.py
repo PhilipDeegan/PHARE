@@ -18,7 +18,7 @@ cells = (100, 50, 25)
 dl = (0.4, 0.4, 0.4)
 diag_outputs = "phare_outputs/harris_3d"
 time_step = 0.002
-final_time = 10
+final_time = 0.002  # 10
 timestamps = [0, final_time]
 
 hs = hour_seconds = 3600.0
