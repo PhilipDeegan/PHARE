@@ -23,7 +23,7 @@ void updater_routine(benchmark::State& state)
     GridLayout_t layout{cells};
     Electromag_t em{layout};
     Ions ions{layout, "protons"};
-    Boxing_t const boxing{layout, grow(layout.AMRBox(), GridLayout_t::nbrParticleGhosts())};
+    Boxing_t const boxing{layout, {grow(layout.AMRBox(), GridLayout_t::nbrParticleGhosts())}};
 
     auto& patch_particles = ions.populations[0].particles;
     patch_particles.domain_particles.vector()
@@ -46,7 +46,7 @@ void updater_routine(benchmark::State& state)
 
         patch_particles.domain_particles = particles_copy;
         auto& pack
-            = std::get<3>(ions.getRunTimeResourcesViewList()[0].getCompileTimeResourcesViewList());
+            = std::get<4>(ions.getRunTimeResourcesViewList()[0].getCompileTimeResourcesViewList());
         pack.setBuffer(&patch_particles.pack());
 
         ionUpdater_.updatePopulations(ions, em, boxing, dt, core::UpdaterMode::all);

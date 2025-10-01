@@ -1,4 +1,3 @@
-
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 #include <random>
@@ -20,7 +19,7 @@ public:
     }
 
 protected:
-    const std::uint32_t nx = 10;
+    std::uint32_t const nx = 10;
     NdArray a;
 };
 
@@ -35,8 +34,8 @@ public:
     }
 
 protected:
-    const std::uint32_t nx = 10;
-    const std::uint32_t ny = 20;
+    std::uint32_t const nx = 10;
+    std::uint32_t const ny = 20;
     NdArray a;
 };
 
@@ -51,9 +50,9 @@ public:
     }
 
 protected:
-    const std::uint32_t nx = 10;
-    const std::uint32_t ny = 20;
-    const std::uint32_t nz = 30;
+    std::uint32_t const nx = 10;
+    std::uint32_t const ny = 20;
+    std::uint32_t const nz = 30;
     NdArray a;
 };
 
@@ -287,7 +286,7 @@ TEST(MaskedView1d, maskOps)
     constexpr std::size_t dim    = 1;
     constexpr std::uint32_t size = 20;
     using Mask                   = NdArrayMask;
-    NdArrayVector<dim> array{size};
+    NdArrayVector<dim> array{{size}, 0.};
 
     EXPECT_EQ(std::accumulate(array.begin(), array.end(), 0), 0);
 
@@ -320,7 +319,7 @@ TEST(MaskedView2d, maskOps)
     constexpr std::uint32_t size   = 20;
     constexpr std::uint32_t sizeSq = 20 * 20;
     using Mask                     = NdArrayMask;
-    NdArrayVector<dim> array{size, size};
+    NdArrayVector<dim> array{{size, size}, 0.};
 
     EXPECT_EQ(std::accumulate(array.begin(), array.end(), 0), 0);
 
@@ -359,7 +358,7 @@ TEST(MaskedView2d, maskOps2)
     constexpr std::uint32_t size0 = 20, size1 = 22;
     constexpr std::uint32_t sizeSq = size0 * size1;
     using Mask                     = NdArrayMask;
-    NdArrayVector<dim> array{size0, size1};
+    NdArrayVector<dim> array{{size0, size1}, 0.};
 
     EXPECT_EQ(std::accumulate(array.begin(), array.end(), 0), 0);
 
@@ -391,6 +390,60 @@ TEST(MaskedView2d, maskOps2)
                                                                   + twoCellsOffset5.nCells(array)
                                                                   + Mask{0u}.nCells(array));
 }
+
+TEST(MaskedView3d, maskOps3)
+{
+    constexpr std::size_t dim      = 3;
+    constexpr std::uint32_t size0  = 10;
+    constexpr std::uint32_t sizeCu = size0 * size0 * size0;
+    using Mask                     = PHARE::core::NdArrayMask;
+
+    auto sum = [](auto const& array) { return std::accumulate(array.begin(), array.end(), 0); };
+
+    {
+        NdArrayVector<dim> array{size0, size0, size0};
+        EXPECT_EQ(sum(array), 0);
+        std::fill(array.begin(), array.end(), 1);
+        EXPECT_EQ(sum(array), sizeCu);
+    }
+
+    {
+        NdArrayVector<dim> array{size0, size0, size0};
+        EXPECT_EQ(std::accumulate(array.begin(), array.end(), 0), 0);
+        array[Mask{0}] = 1;
+        EXPECT_EQ(std::accumulate(array.begin(), array.end(), 0), 488);
+
+        // outter cells of a 10**3 cube =
+        // (10 * 10 * 2) + (10 * 8 * 2) + (8 * 8 * 2);
+        // or
+        // (8 * 8 * 6) + (10 * 4) + (8 * 8);
+        // = 488
+    }
+
+    std::uint32_t ten = 10;
+    PHARE::core::NdArrayVector<3> array(ten, ten, ten);
+
+    array[Mask{0}] = 1;
+    EXPECT_EQ(sum(array), 488);
+    array[Mask{1}] >> array[Mask{0}];
+    EXPECT_EQ(sum(array), 0);
+
+    array[Mask{2}] = 1;
+    EXPECT_EQ(sum(array), 152);
+    array[Mask{1}] = 1;
+    EXPECT_EQ(sum(array), 448);
+    array[Mask{1}] = 0;
+    EXPECT_EQ(sum(array), 152);
+
+    array[Mask{2}] >> array[Mask{1}];
+    EXPECT_EQ(sum(array), 448);
+    array[Mask{2}] = 0;
+    EXPECT_EQ(sum(array), 296);
+
+    EXPECT_EQ(Mask{1}.nCells(array), 296);
+    EXPECT_EQ(Mask{2}.nCells(array), 152);
+}
+
 
 int main(int argc, char** argv)
 {

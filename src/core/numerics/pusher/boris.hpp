@@ -1,20 +1,26 @@
 #ifndef PHARE_CORE_PUSHER_BORIS_HPP
 #define PHARE_CORE_PUSHER_BORIS_HPP
 
+
+#include "core/errors.hpp"
+#include "core/logger.hpp"
+#include "core/numerics/pusher/pusher.hpp"
+
+
 #include <array>
 #include <cmath>
 #include <cstddef>
-#include <algorithm>
+#include <sstream>
 #include <iterator>
+#include <algorithm>
+#include <exception>
 #include <stdexcept>
-#include "core/numerics/pusher/pusher.hpp"
-#include "core/utilities/range/range.hpp"
-#include "core/errors.hpp"
-#include "core/logger.hpp"
-#include "core/data/particles/particle.hpp"
 
 namespace PHARE::core
 {
+class BorisException : public DictionaryException
+{
+};
 
 
 template<std::size_t dim, typename ParticleRange, typename Electromag, typename Interpolator,
@@ -22,6 +28,80 @@ template<std::size_t dim, typename ParticleRange, typename Electromag, typename 
 class BorisPusher
     : public Pusher<dim, ParticleRange, Electromag, Interpolator, BoundaryCondition, GridLayout>
 {
+    struct MoveTwoCellException : std::exception
+    {
+        MoveTwoCellException(double const d, double const v)
+            : delta{d}
+            , vel{v}
+        {
+        }
+
+        double delta, vel;
+    };
+
+    struct PrePushException : std::exception
+    {
+        PrePushException(std::exception_ptr const& exp, std::size_t const pidx)
+            : cause{exp}
+            , particle_idx{pidx}
+        {
+        }
+
+        auto operator()() const
+        {
+            try
+            {
+                if (cause)
+                    std::rethrow_exception(cause);
+            }
+            catch (MoveTwoCellException const& e)
+            {
+                std::stringstream ss;
+                ss << "PrePush Particle moved 2 cells with delta/vel: ";
+                ss << e.delta << "/" << e.vel << std::endl;
+                return ss.str();
+            }
+            catch (...)
+            {
+                // else throw
+            }
+            throw std::runtime_error("Unhandled PrePushException!");
+        }
+
+        std::exception_ptr cause;
+        std::size_t particle_idx;
+    };
+    struct PostPushException : std::exception
+    {
+        PostPushException(std::exception_ptr const& exp)
+            : cause{exp}
+        {
+        }
+
+        auto operator()() const
+        {
+            try
+            {
+                if (cause)
+                    std::rethrow_exception(cause);
+            }
+            catch (MoveTwoCellException const& e)
+            {
+                std::stringstream ss;
+                ss << "PostPush Particle moved 2 cells with delta/vel: ";
+                ss << e.delta << "/" << e.vel << std::endl;
+                return ss.str();
+            }
+            catch (...)
+            {
+                // else throw
+            }
+            throw std::runtime_error("Unhandled PostPushException!");
+        }
+
+        std::exception_ptr cause;
+    };
+
 public:
     using Super
         = Pusher<dim, ParticleRange, Electromag, Interpolator, BoundaryCondition, GridLayout>;
@@ -87,7 +167,15 @@ public:
         // rangeIn : t=n, rangeOut : t=n+1/2
         // Do not partition on this step - this is to keep all domain and ghost
         //   particles consistent. see: https://github.com/PHAREHUB/PHARE/issues/571
-        prePushStep_(rangeIn, rangeOut);
+        try
+        {
+            prePushStep_(rangeIn, rangeOut);
+        }
+        catch (PrePushException const& ex)
+        {
+            PHARE_LOG_ERROR(BorisException{}("cause", ex())());
+        }
+
 
         rangeOut = firstSelector(rangeOut);
 
@@ -99,11 +187,27 @@ public:
 
             //  get electromagnetic fields interpolated on the particles of rangeOut stop at newEnd.
             //  get the particle velocity from t=n to t=n+1
-            accelerate_(currPart, interpolator(currPart, emFields, layout), dto2m);
+            auto const& local_em = interpolator(currPart, emFields, layout);
+            accelerate_(currPart, local_em, dto2m);
 
             // now advance the particles from t=n+1/2 to t=n+1 using v_{n+1} just calculated
             // and get a pointer to the first leaving particle
-            postPushStep_(rangeOut, idx);
+            try
+            {
+                postPushStep_(rangeOut, idx);
+            }
+            catch (PostPushException const& ex)
+            {
+                BorisException bex;
+                bex("cause", ex());
+                auto const& [e, b] = local_em;
+                for (std::uint16_t i = 0; i < 3; ++i)
+                    bex("E_" + std::to_string(i), std::to_string(e[i]));
+                for (std::uint16_t i = 0; i < 3; ++i)
+                    bex("B_" + std::to_string(i), std::to_string(b[i]));
+
+                PHARE_LOG_ERROR(bex());
+            }
         }
 
         return secondSelector(rangeOut);
@@ -136,14 +240,13 @@ private:
             double iCell = std::floor(delta);
             if (std::abs(delta) > 2)
             {
-                PHARE_LOG_ERROR("Error, particle moves more than 1 cell, delta >2");
+                throw MoveTwoCellException{delta, partIn.v[iDim]};
             }
             partOut.delta[iDim] = delta - iCell;
             newCell[iDim]       = static_cast<int>(iCell + partIn.iCell[iDim]);
         }
         return newCell;
     }
-
 
 
     /** advance the particles in rangeIn of half a time step and store them
@@ -172,18 +275,32 @@ private:
             outParticles[outIdx].weight = inParticles[inIdx].weight;
             outParticles[outIdx].v      = inParticles[inIdx].v;
 
-            auto newCell = advancePosition_(inParticles[inIdx], outParticles[outIdx]);
-            if (newCell != inParticles[inIdx].iCell)
-                outParticles.change_icell(newCell, outIdx);
+            try
+            {
+                auto newCell = advancePosition_(inParticles[inIdx], outParticles[outIdx]);
+                if (newCell != inParticles[inIdx].iCell)
+                    outParticles.change_icell(newCell, outIdx);
+            }
+            catch (MoveTwoCellException const&)
+            {
+                throw PrePushException{std::current_exception(), inIdx};
+            }
         }
     }
 
     void postPushStep_(ParticleRange& range, std::size_t idx)
     {
-        auto& particles = range.array();
-        auto newCell    = advancePosition_(particles[idx], particles[idx]);
-        if (newCell != particles[idx].iCell)
-            particles.change_icell(newCell, idx);
+        try
+        {
+            auto& particles = range.array();
+            auto newCell    = advancePosition_(particles[idx], particles[idx]);
+            if (newCell != particles[idx].iCell)
+                particles.change_icell(newCell, idx);
+        }
+        catch (MoveTwoCellException const&)
+        {
+            throw PostPushException{std::current_exception()};
+        }
     }
 
 
