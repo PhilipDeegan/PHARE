@@ -273,11 +273,18 @@ void compare(GridLayout_t const& layout, R& ref, C& cmp)
     PHARE_LOG_LINE_STR("results: " << freport.why());
     EXPECT_TRUE(freport);
 
-    zero_ghost_layer(layout, ref.populations[0].rho, cmp.populations[0].rho);
-    auto const rhoport
-        = compare_reduced_fields(ref.populations[0].rho, cmp.populations[0].rho, diff);
-    PHARE_LOG_LINE_STR("results: " << rhoport.why());
-    EXPECT_TRUE(rhoport);
+    zero_ghost_layer(layout, ref.populations[0].particleDensity,
+                     cmp.populations[0].particleDensity);
+    auto const rhoPport = compare_reduced_fields(ref.populations[0].particleDensity,
+                                                 cmp.populations[0].particleDensity, diff);
+    PHARE_LOG_LINE_STR("results: " << rhoPport.why());
+    EXPECT_TRUE(rhoPport);
+
+    zero_ghost_layer(layout, ref.populations[0].chargeDensity, cmp.populations[0].chargeDensity);
+    auto const rhoCport = compare_reduced_fields(ref.populations[0].chargeDensity,
+                                                 cmp.populations[0].chargeDensity, diff);
+    PHARE_LOG_LINE_STR("results: " << rhoCport.why());
+    EXPECT_TRUE(rhoCport);
 }
 
 

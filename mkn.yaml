@@ -13,13 +13,13 @@ property:
   # HDF5_INC: /opt/mpi/rocm_hdf5/include
   # HDF5_PTH: /opt/mpi/rocm_hdf5/lib
 
-  # debian
-  HDF5_INC: /usr/include/hdf5/openmpi
-  HDF5_PTH: /usr/lib/x86_64-linux-gnu/hdf5/openmpi
+  # # debian
+  # HDF5_INC: /usr/include/hdf5/openmpi
+  # HDF5_PTH: /usr/lib/x86_64-linux-gnu/hdf5/openmpi
 
-  # # kaa
-  # HDF5_INC: /usr/include/openmpi-x86_64
-  # HDF5_PTH: /usr/lib64/openmpi/lib
+  # kaa
+  HDF5_INC: /usr/include/openmpi-x86_64
+  HDF5_PTH: /usr/lib64/openmpi/lib
 
   mkn.base: base_
   mkn.args: -DPHARE_HAS_HIGHFIVE=1 -DPHARE_DIAG_DOUBLES=1

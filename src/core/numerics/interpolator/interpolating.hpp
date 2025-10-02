@@ -24,20 +24,20 @@ class Interpolating
 
 public:
     template<typename Particles, typename VecField, typename GridLayout, typename Field>
-    inline void operator()(Particles const& particles, Field& density, VecField& flux,
+    inline void operator()(Particles const& particles, Field& rhoP, Field& rhoC, VecField& flux,
                            GridLayout const& layout, double coef = 1.)
     {
         using enum LayoutMode;
         if constexpr (any_in(ParticleArray_t::layout_mode, AoSMapped))
-            Interpolator_t{}(particles, density, flux, layout, coef);
+            Interpolator_t{}(particles, rhoP, rhoC, flux, layout, coef);
         else
-            particleToMesh(particles, layout, density, flux, coef);
+            particleToMesh(particles, layout, rhoP, rhoC, flux, coef);
     }
 
 
     template<typename GridLayout, typename VecField, typename Field>
-    void particleToMesh(ParticleArray_t const& particles, GridLayout const& layout, Field& density,
-                        VecField& flux, double coef = 1.) _PHARE_ALL_FN_
+    void particleToMesh(ParticleArray_t const& particles, GridLayout const& layout, Field& rhoP,
+                        Field& rhoC, VecField& flux, double coef = 1.) _PHARE_ALL_FN_
     {
         using Particles = ParticleArray_t;
         // static_assert(Particles::storage_mode == StorageMode::SPAN);
@@ -55,16 +55,17 @@ public:
 
             if constexpr (alloc_mode == AllocatorMode::CPU)
             {
-                assert(particles().size() == density().size());
+                assert(particles().size() == rhoP().size());
                 assert(particles().size() == flux[0]().size());
 
                 for (std::size_t tidx = 0; tidx < particles().size(); ++tidx)
                 {
                     auto const& parts = particles()[tidx];
-                    auto& rho         = density()[tidx];
+                    auto& rhop        = rhoP()[tidx];
+                    auto& rhoc        = rhoC()[tidx];
                     auto F = flux.template as<VecField_vt>([&](auto& c) { return c()[tidx]; });
                     for (auto const& p : parts())
-                        interp_.particleToMesh(p, rho(), F, rho.layout(), coef);
+                        interp_.particleToMesh(p, rhop(), rhoc(), F, rhop.layout(), coef);
                 }
             }
             else
@@ -78,7 +79,7 @@ public:
             {
                 for (auto const& bix : particles.local_box())
                     for (auto const& p : particles(bix))
-                        interp_.particleToMesh(p, density, flux, layout, coef);
+                        interp_.particleToMesh(p, rhoP, rhoC, flux, layout, coef);
             }
             // else if (alloc_mode == AllocatorMode::GPU_UNIFIED and impl < 2)
             // {
@@ -97,7 +98,7 @@ public:
                     using Launcher = gpu::BoxCellNLauncher<lobox_t>;
                     auto lobox     = particles.local_box();
                     Launcher{lobox, particles.max_size()}([=] _PHARE_ALL_FN_() mutable {
-                        box_kernel(particles, layout, flux, density);
+                        box_kernel(particles, layout, flux, rhoP, rhoC);
                     });
                 })
             }
@@ -109,14 +110,14 @@ public:
             if constexpr (any_in(Particles::layout_mode, SoATS))
                 for (auto const& tile : particles())
                     for (std::size_t i = 0; i < tile().size(); ++i)
-                        interp_.particleToMesh(tile()[i], density, flux, layout, coef);
+                        interp_.particleToMesh(tile()[i], rhoP, rhoC, flux, layout, coef);
             else if constexpr (any_in(Particles::layout_mode, SoAVX))
             {
                 for (auto const& it : particles)
-                    interp_.particleToMesh(it, density, flux, layout, coef);
+                    interp_.particleToMesh(it, rhoP, rhoC, flux, layout, coef);
             }
             else
-                interp_(particles, density, flux, layout, coef);
+                interp_(particles, rhoP, rhoC, flux, layout, coef);
         }
         else if (alloc_mode == AllocatorMode::GPU_UNIFIED)
         {
@@ -124,7 +125,8 @@ public:
             PHARE_WITH_MKN_GPU( //
                 mkn::gpu::GDLauncher{particles.size()}([=] _PHARE_ALL_FN_() mutable {
                     auto particle = particles.begin() + mkn::gpu::idx();
-                    Interpolator_t{}.particleToMesh(deref(particle), density, flux, layout, coef);
+                    Interpolator_t{}.particleToMesh(deref(particle), rhoP, rhoC, flux, layout,
+                                                    coef);
                 }); //
             )
         }

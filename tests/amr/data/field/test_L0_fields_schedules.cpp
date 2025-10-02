@@ -114,9 +114,9 @@ TYPED_TEST(FieldScheduleHierarchyTest, testing_hyhy_schedules)
         {
             for (auto& pop : ions)
             {
-                setup_field(layout, pop.density());
+                setup_field(layout, pop.particleDensity());
                 setup_vecfield(layout, pop.flux());
-                PHARE_LOG_LINE_SS(sum_field(reduce(pop.density())));
+                PHARE_LOG_LINE_SS(sum_field(reduce(pop.particleDensity())));
             }
         }
     }
@@ -133,7 +133,7 @@ TYPED_TEST(FieldScheduleHierarchyTest, testing_hyhy_schedules)
 
         for (auto const& pop : ions)
         {
-            PHARE_LOG_LINE_SS(sum_field(reduce_single(pop.density())));
+            PHARE_LOG_LINE_SS(sum_field(reduce_single(pop.particleDensity())));
         }
     }
 }

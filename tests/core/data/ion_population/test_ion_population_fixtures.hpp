@@ -158,11 +158,11 @@ class UsableIons
 
     void set()
     {
-        auto&& [_bV, _M, _pd, _cd, _md] = Super::getCompileTimeResourcesViewList();
+        auto&& [_bV, _M, _cd, _md] = Super::getCompileTimeResourcesViewList();
         Vi.set_on(_bV);
         M.set_on(_M);
-        _pd.setBuffer(&particleDensity);
         _cd.setBuffer(&chargeDensity);
+        _md.setBuffer(&particleDensity);
 
         auto& super_pops = Super::getRunTimeResourcesViewList();
         super_pops.clear();

@@ -321,7 +321,7 @@ private:
     void static _link(Args&&... args)
     {
         auto const& [tile_set, tile, box_shape, point, idx] = std::forward_as_tuple(args...);
-        if (point < box_shape)
+        if (for_N_all<dimension>([&](auto i) { return point[i] < box_shape[i]; }))
             tile->link(idx) = tile_set.cells_(point);
     }
 

@@ -86,7 +86,7 @@ template<typename Ions, typename Electromag, typename GridLayout>
 void IonUpdaterPP<Ions, Electromag, GridLayout>::updateIons(Ions& ions)
 {
     // fixMomentGhosts(ions, layout);
-    ions.computeDensity();
+    ions.computeChargeDensity();
     ions.computeBulkVelocity();
 }
 

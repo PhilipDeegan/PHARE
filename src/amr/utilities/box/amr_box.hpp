@@ -9,6 +9,7 @@
 #include "amr/amr_constants.hpp"
 
 #include "SAMRAI/hier/Box.h"
+#include "core/utilities/types.hpp"
 
 
 namespace PHARE::amr
@@ -174,7 +175,12 @@ Box_t refine_box(Box_t const& box)
 template<typename Box_t>
 Box_t coarsen_box(Box_t const& box)
 {
-    return Box_t{(box.lower) / refinementRatio, (box.upper) / refinementRatio};
+    auto static constexpr dim = Box_t::dimension;
+
+    return Box_t{core::Point{core::for_N_make_array<dim>(
+                     [&](auto i) { return box.lower[i] / refinementRatio; })},
+                 core::Point{core::for_N_make_array<dim>(
+                     [&](auto i) { return box.upper[i] / refinementRatio; })}};
 }
 
 

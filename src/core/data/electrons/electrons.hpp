@@ -103,7 +103,7 @@ public:
     }
 
 
-    void computeDensity() {}
+    void computeChargeDensity() {}
 
 
 
@@ -126,9 +126,9 @@ public:
             auto const JyOnVy = GridLayout::project(Jy, ijk, GridLayout::JyToMoments());
             auto const JzOnVz = GridLayout::project(Jz, ijk, GridLayout::JzToMoments());
 
-            Vex(ijk) = Vix(ijk) - JxOnVx / Ni(ijk);
-            Vey(ijk) = Viy(ijk) - JyOnVy / Ni(ijk);
-            Vez(ijk) = Viz(ijk) - JzOnVz / Ni(ijk);
+            Vex(ijk) = Vix(ijk) - JxOnVx / Ne(ijk);
+            Vey(ijk) = Viy(ijk) - JyOnVy / Ne(ijk);
+            Vez(ijk) = Viz(ijk) - JzOnVz / Ne(ijk);
         });
     }
 
@@ -308,7 +308,7 @@ public:
 
 
 
-    void computeDensity() { fluxComput_.computeDensity(); }
+    void computeChargeDensity() { fluxComput_.computeChargeDensity(); }
     void computeBulkVelocity(GridLayout const& layout) { fluxComput_.computeBulkVelocity(layout); }
     void computePressure(GridLayout const& layout) { pressureClosure_.computePressure(layout); }
 
@@ -337,7 +337,7 @@ public:
     {
         if (isUsable())
         {
-            momentModel_.computeDensity();
+            momentModel_.computeChargeDensity();
             momentModel_.computeBulkVelocity(layout);
             momentModel_.computePressure(layout);
         }

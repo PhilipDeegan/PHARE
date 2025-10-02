@@ -106,7 +106,7 @@ TYPED_TEST(FieldScheduleHierarchyTest, testing_hyhy_schedules)
         for (auto& pop : ions)
             if (pop.name() == "protons")
             {
-                PHARE_LOG_LINE_SS(core::sum_field(reduce(pop.density())));
+                PHARE_LOG_LINE_SS(core::sum_field(reduce(pop.particleDensity())));
             }
     }
 
@@ -129,7 +129,7 @@ TYPED_TEST(FieldScheduleHierarchyTest, testing_hyhy_schedules)
                     auto const domGhostBox
                         = layout.AMRGhostBoxFor(pop.flux()[0].physicalQuantity());
 
-                    PHARE_LOG_LINE_SS(core::sum_field(reduce_single(pop.density())));
+                    PHARE_LOG_LINE_SS(core::sum_field(reduce_single(pop.particleDensity())));
                 }
     }
 }

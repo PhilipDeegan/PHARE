@@ -50,7 +50,7 @@ public:
     static void updateIons(Ions& ions)
     {
         // fixMomentGhosts(ions, layout);
-        ions.computeDensity();
+        ions.computeChargeDensity();
         ions.computeBulkVelocity();
     }
 
@@ -255,10 +255,10 @@ void IonUpdaterMultiTS<Ions, Electromag, GridLayout>::updateAndDepositAll_(Model
             Interpolating_t interp;
             for (auto& pop : view.ions)
             {
-                interp.particleToMesh(pop.domainParticles(), view.layout, pop.density(),
-                                      pop.flux());
-                interp.particleToMesh(pop.patchGhostParticles(), view.layout, pop.density(),
-                                      pop.flux());
+                interp.particleToMesh(pop.domainParticles(), view.layout, pop.particleDensity(),
+                                      pop.chargeDensity(), pop.flux());
+                interp.particleToMesh(pop.patchGhostParticles(), view.layout, pop.particleDensity(),
+                                      pop.chargeDensity(), pop.flux());
             }
         });
     }

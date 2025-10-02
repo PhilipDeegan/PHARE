@@ -85,9 +85,7 @@ namespace core
                 // have to account for the field dimensionality.
 
                 auto& popDensity = pop.chargeDensity();
-                std::transform(std::begin(chargeDensity_), std::end(chargeDensity_),
-                               std::begin(popDensity), std::begin(chargeDensity_),
-                               std::plus<Float>{});
+                core::transform(chargeDensity_, popDensity, chargeDensity_, std::plus<Float>{});
             }
         }
 
@@ -102,9 +100,8 @@ namespace core
                 // have to account for the field dimensionality.
 
                 auto& popDensity = pop.particleDensity();
-                std::transform(
-                    std::begin(massDensity_), std::end(massDensity_), std::begin(popDensity),
-                    std::begin(massDensity_),
+                core::transform(
+                    massDensity_, popDensity, massDensity_,
                     [&pop](auto const& n, auto const& pop_n) { return n + pop_n * pop.mass(); });
             }
         }

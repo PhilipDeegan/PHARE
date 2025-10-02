@@ -29,10 +29,10 @@ namespace PHARE::amr
 {
 
 
-template<typename Dst>
-void coarsen_field(Dst& destinationField, auto& sourceField, auto& intersectionBox, auto& coarsener)
+void coarsen_field(auto& destinationField, auto& sourceField, auto& intersectionBox,
+                   auto& coarsener)
 {
-    for (auto const bix : phare_box_from<Dst::dimension>(intersectionBox))
+    for (auto const bix : intersectionBox)
         coarsener(sourceField, destinationField, bix);
 }
 
@@ -167,7 +167,7 @@ namespace amr
             else // not tile_set field
             {
                 FieldCoarsenerPolicy coarsener{destLayout.centering(qty), srcGBox, destGBox, ratio};
-                coarsen_field(destinationField, sourceField, intersectionBox, coarsener);
+                coarsen_field(destinationField, sourceField, box, coarsener);
             }
         }
     };

@@ -66,7 +66,7 @@ struct Box
         : lower{_lower}
         , upper{_upper}
     {
-        // PHARE_DEBUG_DO(verify<dim>(lower, upper));
+        PHARE_DEBUG_DO(verify<dim>(lower, upper));
     }
 
     template<typename T>
@@ -74,7 +74,6 @@ struct Box
         : lower{_lower}
         , upper{_upper}
     {
-        assert(lower <= upper);
         PHARE_DEBUG_DO(verify<dim>(lower, upper));
     }
 

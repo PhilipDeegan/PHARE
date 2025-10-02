@@ -45,7 +45,7 @@ public:
     static void updateIons(Ions& ions)
     {
         // fixMomentGhosts(ions, layout);
-        ions.computeDensity();
+        ions.computeChargeDensity();
         ions.computeBulkVelocity();
     }
 

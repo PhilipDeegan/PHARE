@@ -512,15 +512,29 @@ namespace amr
         {
             PHARE_LOG_SCOPE(2, "HybridHybridMessengerStrategy::fillDensityBorders");
 
+            std::size_t const fieldsPerPop = popDensityBorderSumRefiners_.size() / ions.size();
+
             for (std::size_t i = 0; i < ions.size(); ++i)
             {
                 for (auto patch : resourcesManager_->enumerate(level, ions, scratch_field))
-                    core::reduce_into(scratch_field, ions[i].density());
+                    core::reduce_into(scratch_field, ions[i].particleDensity());
 
-                popDensityBorderSumRefiners_[i].fill(level.getLevelNumber(), fillTime);
+                popDensityBorderSumRefiners_[i * fieldsPerPop].fill(level.getLevelNumber(),
+                                                                    fillTime);
 
                 for (auto patch : resourcesManager_->enumerate(level, ions, scratch_field))
-                    core::copy_fields(ions[i].density(), scratch_field);
+                    core::copy_fields(ions[i].particleDensity(), scratch_field);
+
+                //
+
+                for (auto patch : resourcesManager_->enumerate(level, ions, scratch_field))
+                    core::reduce_into(scratch_field, ions[i].chargeDensity());
+
+                popDensityBorderSumRefiners_[i * fieldsPerPop + 1].fill(level.getLevelNumber(),
+                                                                        fillTime);
+
+                for (auto patch : resourcesManager_->enumerate(level, ions, scratch_field))
+                    core::copy_fields(ions[i].chargeDensity(), scratch_field);
             }
         }
 

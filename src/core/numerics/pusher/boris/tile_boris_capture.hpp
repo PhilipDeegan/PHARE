@@ -329,7 +329,8 @@ struct MultiBorisFunctors
             auto const tile_cell = parts.local_cell(tile.lower);
             auto const& layout   = electromag.E[0][tile_idx].layout(); // any per tile
             auto const em        = em_tile(tile_idx);
-            auto& rho            = pop.density()[tile_idx];
+            auto& rhoP           = pop.particleDensity()[tile_idx];
+            auto& rhoC           = pop.chargeDensity()[tile_idx];
             auto F = pop.flux().template as<VecField_vt>([&](auto& c) { return c()[tile_idx]; });
             Interpolator_t interp;
 
@@ -338,11 +339,11 @@ struct MultiBorisFunctors
                 {
                     per_particle(p, layout, tile_cell, 0, em);
                     if constexpr (!border)
-                        interp.particleToMesh(p, rho(), F, layout);
+                        interp.particleToMesh(p, rhoP(), rhoC(), F, layout);
                     else
                     {
                         if (isIn(p.iCell(), patch_boxings.nonLevelGhostBox))
-                            interp.particleToMesh(p, rho(), F, layout);
+                            interp.particleToMesh(p, rhoP(), rhoC(), F, layout);
                     }
                 }
             };

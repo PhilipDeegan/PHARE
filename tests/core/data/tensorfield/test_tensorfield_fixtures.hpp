@@ -79,13 +79,14 @@ protected:
 
 public:
     template<typename GridLayout>
-    UsableTensorField(std::string const& name, GridLayout const& layout, tensor_t qty, double v = 0)
+    UsableTensorField(std::string const& name, GridLayout const& layout, tensor_t qty,
+                      std::optional<double> v = std::nullopt)
         : Super{name, qty}
         , xyz{make_grids(Super::componentNames(), layout, qty)}
     {
-        if (v != 0)
+        if (v)
             for (std::size_t i = 0; i < N_elements; ++i)
-                xyz[i].fill(v);
+                xyz[i].fill(*v);
         _set();
     }
 

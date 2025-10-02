@@ -160,7 +160,7 @@ struct AmpereTileTest : public ::testing::Test
 
         GridLayout_t layout;
         UsableElectromag_t em{layout};
-        UsableVecField_t J{"J", layout, HybridQuantity::Vector::J};
+        UsableVecField_t J{"J", layout, HybridQuantity::Vector::J, 0};
     };
 
     template<auto am = AllocatorMode::CPU>
@@ -179,7 +179,7 @@ struct AmpereTileTest : public ::testing::Test
 
         GridLayout_t layout;
         UsableElectromag_t em{layout};
-        UsableVecField_t J{"J", layout, HybridQuantity::Vector::J};
+        UsableVecField_t J{"J", layout, HybridQuantity::Vector::J, 0};
     };
 
     using RefPatch = ContiguousPatch<>;

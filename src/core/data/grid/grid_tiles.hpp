@@ -12,6 +12,7 @@
 #include "core/data/tiles/tile_set_traversal.hpp"
 
 
+#include <optional>
 #include <tuple>
 #include <string>
 #include <cstddef>
@@ -430,7 +431,7 @@ public:
     auto constexpr static dimension  = Grid_t::dimension;
 
     GridTileSet(std::string const& name, GridLayout_t const& layout,
-                physical_quantity_type const qty)
+                physical_quantity_type const qty, std::optional<type> val = std::nullopt)
         : Super{layout.AMRBox(), layout, qty}
         , View{name, qty}
         , name_{name}
@@ -442,6 +443,8 @@ public:
         View::setBuffer(this);
         assert(View::isUsable());
         assert((**this)[0]().data());
+        if (val)
+            fill(*val);
         // ptr = &TileOverlaps_t::getOrCreateQuantity(layout_, *this);
     }
 

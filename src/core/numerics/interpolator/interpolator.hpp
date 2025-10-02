@@ -795,8 +795,8 @@ public:
      */
 
     template<typename Particle_t, typename VecField, typename Field>
-    void particleToMesh(Particle_t const& particle, Field& density, VecField& flux,
-                        Box<int, dim> const amrBox, double coef = 1.) _PHARE_ALL_FN_
+    void particleToMesh(Particle_t const& particle, Field& particleDensity, Field& chargeDensity,
+                        VecField& flux, Box<int, dim> const amrBox, double coef = 1.) _PHARE_ALL_FN_
     {
         static_assert(not std::is_const_v<Field>);    // bad!
         static_assert(not std::is_const_v<VecField>); // bad!
@@ -806,8 +806,11 @@ public:
         auto& [xFlux, yFlux, zFlux] = flux();
         indexAndWeights_<QtyCentering::primal>(amrBox, particle.iCell(), particle.delta());
         particleToMesh_(
-            density, particle, [](auto const& /*part*/) { return 1.; }, startIndex_, weights_,
-            coef);
+            particleDensity, particle, [](auto const& /*part*/) { return 1.; }, startIndex_,
+            weights_, coef);
+        particleToMesh_(
+            chargeDensity, particle, [](auto const& part) { return part.charge(); }, startIndex_,
+            weights_, coef);
         particleToMesh_(
             xFlux, particle, [](auto const& part) { return part.v()[0]; }, startIndex_, weights_,
             coef);
@@ -819,10 +822,11 @@ public:
             coef);
     }
     template<typename Particle_t, typename VecField, typename GridLayout, typename Field>
-    void particleToMesh(Particle_t const& particle, Field& density, VecField& flux,
-                        GridLayout const& layout, double coef = 1.) _PHARE_ALL_FN_
+    void particleToMesh(Particle_t const& particle, Field& particleDensity, Field& chargeDensity,
+                        VecField& flux, GridLayout const& layout, double coef = 1.) _PHARE_ALL_FN_
     {
-        particleToMesh(particle, density, flux, grow(layout.AMRBox(), layout.nbrGhosts()), coef);
+        particleToMesh(particle, particleDensity, chargeDensity, flux,
+                       grow(layout.AMRBox(), layout.nbrGhosts()), coef);
     }
 
     template<typename Particle_t, typename GridLayout>
@@ -854,8 +858,8 @@ public:
 
 
     template<typename Particles, typename VecField, typename GridLayout, typename Field>
-    inline void operator()(Particles const& particles, Field& density, VecField& flux,
-                           GridLayout const& layout, double coef = 1.)
+    inline void operator()(Particles const& particles, Field& particleDensity, Field& chargeDensity,
+                           VecField& flux, GridLayout const& layout, double coef = 1.)
     {
         // for each particle, first calculate the startIndex and weights
         // for dual and primal quantities.
@@ -870,7 +874,7 @@ public:
         auto end   = particles.end();
 
         for (auto currPart = begin; currPart != end; ++currPart)
-            particleToMesh(*currPart, density, flux, layout, coef);
+            particleToMesh(*currPart, particleDensity, chargeDensity, flux, layout, coef);
 
 
         PHARE_LOG_STOP(3, "ParticleToMesh::operator()");

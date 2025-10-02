@@ -110,7 +110,7 @@ TYPED_TEST(TileMappingTest, view_outputs)
             auto const& shape = tile.shape();
 
             //     PHARE_LOG_LINE_SS(tile << " " << shape);
-            EXPECT_TRUE(shape > 2);
+            EXPECT_TRUE(for_N_all<dimension>([&](auto i) { return shape[i] > 2; }));
             // EXPECT_TRUE(shape < 10);
         }
 

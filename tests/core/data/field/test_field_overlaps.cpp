@@ -29,7 +29,7 @@ TEST(FieldOverlapTest, syncInnerGhostsScan)
     auto constexpr static n_ghosts     = GridLayout_t::nbrGhosts();
 
     GridLayout_t layout = TestGridLayout_t{cells};
-    TiledGrid_t grid{"field", layout, HybridQuantity::Scalar::Vx};
+    TiledGrid_t grid{"field", layout, HybridQuantity::Scalar::Vx, 0};
 
     for (auto& tile : grid())
     {
@@ -69,7 +69,7 @@ TEST(FieldOverlapTest, syncInnerGhostsOverlaps)
     auto constexpr static n_ghosts = GridLayout_t::nbrGhosts();
 
     GridLayout_t const layout = TestGridLayout_t{cells};
-    TiledGrid_t grid{"field", layout, HybridQuantity::Scalar::Vx};
+    TiledGrid_t grid{"field", layout, HybridQuantity::Scalar::Vx, 0};
 
 
     for (auto& tile : grid())
