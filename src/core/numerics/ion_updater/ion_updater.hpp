@@ -113,8 +113,11 @@ void IonUpdater<Ions, Electromag, GridLayout>::updatePopulations(Ions& ions, Ele
 template<typename Ions, typename Electromag, typename GridLayout>
 void IonUpdater<Ions, Electromag, GridLayout>::updateIons(Ions& ions)
 {
+    assert(no_nans(ions.velocity()(Component::X)));
     ions.computeChargeDensity();
+    assert(no_nans(ions.velocity()(Component::X)));
     ions.computeBulkVelocity();
+    assert(no_nans(ions.velocity()(Component::X)));
 }
 
 

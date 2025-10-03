@@ -91,6 +91,7 @@ namespace core
 
         void computeMassDensity()
         {
+            check();
             massDensity_.zero();
 
             for (auto const& pop : populations_)
@@ -109,6 +110,7 @@ namespace core
 
         void computeBulkVelocity()
         {
+            check();
             computeMassDensity();
 
             bulkVelocity_.zero();
@@ -176,13 +178,10 @@ namespace core
         // because it is for internal use only so no object will ever need to access it.
         NO_DISCARD bool isUsable() const
         {
-            bool usable = chargeDensity_.isUsable() and bulkVelocity_.isUsable()
-                          and momentumTensor_.isUsable() and massDensity_.isUsable();
-
+            auto usable
+                = core::isUsable(chargeDensity_, bulkVelocity_, momentumTensor_, massDensity_);
             for (auto const& pop : populations_)
-            {
-                usable = usable and pop.isUsable();
-            }
+                usable &= usable and pop.isUsable();
             return usable;
         }
 
@@ -190,13 +189,10 @@ namespace core
 
         NO_DISCARD bool isSettable() const
         {
-            bool settable = massDensity_.isSettable() and chargeDensity_.isSettable()
-                            and bulkVelocity_.isSettable() and momentumTensor_.isSettable();
-
+            auto settable
+                = core::isSettable(chargeDensity_, bulkVelocity_, momentumTensor_, massDensity_);
             for (auto const& pop : populations_)
-            {
                 settable = settable and pop.isSettable();
-            }
             return settable;
         }
 
@@ -243,6 +239,16 @@ namespace core
 
 
     private:
+        void check() const
+        {
+            assert(no_nans(massDensity_));
+            assert(no_nans(chargeDensity_));
+            assert(no_nans(bulkVelocity_[0]));
+            assert(no_nans(bulkVelocity_[1]));
+            assert(no_nans(bulkVelocity_[2]));
+        }
+
+
         field_type massDensity_;
         field_type chargeDensity_;
         vecfield_type bulkVelocity_;

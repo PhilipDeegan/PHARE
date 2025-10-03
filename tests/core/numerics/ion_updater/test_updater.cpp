@@ -232,7 +232,7 @@ struct IonUpdaterTest : public ::testing::Test,
     // grid configuration
     GridLayout const layout{{0.1}, {100u}, {{0.}}};
 
-    // assumes no level ghost cells
+
     Boxing_t const boxing{layout, {layout.AMRBox()}};
     std::unordered_map<std::string, Boxing_t> const levelBoxing{{"patch_id", boxing}};
 
@@ -247,7 +247,7 @@ struct IonUpdaterTest : public ::testing::Test,
         // now let's initialize Electromag fields to user input functions
         // and ion population particles to user supplied moments
 
-
+        assert(no_nans(ions.velocity()(Component::X)));
         EM.initialize(layout);
         for (auto& pop : ions)
         {
@@ -256,6 +256,7 @@ struct IonUpdaterTest : public ::testing::Test,
             particleInitializer->loadParticles(pop.domainParticles(), layout);
             EXPECT_GT(pop.domainParticles().size(), 0ull);
         }
+        assert(no_nans(ions.velocity()(Component::X)));
 
         // now all domain particles are loaded we need to manually insert
         // ghost particles (this is in reality SAMRAI's job)
@@ -352,20 +353,24 @@ struct IonUpdaterTest : public ::testing::Test,
                 levelGhostPartNew = levelGhostPartOld;
                 levelGhostPart    = levelGhostPartOld;
 
-                std::size_t const ghosts_cells = (interp_order == 1 ? 1 : 2);
                 EXPECT_EQ(pop.domainParticles().size(), 100 * nbrPartPerCell);
-                EXPECT_EQ(levelGhostPartOld.size(), ghosts_cells * nbrPartPerCell);
+                EXPECT_EQ(levelGhostPartOld.size(),
+                          GridLayout::nbrParticleGhosts() * nbrPartPerCell);
                 EXPECT_EQ(patchGhostPart.size(), 0);
 
 
             } // end 1D
         } // end pop loop
 
+        assert(no_nans(ions.velocity()(Component::X)));
         PHARE::core::depositParticles(ions, layout, interpolator, PHARE::core::DomainDeposit{});
         PHARE::core::depositParticles(ions, layout, interpolator, PHARE::core::LevelGhostDeposit{});
+        assert(no_nans(ions.velocity()(Component::X)));
 
         ions.computeChargeDensity();
+        assert(no_nans(ions.velocity()(Component::X)));
         ions.computeBulkVelocity();
+        assert(no_nans(ions.velocity()(Component::X)));
     } // end Ctor
 
 
@@ -386,6 +391,7 @@ struct IonUpdaterTest : public ::testing::Test,
 
     auto update(auto& ionUpdater, auto const mode)
     {
+        assert(no_nans(ions.velocity()(Component::X)));
         if constexpr (ParticleArray::layout_mode == AoSMapped)
             ionUpdater.updatePopulations(*ions, *EM, boxing, dt, mode);
 
@@ -395,6 +401,7 @@ struct IonUpdaterTest : public ::testing::Test,
             assert(ions.massDensity().data() == level[0].ions.massDensity().data());
             ionUpdater.updatePopulations(level, levelBoxing, dt, mode);
         }
+        assert(no_nans(ions.velocity()(Component::X)));
     }
 
     void fillIonsMomentsGhosts()
@@ -420,15 +427,15 @@ struct IonUpdaterTest : public ::testing::Test,
 
         auto const& protonParticleDensity = reduce(populations[0].particleDensity());
         auto const& protonChargeDensity   = reduce(populations[0].chargeDensity());
-        auto const& protonFx = reduce(populations[0].flux().getComponent(Component::X));
-        auto const& protonFy = reduce(populations[0].flux().getComponent(Component::Y));
-        auto const& protonFz = reduce(populations[0].flux().getComponent(Component::Z));
+        auto const& protonFx              = reduce(populations[0].flux()(Component::X));
+        auto const& protonFy              = reduce(populations[0].flux()(Component::Y));
+        auto const& protonFz              = reduce(populations[0].flux()(Component::Z));
 
         auto const& alphaParticleDensity = reduce(populations[1].particleDensity());
         auto const& alphaChargeDensity   = reduce(populations[1].chargeDensity());
-        auto const& alphaFx              = reduce(populations[1].flux().getComponent(Component::X));
-        auto const& alphaFy              = reduce(populations[1].flux().getComponent(Component::Y));
-        auto const& alphaFz              = reduce(populations[1].flux().getComponent(Component::Z));
+        auto const& alphaFx              = reduce(populations[1].flux()(Component::X));
+        auto const& alphaFy              = reduce(populations[1].flux()(Component::Y));
+        auto const& alphaFz              = reduce(populations[1].flux()(Component::Z));
 
         auto ix0 = this->layout.physicalStartIndex(QtyCentering::primal, Direction::X);
         auto ix1 = this->layout.physicalEndIndex(QtyCentering::primal, Direction::X);
@@ -445,22 +452,22 @@ struct IonUpdaterTest : public ::testing::Test,
         };
 
         auto check = [&](auto const& newField, auto const& og) {
+            assert(no_nans(newField));
+            assert(no_nans(og));
             auto const& originalField = reduce(og);
-            nonZero(newField, "newField");
+            nonZero(newField, newField.name() + ":new");
             // nonZero(originalField, "originalField");
             for (auto ix = ix0; ix <= ix1; ++ix)
             {
                 auto evolution = std::abs(newField(ix) - originalField(ix));
                 //  should check that moments are still compatible with user inputs also
-                EXPECT_TRUE(evolution > 0.0);
+                EXPECT_GT(evolution, 0.0);
                 if (evolution <= 0.0)
-                    std::cout << "after update : " << newField(ix)
+                    std::cout << newField.name() + ": after update : " << newField(ix)
                               << " before update : " << originalField(ix)
                               << " evolution : " << evolution << " ix : " << ix << "\n";
             }
         };
-
-
 
 
         check(protonParticleDensity, ionsBufferCpy[0].particleDensity());
@@ -476,12 +483,10 @@ struct IonUpdaterTest : public ::testing::Test,
         check(alphaFz, ionsBufferCpy[1].flux()(Component::Z));
 
         // check(reduce(ions.density()), ionsBufferCpy.density()); ?
-        check(reduce(ions.velocity().getComponent(Component::X)),
-              ionsBufferCpy.velocity()(Component::X));
-        check(reduce(ions.velocity().getComponent(Component::Y)),
-              ionsBufferCpy.velocity()(Component::Y));
-        check(reduce(ions.velocity().getComponent(Component::Z)),
-              ionsBufferCpy.velocity()(Component::Z));
+        assert(no_nans(ionsBufferCpy.velocity()(Component::X)));
+        check(reduce(ions.velocity()(Component::X)), ionsBufferCpy.velocity()(Component::X));
+        check(reduce(ions.velocity()(Component::Y)), ionsBufferCpy.velocity()(Component::Y));
+        check(reduce(ions.velocity()(Component::Z)), ionsBufferCpy.velocity()(Component::Z));
     }
 
 
@@ -530,15 +535,14 @@ struct IonUpdaterTest : public ::testing::Test,
 };
 
 
-
-using Permutations = ::testing::Types<          //
-    TestParam<SimOpts{1, 1}>,                   //
-    TestParam<SimOpts{1, 2}>,                   //
-    TestParam<SimOpts{1, 3}>,                   //
-    TestParam<SimOpts{1, 1, LayoutMode::AoSTS}> //
-    >;
-
-
+// clang-format off
+using Permutations = ::testing::Types<
+    TestParam<SimOpts{1, 1}>
+  , TestParam<SimOpts{1, 2}>
+  , TestParam<SimOpts{1, 3}>
+  , TestParam<SimOpts{1, 1, LayoutMode::AoSTS}>
+>;
+// clang-format on
 TYPED_TEST_SUITE(IonUpdaterTest, Permutations, );
 
 
@@ -702,13 +706,18 @@ TYPED_TEST(IonUpdaterTest, momentsAreChangedInParticlesAndMomentsMode)
 
     auto ionsBufferCpy = this->ions;
 
-    assert(ionsBufferCpy.particleDensity.data() != this->ions.particleDensity.data());
+    assert(ionsBufferCpy.massDensity.data() != this->ions.massDensity.data());
 
+    assert(no_nans(this->ions.velocity()(Component::X)));
     this->update(ionUpdater, UpdaterMode::all);
+    assert(no_nans(this->ions.velocity()(Component::X)));
 
     this->fillIonsMomentsGhosts();
+    assert(no_nans(this->ions.velocity()(Component::X)));
 
     ionUpdater.updateIons(this->ions);
+
+    assert(no_nans(this->ions.velocity()(Component::X)));
 
     this->checkMomentsHaveEvolved(ionsBufferCpy);
     this->checkDensityIsAsPrescribed();
@@ -724,7 +733,7 @@ TYPED_TEST(IonUpdaterTest, momentsAreChangedInMomentsOnlyMode)
 
     auto ionsBufferCpy = this->ions;
 
-    assert(ionsBufferCpy.particleDensity.data() != this->ions.particleDensity.data());
+    assert(ionsBufferCpy.massDensity.data() != this->ions.massDensity.data());
 
     this->update(ionUpdater, UpdaterMode::domain_only);
 
@@ -759,9 +768,9 @@ TYPED_TEST(IonUpdaterTest, thatNoNaNsExistOnPhysicalNodesMoments)
             auto const& density = reduce(pop.particleDensity());
             auto const& flux    = pop.flux();
 
-            auto const& fx = reduce(flux.getComponent(Component::X));
-            auto const& fy = reduce(flux.getComponent(Component::Y));
-            auto const& fz = reduce(flux.getComponent(Component::Z));
+            auto const& fx = reduce(flux(Component::X));
+            auto const& fy = reduce(flux(Component::Y));
+            auto const& fz = reduce(flux(Component::Z));
 
             EXPECT_FALSE(std::isnan(density(ix)));
             EXPECT_FALSE(std::isnan(fx(ix)));

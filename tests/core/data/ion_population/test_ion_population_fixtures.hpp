@@ -1,8 +1,6 @@
 #ifndef PHARE_TEST_CORE_DATA_ION_POPULATIONS_ION_POPULATION_FIXTURES_HPP
 #define PHARE_TEST_CORE_DATA_ION_POPULATIONS_ION_POPULATION_FIXTURES_HPP
 
-#include <cassert>
-#include <functional>
 
 #include "phare_core.hpp"
 #include "core/data/ions/ions.hpp"
@@ -15,11 +13,14 @@
 #include "tests/core/data/vecfield/test_vecfield_fixtures.hpp"
 #include "tests/core/data/particles/test_particles_fixtures.hpp"
 
+
+#include <cassert>
+
 namespace PHARE::core
 {
 
 
-template<typename ParticleArray_, std::size_t interp_>
+template<typename ParticleArray_, std::size_t interp_, typename Quantity_ = HybridQuantity>
 struct UsableIonsDefaultTypes
 {
 public:
@@ -31,6 +32,7 @@ public:
     using PHARE_Types     = PHARE::core::PHARE_Types<opts>;
     using GridLayout_t    = PHARE_Types::GridLayout_t;
     using ParticleArray_t = ParticleArray_;
+    using Quantity        = Quantity_;
 
     using UsableVecField_t = UsableVecField<GridLayout_t, alloc_mode, layout_mode>;
     using UsableTensorField_t
@@ -60,6 +62,7 @@ auto inline pop_dict(std::string const& name, std::size_t const ppc = 0)
 template<typename _defaults>
 class UsableIonsPopulation : public _defaults::IonPopulation_t
 {
+    using Quantity        = _defaults::Quantity;
     using GridLayout_t    = _defaults::GridLayout_t;
     using VecField_t      = _defaults::VecField_t;
     using TensorField_t   = _defaults::TensorField_t;
@@ -78,19 +81,15 @@ class UsableIonsPopulation : public _defaults::IonPopulation_t
         _particles.setBuffer(&particles.pack());
     }
 
-    _defaults::Grid_t make_grid(std::string const& name, auto qty) const
-    {
-        return {name, layout_, qty};
-    }
 
 public:
     UsableIonsPopulation(initializer::PHAREDict const& dict, GridLayout_t const& layout)
         : Super{dict}
         , layout_{layout}
-        , particleDensity{make_grid(this->name() + "_particleDensity", HybridQuantity::Scalar::rho)}
-        , chargeDensity{make_grid(this->name() + "_chargeDensity", HybridQuantity::Scalar::rho)}
-        , F{this->name() + "_flux", layout, HybridQuantity::Vector::V}
-        , M{this->name() + "_momentumTensor", layout, HybridQuantity::Tensor::M}
+        , particleDensity{this->name() + "_particleDensity", layout_, Quantity::Scalar::rho, 1}
+        , chargeDensity{this->name() + "_chargeDensity", layout_, Quantity::Scalar::rho, 1}
+        , F{this->name() + "_flux", layout, Quantity::Vector::V, 1}
+        , M{this->name() + "_momentumTensor", layout, Quantity::Tensor::M, 1}
         , particles{this->name(), layout}
     {
         set();
@@ -130,6 +129,7 @@ template<typename _defaults>
 class UsableIons
     : public Ions<typename _defaults::IonPopulation_t, typename _defaults::GridLayout_t>
 {
+    using Quantity     = _defaults::Quantity;
     using GridLayout_t = _defaults::GridLayout_t;
     using Super        = Ions<typename _defaults::IonPopulation_t, GridLayout_t>;
 
@@ -162,7 +162,7 @@ class UsableIons
         Vi.set_on(_bV);
         M.set_on(_M);
         _cd.setBuffer(&chargeDensity);
-        _md.setBuffer(&particleDensity);
+        _md.setBuffer(&massDensity);
 
         auto& super_pops = Super::getRunTimeResourcesViewList();
         super_pops.clear();
@@ -171,21 +171,16 @@ class UsableIons
     }
 
 
-    _defaults::Grid_t make_grid(std::string const& name, auto qty) const
-    {
-        return {name, layout_, qty};
-    }
-
 public:
     using ParticleArray_t = typename _defaults::ParticleArray_t;
 
     UsableIons(GridLayout_t const& layout, initializer::PHAREDict const& dict)
         : Super{dict}
         , layout_{layout}
-        , particleDensity{make_grid("particleDensity", HybridQuantity::Scalar::rho)}
-        , chargeDensity{make_grid("chargeDensity", HybridQuantity::Scalar::rho)}
-        , Vi{"bulkVel", layout, HybridQuantity::Vector::V}
-        , M{"momentumTensor", layout, HybridQuantity::Tensor::M}
+        , massDensity{"massDensity", layout_, Quantity::Scalar::rho, 1}
+        , chargeDensity{"chargeDensity", layout_, Quantity::Scalar::rho, 1}
+        , Vi{"bulkVel", layout, Quantity::Vector::V, 1}
+        , M{"momentumTensor", layout, Quantity::Tensor::M, 0}
     {
         auto& super_pops = Super::getRunTimeResourcesViewList();
         populations.reserve(super_pops.size());
@@ -208,7 +203,7 @@ public:
     UsableIons(UsableIons&& that)
         : Super(super(*that))
         , layout_{that.layout_}
-        , particleDensity{std::move(that.particleDensity)}
+        , massDensity{std::move(that.massDensity)}
         , chargeDensity{std::move(that.chargeDensity)}
         , Vi{std::move(that.Vi)}
         , M{std::move(that.M)}
@@ -220,7 +215,7 @@ public:
     UsableIons(UsableIons const& that)
         : Super(super(*that))
         , layout_{that.layout_}
-        , particleDensity{that.particleDensity}
+        , massDensity{that.massDensity}
         , chargeDensity{that.chargeDensity}
         , Vi{that.Vi}
         , M{that.M}
@@ -238,7 +233,7 @@ public:
     auto& operator*() const { return super(); }
 
     GridLayout_t layout_;
-    _defaults::Grid_t particleDensity, chargeDensity;
+    _defaults::Grid_t massDensity, chargeDensity;
     _defaults::UsableVecField_t Vi;
     _defaults::UsableTensorField_t M;
     std::vector<UsableIonsPopulation<_defaults>> populations;

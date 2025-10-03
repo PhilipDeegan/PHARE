@@ -579,12 +579,12 @@ namespace amr
                         // then grab levelGhostParticlesOld and levelGhostParticlesNew
                         // and project them with alpha and (1-alpha) coefs, respectively
                         auto& levelGhostOld = pop.levelGhostParticlesOld();
-                        interpolate_(makeRange(levelGhostOld), particleDensity, chargeDensity, flux,
-                                     layout, 1. - alpha);
+                        interpolate_(levelGhostOld, particleDensity, chargeDensity, flux, layout,
+                                     1. - alpha);
 
                         auto& levelGhostNew = pop.levelGhostParticlesNew();
-                        interpolate_(makeRange(levelGhostNew), particleDensity, chargeDensity, flux,
-                                     layout, alpha);
+                        interpolate_(levelGhostNew, particleDensity, chargeDensity, flux, layout,
+                                     alpha);
                     }
                 }
             }

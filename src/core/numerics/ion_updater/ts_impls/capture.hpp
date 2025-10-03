@@ -148,7 +148,7 @@ void IonUpdaterMultiTS<Ions, Electromag, GridLayout>::updateAndDepositDomain_(
                 launcher.g.x = pps().size();
                 launcher.ds  = ds * 4 * 8;
 
-                assert(launcher.ds < 65000);
+                assert(launcher.ds < 65000); // parameterize based on gpu spec
 
                 auto density = pop.density();
                 auto flux    = *pop.flux();

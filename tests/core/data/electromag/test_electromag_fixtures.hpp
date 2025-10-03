@@ -125,8 +125,8 @@ public:
     template<typename GridLayout>
     UsableElectromag(GridLayout const& layout, initializer::PHAREDict const& dict)
         : Super{dict}
-        , E{"EM_E", layout, HybridQuantity::Vector::E}
-        , B{"EM_B", layout, HybridQuantity::Vector::B}
+        , E{"EM_E", layout, HybridQuantity::Vector::E, 0}
+        , B{"EM_B", layout, HybridQuantity::Vector::B, 0}
     {
         _set();
     }

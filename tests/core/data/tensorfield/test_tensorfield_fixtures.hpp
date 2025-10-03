@@ -157,7 +157,7 @@ protected:
     {
         auto qts = HybridQuantity::componentsQuantities(qty);
         return for_N<N_elements, for_N_R_mode::make_array>(
-            [&](auto i) { return Grid_t{compNames[i], layout, qts[i]}; });
+            [&](auto i) { return Grid_t{compNames[i], layout, qts[i], 0}; });
     }
 
     std::array<Grid_t, N_elements> xyz;

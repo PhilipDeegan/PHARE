@@ -89,7 +89,7 @@ public:
 
 
     Grid(Grid const& source) // let field_ default
-        : Super{source.shape()}
+        : Super{source}
         , name_{source.name()}
         , qty_{source.physicalQuantity()}
     {

@@ -27,6 +27,15 @@ namespace amr
     using core::dirY;
     using core::dirZ;
 
+    template<typename T, std::size_t dim>
+    core::Box<std::uint32_t, dim> AMRToLocal(core::Box<T, dim> const& AMRBox,
+                                             core::Box<T, dim> const& referenceAMRBox)
+    {
+        return {(AMRBox.lower() - referenceAMRBox.lower()).as_unsigned(),
+                (AMRBox.upper() - referenceAMRBox.lower()).as_unsigned()};
+    }
+
+
     /**
      * @brief offsetIsZero_ returns true of the transformation has zero offset
      */

@@ -616,7 +616,7 @@ auto& reduce_into_(GridTiles_t const& tiles, Grid_t& grid)
 
     grid.reshape(tiles.shape());
     grid.zero();
-    assert(sum_field(grid) == 0);
+    assert(sum_field(grid) < 1e-15);
     auto const& patch_layout = tiles[0].layout().copy_as(tiles.box());
 
 #if PHARE_FIELD_BOX_IMPL == 0
@@ -674,10 +674,32 @@ auto& reduce_into(Dst& dst, Src const& src)
 }
 
 
+template<typename TiledField>
+bool no_nans(TiledField const& field)
+    requires(is_field_tile_set_v<TiledField>)
+{
+    for (auto const tile : field())
+        for (auto const& v : tile())
+            if (std::isnan(v))
+                return false;
+    return true;
+}
+template<typename Field>
+bool no_nans(Field const& field)
+    requires(not is_field_tile_set_v<Field>)
+{
+    for (auto const& v : field)
+        if (std::isnan(v))
+            return false;
+    return true;
+}
+
+
 template<typename Tiles>
 auto reduce(Tiles const& input)
     requires(is_field_tile_set_v<Tiles>)
 {
+    assert(no_nans(input));
     using Grid_t = Tiles::grid_type;
     Grid_t grid{input.name(), input.physicalQuantity(), input.shape()};
     reduce_into(grid, input);
@@ -688,6 +710,7 @@ template<typename Tiles>
 auto& reduce(Tiles const& input)
     requires(!is_field_tile_set_v<Tiles>)
 {
+    assert(no_nans(input));
     return input;
 }
 

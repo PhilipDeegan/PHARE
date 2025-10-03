@@ -58,9 +58,6 @@ public:
         // For the moment we only take the case of field with the same centering
         TBOX_ASSERT(fineField.physicalQuantity() == coarseField.physicalQuantity());
 
-        //     coarsen<dim>(fine_start_index(coarseIndex), fineField, coarseField,
-        //                  AMRToLocal(coarseIndex, destinationBox_));
-        // }
 
         core::Point<int, dimension> fineStartIndex;
         for (auto i = std::size_t{0}; i < dimension; ++i)

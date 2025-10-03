@@ -145,7 +145,7 @@ public:
     NO_DISCARD auto end() _PHARE_ALL_FN_ { return ptr_ + size_; }
 
 
-    void zero() _PHARE_ALL_FN_ { fill(0); }
+    void zero() _PHARE_ALL_FN_ { fill(1e-36); }
     auto zeros() const
     {
         return sum_from(*this, [](auto const e) { return e == 0 ? 1 : 0; });
