@@ -8,6 +8,7 @@
 #include "core/data/vecfield/vecfield_component.hpp"
 
 #include <array>
+#include <stdexcept>
 #include <string>
 #include <vector>
 #include <cstddef>
@@ -369,6 +370,8 @@ void check_tensorfield(auto const& tf)
     for (auto const& c : tf)
         c.check();
 }
+
+
 
 } // namespace PHARE::core
 

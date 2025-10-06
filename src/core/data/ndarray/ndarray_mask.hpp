@@ -15,11 +15,10 @@
 #include "core/vector.hpp"
 #include "core/utilities/types.hpp"
 
-#include "core/data/ndarray/ndarray_view.hpp"
+#include "core/data/ndarray/ndarray_base.hpp"
 
 namespace PHARE::core
 {
-
 
 template<typename Array, typename Mask>
 class MaskedView

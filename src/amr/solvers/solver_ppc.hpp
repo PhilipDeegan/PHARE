@@ -307,25 +307,10 @@ void SolverPPC<HybridModel, AMR_Types>::accumulateFluxSum(IPhysicalModel_t& mode
     PHARE_LOG_SCOPE(1, "SolverPPC::accumulateFluxSum");
 
     auto& hybridModel = dynamic_cast<HybridModel&>(model);
-
-    for (auto& patch : level)
-    {
-        auto& Eavg         = electromagAvg_.E;
-        auto const& layout = amr::layoutFromPatch<GridLayout>(*patch);
-        auto _             = hybridModel.resourcesManager->setOnPatch(*patch, fluxSumE_, Eavg);
-
-        layout.evalOnGhostBox(fluxSumE_(core::Component::X), [&](auto const&... args) mutable {
-            fluxSumE_(core::Component::X)(args...) += Eavg(core::Component::X)(args...) * coef;
-        });
-
-        layout.evalOnGhostBox(fluxSumE_(core::Component::Y), [&](auto const&... args) mutable {
-            fluxSumE_(core::Component::Y)(args...) += Eavg(core::Component::Y)(args...) * coef;
-        });
-
-        layout.evalOnGhostBox(fluxSumE_(core::Component::Z), [&](auto const&... args) mutable {
-            fluxSumE_(core::Component::Z)(args...) += Eavg(core::Component::Z)(args...) * coef;
-        });
-    }
+    auto& rm          = *hybridModel.resourcesManager;
+    auto& Eavg        = electromagAvg_.E;
+    for (auto& patch : rm.enumerate(level, fluxSumE_, Eavg))
+        accumulate(fluxSumE_, Eavg, coef);
 }
 
 
@@ -337,14 +322,9 @@ void SolverPPC<HybridModel, AMR_Types>::resetFluxSum(IPhysicalModel_t& model,
     PHARE_LOG_SCOPE(1, "SolverPPC::resetFluxSum");
 
     auto& hybridModel = dynamic_cast<HybridModel&>(model);
-
-    for (auto& patch : level)
-    {
-        auto const& layout = amr::layoutFromPatch<GridLayout>(*patch);
-        auto _             = hybridModel.resourcesManager->setOnPatch(*patch, fluxSumE_);
-
+    auto& rm          = *hybridModel.resourcesManager;
+    for (auto& patch : rm.enumerate(level, fluxSumE_))
         fluxSumE_.zero();
-    }
 }
 
 
@@ -363,7 +343,7 @@ void SolverPPC<HybridModel, AMR_Types>::reflux(IPhysicalModel_t& model,
         auto _sp    = hybridModel.resourcesManager->setOnPatch(*patch, Bold_, Eavg, B);
         auto _sl    = core::SetLayout(&layout, faraday);
         auto dt     = time - oldTime_[level.getLevelNumber()];
-        faraday(Bold_, Eavg, B, dt);
+        faraday_(Bold_, Eavg, B, dt);
     };
 }
 

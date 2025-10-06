@@ -56,7 +56,7 @@ public:
         {
             auto coarseIdx{fineIndex};
             for (auto& idx : coarseIdx)
-                idx = idx / 2;
+                idx = idx / ratio_;
             for (auto& dst_tile : fineField())
                 if (auto const dst_box = dst_tile.ghost_box(); isIn(fineIndex, dst_box))
                     for (auto const& src_tile : coarseField())

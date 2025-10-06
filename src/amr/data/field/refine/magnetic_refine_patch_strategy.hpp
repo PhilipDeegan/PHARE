@@ -88,7 +88,7 @@ public:
         auto layout        = PHARE::amr::layoutFromPatch<gridlayout_type>(fine);
         auto fineBoxLayout = Geometry::layoutFromBox(fine_box, layout);
 
-        using Field_t = std::decay_t<decltype(bx[0])>;
+        using Field_t = std::decay_t<decltype(bx)>;
         if constexpr (core::is_field_tile_set_v<Field_t>)
         {
             //

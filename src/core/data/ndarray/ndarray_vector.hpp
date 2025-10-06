@@ -6,7 +6,6 @@
 #include "core/vector.hpp"
 #include "core/utilities/types.hpp"
 #include "core/data/ndarray/ndarray_view.hpp"
-#include "core/data/ndarray/ndarray_mask.hpp"
 
 
 #include <array>
@@ -123,13 +122,6 @@ public:
         return *this;
     }
 
-
-
-    NO_DISCARD auto operator[](NdArrayMask&& mask)
-    {
-        return MaskedView{*this, std::forward<NdArrayMask>(mask)};
-    }
-    NO_DISCARD auto operator[](NdArrayMask const& mask) { return MaskedView{*this, mask}; }
 
 
 

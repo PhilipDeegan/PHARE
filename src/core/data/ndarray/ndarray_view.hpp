@@ -4,6 +4,8 @@
 
 #include "core/def.hpp"
 #include "core/utilities/types.hpp"
+#include "core/data/ndarray/ndarray_base.hpp"
+#include "core/data/ndarray/ndarray_mask.hpp"
 
 #include <array>
 #include <vector>
@@ -12,64 +14,6 @@
 
 namespace PHARE::core
 {
-template<std::size_t dim, bool c_ordering = true>
-struct NdArrayViewer
-{
-    using Id  = std::uint16_t;
-    using Idx = Id const;
-
-    template<typename NCells, template<typename, std::size_t> typename Indexes, typename Index>
-    static inline std::uint32_t idx(NCells const& nCells,
-                                    Indexes<Index, dim> const& indexes) _PHARE_ALL_FN_
-    {
-        if constexpr (dim == 1)
-            return idx(nCells, indexes[0]);
-
-        else if constexpr (dim == 2)
-            return idx(nCells, indexes[0], indexes[1]);
-
-        else if constexpr (dim == 3)
-            return idx(nCells, indexes[0], indexes[1], indexes[2]);
-    }
-
-    static inline std::uint32_t idx(auto const /*nCells*/, Idx i) _PHARE_ALL_FN_ { return i; }
-
-
-    static inline std::uint32_t idx(auto const nCells, Idx i, Idx j) _PHARE_ALL_FN_
-    {
-        if constexpr (c_ordering)
-            return j + i * nCells[1];
-        else
-            return i + j * nCells[0];
-    }
-    static inline std::uint32_t idx(auto const nCells, Idx i, Idx j, Idx k) _PHARE_ALL_FN_
-    {
-        if constexpr (c_ordering)
-            return k + j * nCells[2] + i * nCells[1] * nCells[2];
-        else
-            return i + j * nCells[0] + k * nCells[1] * nCells[0];
-    }
-
-
-
-    template<template<typename, std::size_t> typename Indexes, typename Index>
-    NO_DISCARD static inline auto& at(auto* data, auto const& nCells,
-                                      Indexes<Index, dim> const& indexes) _PHARE_ALL_FN_
-
-    {
-        auto const& i = idx(nCells, indexes);
-        assert(i < product(nCells, std::uint32_t{1}));
-        return data[i];
-    }
-
-    static inline auto& at(auto* data, auto const nCells, auto const... indexes) _PHARE_ALL_FN_
-    {
-        auto const& i = idx(nCells, indexes...);
-        assert(i < product(nCells, std::uint32_t{1}));
-        return data[i];
-    }
-};
-
 
 
 template<std::size_t dim, typename DataType = double, bool c_ordering = true>
@@ -234,6 +178,13 @@ public:
 
 
     auto size_address() _PHARE_ALL_FN_ { return &size_; }
+
+
+    NO_DISCARD auto operator[](NdArrayMask&& mask)
+    {
+        return MaskedView{*this, std::forward<NdArrayMask>(mask)};
+    }
+    NO_DISCARD auto operator[](NdArrayMask const& mask) { return MaskedView{*this, mask}; }
 
 private:
     pointer_type ptr_ = nullptr;
