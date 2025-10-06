@@ -3,15 +3,21 @@
 #
 
 
-def cpp_lib(override=None):
-    import importlib
+import json
+import importlib
 
+# continue to use override if set
+_active_layouts = [
+    1,  # AoS Cellmap
+    3,  # AoS TileSet
+]  # see: src/core/data/particles/particle_array_def.hpp
+
+
+def cpp_lib():
     return importlib.import_module("pybindlibs.cpp")
 
 
 def cpp_etc_lib():
-    import importlib
-
     return importlib.import_module("pybindlibs.cpp_etc")
 
 
@@ -35,3 +41,20 @@ def create_splitter(dim, interp, n_particles):
 
 def split_pyarrays_fn(dim, interp, n_particles):
     return getattr(cpp_lib(), f"split_pyarray_particles_{dim}_{interp}_{n_particles}")
+
+
+def supported_particle_layouts():
+    # see: src/core/data/particles/particle_array_def.hpp
+    return _active_layouts
+
+
+def mpi_rank():
+    return getattr(cpp_lib(), "mpi_rank")()
+
+
+def mpi_size():
+    return getattr(cpp_lib(), "mpi_size")()
+
+
+def mpi_barrier():
+    return getattr(cpp_lib(), "mpi_barrier")()

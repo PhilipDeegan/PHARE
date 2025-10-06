@@ -19,7 +19,7 @@ namespace amr
         using IPhysicalModel = typename HybridModel::Interface;
 
     public:
-        static std::string const stratName;
+        static std::string inline const stratName = "MHDModel-HybridModel";
 
         MHDHybridMessengerStrategy(
             std::shared_ptr<typename MHDModel::resources_manager_type> mhdResourcesManager,
@@ -84,12 +84,12 @@ namespace amr
 
         virtual ~MHDHybridMessengerStrategy() = default;
 
-        void fillElectricGhosts(VecFieldT& /*E*/, int const /*levelNumber*/,
+        void fillElectricGhosts(VecFieldT& /*E*/, SAMRAI::hier::PatchLevel const& /*level*/,
                                 double const /*fillTime*/) override
         {
         }
 
-        void fillCurrentGhosts(VecFieldT& /*J*/, int const /*levelNumber*/,
+        void fillCurrentGhosts(VecFieldT& /*J*/, SAMRAI::hier::PatchLevel const& /*level*/,
                                double const /*fillTime*/) override
         {
         }
@@ -142,6 +142,11 @@ namespace amr
             // call coarsning schedules...
         }
 
+        void reflux(int const /*coarserLevelNumber*/, int const /*fineLevelNumber*/,
+                    double const /*syncTime*/) override
+        {
+        }
+
         void postSynchronize(IPhysicalModel& /*model*/, SAMRAI::hier::PatchLevel& /*level*/,
                              double const /*time*/) override
         {
@@ -156,9 +161,7 @@ namespace amr
         Electromag EM_old_{stratName + "_EM_old"};
     };
 
-    template<typename MHDModel, typename HybridModel>
-    std::string const MHDHybridMessengerStrategy<MHDModel, HybridModel>::stratName
-        = "MHDModel-HybridModel";
+
 
 } // namespace amr
 } // namespace PHARE

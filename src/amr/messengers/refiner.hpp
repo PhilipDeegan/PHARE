@@ -2,11 +2,11 @@
 #define PHARE_REFINER_HPP
 
 #include "communicator.hpp"
-#include "core/data/vecfield/vecfield.hpp"
 
-#include "amr/messengers/field_sum_transaction.hpp"
+#include "core/utilities/types.hpp"
 
-#include <tuple>
+
+// #include <tuple>
 #include <stdexcept>
 
 
@@ -15,11 +15,12 @@ namespace PHARE::amr
 
 enum class RefinerType {
     GhostField,
-    PatchGhostField,
     InitField,
     InitInteriorPart,
     LevelBorderParticles,
     PatchFieldBorderSum,
+    PatchVecFieldBorderSum,
+    PatchTensorFieldBorderSum,
     ExteriorGhostParticles
 };
 
@@ -28,15 +29,20 @@ enum class RefinerType {
 template<typename ResourcesManager, RefinerType Type>
 class Refiner : private Communicator<RefinerTypes, ResourcesManager::dimension>
 {
-    using FieldData_t = typename ResourcesManager::UserField_t::patch_data_type;
+    using FieldData_t       = ResourcesManager::UserField_t::patch_data_type;
+    using VecFieldData_t    = ResourcesManager::template UserTensorField_t<1>::patch_data_type;
+    using TensorFieldData_t = ResourcesManager::template UserTensorField_t<2>::patch_data_type;
 
 
 public:
     void registerLevel(std::shared_ptr<SAMRAI::hier::PatchHierarchy> const& hierarchy,
-                       std::shared_ptr<SAMRAI::hier::PatchLevel> const& level)
+                       std::shared_ptr<SAMRAI::hier::PatchLevel> const& level,
+                       std::shared_ptr<SAMRAI::xfer::RefineTransactionFactory> const& refac
+                       = nullptr)
     {
         auto levelNumber = level->getLevelNumber();
 
+        using enum RefinerType;
         for (auto& algo : this->algos)
         {
             // for GhostField we need schedules that take on the level where there is an
@@ -57,7 +63,7 @@ public:
             // destination level. Note that the schedule remains valid as long as the levels
             // involved in its creation do not change; thus, it can be used for multiple
             // data communication cycles.
-            if constexpr (Type == RefinerType::GhostField)
+            if constexpr (Type == GhostField)
             {
                 this->add(algo,
                           algo->createSchedule(level, level->getNextCoarserHierarchyLevelNumber(),
@@ -65,23 +71,16 @@ public:
                           levelNumber);
             }
 
-            // the following schedule will only fill patch ghost nodes
-            // not level border ghosts
-            else if constexpr (Type == RefinerType::PatchGhostField)
-            {
-                this->add(algo, algo->createSchedule(level), levelNumber);
-            }
 
             // schedule used to += density and flux for populations
             // on incomplete overlaped ghost box nodes
-            else if constexpr (Type == RefinerType::PatchFieldBorderSum)
+            else if constexpr (core::any_in(Type, PatchFieldBorderSum, PatchVecFieldBorderSum,
+                                            PatchTensorFieldBorderSum))
             {
-                this->add(algo,
-                          algo->createSchedule(
-                              level, 0,
-                              std::make_shared<FieldBorderSumTransactionFactory<FieldData_t>>()),
-                          levelNumber);
+                assert(refac); // pass on call to this function
+                this->add(algo, algo->createSchedule(level, 0, refac), levelNumber);
             }
+
 
             // this createSchedule overload is used to initialize fields.
             // note that here we must take that createsSchedule() overload and put nullptr
@@ -170,6 +169,7 @@ public:
             this->findSchedule(algo, levelNumber)->fillData(initDataTime);
     }
 
+
     template<typename VecFieldT>
     void fill(VecFieldT& vec, int const levelNumber, double const fillTime)
     {
@@ -177,35 +177,6 @@ public:
             this->findSchedule(algo, levelNumber)->fillData(fillTime);
     }
 
-
-    /**
-     * @Brief This overload creates a Refiner for communication with both spatial and
-     * time interpolation. Data is communicated from the model vector field defined at
-     * time t=n+1 and its version at time t=n (oldModel), onto the `ghost` vector field.
-     *
-     *
-     * @param ghost represents the VecField that needs its ghost nodes filled
-     * @param model represents the VecField from which data is taken (at
-     * time t_coarse+dt_coarse)
-     * @param oldModel represents the model VecField from which data is taken
-     * at time t_coarse
-     * @param rm is the ResourcesManager
-     * @param refineOp is the spatial refinement operator
-     * @param timeOp is the time interpolator
-     *
-     * @return the function returns a Refiner
-     */
-    Refiner(core::VecFieldNames const& ghost, core::VecFieldNames const& model,
-            core::VecFieldNames const& oldModel, std::shared_ptr<ResourcesManager> const& rm,
-            std::shared_ptr<SAMRAI::hier::RefineOperator> refineOp,
-            std ::shared_ptr<SAMRAI::hier::TimeInterpolateOperator> timeOp,
-            std::shared_ptr<SAMRAI::xfer::VariableFillPattern> variableFillPattern = nullptr)
-    {
-        constexpr auto dimension = ResourcesManager::dimension;
-
-        register_time_interpolated_vector_field( //
-            rm, ghost, ghost, oldModel, model, refineOp, timeOp, variableFillPattern);
-    }
 
 
 
@@ -215,37 +186,14 @@ public:
     Refiner(std::string const& ghost, std::string const& model, std::string const& oldModel,
             std::shared_ptr<ResourcesManager> const& rm,
             std::shared_ptr<SAMRAI::hier::RefineOperator> refineOp,
-            std ::shared_ptr<SAMRAI::hier::TimeInterpolateOperator> timeOp,
+            std::shared_ptr<SAMRAI::hier::TimeInterpolateOperator> timeOp,
+
             std::shared_ptr<SAMRAI::xfer::VariableFillPattern> variableFillPattern = nullptr)
     {
         constexpr auto dimension = ResourcesManager::dimension;
 
         register_time_interpolated_resource( //
             rm, ghost, ghost, oldModel, model, refineOp, timeOp, variableFillPattern);
-    }
-
-
-    /**
-     * @brief this overload creates a Refiner for communication without time interpolation
-     * and from one quantity to the same quantity. It is typically used for initialization.
-     */
-    Refiner(core::VecFieldNames const& src_dest, std::shared_ptr<ResourcesManager> const& rm,
-            std::shared_ptr<SAMRAI::hier::RefineOperator> refineOp)
-        : Refiner(src_dest, src_dest, rm, refineOp)
-    {
-    }
-
-
-    /**
-     * @brief this overload creates a Refiner for communication without time interpolation
-     * and from one quantity to another quantity.
-     */
-    Refiner(core::VecFieldNames const& dst, core::VecFieldNames const& src,
-            std::shared_ptr<ResourcesManager> const& rm,
-            std::shared_ptr<SAMRAI::hier::RefineOperator> refineOp,
-            std::shared_ptr<SAMRAI::xfer::VariableFillPattern> variableFillPattern = nullptr)
-    {
-        register_vector_field(rm, dst, src, refineOp, variableFillPattern);
     }
 
 
@@ -261,6 +209,7 @@ public:
 
 
 
+
     /**
      * @brief This overload of makeRefiner creates a Refiner for communication from one
      * scalar quantity to itself without time interpolation.
@@ -270,7 +219,6 @@ public:
         : Refiner{name, name, rm, refineOp}
     {
     }
-
 
 
     auto& register_resource(auto& rm, auto& dst, auto& src, auto& scratch, auto&&... args)

@@ -4,12 +4,16 @@
 
 #include "core/def/phlop.hpp" // scope timing
 
-#include "simulator/simulator.hpp"
-#include "core/utilities/algorithm.hpp"
+#include "amr/wrappers/integrator.hpp"
 #include "core/utilities/mpi_utils.hpp"
+
+#include <SAMRAI/hier/VariableDatabase.h>
+#include <SAMRAI/tbox/RestartManager.h>
+#include <SAMRAI/hier/PatchDataRestartManager.h>
 
 #include <memory>
 #include <iostream>
+
 
 namespace PHARE
 {
@@ -17,7 +21,7 @@ class StreamAppender : public SAMRAI::tbox::Logger::Appender
 {
 public:
     StreamAppender(std::ostream* stream) { d_stream = stream; }
-    void logMessage(std::string const& message, std::string const& filename, const int line)
+    void logMessage(std::string const& message, std::string const& filename, int const line)
     {
         (*d_stream) << "At :" << filename << " line :" << line << " message: " << message
                     << std::endl;
@@ -42,7 +46,7 @@ public:
         SAMRAI::tbox::Logger::getInstance()->setWarningAppender(appender);
         PHARE_WITH_PHLOP( //
             if (auto e = core::get_env("PHARE_SCOPE_TIMING", "false"); e == "1" || e == "true")
-                phlop::ScopeTimerMan::INSTANCE()
+                phlop::threaded::ScopeTimerMan::INSTANCE()
                     .file_name(".phare/timings/rank." + std::to_string(core::mpi::rank()) + ".txt")
                     .init(); //
         )
@@ -50,20 +54,22 @@ public:
 
     ~SamraiLifeCycle()
     {
-        PHARE_WITH_PHLOP(phlop::ScopeTimerMan::reset());
+        PHARE_WITH_PHLOP(phlop::threaded::ScopeTimerMan::reset());
         SAMRAI::tbox::SAMRAIManager::shutdown();
         SAMRAI::tbox::SAMRAIManager::finalize();
         SAMRAI::tbox::SAMRAI_MPI::finalize();
+        PHARE::initializer::PHAREDictHandler::INSTANCE().stop();
     }
 
     static void reset()
     {
-        PHARE_WITH_PHLOP(phlop::ScopeTimerMan::reset());
         PHARE::initializer::PHAREDictHandler::INSTANCE().stop();
         SAMRAI::tbox::SAMRAIManager::shutdown();
         SAMRAI::tbox::SAMRAIManager::startup();
     }
 };
+
+
 
 
 } // namespace PHARE

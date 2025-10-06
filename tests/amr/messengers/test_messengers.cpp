@@ -1,15 +1,15 @@
 
 
-#include "src/simulator/simulator.hpp"
-#include "src/simulator/phare_types.hpp"
-#include "src/phare/phare.hpp"
+#include "simulator/simulator.hpp"
+#include "simulator/phare_types.hpp"
+#include "phare/phare.hpp"
 
 #include "test_messenger_basichierarchy.hpp"
 #include "test_integrator_strat.hpp"
 #include "test_messenger_tag_strategy.hpp"
 #include "tests/initializer/init_functions.hpp"
 
-#include "gmock/gmock.h"
+
 #include "gtest/gtest.h"
 
 
@@ -198,15 +198,15 @@ PHARE::initializer::PHAREDict createDict()
 
 namespace test_1d
 {
-static constexpr std::size_t dim          = 1;
-static constexpr std::size_t interpOrder  = 1;
-static constexpr std::size_t nbRefinePart = 2;
+static constexpr std::size_t dim         = 1;
+static constexpr std::size_t interpOrder = 1;
+static constexpr PHARE::SimOpts opts{dim, interpOrder};
 
-using Simulator         = PHARE::Simulator<dim, interpOrder, nbRefinePart>;
+using Simulator         = PHARE::Simulator<opts>;
 using HybridModelT      = Simulator::HybridModel;
 using MHDModelT         = Simulator::MHDModel;
 using ResourcesManagerT = typename HybridModelT::resources_manager_type;
-using Phare_Types       = PHARE::PHARE_Types<dim, interpOrder, nbRefinePart>;
+using Phare_Types       = PHARE::PHARE_Types<opts>;
 
 
 
@@ -254,11 +254,11 @@ public:
 
     HybridMessengers()
     {
-        auto resourcesManagerHybrid = std::make_shared<ResourcesManagerT>();
-        auto resourcesManagerMHD    = std::make_shared<ResourcesManagerT>();
+        auto hybridModel            = std::make_unique<HybridModelT>(createDict());
+        auto resourcesManagerHybrid = hybridModel->resourcesManager;
 
-        auto hybridModel = std::make_unique<HybridModelT>(createDict(), resourcesManagerHybrid);
-        auto mhdModel    = std::make_unique<MHDModelT>(resourcesManagerMHD);
+        auto resourcesManagerMHD = std::make_shared<ResourcesManagerT>();
+        auto mhdModel            = std::make_unique<MHDModelT>(resourcesManagerMHD);
 
         hybridModel->resourcesManager->registerResources(hybridModel->state);
         mhdModel->resourcesManager->registerResources(mhdModel->state);
@@ -286,6 +286,8 @@ TEST_F(HybridMessengers, receiveQuantitiesFromMHDHybridModelsAndHybridSolver)
     auto hybridSolver = std::make_unique<SolverPPC<HybridModelT, SAMRAI_Types>>(
         createDict()["simulation"]["algo"]);
 
+    hybridSolver->registerResources(*models[1]);
+
     MessengerRegistration::registerQuantities(*messengers[1], *models[0], *models[1],
                                               *hybridSolver);
 }
@@ -295,6 +297,9 @@ TEST_F(HybridMessengers, receiveQuantitiesFromMHDHybridModelsAndHybridSolver)
 TEST_F(HybridMessengers, receiveQuantitiesFromMHDHybridModelsAndMHDSolver)
 {
     auto mhdSolver = std::make_unique<SolverMHD<MHDModelT, SAMRAI_Types>>();
+
+    mhdSolver->registerResources(*models[0]);
+
     MessengerRegistration::registerQuantities(*messengers[0], *models[0], *models[0], *mhdSolver);
 }
 
@@ -443,12 +448,13 @@ template<uint8_t dimension, std::size_t nbRefinePart>
 struct AfullHybridBasicHierarchy
 {
     static constexpr std::size_t interpOrder = 1;
+    static constexpr auto opts = PHARE::SimOpts::make(dimension, interpOrder, nbRefinePart);
 
-    using Simulator         = typename PHARE::Simulator<dimension, interpOrder, nbRefinePart>;
+    using Simulator         = typename PHARE::Simulator<opts>;
     using HybridModelT      = typename Simulator::HybridModel;
     using MHDModelT         = typename Simulator::MHDModel;
     using ResourcesManagerT = typename HybridModelT::resources_manager_type;
-    using Phare_Types       = PHARE::PHARE_Types<dimension, interpOrder, nbRefinePart>;
+    using Phare_Types       = PHARE::PHARE_Types<opts>;
 
     int const firstHybLevel{0};
     int const ratio{2};

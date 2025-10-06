@@ -1,5 +1,13 @@
 
+<<<<<<< HEAD
 #include "phare/phare.hpp" // samrai lifecycle
+=======
+#ifndef PHARE_HAS_HIGHFIVE
+#define PHARE_HAS_HIGHFIVE 0
+#endif
+
+#include "tools/bench/core/bench.hpp"
+>>>>>>> 0cc9019 (...)
 
 #include "amr/data/particles/particles_data.hpp"
 
@@ -26,7 +34,7 @@ public:
 
         assert(sourceBox == data->sourceDomain);
 
-        data->sourceData.domainParticles = PHARE::core::bench::make_particles<dim>(ppc, sourceBox);
+        data->sourceData.domainParticles = PHARE::core::make_particles<dim>(ppc, sourceBox);
         assert(data->sourceData.domainParticles.size() == ppc * sourceBox.size());
     }
 

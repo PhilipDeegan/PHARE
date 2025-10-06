@@ -23,7 +23,7 @@
 
 using namespace PHARE::core;
 
-const double Te = 0.12;
+double const Te = 0.12;
 
 
 
@@ -136,7 +136,7 @@ struct ElectronsTest : public ::testing::Test
     using FieldND          = Field<dim, HybridQuantity::Scalar>;
     using VecFieldND       = VecField<FieldND, HybridQuantity>;
     using SymTensorFieldND = SymTensorField<FieldND, HybridQuantity>;
-    using ParticleArray_t  = ParticleArray<dim>;
+    using ParticleArray_t  = ParticleArray<ParticleArrayOptions{dim}>;
     using IonPopulationND  = IonPopulation<ParticleArray_t, VecFieldND, SymTensorFieldND>;
     using IonsT            = Ions<IonPopulationND, GridYee>;
     using PartPackND       = ParticlesPack<ParticleArray_t>;
@@ -147,8 +147,8 @@ struct ElectronsTest : public ::testing::Test
 
     Electromag<VecFieldND> electromag;
 
-    UsableVecField<dim> J, F, Ve, Vi;
-    UsableTensorField<dim> ionTensor, protonTensor;
+    UsableVecField<GridYee> J, F, Ve, Vi;
+    UsableTensorField<GridYee> ionTensor, protonTensor;
 
     GridND ionChargeDensity, ionMassDensity, protonParticleDensity, protonChargeDensity, Pe;
 
@@ -211,17 +211,14 @@ struct ElectronsTest : public ::testing::Test
         auto&& emm = std::get<0>(electrons.getCompileTimeResourcesViewList());
         auto&& fc  = std::get<0>(emm.getCompileTimeResourcesViewList());
 
-
         Ve.set_on(std::get<0>(fc.getCompileTimeResourcesViewList()));
-
 
         auto&& pc          = std::get<1>(emm.getCompileTimeResourcesViewList());
         auto const& [_, P] = pc.getCompileTimeResourcesViewList();
         P.setBuffer(&Pe);
 
-        auto const& [Jx, Jy, Jz]    = J();
-        auto const& [Vix, Viy, Viz] = Vi();
-
+        auto& [Jx, Jy, Jz]    = J();
+        auto& [Vix, Viy, Viz] = Vi();
 
         if constexpr (dim == 1)
         {
@@ -430,7 +427,6 @@ TYPED_TEST(ElectronsTest, ThatElectronsVelocityEqualIonVelocityMinusJ)
     auto& layout    = this->layout;
 
     electrons.update(layout);
-
     auto& Ne = electrons.density();
 
     auto check = [&layout](auto const& Vecomp, auto const& Vicomp, auto const& Jcomp,
