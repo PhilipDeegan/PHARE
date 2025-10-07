@@ -213,7 +213,6 @@ struct IonsBuffers
     using GridLayout                 = PHARETypes::GridLayout_t;
     using Ions                       = PHARETypes::Ions_t;
     using ParticleArray              = PHARETypes::ParticleArray_t;
-    using ParticleInitializerFactory = PHARETypes::ParticleInitializerFactory_t;
 
 
     Grid ionChargeDensity;
@@ -372,7 +371,8 @@ struct IonUpdaterTest : public ::testing::Test
     using Electromag    = PHARETypes::Electromag_t;
     using GridLayout    = PHARE::core::GridLayout<GridLayoutImplYee<dim, interp_order>>;
     using ParticleArray = PHARETypes::ParticleArray_t;
-    using ParticleInitializerFactory = PHARETypes::ParticleInitializerFactory_t;
+    using ParticleInitializerFactory
+        = PHARE::amr::ParticleInitializerFactory<ParticleArray, GridLayout>;
 
     using ElectromagInitializerFactory_t = PHARE::amr::ElectromagInitializerFactory;
     using IonUpdater = PHARE::core::IonUpdater<Ions, Electromag, GridLayout>;
