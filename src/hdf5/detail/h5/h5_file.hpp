@@ -16,18 +16,6 @@ using HiFile = HighFive::File;
 using FileOp = HighFive::File::AccessMode;
 
 
-
-template<std::size_t dim, typename Data>
-NO_DISCARD auto decay_to_pointer(Data& data)
-{
-    if constexpr (dim == 1)
-        return data.data();
-    if constexpr (dim == 2)
-        return data[0].data();
-    if constexpr (dim == 3)
-        return data[0][0].data();
-}
-
 template<typename Data, std::size_t dim>
 NO_DISCARD auto vector_for_dim()
 {
@@ -245,10 +233,10 @@ public:
     }
 
 
-    HighFiveFile(const HighFiveFile&)             = delete;
-    HighFiveFile(const HighFiveFile&&)            = delete;
-    HighFiveFile& operator=(const HighFiveFile&)  = delete;
-    HighFiveFile& operator=(const HighFiveFile&&) = delete;
+    HighFiveFile(HighFiveFile const&)             = delete;
+    HighFiveFile(HighFiveFile const&&)            = delete;
+    HighFiveFile& operator=(HighFiveFile const&)  = delete;
+    HighFiveFile& operator=(HighFiveFile const&&) = delete;
 
 private:
     HighFive::FileAccessProps fapl_;

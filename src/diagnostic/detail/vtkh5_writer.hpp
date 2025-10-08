@@ -1,20 +1,16 @@
-#ifndef PHARE_DETAIL_DIAGNOSTIC_HIGHFIVE_HPP
-#define PHARE_DETAIL_DIAGNOSTIC_HIGHFIVE_HPP
+#ifndef PHARE_DIAGNOSTIC_DETAIL_VTK_H5_WRITER_HPP
+#define PHARE_DIAGNOSTIC_DETAIL_VTK_H5_WRITER_HPP
 
 
 #include "core/utilities/types.hpp"
 #include "core/utilities/mpi_utils.hpp"
+#include "core/utilities/meta/meta_utilities.hpp"
 #include "core/data/vecfield/vecfield_component.hpp"
 
 #include "hdf5/detail/h5/h5_file.hpp"
 
 #include "diagnostic/diagnostic_props.hpp"
-#include "diagnostic/detail/h5typewriter.hpp"
-#include "diagnostic/detail/types/info.hpp"
-#include "diagnostic/detail/types/meta.hpp"
-#include "diagnostic/detail/types/fluid.hpp"
-#include "diagnostic/detail/types/particle.hpp"
-#include "diagnostic/detail/types/electromag.hpp"
+#include "diagnostic/detail/vtkh5_type_writer.hpp"
 
 
 #if !defined(PHARE_DIAG_DOUBLES)
@@ -22,9 +18,77 @@
 #endif
 
 
-namespace PHARE::diagnostic::h5
+namespace PHARE::diagnostic::vtkh5
 {
 using namespace hdf5::h5;
+
+
+template<typename Writer>
+class ElectromagDiagnosticWriter : public H5TypeWriter<Writer>
+{
+    using Super = H5TypeWriter<Writer>;
+
+public:
+    ElectromagDiagnosticWriter(Writer& h5Writer)
+        : Super{h5Writer}
+    {
+    }
+    void write(DiagnosticProperties&) override {}
+    void compute(DiagnosticProperties&) override {}
+};
+template<typename Writer>
+class FluidDiagnosticWriter : public H5TypeWriter<Writer>
+{
+    using Super = H5TypeWriter<Writer>;
+
+public:
+    FluidDiagnosticWriter(Writer& h5Writer)
+        : Super{h5Writer}
+    {
+    }
+    void write(DiagnosticProperties&) override {}
+    void compute(DiagnosticProperties&) override {}
+};
+template<typename Writer>
+class ParticlesDiagnosticWriter : public H5TypeWriter<Writer>
+{
+    using Super = H5TypeWriter<Writer>;
+
+public:
+    ParticlesDiagnosticWriter(Writer& h5Writer)
+        : Super{h5Writer}
+    {
+    }
+    void write(DiagnosticProperties&) override {}
+    void compute(DiagnosticProperties&) override {}
+};
+template<typename Writer>
+class MetaDiagnosticWriter : public H5TypeWriter<Writer>
+{
+    using Super = H5TypeWriter<Writer>;
+
+public:
+    MetaDiagnosticWriter(Writer& h5Writer)
+        : Super{h5Writer}
+    {
+    }
+    void write(DiagnosticProperties&) override {}
+    void compute(DiagnosticProperties&) override {}
+};
+template<typename Writer>
+class InfoDiagnosticWriter : public H5TypeWriter<Writer>
+{
+    using Super = H5TypeWriter<Writer>;
+
+public:
+    InfoDiagnosticWriter(Writer& h5Writer)
+        : Super{h5Writer}
+    {
+    }
+    void write(DiagnosticProperties&) override {}
+    void compute(DiagnosticProperties&) override {}
+};
+
 
 
 
@@ -224,29 +288,29 @@ template<typename ModelView>
 void H5Writer<ModelView>::dump(std::vector<DiagnosticProperties*> const& diagnostics,
                                double timestamp)
 {
-    timestamp_                     = timestamp;
-    fileAttributes_["dimension"]   = dimension;
-    fileAttributes_["interpOrder"] = interpOrder;
-    fileAttributes_["layoutType"]  = modelView_.getLayoutTypeString();
-    fileAttributes_["domain_box"]  = modelView_.domainBox();
-    fileAttributes_["cell_width"]  = modelView_.cellWidth();
-    fileAttributes_["origin"]      = modelView_.origin();
+    timestamp_ = timestamp;
+    // fileAttributes_["dimension"]   = dimension;
+    // fileAttributes_["interpOrder"] = interpOrder;
+    // fileAttributes_["layoutType"]  = modelView_.getLayoutTypeString();
+    // fileAttributes_["domain_box"]  = modelView_.domainBox();
+    // fileAttributes_["cell_width"]  = modelView_.cellWidth();
+    // fileAttributes_["origin"]      = modelView_.origin();
 
-    fileAttributes_["boundary_conditions"] = modelView_.boundaryConditions();
+    // fileAttributes_["boundary_conditions"] = modelView_.boundaryConditions();
 
-    for (auto* diagnostic : diagnostics)
-        if (!file_flags.count(diagnostic->type + diagnostic->quantity))
-            file_flags[diagnostic->type + diagnostic->quantity] = this->flags;
+    // for (auto* diagnostic : diagnostics)
+    //     if (!file_flags.count(diagnostic->type + diagnostic->quantity))
+    //         file_flags[diagnostic->type + diagnostic->quantity] = this->flags;
 
-    initializeDatasets_(diagnostics);
-    writeDatasets_(diagnostics);
+    // initializeDatasets_(diagnostics);
+    // writeDatasets_(diagnostics);
 
-    for (auto* diagnostic : diagnostics)
-    {
-        typeWriters_.at(diagnostic->type)->finalize(*diagnostic);
-        // don't truncate past first dump
-        file_flags[diagnostic->type + diagnostic->quantity] = READ_WRITE;
-    }
+    // for (auto* diagnostic : diagnostics)
+    // {
+    //     typeWriters_.at(diagnostic->type)->finalize(*diagnostic);
+    //     // don't truncate past first dump
+    //     file_flags[diagnostic->type + diagnostic->quantity] = READ_WRITE;
+    // }
 }
 
 template<typename ModelView>
@@ -272,39 +336,39 @@ void H5Writer<ModelView>::dump_level(std::size_t level,
 template<typename ModelView>
 void H5Writer<ModelView>::initializeDatasets_(std::vector<DiagnosticProperties*> const& diagnostics)
 {
-    std::size_t maxLocalLevel = 0;
-    std::unordered_map<std::size_t, std::vector<std::string>> lvlPatchIDs;
-    Attributes patchAttributes; // stores dataset info/size for synced MPI creation
+    // std::size_t maxLocalLevel = 0;
+    // std::unordered_map<std::size_t, std::vector<std::string>> lvlPatchIDs;
+    // Attributes patchAttributes; // stores dataset info/size for synced MPI creation
 
-    for (auto* diag : diagnostics)
-        typeWriters_.at(diag->type)->createFiles(*diag);
+    // for (auto* diag : diagnostics)
+    //     typeWriters_.at(diag->type)->createFiles(*diag);
 
-    auto collectPatchAttributes = [&](GridLayout&, std::string patchID, std::size_t iLevel) {
-        if (!lvlPatchIDs.count(iLevel))
-            lvlPatchIDs.emplace(iLevel, std::vector<std::string>());
+    // auto collectPatchAttributes = [&](GridLayout&, std::string patchID, std::size_t iLevel) {
+    //     if (!lvlPatchIDs.count(iLevel))
+    //         lvlPatchIDs.emplace(iLevel, std::vector<std::string>());
 
-        lvlPatchIDs.at(iLevel).emplace_back(patchID);
+    //     lvlPatchIDs.at(iLevel).emplace_back(patchID);
 
-        for (auto* diag : diagnostics)
-        {
-            typeWriters_.at(diag->type)->getDataSetInfo(*diag, iLevel, patchID, patchAttributes);
-        }
-        maxLocalLevel = iLevel;
-    };
+    //     for (auto* diag : diagnostics)
+    //     {
+    //         typeWriters_.at(diag->type)->getDataSetInfo(*diag, iLevel, patchID, patchAttributes);
+    //     }
+    //     maxLocalLevel = iLevel;
+    // };
 
-    modelView_.visitHierarchy(collectPatchAttributes, minLevel, maxLevel);
+    // modelView_.visitHierarchy(collectPatchAttributes, minLevel, maxLevel);
 
-    // sets empty vectors in case current process lacks patch on a level
-    std::size_t maxMPILevel = core::mpi::max(maxLocalLevel);
-    for (std::size_t lvl = minLevel; lvl <= maxMPILevel; lvl++)
-        if (!lvlPatchIDs.count(lvl))
-            lvlPatchIDs.emplace(lvl, std::vector<std::string>());
+    // // sets empty vectors in case current process lacks patch on a level
+    // std::size_t maxMPILevel = core::mpi::max(maxLocalLevel);
+    // for (std::size_t lvl = minLevel; lvl <= maxMPILevel; lvl++)
+    //     if (!lvlPatchIDs.count(lvl))
+    //         lvlPatchIDs.emplace(lvl, std::vector<std::string>());
 
-    for (auto* diagnostic : diagnostics)
-    {
-        typeWriters_.at(diagnostic->type)
-            ->initDataSets(*diagnostic, lvlPatchIDs, patchAttributes, maxMPILevel);
-    }
+    // for (auto* diagnostic : diagnostics)
+    // {
+    //     typeWriters_.at(diagnostic->type)
+    //         ->initDataSets(*diagnostic, lvlPatchIDs, patchAttributes, maxMPILevel);
+    // }
 }
 
 
@@ -312,36 +376,36 @@ void H5Writer<ModelView>::initializeDatasets_(std::vector<DiagnosticProperties*>
 template<typename ModelView>
 void H5Writer<ModelView>::writeDatasets_(std::vector<DiagnosticProperties*> const& diagnostics)
 {
-    std::unordered_map<std::size_t, std::vector<std::pair<std::string, Attributes>>>
-        patchAttributes;
+    // std::unordered_map<std::size_t, std::vector<std::pair<std::string, Attributes>>>
+    //     patchAttributes;
 
-    std::size_t maxLocalLevel = 0;
-    auto writePatch = [&](GridLayout& gridLayout, std::string patchID, std::size_t iLevel) {
-        if (!patchAttributes.count(iLevel))
-            patchAttributes.emplace(iLevel, std::vector<std::pair<std::string, Attributes>>{});
-        patchPath_ = getPatchPathAddTimestamp(iLevel, patchID);
-        patchAttributes[iLevel].emplace_back(patchID,
-                                             modelView_.getPatchProperties(patchID, gridLayout));
-        for (auto* diagnostic : diagnostics)
-            typeWriters_.at(diagnostic->type)->write(*diagnostic);
-        maxLocalLevel = iLevel;
-    };
+    // std::size_t maxLocalLevel = 0;
+    // auto writePatch = [&](GridLayout& gridLayout, std::string patchID, std::size_t iLevel) {
+    //     if (!patchAttributes.count(iLevel))
+    //         patchAttributes.emplace(iLevel, std::vector<std::pair<std::string, Attributes>>{});
+    //     patchPath_ = getPatchPathAddTimestamp(iLevel, patchID);
+    //     patchAttributes[iLevel].emplace_back(patchID,
+    //                                          modelView_.getPatchProperties(patchID, gridLayout));
+    //     for (auto* diagnostic : diagnostics)
+    //         typeWriters_.at(diagnostic->type)->write(*diagnostic);
+    //     maxLocalLevel = iLevel;
+    // };
 
-    modelView_.visitHierarchy(writePatch, minLevel, maxLevel);
+    // modelView_.visitHierarchy(writePatch, minLevel, maxLevel);
 
-    std::size_t maxMPILevel = core::mpi::max(maxLocalLevel);
-    // sets empty vectors in case current process lacks patch on a level
-    for (std::size_t lvl = minLevel; lvl <= maxMPILevel; lvl++)
-        if (!patchAttributes.count(lvl))
-            patchAttributes.emplace(lvl, std::vector<std::pair<std::string, Attributes>>{});
+    // std::size_t maxMPILevel = core::mpi::max(maxLocalLevel);
+    // // sets empty vectors in case current process lacks patch on a level
+    // for (std::size_t lvl = minLevel; lvl <= maxMPILevel; lvl++)
+    //     if (!patchAttributes.count(lvl))
+    //         patchAttributes.emplace(lvl, std::vector<std::pair<std::string, Attributes>>{});
 
-    for (auto* diagnostic : diagnostics)
-        typeWriters_.at(diagnostic->type)
-            ->writeAttributes(*diagnostic, fileAttributes_, patchAttributes, maxMPILevel);
+    // for (auto* diagnostic : diagnostics)
+    //     typeWriters_.at(diagnostic->type)
+    //         ->writeAttributes(*diagnostic, fileAttributes_, patchAttributes, maxMPILevel);
 }
 
 
 
-} /* namespace PHARE::diagnostic::h5 */
+} // namespace PHARE::diagnostic::vtkh5
 
 #endif /* PHARE_DETAIL_DIAGNOSTIC_HIGHFIVE_H */
