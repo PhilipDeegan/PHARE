@@ -2,9 +2,9 @@
 #define PHARE_PYTHON_CPP_SIMULATOR_HPP
 
 
-#ifndef PHARE_SIM_STR
-#define PHARE_SIM_STR 1, 1, 2 // mostly for clangformat - errors in cpp file if define is missing
-#endif
+// #ifndef PHARE_SIM_STR
+// #define PHARE_SIM_STR 1, 1, 2 // mostly for clangformat - errors in cpp file if define is missing
+// #endif
 
 #include "core/def/phare_mpi.hpp" // IWYU pragma: keep
 // #include "core/utilities/types.hpp"
@@ -52,23 +52,14 @@ void declareSimulator(PyClass&& sim)
         .def("dump", &Simulator::dump, py::arg("timestamp"), py::arg("timestep"));
 }
 
-
+template<typename Sim>
 void inline declare_etc(py::module& m)
 {
-    constexpr auto opts          = SimOpts{PHARE_SIM_STR};
-    using Sim                    = Simulator<opts>;
-    using DW                     = DataWrangler<opts>;
-    constexpr auto dim           = Sim::dimension;
-    constexpr auto interp        = Sim::interp_order;
-    constexpr auto nbRefinedPart = Sim::nbRefinedPart;
-    using _dim                   = core::DimConst<dim>;
-    using _interp                = core::InterpConst<interp>;
+    constexpr auto opts = SimOpts{PHARE_SIM_STR};
 
-    std::string const type_string = std::string{"_"} + PHARE_TO_STR(PHARE_SIM_ID);
-
-
-    std::string name = "DataWrangler" + type_string;
-    py::class_<DW, std::shared_ptr<DW>>(m, name.c_str())
+    using DW         = DataWrangler<opts>;
+    std::string name = "DataWrangler"; // + type_string;
+    py::class_<DW, py::smart_holder>(m, name.c_str())
         .def(py::init<std::shared_ptr<Sim> const&, std::shared_ptr<amr::Hierarchy> const&>())
         .def(py::init<std::shared_ptr<ISimulator> const&, std::shared_ptr<amr::Hierarchy> const&>())
         .def("sync_merge", &DW::sync_merge)
@@ -76,8 +67,8 @@ void inline declare_etc(py::module& m)
         .def("getNumberOfLevels", &DW::getNumberOfLevels);
 
     using PL = PatchLevel<opts>;
-    name     = "PatchLevel_" + type_string;
-    py::class_<PL, std::shared_ptr<PL>>(m, name.c_str())
+    name     = "PatchLevel"; //+ type_string;
+    py::class_<PL, py::smart_holder>(m, name.c_str())
         .def("getEM", &PL::getEM)
         .def("getE", &PL::getE)
         .def("getB", &PL::getB)
@@ -100,9 +91,10 @@ void inline declare_etc(py::module& m)
         .def("getParticles", &PL::getParticles, py::arg("userPopName") = "all");
 
     using _Splitter
-        = PHARE::amr::Splitter<_dim, _interp, core::RefinedParticlesConst<nbRefinedPart>>;
+        = PHARE::amr::Splitter<core::DimConst<Sim::dimension>, core::InterpConst<Sim::interp_order>,
+                               core::RefinedParticlesConst<Sim::nbRefinedPart>>;
     name = "Splitter";
-    py::class_<_Splitter, std::shared_ptr<_Splitter>>(m, name.c_str())
+    py::class_<_Splitter, py::smart_holder>(m, name.c_str())
         .def(py::init<>())
         .def_property_readonly_static("weight", [](py::object) { return _Splitter::weight; })
         .def_property_readonly_static("delta", [](py::object) { return _Splitter::delta; });
@@ -111,29 +103,26 @@ void inline declare_etc(py::module& m)
     m.def(name.c_str(), splitPyArrayParticles<_Splitter>);
 }
 
-// template<typename _dim, typename _interp, typename _nbRefinedPart>
+
 void inline declare_macro_sim(py::module& m)
 {
-    constexpr auto opts = SimOpts{PHARE_SIM_STR};
-    using Sim           = Simulator<opts>;
+    using Sim = Simulator<SimOpts{PHARE_SIM_STR}>;
 
-    std::string const type_string = std::string{"_"} + PHARE_TO_STR(PHARE_SIM_ID);
-
-    declare_etc(m);
-
-    std::string name = "Simulator" + type_string;
+    std::string name = "Simulator"; // + type_string;
     declareSimulator<Sim>(
-        py::class_<Sim, std::shared_ptr<Sim>>(m, name.c_str())
+        py::class_<Sim, py::smart_holder>(m, name.c_str())
             .def_property_readonly_static("dims", [](py::object) { return Sim::dimension; })
             .def_property_readonly_static("interp_order",
                                           [](py::object) { return Sim::interp_order; })
             .def_property_readonly_static("refined_particle_nbr",
                                           [](py::object) { return Sim::nbRefinedPart; }));
 
-    name = "make_simulator" + type_string;
+    name = "make_simulator"; //+ type_string;
     m.def(name.c_str(), [](std::shared_ptr<PHARE::amr::Hierarchy> const& hier) {
         return makeSimulator<Sim>(hier);
     });
+
+    declare_etc<Sim>(m);
 }
 
 

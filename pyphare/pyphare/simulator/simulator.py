@@ -41,7 +41,7 @@ def make_cpp_simulator(dim, interp, nbrRefinedPart, hier):
     if SCOPE_TIMING:
         mon.timing_setup(sim_lib)
 
-    make_sim = f"make_simulator_{cpp.simulator_id(dim, interp, nbrRefinedPart)}"
+    make_sim = "make_simulator"
     assert hasattr(sim_lib, make_sim)
     return getattr(sim_lib, make_sim)(hier)
 
