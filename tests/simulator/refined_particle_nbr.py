@@ -9,14 +9,12 @@ import yaml
 import unittest
 import numpy as np
 
-from pyphare.cpp import cpp_lib
-from pyphare.cpp import splitter_type
+from pyphare import cpp
 from pyphare.simulator.simulator import Simulator
 
-from tests.simulator import NoOverwriteDict, populate_simulation
+from tests.simulator import NoOverwriteDict
+from tests.simulator import populate_simulation
 from tests.simulator.config import project_root
-
-cpp = cpp_lib()
 
 
 class SimulatorRefinedParticleNbr(unittest.TestCase):
@@ -48,7 +46,7 @@ class SimulatorRefinedParticleNbr(unittest.TestCase):
         yaml_delta = [float(s) for s in str(yaml_n_particles["delta"]).split(" ")]
         yaml_weight = [float(s) for s in str(yaml_n_particles["weight"]).split(" ")]
 
-        splitter_t = splitter_type(dim, interp, refined_particle_nbr)
+        splitter_t = cpp.splitter_type(dim, interp, refined_particle_nbr)
         np.testing.assert_allclose(yaml_delta, splitter_t.delta)
         np.testing.assert_allclose(yaml_weight, splitter_t.weight)
 

@@ -2,16 +2,31 @@
 #
 #
 
+import json
+import importlib
+from pyphare.cpp import validate
 
-def cpp_lib(override=None):
-    import importlib
+__all__ = ["validate"]
 
-    return importlib.import_module("pybindlibs.cpp")
+_libs = {}
+
+
+def cpp_lib(sim_str):
+    global _libs
+    if sim_str in _libs:
+        return _libs[sim_str]
+
+    mod_str = f"pybindlibs.cpp_{sim_str}"
+    _libs[mod_str] = importlib.import_module(mod_str)
+
+    return _libs[mod_str]
+
+
+def simulator_id(dim, interp, nbrRefinedPart):
+    return f"{dim}_{interp}_{nbrRefinedPart}"
 
 
 def cpp_etc_lib():
-    import importlib
-
     return importlib.import_module("pybindlibs.cpp_etc")
 
 
@@ -25,13 +40,27 @@ def build_config_as_json():
     return json.dumps(build_config())
 
 
-def splitter_type(dim, interp, n_particles):
-    return getattr(cpp_lib(), f"Splitter_{dim}_{interp}_{n_particles}")
+def splitter_type(dim, interp, nbrRefinedPart):
+    return getattr(cpp_lib(simulator_id(dim, interp, nbrRefinedPart)), "Splitter")
 
 
-def create_splitter(dim, interp, n_particles):
-    return splitter_type(dim, interp, n_particles)()
+def create_splitter(dim, interp, nbrRefinedPart):
+    return splitter_type(dim, interp, nbrRefinedPart)()
 
 
-def split_pyarrays_fn(dim, interp, n_particles):
-    return getattr(cpp_lib(), f"split_pyarray_particles_{dim}_{interp}_{n_particles}")
+def split_pyarrays_fn(dim, interp, nbrRefinedPart):
+    return getattr(
+        cpp_lib(simulator_id(dim, interp, nbrRefinedPart)), "split_pyarray_particles"
+    )
+
+
+def mpi_rank():
+    return getattr(cpp_etc_lib(), "mpi_rank")()
+
+
+def mpi_size():
+    return getattr(cpp_etc_lib(), "mpi_size")()
+
+
+def mpi_barrier():
+    return getattr(cpp_etc_lib(), "mpi_barrier")()

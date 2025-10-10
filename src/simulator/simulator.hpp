@@ -488,6 +488,7 @@ struct SimulatorMaker
 };
 
 
+
 template<typename Simulator>
 std::unique_ptr<Simulator> makeSimulator(std::shared_ptr<amr::Hierarchy> const& hierarchy)
 {
