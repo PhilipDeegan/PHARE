@@ -2,21 +2,16 @@
 #define PHARE_PYTHON_CPP_SIMULATOR_HPP
 
 
-// #ifndef PHARE_SIM_STR
-// #define PHARE_SIM_STR 1, 1, 2 // mostly for clangformat - errors in cpp file if define is missing
-// #endif
+#ifndef PHARE_SIM_STR
+#define PHARE_SIM_STR 1, 1, 2 // mostly for clangformat - errors in cpp file if define is missing
+#endif
 
 #include "core/def/phare_mpi.hpp" // IWYU pragma: keep
-// #include "core/utilities/types.hpp"
-// #include "core/utilities/mpi_utils.hpp"
-// #include "core/data/particles/particle.hpp"
-// #include "core/utilities/meta/meta_utilities.hpp"
 
 #include "amr/samrai.hpp" // IWYU pragma: keep
 #include "amr/wrappers/hierarchy.hpp"
 
 #include "simulator/simulator.hpp" // IWYU pragma: keep
-
 
 #include "python3/pybind_def.hpp" // IWYU pragma: keep
 #include "pybind11/stl.h"         // IWYU pragma: keep
@@ -24,7 +19,6 @@
 #include "pybind11/chrono.h"      // IWYU pragma: keep
 #include "pybind11/complex.h"     // IWYU pragma: keep
 #include "pybind11/functional.h"  // IWYU pragma: keep
-
 
 #include "python3/particles.hpp"     // IWYU pragma: keep
 #include "python3/patch_level.hpp"   // IWYU pragma: keep

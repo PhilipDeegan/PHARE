@@ -31,19 +31,13 @@ def simulator_shutdown():
     gc.collect()
 
 
-def cpp_lib(dim, interp, nbrRefinedPart):
-    return cpp.cpp_lib(cpp.simulator_id(dim, interp, nbrRefinedPart))
-
-
-def make_cpp_simulator(dim, interp, nbrRefinedPart, hier):
-    sim_lib = cpp_lib(dim, interp, nbrRefinedPart)
-
+def make_cpp_simulator(cpp_lib, hier):
     if SCOPE_TIMING:
-        mon.timing_setup(sim_lib)
+        mon.timing_setup(cpp_lib)
 
     make_sim = "make_simulator"
-    assert hasattr(sim_lib, make_sim)
-    return getattr(sim_lib, make_sim)(hier)
+    assert hasattr(cpp_lib, make_sim)
+    return getattr(cpp_lib, make_sim)(hier)
 
 
 def startMPI():
@@ -124,18 +118,9 @@ class Simulator:
                 self._log_to_file()
             ph.populateDict()
 
-            dim, interp, nbrRefinedPart = (
-                self.simulation.ndim,
-                self.simulation.interp_order,
-                self.simulation.refined_particle_nbr,
-            )
-            self.cpp_lib = cpp_lib(dim, interp, nbrRefinedPart)
-
+            self.cpp_lib = cpp.cpp_lib(self.simulation)
             self.cpp_hier = cpp.cpp_etc_lib().make_hierarchy()
-
-            self.cpp_sim = make_cpp_simulator(
-                dim, interp, nbrRefinedPart, self.cpp_hier
-            )
+            self.cpp_sim = make_cpp_simulator(self.cpp_lib, self.cpp_hier)
 
             return self
         except Exception:
