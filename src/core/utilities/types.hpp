@@ -221,6 +221,16 @@ namespace core
 
 
 
+    template<typename T>
+    NO_DISCARD T from_string(std::string const& s)
+    {
+        T t;
+        std::stringstream ss(s);
+        ss >> t;
+        return t;
+    }
+
+
     NO_DISCARD inline std::optional<std::string> get_env(std::string const& key)
     {
         if (char const* val = std::getenv(key.c_str()))
@@ -233,6 +243,14 @@ namespace core
         if (auto e = get_env(key))
             return *e;
         return _default;
+    }
+
+    template<typename T>
+    NO_DISCARD inline T get_env_as(std::string const& key, T const& t)
+    {
+        if (auto e = get_env(key))
+            return from_string<T>(*e);
+        return t;
     }
 
 

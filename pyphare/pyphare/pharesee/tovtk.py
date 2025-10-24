@@ -2,10 +2,9 @@
 # -*- coding: utf-8 -*-
 
 
-import h5py
+import os
 import sys
 import numpy as np
-import os
 
 
 def ndim_from(npx, npy, npz):
@@ -15,14 +14,12 @@ def ndim_from(npx, npy, npz):
         return 2
     elif npx > 2 and npy == 2 and npz == 2:
         return 1
-    else:
-        raise ValueError(
-            f" cannot infer dimension from (npx, npy, npz) = {npx} {npy} {npz}"
-        )
+    raise ValueError(
+        f" cannot infer dimension from (npx, npy, npz) = {npx} {npy} {npz}"
+    )
 
 
 def BtoFlatPrimal(ph_bx, ph_by, ph_bz, npx, npy, npz, gn=2):
-
     nbrPoints = npx * npy * npz
     b = np.zeros((nbrPoints, 3), dtype="f")
 
@@ -114,7 +111,6 @@ def BtoFlatPrimal(ph_bx, ph_by, ph_bz, npx, npy, npz, gn=2):
 
 
 def EtoFlatPrimal(ph_ex, ph_ey, ph_ez, npx, npy, npz, gn=2):
-
     nbrPoints = npx * npy * npz
     e = np.zeros((nbrPoints, 3), dtype="f")
 
@@ -168,7 +164,6 @@ def EtoFlatPrimal(ph_ex, ph_ey, ph_ez, npx, npy, npz, gn=2):
 
 
 def primalScalarToFlatPrimal(ph_scalar, npx, npy, npz, gn=2):
-
     scalar3d = np.zeros((npx, npy, npz), dtype="f")
     if ndim_from(npx, npy, npz) == 2:
         domain = slice(gn, -gn)
@@ -271,14 +266,9 @@ def make3d(root_spacing):
     return root_spacing
 
 
-def main():
+def convert(path):
+    import h5py  # see doc/conventions.md section 2.1.1
 
-    if len(sys.argv) != 2 or sys.argv[1] in ["-h", "--help"]:
-        print(f"Usage: {os.path.basename(sys.argv[0])} <path_to_phare_h5>")
-        print("Works for EM fields, bulk velocity and density")
-        sys.exit(1)
-
-    path = sys.argv[1]
     phare_h5 = h5py.File(path, "r")
     root_spacing = make3d(phare_h5.attrs["cell_width"])
     times = times_in(phare_h5)
@@ -316,7 +306,6 @@ def main():
     steps.create_dataset("Values", data=times[:numberOfTimes])
 
     for ilvl in range(max_nbr_level)[:]:
-
         print(f"Processing level {ilvl}")
 
         lvl = root.create_group(f"Level{ilvl}")
@@ -428,4 +417,9 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    if len(sys.argv) != 2 or sys.argv[1] in ["-h", "--help"]:
+        print(f"Usage: {os.path.basename(sys.argv[0])} <path_to_phare_h5>")
+        print("Works for EM fields, bulk velocity and density")
+        sys.exit(1)
+
+    convert(sys.argv[1])

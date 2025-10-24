@@ -93,9 +93,8 @@ public:
     template<typename Action>
     void visitHierarchy(Action&& action, int minLevel = 0, int maxLevel = 0)
     {
-        PHARE::amr::visitHierarchy<GridLayout>(hierarchy_, *model_.resourcesManager,
-                                               std::forward<Action>(action), minLevel, maxLevel,
-                                               model_);
+        amr::visitHierarchy<GridLayout>(hierarchy_, *model_.resourcesManager,
+                                        std::forward<Action>(action), minLevel, maxLevel, model_);
     }
 
     NO_DISCARD auto boundaryConditions() const { return hierarchy_.boundaryConditions(); }
@@ -139,6 +138,18 @@ public:
     {
         auto key = std::to_string(ilevel) + "_" + patch_id;
         return model_.tags.at(key);
+    }
+
+
+    auto localLevelBoxes(auto const ilvl)
+    {
+        std::vector<core::Box<int, dimension>> boxes;
+        auto const& lvl = *hierarchy_.getPatchLevel(ilvl);
+        boxes.reserve(lvl.getLocalNumberOfPatches());
+        visitHierarchy(
+            [&](auto& layout, auto const&, auto const) { boxes.emplace_back(layout.AMRBox()); },
+            ilvl, ilvl);
+        return boxes;
     }
 
 protected:

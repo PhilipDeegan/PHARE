@@ -1,0 +1,438 @@
+#ifndef PHARE_DIAGNOSTIC_DETAIL_VTK_H5_TYPE_WRITER_HPP
+#define PHARE_DIAGNOSTIC_DETAIL_VTK_H5_TYPE_WRITER_HPP
+
+#include "core/logger.hpp"
+#include "core/utilities/box/box.hpp"
+#include "core/utilities/mpi_utils.hpp"
+#include "core/data/tensorfield/tensorfield.hpp"
+
+#include "core/utilities/types.hpp"
+#include "diagnostic/diagnostic_writer.hpp"
+
+#include "hdf5/detail/h5/h5_file.hpp"
+
+#include <string>
+#include <stdexcept>
+#include <unordered_map>
+
+
+// TODO:
+//     remove logging
+//     write as column major/Fortran memory ordering
+
+
+namespace PHARE::diagnostic::vtkh5::detail
+{
+
+// some testing shows 32 to be the max value supported, something to do with a value `H5S_MAX_RANK`
+static inline auto const CHUNK_SIZE = core::get_env_as("PHARE_VTK_H5_CHUNK_SIZE", std::size_t{32});
+
+} // namespace PHARE::diagnostic::vtkh5::detail
+
+
+namespace PHARE::diagnostic::vtkh5
+{
+
+using namespace hdf5::h5;
+
+template<typename Writer>
+class H5TypeWriter : public PHARE::diagnostic::TypeWriter
+{
+    using FloatType                      = float; // Writer::FloatType;
+    std::string static inline base       = "/VTKHDF/";
+    std::string static inline level_base = base + "Level";
+    std::string static inline step_level = base + "Steps/Level";
+
+public:
+    static constexpr auto dimension = Writer::dimension;
+    using Attributes                = typename Writer::Attributes;
+    using Box_t                     = core::Box<int, dimension>;
+
+    H5TypeWriter(Writer& h5Writer)
+        : h5Writer_{h5Writer}
+    {
+        if constexpr (dimension < 2)
+            throw std::runtime_error("VTK Diagnostics do not support 1D");
+    }
+
+protected:
+    struct VTKBoxes
+    {
+        using Data_t = std::vector<std::array<int, dimension * 2>>;
+
+        static auto flatten(auto const& boxes)
+        {
+            Data_t data(boxes.size(), core::ConstArray<int, dimension * 2>());
+
+            std::size_t pos = 0;
+            for (auto const& box : boxes)
+            {
+                for (std::uint16_t i = 0; i < dimension; ++i)
+                {
+                    data[pos][0 + i * 2] = box.lower[i];
+                    data[pos][1 + i * 2] = box.upper[i];
+                }
+                ++pos;
+            }
+            return data;
+        }
+
+        VTKBoxes(std::vector<Box_t> const& boxes)
+            : data(flatten(boxes))
+        {
+        }
+
+        Data_t const data;
+    };
+
+    struct VTKFileWriter;
+
+    struct VTKFileFieldInfo // assumes all primal
+    {
+        VTKFileFieldInfo(auto const& field, auto const& layout)
+            : lvl{std::to_string(layout.levelNumber())}
+            , ghost_box{layout.AMRGhostBoxFor(field)}
+            , local_box{layout.AMRToLocal(core::grow(ghost_box, -1 * layout.nbrGhosts()))}
+        {
+        }
+
+        auto static flat_cell(auto const& shape, auto const& icell)
+        {
+            if constexpr (dimension == 2)
+                return icell[1] + icell[0] * shape[1];
+            if constexpr (dimension == 3)
+                return icell[2] + icell[1] * shape[2] + icell[0] * shape[1] * shape[2];
+            return icell[0];
+        }
+
+        auto z_jump(auto const& shape, auto const& local_box) // only called in a 3d context
+        {
+            auto const second_slab_start = [&]() {
+                auto lo = local_box.lower;
+                lo[0] += 1;
+                return lo;
+            }();
+            return flat_cell(shape, second_slab_start) - flat_cell(shape, local_box.lower);
+        }
+
+        std::string lvl;
+        Box_t const ghost_box;
+        core::Box<std::uint32_t, dimension> const local_box;
+        std::uint32_t const primal_row_len = local_box.shape(dimension - 1);
+        std::string const path             = level_base + lvl + "/PointData/data";
+    };
+
+
+    struct VTKFileFieldWriter // assumes all primal
+    {
+        void write2D(auto const& field)
+        {
+            PHARE_LOG_LINE_SS(finfo.ghost_box << " " << finfo.local_box << " "
+                                              << finfo.primal_row_len);
+            auto ds          = fw->h5file.getDataSet(finfo.path);
+            auto const write = [&]() {
+                auto bit = finfo.local_box.begin();
+                for (std::uint32_t i = 0; i < finfo.local_box.rows();
+                     ++i, bit += finfo.primal_row_len, data_offset += finfo.primal_row_len)
+                {
+                    PHARE_LOG_LINE_SS(data_offset << " " << finfo.primal_row_len << " " << *bit);
+                    ds.select({data_offset}, {finfo.primal_row_len}).write_raw(&field(*bit));
+                }
+            };
+            write();
+            write();
+        }
+        void write3D(auto const& field)
+        {
+            auto ds             = fw->h5file.getDataSet(finfo.path);
+            auto const gb_shape = finfo.ghost_box.shape().as_unsigned().toArray();
+            auto const z_jump   = finfo.z_jump(gb_shape, finfo.local_box);
+            auto bit            = finfo.local_box.begin();
+            for (std::uint32_t s = 0; s < finfo.local_box.slabs(); ++s, bit += z_jump)
+                for (std::uint32_t i = 0; i < finfo.local_box.rows();
+                     ++i, bit += finfo.primal_row_len, data_offset += finfo.primal_row_len)
+                    ds.select({data_offset}, {finfo.primal_row_len}).write_raw(&field(*bit));
+        }
+        void operator()(auto const& field)
+        {
+            if constexpr (dimension == 2)
+                write2D(field);
+            if constexpr (dimension == 3)
+                write3D(field);
+        }
+
+        VTKFileWriter* fw;
+        VTKFileFieldInfo finfo;
+        std::size_t& data_offset = fw->data_offset; // NOT OWNED HERE
+    };
+
+    template<std::size_t rank>
+    struct VTKFileTensorFieldWriter // assumes all primal
+    {
+        auto static constexpr N = core::detail::tensor_field_dim_from_rank<rank>();
+
+        void write2D(auto const& tf)
+        {
+            auto ds = fw->h5file.getDataSet(finfo.path);
+
+            auto const write = [&]() {
+                auto bit = finfo.local_box.begin();
+                for (std::uint32_t i = 0; i < finfo.local_box.rows();
+                     ++i, bit += finfo.primal_row_len, data_offset += finfo.primal_row_len)
+                    for (std::uint32_t c = 0; c < N; ++c)
+                        ds.select({data_offset, c}, {finfo.primal_row_len, 1})
+                            .write_raw(&tf[c](*bit));
+            };
+            write();
+            write();
+        }
+        void write3D(auto const& tf)
+        {
+            auto ds             = fw->h5file.getDataSet(finfo.path);
+            auto const gb_shape = finfo.ghost_box.shape().as_unsigned().toArray();
+            auto const z_jump   = finfo.z_jump(gb_shape, finfo.local_box);
+            auto bit            = finfo.local_box.begin();
+            for (std::uint32_t s = 0; s < finfo.local_box.slabs(); ++s, bit += z_jump)
+                for (std::uint32_t i = 0; i < finfo.local_box.rows();
+                     ++i, bit += finfo.primal_row_len, data_offset += finfo.primal_row_len)
+                    for (std::uint32_t c = 0; c < N; ++c)
+                        ds.select({data_offset, c}, {finfo.primal_row_len, 1})
+                            .write_raw(&tf[c](*bit));
+        }
+        void operator()(auto const& tf)
+        {
+            if constexpr (dimension == 2)
+                write2D(tf);
+            if constexpr (dimension == 3)
+                write3D(tf);
+        }
+
+        VTKFileWriter* fw;
+        VTKFileFieldInfo finfo;
+        std::size_t& data_offset = fw->data_offset; // NOT OWNED HERE
+    };
+
+    struct VTKFileWriter
+    {
+        VTKFileWriter(auto& prop, auto tw)
+            : diagnostic{prop}
+            , typewriter{tw}
+            , h5file{tw->getOrCreateH5File(prop)}
+        {
+            {
+                initDSDefault(base + "/Steps/Values");
+                auto steps_group = h5file.file().getGroup(base + "/Steps");
+                if (!steps_group.hasAttribute("NSteps"))
+                    steps_group
+                        .template createAttribute<int>("NSteps", HighFive::DataSpace::From(0))
+                        .write(0);
+                auto steps_attr = steps_group.getAttribute("NSteps");
+                steps_attr.write(steps_attr.template read<int>() + 1);
+            }
+
+            {
+                auto const& timestamp = tw->h5Writer_.timestamp();
+                auto ds               = h5file.getDataSet(base + "/Steps/Values");
+                auto const old_size   = ds.getDimensions()[0];
+                ds.resize({old_size + 1});
+                ds.select({old_size}, {1}).write(timestamp);
+            }
+
+            auto root = h5file.file().getGroup(base);
+
+            if (!root.hasAttribute("Version"))
+                root.template createAttribute<std::array<int, 2>>("Version",
+                                                                  std::array<int, 2>{2, 2});
+
+            if (!root.hasAttribute("Origin"))
+                root.template createAttribute<std::array<int, 3>>("Origin",
+                                                                  std::array<int, 3>{0, 0, 0});
+
+            if (!root.hasAttribute("Type"))
+                root.template createAttribute<std::string>("Type", "OverlappingAMR");
+
+            if (!root.hasAttribute("GridDescription"))
+                root.template createAttribute<std::string>("GridDescription", "XYZ");
+        }
+
+        void writeField(auto const& field, auto const& layout)
+        {
+            PHARE_LOG_LINE_SS("writeField " << field.name());
+            VTKFileFieldWriter{this, {field, layout}}(field);
+            PHARE_LOG_LINE_SS("done");
+        }
+
+        template<std::size_t rank = 2> // TODO convert duals to primals
+        void writeTensorField(auto const& tf, auto const& layout)
+        {
+            PHARE_LOG_LINE_SS("writeTensorField " << tf.name());
+            VTKFileTensorFieldWriter<rank>{this, {tf[0], layout}}(tf);
+            PHARE_LOG_LINE_SS("done");
+        }
+
+        template<typename T = FloatType>
+        void initDS(auto const& path, auto const& ds) const
+        {
+            h5file.template create_chunked_data_set<T>(
+                path, std::vector<hsize_t>{detail::CHUNK_SIZE}, ds);
+        }
+
+        template<typename T = FloatType>
+        void initDSDefault(auto const& path) const
+        {
+            initDS<T>(path, HighFive::DataSpace({0}, {HighFive::DataSpace::UNLIMITED}));
+        }
+
+        void initFileLevel(int const level) const
+        {
+            auto const lvl = std::to_string(level);
+
+            { // lo0, up0, lo1, up1, lo2, up2
+                auto const path = level_base + lvl + "/AMRBox";
+                h5file.template create_chunked_data_set<int>(
+                    path, std::vector<hsize_t>{detail::CHUNK_SIZE, 6},
+                    HighFive::DataSpace({0, 6}, {HighFive::DataSpace::UNLIMITED, 6}));
+            }
+
+            auto const chucked_int_datasets = std::array{step_level + lvl + "/PointDataOffset/data",
+                                                         step_level + lvl + "/AMRBoxOffset",
+                                                         step_level + lvl + "/NumberOfAMRBox"};
+
+            for (auto const& path : chucked_int_datasets)
+            {
+                h5file.template create_chunked_data_set<int>(
+                    path, std::vector<hsize_t>{detail::CHUNK_SIZE},
+                    HighFive::DataSpace({0}, {HighFive::DataSpace::UNLIMITED}));
+            }
+        }
+
+        void initFieldFileLevel(int const level, auto& boxes)
+        {
+            PHARE_LOG_LINE_SS("initFieldFileLevel");
+            initDSDefault(level_base + std::to_string(level) + "/PointData/data");
+            resize(level, boxes);
+        }
+
+        template<std::size_t rank = 2>
+        void initTensorFieldFileLevel(auto const level, auto& boxes)
+        {
+            PHARE_LOG_LINE_SS("initTensorFieldFileLevel");
+            auto constexpr N = core::detail::tensor_field_dim_from_rank<rank>();
+            auto const path  = level_base + std::to_string(level) + "/PointData/data";
+            h5file.template create_chunked_data_set<FloatType>(
+                path, std::vector<hsize_t>{detail::CHUNK_SIZE, N},
+                HighFive::DataSpace({0, N}, {HighFive::DataSpace::UNLIMITED, N}));
+
+            resize<N>(level, boxes);
+        }
+
+
+
+        template<std::size_t N = 1>
+        void resize_data(auto const ilvl, auto const& boxes)
+        {
+            // data is per face of a cube (cell)
+            //  so 2d data is * 2
+            //  and 1d data is * 4
+            constexpr static auto X_TIMES = std::array{4, 2, /* 3d noop */ 1}[dimension - 1];
+
+            PHARE_LOG_LINE_SS("resize_data");
+            auto const lvl       = std::to_string(ilvl);
+            auto const data_path = level_base + lvl + "/PointData/data";
+            auto point_data_ds   = h5file.getDataSet(data_path);
+            data_offset          = point_data_ds.getDimensions()[0];
+
+            {
+                auto ds             = h5file.getDataSet(step_level + lvl + "/PointDataOffset/data");
+                auto const old_size = ds.getDimensions()[0];
+                ds.resize({old_size + 1});
+                ds.select({old_size}, {1}).write(data_offset);
+            }
+
+            auto const rank_data_size = core::mpi::collect(
+                core::sum_from(boxes, [](auto const& b) { return b.size() * X_TIMES; }));
+            auto const new_size = data_offset + core::sum(rank_data_size);
+
+            PHARE_LOG_LINE_SS(new_size);
+            if constexpr (N == 1)
+                point_data_ds.resize({new_size});
+            else
+                point_data_ds.resize({new_size, N});
+            for (int i = 0; i < core::mpi::rank(); ++i)
+                data_offset += rank_data_size[i];
+            PHARE_LOG_LINE_SS("done");
+        }
+
+
+        void resize_boxes(auto const ilvl, auto const& boxes)
+        {
+            PHARE_LOG_LINE_SS("resize_boxes");
+
+            auto const lvl           = std::to_string(ilvl);
+            auto const rank_box_size = core::mpi::collect(boxes.size());
+            auto const total_boxes   = core::sum(rank_box_size);
+
+            {
+                auto ds             = h5file.getDataSet(step_level + lvl + "/NumberOfAMRBox");
+                auto const old_size = ds.getDimensions()[0];
+                ds.resize({old_size + 1});
+                ds.select({old_size}, {1}).write(total_boxes);
+            }
+
+            auto amrbox_ds = h5file.getDataSet(level_base + lvl + "/AMRBox");
+            box_offset     = amrbox_ds.getDimensions()[0];
+
+            {
+                auto ds             = h5file.getDataSet(step_level + lvl + "/AMRBoxOffset");
+                auto const old_size = ds.getDimensions()[0];
+                ds.resize({old_size + 1});
+                ds.select({old_size}, {1}).write(box_offset);
+            }
+
+
+            amrbox_ds.resize({box_offset + total_boxes, 6});
+            PHARE_LOG_LINE_SS("resize");
+            for (int i = 0; i < core::mpi::rank(); ++i)
+                box_offset += rank_box_size[i];
+
+            PHARE_LOG_LINE_SS("writeBoxesForLevel");
+            auto const vtk_boxes = VTKBoxes{boxes};
+            amrbox_ds.select({box_offset, 0}, {boxes.size(), dimension * 2}).write(vtk_boxes.data);
+
+            PHARE_LOG_LINE_SS("done");
+        }
+
+        template<std::size_t N = 1>
+        void resize(auto const ilvl, auto& boxes)
+        {
+            resize_boxes(ilvl, boxes);
+            for (auto& box : boxes)
+                box.upper += 1; // primal
+            resize_data<N>(ilvl, boxes);
+        }
+
+
+        DiagnosticProperties& diagnostic;
+        H5TypeWriter<Writer>* typewriter;
+        HighFiveFile& h5file;
+        std::size_t box_offset = 0, data_offset = 0;
+    };
+
+
+    auto& getOrCreateH5File(DiagnosticProperties const& diagnostic)
+    {
+        if (!fileData_.count(diagnostic.quantity))
+            fileData_.emplace(diagnostic.quantity, this->h5Writer_.makeFile(diagnostic));
+        return *fileData_.at(diagnostic.quantity);
+    }
+
+
+    Writer& h5Writer_;
+    std::unordered_map<std::string, std::unique_ptr<HighFiveFile>> fileData_;
+};
+
+
+
+} // namespace PHARE::diagnostic::vtkh5
+
+#endif // PHARE_DIAGNOSTIC_DETAIL_VTK_H5_TYPE_WRITER_HPP

@@ -93,9 +93,27 @@ struct Box
         return *this;
     }
 
-    NO_DISCARD auto shape() const { return upper - lower + 1; }
-    NO_DISCARD auto size() const { return core::product(shape()); }
 
+    NO_DISCARD auto shape(std::size_t const i) const { return upper[i] - lower[i] + 1; }
+    NO_DISCARD auto shape() const { return upper - lower + 1; }
+    NO_DISCARD auto size() const { return core::product(shape(), std::size_t{1}); }
+
+    NO_DISCARD Type rows() const
+    {
+        if constexpr (dim == 1)
+            return 1;
+        if constexpr (dim == 2)
+            return shape(0);
+        if constexpr (dim == 3)
+            return shape(0) * shape(1);
+    }
+    NO_DISCARD Type slabs() const
+    {
+        if constexpr (dim == 1 || dim == 2)
+            return 1;
+        if constexpr (dim == 3)
+            return shape(0);
+    }
 
     using iterator = box_iterator<Type, dim>;
     NO_DISCARD auto begin() { return iterator{this, lower}; }
@@ -186,6 +204,39 @@ public:
     {
         increment(dim - 1);
         return *this;
+    }
+
+    auto& operator+=(std::uint32_t s)
+    {
+        auto lo = box_->upper;
+        for (std::uint16_t d = 0; d < dim; ++d)
+            lo[d] += 1 - box_->lower[d];
+        if constexpr (dim == 3)
+        {
+            {
+                auto const prod = lo[1] * lo[2];
+                auto const div  = s / prod;
+                s -= div * prod;
+                index_[0] += div;
+            }
+            auto const div = s / lo[2];
+            s -= div * lo[2];
+            index_[1] += div;
+        }
+        if constexpr (dim == 2)
+        {
+            auto const div = s / lo[1];
+            s -= div * lo[1];
+            index_[0] += div;
+        }
+        index_[dim - 1] += s;
+        return *this;
+    }
+    auto operator+(std::uint32_t const s) const
+    {
+        auto copy = *this;
+        copy += s;
+        return copy;
     }
 
     bool operator!=(box_iterator const& other) const
