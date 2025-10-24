@@ -29,7 +29,6 @@ using HiFile = HighFive::File;
 using FileOp = HighFive::File::AccessMode;
 
 
-
 template<typename Data, std::size_t dim>
 NO_DISCARD auto vector_for_dim()
 {
@@ -132,6 +131,7 @@ public:
         if (exist(path))
             return h5file_.getDataSet(path);
         createGroupsToDataSet(path);
+
         HighFive::DataSetCreateProps props;
         props.add(HighFive::Chunking{chunk});
         return h5file_.createDataSet(path, dataspace, HighFive::create_datatype<Type>(), props);

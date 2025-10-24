@@ -23,7 +23,6 @@ namespace PHARE::diagnostic::vtkh5
 using namespace hdf5::h5;
 
 
-
 template<typename _ModelView>
 class H5Writer
 {

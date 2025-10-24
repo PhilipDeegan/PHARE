@@ -16,10 +16,10 @@ ph.NO_GUI()
 cpp = cpp_lib()
 
 
-cells = (200, 100)
+cells = (100, 100)
 time_step = 0.005
 final_time = 0.01
-timestamps = [0, final_time/2,final_time] #np.arange(0, final_time + time_step, final_time / 5)
+timestamps = [0, final_time / 2, final_time]
 diag_dir = "phare_outputs/harris_2d"
 
 
@@ -27,19 +27,20 @@ def config():
     L = 0.5
 
     sim = ph.Simulation(
+        # smallest_patch_size=50,
+        # largest_patch_size=50,
         time_step=time_step,
         final_time=final_time,
         cells=cells,
         dl=(0.40, 0.40),
         refinement="tagging",
-        max_nbr_levels=2,
+        max_nbr_levels=1,
         hyper_resistivity=0.002,
         resistivity=0.001,
         diag_options={
-            "format": "phareh5",
+            "format": "pharevtkh5",
             "options": {"dir": diag_dir, "mode": "overwrite"},
         },
-
         restart_options={
             "dir": "checkpoints",
             "mode": "overwrite",

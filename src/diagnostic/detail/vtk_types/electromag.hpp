@@ -7,6 +7,7 @@
 #include <optional>
 #include <unordered_map>
 
+
 namespace PHARE::diagnostic::vtkh5
 {
 
@@ -16,6 +17,7 @@ class ElectromagDiagnosticWriter : public H5TypeWriter<H5Writer>
     using Super              = H5TypeWriter<H5Writer>;
     using VTKFileWriter      = Super::VTKFileWriter;
     using VTKFileInitializer = Super::VTKFileInitializer;
+
 
 public:
     ElectromagDiagnosticWriter(H5Writer& h5Writer)
