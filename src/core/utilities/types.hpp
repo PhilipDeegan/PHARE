@@ -461,6 +461,13 @@ constexpr auto for_N(Fn&& fn)
     return for_N<N, M>(fn);
 }
 
+
+template<std::uint16_t N, typename Fn>
+constexpr auto for_N_make_array(Fn&& fn)
+{
+    return for_N<N, for_N_R_mode::make_array>(fn);
+}
+
 template<std::uint16_t N, typename Fn>
 NO_DISCARD constexpr auto for_N_all(Fn&& fn)
 {
