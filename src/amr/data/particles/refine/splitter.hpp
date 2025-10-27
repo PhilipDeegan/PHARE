@@ -1,15 +1,19 @@
 #ifndef PHARE_SPLITTER_HPP
 #define PHARE_SPLITTER_HPP
 
+#include "core/utilities/types.hpp"
+#include "core/utilities/point/point.hpp"
+#include "core/data/particles/particle_array_def.hpp"
+
+#include "amr/amr_constants.hpp"
+
 #include <array>
 #include <cmath>
 #include <tuple>
 #include <cassert>
 #include <cstdint>
 #include <cstddef>
-#include "core/utilities/types.hpp"
-#include "core/utilities/point/point.hpp"
-#include "amr/amr_constants.hpp"
+
 
 namespace PHARE::amr
 {
@@ -53,52 +57,61 @@ public:
     {
     }
 
-    template<typename Particle, typename Particles>
-    inline void operator()(Particle const& coarsePartOnRefinedGrid, Particles& refinedParticles,
-                           std::size_t idx = 0) const
+
+
+    template<typename FineiCellDelta, typename ParticleIt, typename Particles>
+    inline void operator()(FineiCellDelta const& fine, ParticleIt const& coarseParticle,
+                           Particles& refinedParticles, size_t idx = 0) const
     {
-        dispatch_(coarsePartOnRefinedGrid, refinedParticles, idx);
+        dispatch(fine, coarseParticle, refinedParticles, idx);
     }
 
     std::tuple<Patterns...> patterns{};
     std::size_t nbRefinedParts{0};
 
 private:
-    template<typename Particle, typename Particles>
+    template<typename FineiCellDelta, typename ParticleIt, typename Particles>
+    void dispatch(FineiCellDelta const& fine, ParticleIt const& particle, //
+                  Particles& particles, std::size_t idx) const
 
-    void dispatch(Particle const& particle, Particles& particles, std::size_t idx) const
+
     {
-        using Weight_t = std::decay_t<decltype(particle.weight)>;
-        using Delta_t  = std::decay_t<decltype(particle.delta[0])>;
+        using Weight_t = std::decay_t<decltype(particle.weight())>;
+        using Delta_t  = std::decay_t<decltype(particle.delta()[0])>;
 
-        constexpr auto dimension = Particle::dimension;
+        constexpr auto dimension = ParticleIt::dimension;
         constexpr auto refRatio  = PHARE::amr::refinementRatio;
         constexpr std::array power{refRatio, refRatio * refRatio, refRatio * refRatio * refRatio};
 
         assert(particles.size() >= idx + nbRefinedParts);
 
-        using FineParticle = decltype(particles[0]); // may be a reference
+        auto split = [&](auto& fineParticle, auto& pattern, auto const& rpIndex) {
+            fineParticle.weight()
+                = particle.weight() * static_cast<Weight_t>(pattern.weight_) * power[dimension - 1];
+            fineParticle.charge() = particle.charge();
+            fineParticle.iCell()  = fine.iCell();
+            fineParticle.delta()  = fine.delta();
+            fineParticle.v()      = particle.v();
+
+            for (size_t iDim = 0; iDim < dimension; iDim++)
+            {
+                fineParticle.delta()[iDim] += static_cast<Delta_t>(pattern.deltas_[rpIndex][iDim]);
+                Delta_t integra = std::floor(fineParticle.delta()[iDim]);
+                fineParticle.delta()[iDim] -= integra;
+                fineParticle.iCell()[iDim] += static_cast<int32_t>(integra);
+            }
+        };
 
         core::apply(patterns, [&](auto const& pattern) {
             auto weight = static_cast<Weight_t>(pattern.weight_);
             for (size_t rpIndex = 0; rpIndex < pattern.deltas_.size(); rpIndex++)
             {
-                FineParticle fineParticle = particles[idx++];
-                fineParticle.weight       = particle.weight * static_cast<Weight_t>(pattern.weight_)
-                                      * power[dimension - 1];
-                fineParticle.charge = particle.charge;
-                fineParticle.iCell  = particle.iCell;
-                fineParticle.delta  = particle.delta;
-                fineParticle.v      = particle.v;
+                auto fineParticle = particles.begin() + idx++;
 
-                for (size_t iDim = 0; iDim < dimension; iDim++)
-                {
-                    fineParticle.delta[iDim]
-                        += static_cast<Delta_t>(pattern.deltas_[rpIndex][iDim]);
-                    Delta_t integra = std::floor(fineParticle.delta[iDim]);
-                    fineParticle.delta[iDim] -= integra;
-                    fineParticle.iCell[iDim] += static_cast<int32_t>(integra);
-                }
+                if constexpr (Particles::layout_mode == core::LayoutMode::SoA)
+                    split(fineParticle, pattern, rpIndex);
+                else
+                    split(*fineParticle, pattern, rpIndex);
             }
         });
     }
@@ -162,6 +175,7 @@ template<typename dim>
 struct WhitePattern
 {
 };
+
 
 } // namespace PHARE::amr
 

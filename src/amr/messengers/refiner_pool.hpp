@@ -98,13 +98,11 @@ namespace amr
 
 
 
-        void registerLevel(std::shared_ptr<SAMRAI::hier::PatchHierarchy> const& hierarchy,
-                           std::shared_ptr<SAMRAI::hier::PatchLevel> const& level)
+
+        void registerLevel(auto&&... args)
         {
             for (auto& [_, refiner] : refiners_)
-            {
-                refiner.registerLevel(hierarchy, level);
-            }
+                refiner.registerLevel(args...);
         }
 
 
@@ -230,6 +228,7 @@ void RefinerPool<ResourcesManager, Type>::addTimeRefiners(
     std::shared_ptr<SAMRAI::xfer::VariableFillPattern> fillPattern)
 {
     for (auto const& ghostVec : ghostVecs)
+
         addTimeRefiner(ghostVec, modelVec, oldModelVec, refineOp, timeOp, ghostVec, fillPattern);
 }
 

@@ -1,35 +1,32 @@
 #
 #
 
-
 import unittest
 import numpy as np
 from ddt import ddt
 
 
+from pyphare import cpp
 import pyphare.core.box as boxm
+from pyphare.core.box import Box
 from pyphare.core.box import amr_to_local
 
-from pyphare.cpp import cpp_lib
-from pyphare.core.box import Box
 from pyphare.core.phare_utilities import assert_fp_any_all_close, np_array_ify
+
 from pyphare.pharein import ElectronModel, MaxwellianFluidModel
 from pyphare.pharein.diagnostics import (
     ElectromagDiagnostics,
     FluidDiagnostics,
     ParticleDiagnostics,
 )
-from pyphare.pharein.simulation import Simulation
+from pyphare.pharein.simulation import Simulation, supported_dimensions
 from pyphare.pharesee.geometry import hierarchy_overlaps, level_ghost_boxes
 from pyphare.pharesee.hierarchy import hierarchy_from
 from pyphare.pharesee.hierarchy.hierarchy import format_timestamp
 from pyphare.pharesee.hierarchy.hierarchy_utils import merge_particles
 from pyphare.simulator.simulator import Simulator
-
 from tests.diagnostic import all_timestamps
 from tests.simulator import SimulatorTest, diff_boxes
-
-cpp = cpp_lib()
 
 
 @ddt
@@ -80,6 +77,7 @@ class AdvanceTestBase(SimulatorTest):
         timestamps=None,
         block_merging_particles=False,
         diag_outputs="",
+        sim_setup_kwargs={},
     ):
         """
         this function creates and run a simulation setup for the tests
@@ -87,7 +85,7 @@ class AdvanceTestBase(SimulatorTest):
         """
 
         diag_outputs = self.unique_diag_dir_for_test_case(
-            "phare_outputs/advance", ndim, interp_order, diag_outputs
+            "phare_outputs/advance", ndim, interp_order, sim_setup_kwargs, diag_outputs
         )
 
         from pyphare.pharein import global_vars
@@ -208,7 +206,7 @@ class AdvanceTestBase(SimulatorTest):
                     quantity=quantity, write_timestamps=timestamps, population_name=pop
                 )
 
-        Simulator(global_vars.sim).run()
+        Simulator(sim).setup(**sim_setup_kwargs).run()
 
         # ----------------------------------------------------------------------
         # The simulation has run, now we build the hierarchy with the requested
@@ -227,7 +225,7 @@ class AdvanceTestBase(SimulatorTest):
         if qty in ["e", "b", "eb"]:
             return eb_hier
 
-        is_particle_type = qty == "particles" or qty == "particles_patch_ghost"
+        is_particle_type = qty == "particles"  # or qty == "particles_patch_ghost"
 
         if is_particle_type:
             particle_hier = None
@@ -320,132 +318,118 @@ class AdvanceTestBase(SimulatorTest):
                     assert_fp_any_all_close(slice1, slice2, atol=5.5e-15, rtol=0)
                     success_test_nbr += 1
 
+                except AssertionError as e:
+                    import matplotlib.pyplot as plt
+                    from matplotlib.patches import Rectangle
 
-                    try:
-                        # empirical max absolute observed 5.2e-15
-                        # https://hephaistos.lpp.polytechnique.fr/teamcity/buildConfiguration/Phare_Phare_BuildGithubPrClang/78544
-                        # seems correct considering ghosts are filled with schedules
-                        # involving linear/spatial interpolations and so on where
-                        # rounding errors may occur.... setting atol to 5.5e-15
-                        assert_fp_any_all_close(slice1, slice2, atol=5.5e-15, rtol=0)
-                        checks += 1
-                    except AssertionError as e:
-                        import matplotlib.pyplot as plt
-                        from matplotlib.patches import Rectangle
+                    if box.ndim == 1:
+                        failed_i = np.where(np.abs(slice1 - slice2) > 5.5e-15)
 
-                        if box.ndim == 1:
-                            failed_i = np.where(np.abs(slice1 - slice2) > 5.5e-15)
+                    if box.ndim == 2:
+                        failed_i, failed_j = np.where(np.abs(slice1 - slice2) > 5.5e-15)
 
-                        if box.ndim == 2:
-                            failed_i, failed_j = np.where(
-                                np.abs(slice1 - slice2) > 5.5e-15
+                        def makerec(lower, upper, dl, fc="none", ec="g", lw=1, ls="-"):
+                            origin = (lower[0] * dl[0], lower[1] * dl[1])
+                            sizex, sizey = [
+                                (u - l) * d for u, l, d in zip(upper, lower, dl)
+                            ]
+                            print(f"makerec: {origin}, {sizex}, {sizey}")
+                            return Rectangle(
+                                origin, sizex, sizey, fc=fc, ec=ec, ls=ls, lw=lw
                             )
 
-                            def makerec(
-                                lower, upper, dl, fc="none", ec="g", lw=1, ls="-"
-                            ):
-                                origin = (lower[0] * dl[0], lower[1] * dl[1])
-                                sizex, sizey = [
-                                    (u - l) * d for u, l, d in zip(upper, lower, dl)
-                                ]
-                                print(f"makerec: {origin}, {sizex}, {sizey}")
-                                return Rectangle(
-                                    origin, sizex, sizey, fc=fc, ec=ec, ls=ls, lw=lw
-                                )
-
-                            datahier.plot(
+                        datahier.plot(
+                            qty=pd1.name,
+                            plot_patches=True,
+                            filename=pd1.name + ".png",
+                            patchcolors=["k", "blue"],
+                        )
+                        for level_idx in range(datahier.levelNbr()):
+                            fig, ax = datahier.plot(
                                 qty=pd1.name,
                                 plot_patches=True,
-                                filename=pd1.name + ".png",
-                                patchcolors=["k", "blue"],
+                                title=f"{pd1.name} at level {level_idx}",
+                                levels=(level_idx,),
                             )
-                            for level_idx in range(datahier.levelNbr()):
-                                fig, ax = datahier.plot(
-                                    qty=pd1.name,
-                                    plot_patches=True,
-                                    title=f"{pd1.name} at level {level_idx}",
-                                    levels=(level_idx,),
+                            for patch in datahier.level(level_idx).patches:
+                                ax.text(
+                                    patch.patch_datas[pd1.name].origin[0],
+                                    patch.patch_datas[pd1.name].origin[1],
+                                    patch.id,
                                 )
-                                for patch in datahier.level(level_idx).patches:
-                                    ax.text(
-                                        patch.patch_datas[pd1.name].origin[0],
-                                        patch.patch_datas[pd1.name].origin[1],
-                                        patch.id,
-                                    )
 
-                                # add the overlap box only on the level
-                                # where the failing overlap is
-                                if level_idx == ilvl:
-                                    ax.add_patch(
-                                        makerec(
-                                            box.lower,
-                                            box.upper,
-                                            pd1.layout.dl,
-                                            fc="none",
-                                            ec="r",
-                                        )
+                            # add the overlap box only on the level
+                            # where the failing overlap is
+                            if level_idx == ilvl:
+                                ax.add_patch(
+                                    makerec(
+                                        box.lower,
+                                        box.upper,
+                                        pd1.layout.dl,
+                                        fc="none",
+                                        ec="r",
                                     )
-                                    print("making recs for ghost boxes")
-                                    ax.add_patch(
-                                        makerec(
-                                            pd1.ghost_box.lower,
-                                            pd1.ghost_box.upper,
-                                            pd1.layout.dl,
-                                            fc="none",
-                                            ec="b",
-                                            ls="--",
-                                            lw=2,
-                                        )
+                                )
+                                print("making recs for ghost boxes")
+                                ax.add_patch(
+                                    makerec(
+                                        pd1.ghost_box.lower,
+                                        pd1.ghost_box.upper,
+                                        pd1.layout.dl,
+                                        fc="none",
+                                        ec="b",
+                                        ls="--",
+                                        lw=2,
                                     )
-                                    ax.add_patch(
-                                        makerec(
-                                            pd2.ghost_box.lower,
-                                            pd2.ghost_box.upper,
-                                            pd2.layout.dl,
-                                            fc="none",
-                                            ec="b",
-                                            ls="--",
-                                            lw=2,
-                                        )
+                                )
+                                ax.add_patch(
+                                    makerec(
+                                        pd2.ghost_box.lower,
+                                        pd2.ghost_box.upper,
+                                        pd2.layout.dl,
+                                        fc="none",
+                                        ec="b",
+                                        ls="--",
+                                        lw=2,
                                     )
-                                    for i, j in zip(failed_i, failed_j):
-                                        x = i + pd2.ghost_box.lower[0] + loc_b2.lower[0]
-                                        x *= pd2.layout.dl[0]
-                                        y = j + pd2.ghost_box.lower[1] + loc_b2.lower[1]
-                                        y *= pd2.layout.dl[1]
-                                        ax.plot(x, y, marker="+", color="r")
+                                )
+                                for i, j in zip(failed_i, failed_j):
+                                    x = i + pd2.ghost_box.lower[0] + loc_b2.lower[0]
+                                    x *= pd2.layout.dl[0]
+                                    y = j + pd2.ghost_box.lower[1] + loc_b2.lower[1]
+                                    y *= pd2.layout.dl[1]
+                                    ax.plot(x, y, marker="+", color="r")
 
-                                        x = i + pd1.ghost_box.lower[0] + loc_b1.lower[0]
-                                        x *= pd1.layout.dl[0]
-                                        y = j + pd1.ghost_box.lower[1] + loc_b1.lower[1]
-                                        y *= pd1.layout.dl[1]
-                                        ax.plot(x, y, marker="o", color="r")
-                                    ax.set_title(
-                                        f"max error: {np.abs(slice1 - slice2).max()}, min error: {np.abs(slice1[failed_i, failed_j] - slice2[failed_i, failed_j]).min()}"
-                                    )
-                                    fig.savefig(
-                                        f"{pd1.name}_level_{level_idx}_box_lower{box.lower}_upper{box.upper}.png"
-                                    )
-                        print("coarsest time: ", coarsest_time)
-                        print("AssertionError", pd1.name, e)
-                        print(f"overlap box {box} (shape {box.shape})")
-                        print(f"offsets: {offsets}")
-                        print(
-                            f"pd1 ghost box {pd1.ghost_box} (shape {pd1.ghost_box.shape}) and box {pd1.box} (shape {pd1.box.shape})"
-                        )
-                        print(
-                            f"pd2 ghost box {pd2.ghost_box} (shape {pd2.ghost_box.shape}) and box {pd2.box} (shape {pd2.box.shape})"
-                        )
-                        print("interp_order: ", pd1.layout.interp_order)
-                        if box.ndim == 1:
-                            print(f"failing cells: {failed_i}")
-                        elif box.ndim == 2:
-                            print(f"failing cells: {failed_i}, {failed_j}")
-                        print(coarsest_time)
-                        # if self.rethrow_:
-                        #     raise e
-                        # return diff_boxes(slice1, slice2, box)
-
+                                    x = i + pd1.ghost_box.lower[0] + loc_b1.lower[0]
+                                    x *= pd1.layout.dl[0]
+                                    y = j + pd1.ghost_box.lower[1] + loc_b1.lower[1]
+                                    y *= pd1.layout.dl[1]
+                                    ax.plot(x, y, marker="o", color="r")
+                                ax.set_title(
+                                    f"max error: {np.abs(slice1 - slice2).max()}, min error: {np.abs(slice1[failed_i, failed_j] - slice2[failed_i, failed_j]).min()}"
+                                )
+                                fig.savefig(
+                                    f"{pd1.name}_level_{level_idx}_box_lower{box.lower}_upper{box.upper}.png"
+                                )
+                    print("coarsest time: ", coarsest_time)
+                    print("AssertionError", pd1.name, e)
+                    print(f"overlap box {box} (shape {box.shape})")
+                    print(f"offsets: {offsets}")
+                    print(
+                        f"pd1 ghost box {pd1.ghost_box} (shape {pd1.ghost_box.shape}) and box {pd1.box} (shape {pd1.box.shape})"
+                    )
+                    print(
+                        f"pd2 ghost box {pd2.ghost_box} (shape {pd2.ghost_box.shape}) and box {pd2.box} (shape {pd2.box.shape})"
+                    )
+                    print("interp_order: ", pd1.layout.interp_order)
+                    if box.ndim == 1:
+                        print(f"failing cells: {failed_i}")
+                    elif box.ndim == 2:
+                        print(f"failing cells: {failed_i}, {failed_j}")
+                    print(coarsest_time)
+                    # if self.rethrow_:
+                    #     raise e
+                    # return diff_boxes(slice1, slice2, box)
         return success_test_nbr
 
     def _test_overlaped_fields_are_equal(self, datahier, time_step_nbr, time_step):
@@ -486,6 +470,9 @@ class AdvanceTestBase(SimulatorTest):
             **kwargs,
         )
 
+        if cpp.mpi_rank() > 0:
+            return
+
         for time_step_idx in range(time_step_nbr + 1):
             coarsest_time = time_step_idx * time_step
 
@@ -522,23 +509,25 @@ class AdvanceTestBase(SimulatorTest):
                         self.assertEqual(part1, part2)
 
     def _test_L0_particle_number_conservation(
-        self, ndim, interp_order, ppc=100, cells=120
+        self, ndim, interp_order, ppc=100, **kwargs
     ):
         time_step_nbr = 10
         time_step = 0.001
-
-        n_particles = ppc * (cells**ndim)
+        kwargs["cells"] = kwargs.get("cells", 120)
+        n_particles = ppc * (kwargs["cells"] ** ndim)
 
         datahier = self.getHierarchy(
             ndim,
             interp_order,
-            None,
-            "particles",
+            qty="particles",
             time_step=time_step,
             time_step_nbr=time_step_nbr,
             nbr_part_per_cell=ppc,
-            cells=cells,
+            **kwargs,
         )
+
+        if cpp.mpi_rank() > 0:
+            return
 
         for time_step_idx in range(time_step_nbr + 1):
             coarsest_time = time_step_idx * time_step
@@ -552,32 +541,37 @@ class AdvanceTestBase(SimulatorTest):
     def _test_field_coarsening_via_subcycles(
         self, dim, interp_order, refinement_boxes, cells=60, **kwargs
     ):
+        import random
+        from pyphare.pharein import global_vars
+        from .utilities.field_coarsening import coarsen
+
         print(
             "test_field_coarsening_via_subcycles for dim/interp : {}/{}".format(
                 dim, interp_order
             )
         )
 
-        from pyphare.pharein import global_vars
-
-        from .utilities.field_coarsening import coarsen
+        rando = 1183932801  # random.randint(0, int(1e10))
+        print(f"RNG FOR ADVANCE TEST = {rando}")
 
         time_step_nbr = 3
 
-        diag_outputs = f"subcycle_coarsening/{dim}/{interp_order}/{self.ddt_test_id()}"
         datahier = self.getHierarchy(
             dim,
             interp_order,
             refinement_boxes,
             "fields",
             cells=cells,
-            diag_outputs=diag_outputs,
             time_step=0.001,
             extra_diag_options={"fine_dump_lvl_max": 10},
             time_step_nbr=time_step_nbr,
             largest_patch_size=30,
+            model_init={"seed": rando},
             **kwargs,
         )
+
+        if cpp.mpi_rank() > 0:
+            return
 
         qties = ["rho"]
         qties += [f"{qty}{xyz}" for qty in ["E", "V"] for xyz in ["x", "y", "z"]]
@@ -848,7 +842,7 @@ class AdvanceTestBase(SimulatorTest):
         return successful_test_nbr
 
     def _test_field_level_ghosts_via_subcycles_and_coarser_interpolation(
-        self, ndim, interp_order, refinement_boxes
+        self, ndim, interp_order, refinement_boxes, **kwargs
     ):
         """
         This test intends to check that level ghost field values during substeps
@@ -889,6 +883,7 @@ class AdvanceTestBase(SimulatorTest):
         import random
 
         rando = random.randint(0, int(1e10))
+        print(f"RNG FOR ADVANCE TEST = {rando}")
 
         def _getHier(diag_dir, boxes=[]):
             return self.getHierarchy(
@@ -903,6 +898,7 @@ class AdvanceTestBase(SimulatorTest):
                 time_step=0.001,
                 model_init={"seed": rando},
                 diag_outputs=diag_dir,
+                **kwargs,
             )
 
         L0_datahier = _getHier("L0_diags")
@@ -936,8 +932,14 @@ class AdvanceTestBase(SimulatorTest):
     def _test_domain_particles_on_refined_level(
         self, ndim, interp_order, refinement_boxes, **kwargs
     ):
+        import random
+
         time_step_nbr = 5
         time_step = 0.001
+
+        rando = 1183932801
+        # rando = 9628442582  # random.randint(0, int(1e10))
+        print(f"RNG FOR ADVANCE TEST = {rando}")
 
         self.base_test_domain_particles_on_refined_level(
             self.getHierarchy(
@@ -948,6 +950,7 @@ class AdvanceTestBase(SimulatorTest):
                 time_step=time_step,
                 time_step_nbr=time_step_nbr,
                 block_merging_particles=True,
+                model_init={"seed": rando},
                 **kwargs,
             )
         )

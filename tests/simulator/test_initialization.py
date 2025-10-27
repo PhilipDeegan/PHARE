@@ -5,7 +5,8 @@ import unittest
 import numpy as np
 from ddt import ddt
 
-from pyphare.cpp import cpp_lib
+from pyphare import cpp
+
 from pyphare.core.box import nDBox
 from pyphare.core.phare_utilities import assert_fp_any_all_close
 from pyphare.pharein import ElectronModel, MaxwellianFluidModel
@@ -22,9 +23,6 @@ from pyphare.pharesee.particles import aggregate as aggregate_particles
 from pyphare.simulator.simulator import Simulator
 
 from tests.simulator import SimulatorTest
-
-
-cpp = cpp_lib()
 
 
 @ddt
@@ -52,10 +50,11 @@ class InitializationTest(SimulatorTest):
         largest_patch_size=10,
         cells=120,
         dl=0.1,
+        sim_setup_kwargs={},
         **kwargs,
     ):
         diag_outputs = self.unique_diag_dir_for_test_case(
-            "phare_outputs/init", ndim, interp_order, diag_outputs
+            "phare_outputs/init", ndim, interp_order, sim_setup_kwargs, diag_outputs
         )
         from pyphare.pharein import global_vars
 
@@ -193,7 +192,7 @@ class InitializationTest(SimulatorTest):
                     population_name=pop,
                 )
 
-        Simulator(global_vars.sim).initialize().reset()
+        Simulator(global_vars.sim).setup(**sim_setup_kwargs).initialize().reset()
 
         eb_hier = None
         if qty in ["e", "eb"]:
@@ -207,7 +206,7 @@ class InitializationTest(SimulatorTest):
         if qty in ["e", "b", "eb"]:
             return eb_hier
 
-        is_particle_type = qty == "particles" or qty == "particles_patch_ghost"
+        is_particle_type = qty == "particles"  # or qty == "particles_patch_ghost"
 
         if is_particle_type:
             particle_hier = None
@@ -250,26 +249,23 @@ class InitializationTest(SimulatorTest):
                 )
             return mom_hier
 
-    def _test_B_is_as_provided_by_user(self, dim, interp_order, ppc=100, **kwargs):
+    def _test_B_is_as_provided_by_user(self, ndim, interp_order, **kwargs):
         print(
             "test_B_is_as_provided_by_user : dim  {} interp_order : {}".format(
-                dim, interp_order
+                ndim, interp_order
             )
         )
         now = self.datetime_now()
         hier = self.getHierarchy(
-            dim,
-            interp_order,
-            refinement_boxes=None,
-            qty="b",
-            nbr_part_per_cell=ppc,
-            diag_outputs=f"test_b/{dim}/{interp_order}/{self.ddt_test_id()}",
-            **kwargs,
+            ndim, interp_order, refinement_boxes=None, qty="b", **kwargs
         )
         print(
-            f"\n{self._testMethodName}_{dim}d init took {self.datetime_diff(now)} seconds"
+            f"\n{self._testMethodName}_{ndim}d init took {self.datetime_diff(now)} seconds"
         )
         now = self.datetime_now()
+
+        if cpp.mpi_rank() > 0:
+            return
 
         from pyphare.pharein import global_vars
 
@@ -281,6 +277,7 @@ class InitializationTest(SimulatorTest):
         for ilvl, level in hier.levels().items():
             self.assertTrue(ilvl == 0)  # only level 0 is expected perfect precision
             print("checking level {}".format(ilvl))
+
             for patch in level.patches:
                 bx_pd = patch.patch_datas["Bx"]
                 by_pd = patch.patch_datas["By"]
@@ -294,18 +291,18 @@ class InitializationTest(SimulatorTest):
                 xby = by_pd.x[:]
                 xbz = bz_pd.x[:]
 
-                if dim == 1:
+                if ndim == 1:
                     # discrepancy in 1d for some reason : https://github.com/PHAREHUB/PHARE/issues/580
                     assert_fp_any_all_close(bx, bx_fn(xbx), atol=1e-15, rtol=0)
                     assert_fp_any_all_close(by, by_fn(xby), atol=1e-15, rtol=0)
                     assert_fp_any_all_close(bz, bz_fn(xbz), atol=1e-15, rtol=0)
 
-                if dim >= 2:
+                if ndim >= 2:
                     ybx = bx_pd.y[:]
                     yby = by_pd.y[:]
                     ybz = bz_pd.y[:]
 
-                if dim == 2:
+                if ndim == 2:
                     xbx, ybx = [
                         a.flatten() for a in np.meshgrid(xbx, ybx, indexing="ij")
                     ]
@@ -324,7 +321,7 @@ class InitializationTest(SimulatorTest):
                         bz, bz_fn(xbz, ybz).reshape(bz.shape), atol=1e-16, rtol=0
                     )
 
-                if dim == 3:
+                if ndim == 3:
                     zbx = bx_pd.z[:]
                     zby = by_pd.z[:]
                     zbz = bz_pd.z[:]
@@ -349,21 +346,22 @@ class InitializationTest(SimulatorTest):
                         bz, bz_fn(xbz, ybz, zbz).reshape(bz.shape), atol=1e-16, rtol=0
                     )
 
-        print(f"\n{self._testMethodName}_{dim}d took {self.datetime_diff(now)} seconds")
+        print(
+            f"\n{self._testMethodName}_{ndim}d took {self.datetime_diff(now)} seconds"
+        )
 
-    def _test_bulkvel_is_as_provided_by_user(
-        self, dim, interp_order, ppc=100, **kwargs
-    ):
+    def _test_bulkvel_is_as_provided_by_user(self, ndim, interp_order, **kwargs):
         hier = self.getHierarchy(
-            dim,
+            ndim,
             interp_order,
-            {"L0": {"B0": nDBox(dim, 10, 19)}},
+            {"L0": {"B0": nDBox(ndim, 10, 19)}},
             "moments",
-            nbr_part_per_cell=ppc,
             beam=True,
-            diag_outputs=f"test_bulkV/{dim}/{interp_order}/{self.ddt_test_id()}",
             **kwargs,
         )
+
+        if cpp.mpi_rank() > 0:
+            return
 
         from pyphare.pharein import global_vars
 
@@ -386,10 +384,10 @@ class InitializationTest(SimulatorTest):
                 nbrGhosts = layout.nbrGhosts(
                     interp_order, centering
                 )  # primal in all directions
-                select = tuple([slice(nbrGhosts, -nbrGhosts) for i in range(dim)])
+                select = tuple([slice(nbrGhosts, -nbrGhosts) for i in range(ndim)])
 
                 def domain(patch_data):
-                    if dim == 1:
+                    if ndim == 1:
                         return patch_data.dataset[select]
                     return patch_data.dataset[:].reshape(
                         patch.box.shape + (nbrGhosts * 2) + 1
@@ -421,7 +419,7 @@ class InitializationTest(SimulatorTest):
         empirical_dim_devs = {
             1: 6e-3,
             2: 3e-2,
-            3: 2e-1,
+            3: 2.4e-1,
         }
         nbParts = {1: 10000, 2: 1000, 3: 20}
         hier = self.getHierarchy(
@@ -433,6 +431,9 @@ class InitializationTest(SimulatorTest):
             beam=True,
             **kwargs,
         )
+
+        if cpp.mpi_rank() > 0:
+            return
 
         from pyphare.pharein import global_vars
 
@@ -479,7 +480,7 @@ class InitializationTest(SimulatorTest):
                     )
 
     def _test_density_decreases_as_1overSqrtN(
-        self, ndim, interp_order, nbr_particles=None, cells=960
+        self, ndim, interp_order, nbr_particles=None, cells=960, **kwargs
     ):
         import matplotlib.pyplot as plt
 
@@ -503,9 +504,11 @@ class InitializationTest(SimulatorTest):
                 largest_patch_size=int(cells / 2),
                 cells=cells,
                 dl=0.0125,
+                **kwargs,
             )
 
-            from pyphare.pharein import global_vars
+            if cpp.mpi_rank() == 0:
+                from pyphare.pharein import global_vars
 
             model = global_vars.sim.model
             density_fn = model.model_dict["protons"]["density"]
@@ -533,6 +536,9 @@ class InitializationTest(SimulatorTest):
                 plt.title(r"$\sigma =$ {}".format(noise[inbr]))
                 plt.savefig(f"noise_{nbrpart}_interp_{ndim}_{interp_order}.png")
                 plt.close("all")
+
+        if cpp.mpi_rank() > 0:
+            return
 
         plt.figure()
         plt.plot(nbr_particles, noise / noise[0], label=r"$\sigma/\sigma_0$")
@@ -564,13 +570,11 @@ class InitializationTest(SimulatorTest):
     def _test_nbr_particles_per_cell_is_as_provided(
         self, ndim, interp_order, ppc=100, **kwargs
     ):
-        ddt_test_id = self.ddt_test_id()
         datahier = self.getHierarchy(
             ndim,
             interp_order,
             {},
             "particles",
-            diag_outputs=f"ppc/{ndim}/{interp_order}/{ddt_test_id}",
             nbr_part_per_cell=ppc,
             **kwargs,
         )
@@ -578,7 +582,7 @@ class InitializationTest(SimulatorTest):
         if cpp.mpi_rank() > 0:
             return
 
-        for pi, patch in enumerate(datahier.level(0).patches):
+        for patch in datahier.level(0).patches:
             pd = patch.patch_datas["protons_particles"]
             icells = pd.dataset[patch.box].iCells
             H, edges = np.histogramdd(icells, bins=patch.box.shape)

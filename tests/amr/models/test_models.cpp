@@ -38,7 +38,7 @@ using Grid1D           = Grid<NdArrayVector<1>, HybridQuantity::Scalar>;
 using VecField1D       = VecField<Field_t, HybridQuantity>;
 using SymTensorField1D = SymTensorField<Field_t, HybridQuantity>;
 using GridImplYee1D    = GridLayoutImplYee<dim, interpOrder>;
-using ParticleArray1D  = ParticleArray<dim>;
+using ParticleArray1D  = ParticleArray<ParticleArrayOptions{dim}>;
 using GridYee1D        = GridLayout<GridImplYee1D>;
 
 using MaxwellianParticleInitializer1D = MaxwellianParticleInitializer<ParticleArray1D, GridYee1D>;
@@ -138,11 +138,9 @@ PHARE::initializer::PHAREDict createDict()
 
 TEST(AHybridModel, fillsHybridMessengerInfo)
 {
-    std::shared_ptr<ResourcesManagerT> resourcesManagerHybrid{
-        std::make_shared<ResourcesManagerT>()};
+    std::unique_ptr<HybridModelT> hybridModel{std::make_unique<HybridModelT>(createDict())};
 
-    std::unique_ptr<HybridModelT> hybridModel{
-        std::make_unique<HybridModelT>(createDict(), resourcesManagerHybrid)};
+    std::shared_ptr<ResourcesManagerT> resourcesManagerHybrid = hybridModel->resourcesManager;
 
 
 

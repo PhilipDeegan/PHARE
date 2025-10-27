@@ -69,10 +69,14 @@ class SimulatorRefinedParticleNbr(unittest.TestCase):
                             per_pop += patch.data.size()
                     max_per_pop = max(max_per_pop, per_pop)
                 prev_min_diff = prev_split_particle_max * min_diff
-                self.assertTrue(max_per_pop > prev_min_diff - (leaving_particles))
+
+                # while splitting particles may leave the domain area
+                #  so we remove the particles from the border cells of each patch
+                self.assertGreater(max_per_pop, prev_min_diff - (leaving_particles))
+
                 if prev_split_particle_max > 0:
                     prev_max_diff = prev_min_diff * dim * max_diff
-                    self.assertTrue(max_per_pop < prev_max_diff)
+                    self.assertLess(max_per_pop, prev_max_diff)
                 prev_split_particle_max = max_per_pop
                 self.simulator = None
 

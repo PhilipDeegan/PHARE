@@ -1,13 +1,12 @@
 #ifndef PHARE_TEST_CORE_FIELD_TEST_HPP
 #define PHARE_TEST_CORE_FIELD_TEST_HPP
 
-#include <cassert>
-#include <functional>
+#include "core/data/field/field.hpp"
+#include "core/hybrid/hybrid_quantities.hpp"
 
-#include "core/data/ndarray/ndarray_vector.hpp"
-
-#include "gmock/gmock.h"
 #include "gtest/gtest.h"
+
+#include <cassert>
 
 
 namespace PHARE::core
@@ -15,25 +14,17 @@ namespace PHARE::core
 template<std::size_t dim>
 struct FieldMock
 {
-    static auto constexpr dimension   = dim;
-    static auto constexpr is_host_mem = true;
-    double data;
+    static auto constexpr dimension  = dim;
+    auto constexpr static alloc_mode = AllocatorMode::CPU;
 
     FieldMock() = default;
 
-    template<typename... Args>
-    auto& operator()(Args...)
-    {
-        return data;
-    }
-    template<typename... Args>
-    auto& operator()(Args...) const
-    {
-        return data;
-    }
+    auto& operator()(auto&&...) { return data; }
+    auto& operator()(auto&&...) const { return data; }
     auto physicalQuantity() const { return qty; }
     std::string name() const { return "FieldMock"; }
 
+    double data;
     HybridQuantity::Scalar qty = HybridQuantity::Scalar::Ex;
 };
 
@@ -48,12 +39,14 @@ void test_fields(GridLayout const& layout, Field const& field0, T1 const& field1
     EXPECT_EQ(field0.shape(), field1.shape());
 
 
+
     for (std::size_t i = 0; i < field0.size(); ++i)
     {
         auto const& v0 = field0.data()[i];
         auto const& v1 = field1.data()[i];
         if (std::isnan(v0) || std::isnan(v1))
-            throw std::runtime_error("This 1dfield should not be NaN index " + std::to_string(i));
+            throw std::runtime_error(field0.name() + " should not be NaN index "
+                                     + std::to_string(i));
         EXPECT_FLOAT_EQ(v0, v1);
     }
 }
@@ -89,4 +82,4 @@ void test(GridLayout const& layout, Field0 const& field0, Field1 const& field1)
 } // namespace PHARE::core
 
 
-#endif /* PHARE_TEST_CORE_FIELD_TEST_H */
+#endif /* PHARE_TEST_CORE_FIELD_TEST_HPP */

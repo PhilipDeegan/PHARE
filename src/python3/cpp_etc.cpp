@@ -14,6 +14,7 @@
 
 
 
+
 namespace py = pybind11;
 
 namespace PHARE::pydata
@@ -36,12 +37,14 @@ auto samrai_version()
     return ss.str();
 }
 
-PYBIND11_MODULE(cpp_etc, m)
+PYBIND11_MODULE(cpp_etc, m, py::mod_gil_not_used())
 {
     auto samrai_restart_file = [](std::string path) {
         return PHARE::amr::HierarchyRestarter::getRestartFileFullPath(path);
     };
     py::class_<core::Span<double>, std::shared_ptr<core::Span<double>>>(m, "Span");
+    m.def("makeSpan", makePySpan<double>);
+
     py::class_<PyArrayWrapper<double>, std::shared_ptr<PyArrayWrapper<double>>, core::Span<double>>(
         m, "PyWrapper");
 

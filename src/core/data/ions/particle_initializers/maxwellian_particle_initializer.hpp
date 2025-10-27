@@ -1,19 +1,23 @@
 #ifndef PHARE_FLUID_PARTICLE_INITIALIZER_HPP
 #define PHARE_FLUID_PARTICLE_INITIALIZER_HPP
 
+
+#include "core/def.hpp"
+#include "core/utilities/types.hpp"
+#include "core/utilities/point/point.hpp"
+#include "core/utilities/thread_pool.hpp"
+#include "core/data/particles/particle.hpp"
+#include "core/data/grid/gridlayoutdefs.hpp"
+#include "core/data/particles/particle_array_def.hpp"
+#include "core/data/particles/particle_array_service.hpp"
+#include "core/data/ions/particle_initializers/particle_initializer.hpp"
+
+#include "initializer/data_provider.hpp"
+
 #include <memory>
 #include <random>
 #include <cassert>
-#include <functional>
 
-#include "core/data/grid/gridlayoutdefs.hpp"
-#include "core/hybrid/hybrid_quantities.hpp"
-#include "core/utilities/types.hpp"
-#include "core/data/ions/particle_initializers/particle_initializer.hpp"
-#include "core/data/particles/particle.hpp"
-#include "initializer/data_provider.hpp"
-#include "core/utilities/point/point.hpp"
-#include "core/def.hpp"
 
 
 namespace PHARE::core
@@ -81,7 +85,6 @@ public:
     }
 
 private:
-    using Particle = typename ParticleArray::value_type;
     InputFunction density_;
     std::array<InputFunction, 3> bulkVelocity_;
     std::array<InputFunction, 3> thermalVelocity_;
@@ -105,6 +108,8 @@ public:
         : _n{density(coords...)}
 
     {
+        // std::unique_lock<std::mutex> lock(ThreadPool::mutex(0)); // PYTHON == DEADLOCK
+
         static_assert(sizeof...(coords) <= 3, "can only provide up to 3 coordinates");
         for (std::uint32_t i = 0; i < 3; i++)
         {
@@ -134,10 +139,12 @@ private:
 
 
 
-template<typename ParticleArray, typename GridLayout>
-void MaxwellianParticleInitializer<ParticleArray, GridLayout>::loadParticles(
-    ParticleArray& particles, GridLayout const& layout) const
+template<typename ParticleArray_t, typename GridLayout>
+void MaxwellianParticleInitializer<ParticleArray_t, GridLayout>::loadParticles(
+    ParticleArray_t& particles, GridLayout const& layout) const
 {
+    // using Particle_t = typename ParticleArray_t::Particle_t;
+
     auto point = [](std::size_t i, auto const& indices) -> core::Point<std::uint32_t, dimension> {
         if constexpr (dimension == 1)
             return {std::get<0>(indices[i])};
@@ -146,17 +153,6 @@ void MaxwellianParticleInitializer<ParticleArray, GridLayout>::loadParticles(
         if constexpr (dimension == 3)
             return {std::get<0>(indices[i]), std::get<1>(indices[i]), std::get<2>(indices[i])};
     };
-
-
-    auto deltas = [](auto& pos, auto& gen) -> std::array<double, dimension> {
-        if constexpr (dimension == 1)
-            return {pos(gen)};
-        if constexpr (dimension == 2)
-            return {pos(gen), pos(gen)};
-        if constexpr (dimension == 3)
-            return {pos(gen), pos(gen), pos(gen)};
-    };
-
 
     // in the following two calls,
     // primal indexes are given here because that's what cellCenteredCoordinates takes
@@ -177,6 +173,11 @@ void MaxwellianParticleInitializer<ParticleArray, GridLayout>::loadParticles(
     auto const [n, V, Vth] = fns();
     auto randGen           = getRNG(rngSeed_);
     ParticleDeltaDistribution<double> deltaDistrib;
+
+
+    core::ParticleArrayService::reserve_ppc_in<ParticleType::Domain>(particles,
+                                                                     nbrParticlePerCell_);
+
 
     for (std::size_t flatCellIdx = 0; flatCellIdx < ndCellIndices.size(); ++flatCellIdx)
     {
@@ -204,10 +205,15 @@ void MaxwellianParticleInitializer<ParticleArray, GridLayout>::loadParticles(
             if (basis_ == Basis::Magnetic)
                 particleVelocity = basisTransform(basis, particleVelocity);
 
-            particles.emplace_back(Particle{cellWeight, particleCharge_, iCell,
-                                            deltas(deltaDistrib, randGen), particleVelocity});
+            particles.emplace_back(
+                cellWeight, particleCharge_, iCell,
+                core::ConstArrayFrom<dimension>([&] { return deltaDistrib(randGen); }),
+                particleVelocity);
         }
     }
+
+    // out_particles = std::move(particles);
+    core::ParticleArrayService::sync<2, ParticleType::Domain>(particles);
 }
 
 } // namespace PHARE::core

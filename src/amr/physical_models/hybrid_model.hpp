@@ -1,51 +1,92 @@
 #ifndef PHARE_HYBRID_MODEL_HPP
 #define PHARE_HYBRID_MODEL_HPP
 
-#include <string>
+
+#include "core/def.hpp"
+#include "core/models/hybrid_state.hpp"
+#include "core/utilities/thread_pool.hpp"
+#include "core/data/vecfield/vecfield.hpp"
+#include "core/data/ions/particle_initializers/particle_initializer_factory.hpp"
 
 #include "initializer/data_provider.hpp"
-#include "core/models/hybrid_state.hpp"
+
 #include "amr/physical_models/physical_model.hpp"
-#include "core/data/ions/particle_initializers/particle_initializer_factory.hpp"
-#include "amr/resources_manager/resources_manager.hpp"
 #include "amr/messengers/hybrid_messenger_info.hpp"
-#include "core/data/vecfield/vecfield.hpp"
-#include "core/def.hpp"
+
+#include "hybrid_model_storage.hpp"
+
+#include <stdexcept>
+#include <string>
+#include <tuple>
+#include <type_traits>
 
 namespace PHARE::solver
 {
+
+// for optional compile time per patch resources - eg grids for reducing during diags
+template<typename AMR_Types, typename Ions, typename Grid_t>
+class HybridModelBase
+    : public IPhysicalModel<AMR_Types>,
+      public hybrid_model_storage<Ions::particle_array_type::layout_mode, Ions, Grid_t>
+{
+public:
+    using Super     = IPhysicalModel<AMR_Types>;
+    using storage_t = hybrid_model_storage<Ions::particle_array_type::layout_mode, Ions, Grid_t>;
+    using resources_manager_type = storage_t::resources_manager_type;
+
+    HybridModelBase(std::string const& model_name)
+        : Super{model_name}
+        , storage_t{}
+    {
+    }
+
+    NO_DISCARD auto getCompileTimeResourcesViewList() const
+    {
+        return storage_t::getCompileTimeResourcesViewList();
+    }
+    NO_DISCARD auto getCompileTimeResourcesViewList()
+    {
+        return storage_t::getCompileTimeResourcesViewList();
+    }
+};
+
+
 /**
  * @brief The HybridModel class is a concrete implementation of a IPhysicalModel. The class
  * holds a HybridState and a ResourcesManager.
  */
 template<typename GridLayoutT, typename Electromag, typename Ions, typename Electrons,
          typename AMR_Types, typename Grid_t>
-class HybridModel : public IPhysicalModel<AMR_Types>
+class HybridModel : public HybridModelBase<AMR_Types, Ions, Grid_t>
 {
 public:
     static constexpr auto dimension = GridLayoutT::dimension;
 
     using Interface              = IPhysicalModel<AMR_Types>;
+    using Super                  = HybridModelBase<AMR_Types, Ions, Grid_t>;
     using amr_types              = AMR_Types;
     using electrons_t            = Electrons;
-    using patch_t                = typename AMR_Types::patch_t;
-    using level_t                = typename AMR_Types::level_t;
+    using patch_t                = AMR_Types::patch_t;
+    using level_t                = AMR_Types::level_t;
+    using State_t                = core::HybridState<Electromag, Ions, Electrons>;
     using gridlayout_type        = GridLayoutT;
     using electromag_type        = Electromag;
-    using vecfield_type          = typename Electromag::vecfield_type;
-    using field_type             = typename vecfield_type::field_type;
+    using vecfield_type          = Electromag::vecfield_type;
+    using field_type             = vecfield_type::field_type;
     using grid_type              = Grid_t;
     using ions_type              = Ions;
-    using particle_array_type    = typename Ions::particle_array_type;
-    using resources_manager_type = amr::ResourcesManager<gridlayout_type, grid_type>;
-    using ParticleInitializerFactory
+    using particle_array_type    = Ions::particle_array_type;
+    using resources_manager_type = Super::resources_manager_type;
+    using ParticleInitializerFactory_t
         = core::ParticleInitializerFactory<particle_array_type, gridlayout_type>;
+
 
     static constexpr std::string_view model_type_name = "HybridModel";
     static inline std::string const model_name{model_type_name};
 
 
-    core::HybridState<Electromag, Ions, Electrons> state;
+
+    State_t state;
     std::shared_ptr<resources_manager_type> resourcesManager;
 
 
@@ -58,7 +99,8 @@ public:
      */
     virtual void allocate(patch_t& patch, double const allocateTime) override
     {
-        resourcesManager->allocate(state, patch, allocateTime);
+        core::apply(getCompileTimeResourcesViewList(),
+                    [&](auto& el) { resourcesManager->allocate(el, patch, allocateTime); });
     }
 
 
@@ -78,11 +120,10 @@ public:
     }
 
 
-    HybridModel(PHARE::initializer::PHAREDict const& dict,
-                std::shared_ptr<resources_manager_type> const& _resourcesManager)
-        : IPhysicalModel<AMR_Types>{model_name}
+    HybridModel(PHARE::initializer::PHAREDict const& dict)
+        : Super{model_name}
         , state{dict}
-        , resourcesManager{std::move(_resourcesManager)}
+        , resourcesManager{std::make_shared<resources_manager_type>()}
     {
     }
 
@@ -97,9 +138,25 @@ public:
 
     NO_DISCARD bool isSettable() const { return state.isSettable(); }
 
-    NO_DISCARD auto getCompileTimeResourcesViewList() const { return std::forward_as_tuple(state); }
+    NO_DISCARD auto getCompileTimeResourcesViewList() const
+    {
+        auto tup = std::tuple_cat(std::forward_as_tuple(state),
+                                  Super::getCompileTimeResourcesViewList());
+        core::for_N<std::tuple_size_v<decltype(tup)>>([&](auto i) {
+            static_assert(std::is_reference_v<std::tuple_element_t<i, decltype(tup)>>);
+        });
+        return tup;
+    }
 
-    NO_DISCARD auto getCompileTimeResourcesViewList() { return std::forward_as_tuple(state); }
+    NO_DISCARD auto getCompileTimeResourcesViewList()
+    {
+        auto tup = std::tuple_cat(std::forward_as_tuple(state),
+                                  Super::getCompileTimeResourcesViewList());
+        core::for_N<std::tuple_size_v<decltype(tup)>>([&](auto i) {
+            static_assert(std::is_reference_v<std::tuple_element_t<i, decltype(tup)>>);
+        });
+        return tup;
+    }
 
     //-------------------------------------------------------------------------
     //                  ends the ResourcesUser interface
@@ -121,27 +178,84 @@ template<typename GridLayoutT, typename Electromag, typename Ions, typename Elec
 void HybridModel<GridLayoutT, Electromag, Ions, Electrons, AMR_Types, Grid_t>::initialize(
     level_t& level)
 {
-    for (auto& patch : level)
-    {
-        // first initialize the ions
-        auto layout = amr::layoutFromPatch<gridlayout_type>(*patch);
-        auto& ions  = state.ions;
-        auto _ = this->resourcesManager->setOnPatch(*patch, state.electromag, state.ions, state.J);
+    auto static const init_mode = core::get_env_as("PHARE_MODEL_INIT_MODE", std::size_t{0});
 
+    auto const init = [this](auto& patch, auto& electromag, auto& ions) {
+        PHARE_LOG_LINE_SS("");
+        auto const& _      = this->resourcesManager->setOnPatch(*patch, electromag, ions);
+        auto const& layout = amr::layoutFromPatch<gridlayout_type>(*patch);
         for (auto& pop : ions)
-        {
-            auto const& info         = pop.particleInitializerInfo();
-            auto particleInitializer = ParticleInitializerFactory::create(info);
-            particleInitializer->loadParticles(pop.domainParticles(), layout);
-        }
+            ParticleInitializerFactory_t::create(pop.particleInitializerInfo())
+                ->loadParticles(pop.domainParticles(), layout);
 
-        state.electromag.initialize(layout);
-        // data initialized to NaN on construction
-        // and in 1D Jx is not worked on in Ampere so
-        // we need to zero J before anything happens
-        state.J.zero();
+        electromag.initialize(layout);
+    };
+
+    // first initialize the ions
+
+    // DEADLOCK with python functions IF NOT GIL-LESS!
+    if (init_mode == 3) // round robin thread pools per patch, thread per tile
+    {
+        if constexpr (any_in(particle_array_type::layout_mode, core::LayoutMode::AoSTS))
+        {
+            using TileParticleArray_t = particle_array_type::per_tile_particles;
+            using TileParticleInitializerFactory_t
+                = core::ParticleInitializerFactory<TileParticleArray_t, gridlayout_type>;
+
+            for (auto& patch : resourcesManager->enumerate(level, state.ions))
+            {
+                auto const pool_idx = core::ThreadPool::INSTANCE().first_ready_idx();
+                auto& pool          = core::ThreadPool::INSTANCE().get_pool(pool_idx);
+                auto const& layout  = amr::layoutFromPatch<gridlayout_type>(*patch);
+                for (auto& pop : state.ions)
+                    for (auto& tyle : pop.domainParticles()())
+                        pool.detach_task([layout = layout, tile = &tyle, pop = &pop]() {
+                            TileParticleInitializerFactory_t::create(pop->particleInitializerInfo())
+                                ->loadParticles((*tile)(), layout.copy_as(**tile));
+                        });
+            }
+
+            for (auto& patch : resourcesManager->enumerate(level, state.electromag))
+                state.electromag.initialize(amr::layoutFromPatch<gridlayout_type>(*patch));
+
+            core::ThreadPool::INSTANCE().wait();
+        }
+        else
+        {
+            throw std::runtime_error("Wrong layout");
+        }
     }
 
+
+    // DEADLOCK with python functions IF NOT GIL-LESS!
+    else if (init_mode == 2) // round robin thread pools
+    {
+        auto& pool = core::ThreadPool::INSTANCE();
+        for (auto& patch : level)
+            pool.async([&, ions = state.ions, electromag = state.electromag,
+                        patch = &*patch]() mutable { init(patch, electromag, ions); });
+    }
+
+
+    // DEADLOCK with python functions IF NOT GIL-LESS!
+    else if (init_mode == 1) // single thread pool
+    {
+        auto& pool = core::ThreadPool::pool(0);
+        for (auto& patch : level)
+            pool.detach_task([&, ions = state.ions, electromag = state.electromag,
+                              patch = patch]() mutable { init(patch, electromag, ions); });
+        pool.wait();
+    }
+
+
+    else if (init_mode == 0) // default serial
+    {
+        for (auto& patch : level)
+            init(patch, state.electromag, state.ions);
+    }
+
+    else
+        throw std::runtime_error("no HybridModel::initialize impl");
 
     resourcesManager->registerForRestarts(*this);
 }

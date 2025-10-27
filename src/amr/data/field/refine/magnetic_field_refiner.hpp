@@ -3,8 +3,7 @@
 
 
 #include "core/def/phare_mpi.hpp" // IWYU pragma: keep
-#include "core/utilities/constants.hpp"
-#include "core/utilities/point/point.hpp"
+#include "core/data/grid/grid_tiles.hpp"
 #include "core/data/grid/gridlayoutdefs.hpp"
 
 #include "amr/resources_manager/amr_utils.hpp"
@@ -39,6 +38,7 @@ public:
         : fineBox_{destinationGhostBox}
         , coarseBox_{sourceGhostBox}
         , centerings_{centering}
+        , ratio_{ratio}
     {
     }
 
@@ -50,7 +50,31 @@ public:
     // see fujimoto et al. 2011 :  doi:10.1016/j.jcp.2011.08.002
     template<typename FieldT>
     void operator()(FieldT const& coarseField, FieldT& fineField,
-                    core::Point<int, dimension> fineIndex)
+                    core::Point<int, dimension> const fineIndex)
+    {
+        if constexpr (core::is_field_tile_set_v<FieldT>)
+        {
+            auto coarseIdx{fineIndex};
+            for (auto& idx : coarseIdx)
+                idx = idx / ratio_;
+            for (auto& dst_tile : fineField())
+                if (auto const dst_box = dst_tile.ghost_box(); isIn(fineIndex, dst_box))
+                    for (auto const& src_tile : coarseField())
+                        if (auto const src_box = src_tile.field_box(); isIn(coarseIdx, src_box))
+                        {
+                            MagneticFieldRefiner{centerings_, samrai_box_from(dst_box),
+                                                 samrai_box_from(src_tile.ghost_box()),
+                                                 ratio_}(src_tile(), dst_tile(), fineIndex);
+                            // break; // done
+                        }
+        }
+        else
+            field_t(coarseField, fineField, fineIndex);
+    }
+
+    template<typename FieldT>
+    void field_t(FieldT const& coarseField, FieldT& fineField,
+                 core::Point<int, dimension> const fineIndex)
     {
         TBOX_ASSERT(coarseField.physicalQuantity() == fineField.physicalQuantity());
 
@@ -187,6 +211,7 @@ private:
     SAMRAI::hier::Box const fineBox_;
     SAMRAI::hier::Box const coarseBox_;
     std::array<core::QtyCentering, dimension> const centerings_;
+    SAMRAI::hier::IntVector const& ratio_;
 };
 } // namespace PHARE::amr
 

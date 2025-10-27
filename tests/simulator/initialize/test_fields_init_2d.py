@@ -4,42 +4,59 @@
 """
 
 import unittest
-
+import itertools
 import numpy as np
 import matplotlib
-from ddt import data, ddt
 
+from pyphare.cpp import supported_particle_layouts
+from ddt import data, ddt, unpack
 from tests.simulator.test_initialization import InitializationTest
 
 matplotlib.use("Agg")  # for systems without GUI
 
 ndim = 2
 interp_orders = [1, 2, 3]
-ppc = 100
+
+
+def permute():
+    layouts = [1]
+    return [
+        dict(
+            interp_order=interp_order,
+            sim_setup_kwargs=dict(layout=layout),
+        )
+        for interp_order, layout in itertools.product(
+            interp_orders, layouts  # supported_particle_layouts()
+        )
+    ]
 
 
 @ddt
 class Initialization2DTest(InitializationTest):
-    @data(*interp_orders)
-    def test_B_is_as_provided_by_user(self, interp_order):
+    @data(*permute())
+    @unpack
+    def test_B_is_as_provided_by_user(self, interp_order, **kwargs):
         print(f"\n{self._testMethodName}_{ndim}d")
-        self._test_B_is_as_provided_by_user(ndim, interp_order, ppc=ppc)
+        self._test_B_is_as_provided_by_user(ndim, interp_order, **kwargs)
 
-    @data(*interp_orders)
-    def test_bulkvel_is_as_provided_by_user(self, interp_order):
+    @data(*permute())
+    @unpack
+    def test_bulkvel_is_as_provided_by_user(self, interp_order, **kwargs):
         print(f"\n{self._testMethodName}_{ndim}d")
-        self._test_bulkvel_is_as_provided_by_user(ndim, interp_order)
+        self._test_bulkvel_is_as_provided_by_user(ndim, interp_order, **kwargs)
 
-    @data(*interp_orders)
-    def test_density_is_as_provided_by_user(self, interp_order):
+    @data(*permute())
+    @unpack
+    def test_density_is_as_provided_by_user(self, interp_order, **kwargs):
         print(f"\n{self._testMethodName}_{ndim}d")
-        self._test_density_is_as_provided_by_user(ndim, interp_order)
+        self._test_density_is_as_provided_by_user(ndim, interp_order, **kwargs)
 
-    @data(*interp_orders)
-    def test_density_decreases_as_1overSqrtN(self, interp_order):
+    @data(*permute())
+    @unpack
+    def test_density_decreases_as_1overSqrtN(self, interp_order, **kwargs):
         print(f"{self._testMethodName}_{ndim}d")
         self._test_density_decreases_as_1overSqrtN(
-            ndim, interp_order, np.asarray([50, 500, 1000, 2222]), cells=220
+            ndim, interp_order, np.asarray([50, 500, 1000, 2222]), cells=220, **kwargs
         )
 
 

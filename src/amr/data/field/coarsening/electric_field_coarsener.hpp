@@ -13,9 +13,6 @@
 
 namespace PHARE::amr
 {
-using core::dirX;
-using core::dirY;
-using core::dirZ;
 /** @brief This class gives an operator() that performs the coarsening of N fine nodes onto a
  * given coarse node
  *
@@ -37,7 +34,7 @@ using core::dirZ;
 template<std::size_t dimension>
 class ElectricFieldCoarsener
 {
-    using Point_t = core::Point<int, dim>;
+    using Point_t = core::Point<int, dimension>;
 
 public:
     ElectricFieldCoarsener(std::array<core::QtyCentering, dimension> const centering,
@@ -52,124 +49,126 @@ public:
 
 
     template<typename FieldT>
-    void operator()(FieldT const& fineField, FieldT& coarseField, core::Point<int, dim> coarseIndex)
+    void operator()(FieldT const& fineField, FieldT& coarseField,
+                    core::Point<int, dimension> coarseIndex)
     {
+        using core::dirX;
+        using core::dirY;
+        using core::dirZ;
         // For the moment we only take the case of field with the same centering
         TBOX_ASSERT(fineField.physicalQuantity() == coarseField.physicalQuantity());
 
-        coarsen<dim>(fine_start_index(coarseIndex), fineField, coarseField,
-                     AMRToLocal(coarseIndex, destinationBox_));
+
+        core::Point<int, dimension> fineStartIndex;
+        for (auto i = std::size_t{0}; i < dimension; ++i)
+        {
+            fineStartIndex[i] = coarseIndex[i] * refinementRatio;
+        }
+
+        fineStartIndex = AMRToLocal(fineStartIndex, sourceBox_);
+        coarseIndex    = AMRToLocal(coarseIndex, destinationBox_);
+
+        if constexpr (dimension == 1)
+        {
+            if (centering_[dirX] == core::QtyCentering::dual) // ex
+            {
+                coarseField(coarseIndex[dirX])
+                    = 0.5 * (fineField(fineStartIndex[dirX] + 1) + fineField(fineStartIndex[dirX]));
+            }
+            else if (centering_[dirX] == core::QtyCentering::primal) // ey, ez
+            {
+                coarseField(coarseIndex[dirX]) = fineField(fineStartIndex[dirX]);
+            }
+        }
+
+        if constexpr (dimension == 2)
+        {
+            if (centering_[dirX] == core::QtyCentering::dual
+                and centering_[dirY] == core::QtyCentering::primal) // ex
+            {
+                coarseField(coarseIndex[dirX], coarseIndex[dirY])
+                    = 0.5
+                      * (fineField(fineStartIndex[dirX], fineStartIndex[dirY])
+                         + fineField(fineStartIndex[dirX] + 1, fineStartIndex[dirY]));
+            }
+            else if (centering_[dirX] == core::QtyCentering::primal
+                     and centering_[dirY] == core::QtyCentering::dual) // ey
+            {
+                coarseField(coarseIndex[dirX], coarseIndex[dirY])
+                    = 0.5
+                      * (fineField(fineStartIndex[dirX], fineStartIndex[dirY])
+                         + fineField(fineStartIndex[dirX], fineStartIndex[dirY] + 1));
+            }
+            else if (centering_[dirX] == core::QtyCentering::primal
+                     and centering_[dirY] == core::QtyCentering::primal) // ez
+            {
+                coarseField(coarseIndex[dirX], coarseIndex[dirY])
+                    = fineField(fineStartIndex[dirX], fineStartIndex[dirY]);
+            }
+            else
+            {
+                throw std::runtime_error("no electric field should end up here");
+            }
+        }
+        else if constexpr (dimension == 3)
+        {
+            if (centering_[dirX] == core::QtyCentering::dual
+                and centering_[dirY] == core::QtyCentering::primal
+                and centering_[dirZ] == core::QtyCentering::primal) // ex
+            {
+                coarseField(coarseIndex[dirX], coarseIndex[dirY], coarseIndex[dirZ])
+                    = 0.5
+                      * (fineField(fineStartIndex[dirX], fineStartIndex[dirY], fineStartIndex[dirZ])
+                         + fineField(fineStartIndex[dirX] + 1, fineStartIndex[dirY],
+                                     fineStartIndex[dirZ]));
+            }
+            else if (centering_[dirX] == core::QtyCentering::primal
+                     and centering_[dirY] == core::QtyCentering::dual
+                     and centering_[dirZ] == core::QtyCentering::primal) // ey
+            {
+                coarseField(coarseIndex[dirX], coarseIndex[dirY], coarseIndex[dirZ])
+                    = 0.5
+                      * (fineField(fineStartIndex[dirX], fineStartIndex[dirY], fineStartIndex[dirZ])
+                         + fineField(fineStartIndex[dirX], fineStartIndex[dirY] + 1,
+                                     fineStartIndex[dirZ]));
+            }
+            else if (centering_[dirX] == core::QtyCentering::primal
+                     and centering_[dirY] == core::QtyCentering::primal
+                     and centering_[dirZ] == core::QtyCentering::dual) // ez
+            {
+                coarseField(coarseIndex[dirX], coarseIndex[dirY], coarseIndex[dirZ])
+                    = 0.5
+                      * (fineField(fineStartIndex[dirX], fineStartIndex[dirY], fineStartIndex[dirZ])
+                         + fineField(fineStartIndex[dirX], fineStartIndex[dirY],
+                                     fineStartIndex[dirZ] + 1));
+            }
+            else
+            {
+                throw std::runtime_error("no electric field should end up here");
+            }
+        }
     }
 
-    for (auto i = std::size_t{0}; i < dimension; ++i)
-    {
-        fineStartIndex[i] = coarseIndex[i] * refinementRatio;
-    }
 
-    fineStartIndex = AMRToLocal(fineStartIndex, sourceBox_);
-    coarseIndex    = AMRToLocal(coarseIndex, destinationBox_);
+    // template<std::size_t D, typename FieldT>
+    // typename std::enable_if<D == 1, void>::type
+    // coarsen(Point_t const fineStartIndex, FieldT const& fineField, FieldT& coarseField,
+    //         Point_t const coarseIndex);
 
-    if constexpr (dimension == 1)
-    {
-        if (centering_[dirX] == core::QtyCentering::dual) // ex
-        {
-            coarseField(coarseIndex[dirX])
-                = 0.5 * (fineField(fineStartIndex[dirX] + 1) + fineField(fineStartIndex[dirX]));
-        }
-        else if (centering_[dirX] == core::QtyCentering::primal) // ey, ez
-        {
-            coarseField(coarseIndex[dirX]) = fineField(fineStartIndex[dirX]);
-        }
-    }
+    // template<std::size_t D, typename FieldT>
+    // typename std::enable_if<D == 2, void>::type
+    // coarsen(Point_t const fineStartIndex, FieldT const& fineField, FieldT& coarseField,
+    //         Point_t const coarseIndex);
 
-    if constexpr (dimension == 2)
-    {
-        if (centering_[dirX] == core::QtyCentering::dual
-            and centering_[dirY] == core::QtyCentering::primal) // ex
-        {
-            coarseField(coarseIndex[dirX], coarseIndex[dirY])
-                = 0.5
-                  * (fineField(fineStartIndex[dirX], fineStartIndex[dirY])
-                     + fineField(fineStartIndex[dirX] + 1, fineStartIndex[dirY]));
-        }
-        else if (centering_[dirX] == core::QtyCentering::primal
-                 and centering_[dirY] == core::QtyCentering::dual) // ey
-        {
-            coarseField(coarseIndex[dirX], coarseIndex[dirY])
-                = 0.5
-                  * (fineField(fineStartIndex[dirX], fineStartIndex[dirY])
-                     + fineField(fineStartIndex[dirX], fineStartIndex[dirY] + 1));
-        }
-        else if (centering_[dirX] == core::QtyCentering::primal
-                 and centering_[dirY] == core::QtyCentering::primal) // ez
-        {
-            coarseField(coarseIndex[dirX], coarseIndex[dirY])
-                = fineField(fineStartIndex[dirX], fineStartIndex[dirY]);
-        }
-        else
-        {
-            throw std::runtime_error("no electric field should end up here");
-        }
-    }
-    else if constexpr (dimension == 3)
-    {
-        if (centering_[dirX] == core::QtyCentering::dual
-            and centering_[dirY] == core::QtyCentering::primal
-            and centering_[dirZ] == core::QtyCentering::primal) // ex
-        {
-            coarseField(coarseIndex[dirX], coarseIndex[dirY], coarseIndex[dirZ])
-                = 0.5
-                  * (fineField(fineStartIndex[dirX], fineStartIndex[dirY], fineStartIndex[dirZ])
-                     + fineField(fineStartIndex[dirX] + 1, fineStartIndex[dirY],
-                                 fineStartIndex[dirZ]));
-        }
-        else if (centering_[dirX] == core::QtyCentering::primal
-                 and centering_[dirY] == core::QtyCentering::dual
-                 and centering_[dirZ] == core::QtyCentering::primal) // ey
-        {
-            coarseField(coarseIndex[dirX], coarseIndex[dirY], coarseIndex[dirZ])
-                = 0.5
-                  * (fineField(fineStartIndex[dirX], fineStartIndex[dirY], fineStartIndex[dirZ])
-                     + fineField(fineStartIndex[dirX], fineStartIndex[dirY] + 1,
-                                 fineStartIndex[dirZ]));
-        }
-        else if (centering_[dirX] == core::QtyCentering::primal
-                 and centering_[dirY] == core::QtyCentering::primal
-                 and centering_[dirZ] == core::QtyCentering::dual) // ez
-        {
-            coarseField(coarseIndex[dirX], coarseIndex[dirY], coarseIndex[dirZ])
-                = 0.5
-                  * (fineField(fineStartIndex[dirX], fineStartIndex[dirY], fineStartIndex[dirZ])
-                     + fineField(fineStartIndex[dirX], fineStartIndex[dirY],
-                                 fineStartIndex[dirZ] + 1));
-        }
-        else
-        {
-            throw std::runtime_error("no electric field should end up here");
-        }
-    }
-}
+    // template<std::size_t D, typename FieldT>
+    // typename std::enable_if<D == 3, void>::type
+    // coarsen(Point_t const fineStartIndex, FieldT const& fineField, FieldT& coarseField,
+    //         Point_t const coarseIndex);
 
 
-template<std::size_t D, typename FieldT>
-typename std::enable_if<D == 1, void>::type coarsen(Point_t const fineStartIndex,
-                                                    FieldT const& fineField, FieldT& coarseField,
-                                                    Point_t const coarseIndex);
-
-template<std::size_t D, typename FieldT>
-typename std::enable_if<D == 2, void>::type coarsen(Point_t const fineStartIndex,
-                                                    FieldT const& fineField, FieldT& coarseField,
-                                                    Point_t const coarseIndex);
-
-template<std::size_t D, typename FieldT>
-typename std::enable_if<D == 3, void>::type coarsen(Point_t const fineStartIndex,
-                                                    FieldT const& fineField, FieldT& coarseField,
-                                                    Point_t const coarseIndex);
-
-
-std::array<core::QtyCentering, dim> const centering_;
-SAMRAI::hier::Box const sourceBox_;
-SAMRAI::hier::Box const destinationBox_;
+    std::array<core::QtyCentering, dimension> const centering_;
+    SAMRAI::hier::Box const sourceBox_;
+    SAMRAI::hier::Box const destinationBox_;
 };
 
 

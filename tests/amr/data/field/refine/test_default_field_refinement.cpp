@@ -1,26 +1,26 @@
 
-#include "core/def/phare_mpi.hpp"
-
-#include "core/data/grid/gridlayout.hpp"
-#include <core/data/grid/gridlayoutimplyee.hpp>
-
-#include "amr/data/field/refine/field_linear_refine.hpp"
-#include "amr/data/field/refine/field_refine_operator.hpp"
-#include "amr/data/field/refine/field_refiner.hpp"
-
-#include "test_field_refinement_on_hierarchy.hpp"
-
-#include <SAMRAI/tbox/SAMRAI_MPI.h>
-#include <SAMRAI/tbox/SAMRAIManager.h>
-
-#include "gtest/gtest.h"
-
-
 /* This unit test is testing properties of the Default field refinement
  * Magnetic and electric field refinement are not added here. They are tested
  * in simulator-based tests (tests/simulator/)
  */
 
+#include "core/def/phare_mpi.hpp"
+#include "core/data/grid/gridlayout.hpp"
+#include "core/data/ndarray/ndarray_vector.hpp"
+#include "core/data/grid/gridlayout.hpp"
+#include "core/data/grid/gridlayout_impl.hpp"
+
+#include "amr/data/field/refine/field_refiner.hpp"
+#include "amr/data/field/refine/field_linear_refine.hpp"
+#include "amr/data/field/refine/field_refine_operator.hpp"
+
+#include "test_field_refinement_on_hierarchy.hpp"
+
+#include <SAMRAI/tbox/SAMRAIManager.h>
+#include <SAMRAI/tbox/SAMRAI_MPI.h>
+
+
+#include "gtest/gtest.h"
 
 using namespace PHARE::core;
 using namespace PHARE::amr;

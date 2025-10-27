@@ -308,9 +308,15 @@ public:
             {
                 auto& dst_grid = dst_grids[c];
                 auto const box = phare_box_from<dimension>(sambox);
-                core::FieldBox<Grid_t> dst{dst_grid, gridLayout, box};
-                dst.template set_from<Operator>(buffer, seek);
-                seek += box.size();
+                auto const view
+                    = core::make_array_view(buffer.data() + seek, *box.shape().as_unsigned());
+                using NdArray = decltype(view);
+
+                core::FieldBox<Grid_t>{dst_grid, gridLayout, box}.template op<Operator>(
+                    core::FieldBox<NdArray>{
+                        view, box,
+                        core::box_from_zero_to_upper_minus_one(*box.shape().as_unsigned())});
+                seek += sambox.size();
             }
         }
     }

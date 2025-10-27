@@ -1,15 +1,15 @@
 
 
-#include "src/simulator/simulator.hpp"
-#include "src/simulator/phare_types.hpp"
-#include "src/phare/phare.hpp"
+#include "simulator/simulator.hpp"
+#include "simulator/phare_types.hpp"
+#include "phare/phare.hpp"
 
 #include "test_messenger_basichierarchy.hpp"
 #include "test_integrator_strat.hpp"
 #include "test_messenger_tag_strategy.hpp"
 #include "tests/initializer/init_functions.hpp"
 
-#include "gmock/gmock.h"
+
 #include "gtest/gtest.h"
 
 
@@ -254,11 +254,11 @@ public:
 
     HybridMessengers()
     {
-        auto resourcesManagerHybrid = std::make_shared<ResourcesManagerT>();
-        auto resourcesManagerMHD    = std::make_shared<ResourcesManagerT>();
+        auto hybridModel            = std::make_unique<HybridModelT>(createDict());
+        auto resourcesManagerHybrid = hybridModel->resourcesManager;
 
-        auto hybridModel = std::make_unique<HybridModelT>(createDict(), resourcesManagerHybrid);
-        auto mhdModel    = std::make_unique<MHDModelT>(resourcesManagerMHD);
+        auto resourcesManagerMHD = std::make_shared<ResourcesManagerT>();
+        auto mhdModel            = std::make_unique<MHDModelT>(resourcesManagerMHD);
 
         hybridModel->resourcesManager->registerResources(hybridModel->state);
         mhdModel->resourcesManager->registerResources(mhdModel->state);
@@ -448,7 +448,7 @@ template<uint8_t dimension, std::size_t nbRefinePart>
 struct AfullHybridBasicHierarchy
 {
     static constexpr std::size_t interpOrder = 1;
-    static constexpr PHARE::SimOpts opts{dimension, interpOrder, nbRefinePart};
+    static constexpr auto opts = PHARE::SimOpts::make(dimension, interpOrder, nbRefinePart);
 
     using Simulator         = PHARE::Simulator<opts>;
     using HybridModelT      = Simulator::HybridModel;

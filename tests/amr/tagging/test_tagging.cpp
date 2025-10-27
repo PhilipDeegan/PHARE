@@ -1,6 +1,4 @@
 
-#include <cmath>
-#include <algorithm>
 
 #include "phare_solver.hpp"
 #include "amr/tagging/tagger.hpp"
@@ -11,11 +9,14 @@
 #include "core/models/hybrid_state.hpp"
 #include "core/utilities/span.hpp"
 
+#include "tests/core/data/gridlayout/gridlayout_test.hpp"
+#include "tests/core/data/vecfield/test_vecfield_fixtures.hpp"
+
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
 
-#include "tests/core/data/gridlayout/gridlayout_test.hpp"
-#include "tests/core/data/vecfield/test_vecfield_fixtures.hpp"
+#include <cmath>
+#include <algorithm>
 
 using namespace PHARE::amr;
 
@@ -23,7 +24,7 @@ using namespace PHARE::amr;
 
 TEST(test_tagger, fromFactoryValid)
 {
-    auto static constexpr opts = PHARE::SimOpts{1ul, 1ul, 2ul};
+    auto static constexpr opts = PHARE::SimOpts::make(1ul, 1ul, 2ul);
     using phare_types          = PHARE::solver::PHARE_Types<opts>;
     PHARE::initializer::PHAREDict dict;
     dict["model"]     = std::string{"HybridModel"};
@@ -35,7 +36,7 @@ TEST(test_tagger, fromFactoryValid)
 
 TEST(test_tagger, fromFactoryInvalid)
 {
-    auto static constexpr opts = PHARE::SimOpts{1ul, 1ul, 2ul};
+    auto static constexpr opts = PHARE::SimOpts::make(1ul, 1ul, 2ul);
     using phare_types          = PHARE::solver::PHARE_Types<opts>;
     PHARE::initializer::PHAREDict dict;
     dict["model"]     = std::string{"invalidModel"};
@@ -170,7 +171,7 @@ struct TestTagger : public ::testing::Test
     auto static constexpr dim            = TaggingTestInfo_t::dim;
     auto static constexpr interp_order   = TaggingTestInfo_t::interp;
     auto static constexpr refinedPartNbr = TaggingTestInfo_t::refinedPartNbr;
-    auto static constexpr opts           = PHARE::SimOpts{dim, interp_order, refinedPartNbr};
+    auto static constexpr opts           = PHARE::SimOpts::make(dim, interp_order, refinedPartNbr);
 
     using phare_types = PHARE::solver::PHARE_Types<opts>;
     using Electromag  = phare_types::Electromag_t;
@@ -187,13 +188,13 @@ struct TestTagger : public ::testing::Test
 
     GridLayoutT layout;
 
-    UsableVecField<dim> B, E;
+    UsableVecField<GridLayoutT> B, E;
 
     SinglePatchHybridModel model;
     std::vector<int> tags;
 
     TestTagger()
-        : layout{TestGridLayout<GridLayoutT>::make(20)}
+        : layout{TestGridLayout<GridLayoutT>::make(20u)}
         , B{"EM_B", layout, HybridQuantity::Vector::B}
         , E{"EM_E", layout, HybridQuantity::Vector::E}
         , model{createDict<dim>()}

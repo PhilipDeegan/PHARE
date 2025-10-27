@@ -1,10 +1,14 @@
 #ifndef PHARE_CORE_UTILITIES_META_META_UTILITIES_HPP
 #define PHARE_CORE_UTILITIES_META_META_UTILITIES_HPP
 
+#include "core/utilities/types.hpp"
+
+
+#include <tuple>
+#include <cassert>
 #include <iterator>
 #include <type_traits>
 
-#include "core/utilities/types.hpp"
 
 #if !defined(PHARE_SIMULATORS)
 #define PHARE_SIMULATORS 3
@@ -121,6 +125,7 @@ namespace core
 
         return nbRefinedPart;
     }
+
 
 
     template<typename Maker> // used from PHARE::amr::Hierarchy

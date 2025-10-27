@@ -25,6 +25,17 @@ using core::dirZ;
 template<typename ResMan, typename TensorFieldDataT>
 class MagneticRefinePatchStrategy : public SAMRAI::xfer::RefinePatchStrategy
 {
+    auto make_fine_field_boxes(auto& fields, auto& fine_box, auto& layout, auto& fineLayout) const
+    {
+        return core::for_N_make_array<N>([&](auto i) {
+            using PhysicalQuantity = std::decay_t<decltype(fields[i].physicalQuantity())>;
+
+            return phare_box_from<dimension>(
+                FieldGeometry<gridlayout_type, PhysicalQuantity>::toFieldBox(
+                    fine_box, fields[i].physicalQuantity(), fineLayout));
+        });
+    }
+
 public:
     using Geometry        = TensorFieldDataT::Geometry;
     using gridlayout_type = TensorFieldDataT::gridlayout_type;
@@ -77,57 +88,59 @@ public:
         auto layout        = PHARE::amr::layoutFromPatch<gridlayout_type>(fine);
         auto fineBoxLayout = Geometry::layoutFromBox(fine_box, layout);
 
-        auto const fine_field_box = core::for_N_make_array<N>([&](auto i) {
-            using PhysicalQuantity = std::decay_t<decltype(fields[i].physicalQuantity())>;
+        using Field_t = std::decay_t<decltype(bx)>;
+        if constexpr (core::is_field_tile_set_v<Field_t>)
+        {
+            //
+        }
+        else
+        {
+            auto const fine_field_boxes
+                = make_fine_field_boxes(fields, fine_box, layout, fineBoxLayout);
 
-            return FieldGeometry<gridlayout_type, PhysicalQuantity>::toFieldBox(
-                fine_box, fields[i].physicalQuantity(), fineBoxLayout);
-        });
+            fix(bx, by, bz, layout, fine_field_boxes);
+        }
+    }
 
+    void fix(auto& bx, auto& by, auto& bz, auto& layout, auto& fine_field_boxes)
+    {
         if constexpr (dimension == 1)
         {
             // if we ever go to c++23 we could use std::views::zip to iterate both on the local and
             // global indices instead of passing the box to do an amr to local inside the function,
             // which is not obvious at call site
-            for (auto const& i : phare_box_from<dimension>(fine_field_box[dirX]))
-            {
+            for (auto const& i : fine_field_boxes[dirX])
                 postprocessBx1d(bx, layout, i);
-            }
         }
 
         else if constexpr (dimension == 2)
         {
-            for (auto const& i : phare_box_from<dimension>(fine_field_box[dirX]))
-            {
+            for (auto const& i : fine_field_boxes[dirX])
                 postprocessBx2d(bx, by, layout, i);
-            }
 
-            for (auto const& i : phare_box_from<dimension>(fine_field_box[dirY]))
-            {
+
+            for (auto const& i : fine_field_boxes[dirY])
                 postprocessBy2d(bx, by, layout, i);
-            }
         }
 
         else if constexpr (dimension == 3)
         {
             auto meshSize = layout.meshSize();
 
-            for (auto const& i : phare_box_from<dimension>(fine_field_box[dirX]))
-            {
+            for (auto const& i : fine_field_boxes[dirX])
                 postprocessBx3d(bx, by, bz, meshSize, layout, i);
-            }
 
-            for (auto const& i : phare_box_from<dimension>(fine_field_box[dirY]))
-            {
+
+            for (auto const& i : fine_field_boxes[dirY])
                 postprocessBy3d(bx, by, bz, meshSize, layout, i);
-            }
 
-            for (auto const& i : phare_box_from<dimension>(fine_field_box[dirZ]))
-            {
+
+            for (auto const& i : fine_field_boxes[dirZ])
                 postprocessBz3d(bx, by, bz, meshSize, layout, i);
-            }
         }
     }
+
+
 
 
     static auto isNewFineFace(auto const& amrIdx, auto const dir)

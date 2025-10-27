@@ -26,7 +26,9 @@ namespace amr
     class MHDMessenger : public IMessenger<typename MHDModel::Interface>
     {
     public:
-        using IPhysicalModel = typename MHDModel::Interface;
+        using IPhysicalModel                      = typename MHDModel::Interface;
+        static std::string inline const stratName = "MHDModel-MHDModel";
+
         MHDMessenger(std::shared_ptr<typename MHDModel::resources_manager_type> resourcesManager,
                      int const firstLevel)
             : resourcesManager_{std::move(resourcesManager)}
@@ -49,8 +51,6 @@ namespace amr
         {
         }
 
-
-        static std::string const stratName;
 
         std::string fineModelName() const override { return MHDModel::model_name; }
 
@@ -108,7 +108,6 @@ namespace amr
         }
 
 
-
         void synchronize(SAMRAI::hier::PatchLevel& /*level*/) final
         {
             // call coarsning schedules...
@@ -136,8 +135,9 @@ namespace amr
     };
 
 
-    template<typename MHDModel>
-    std::string const MHDMessenger<MHDModel>::stratName = "MHDModel-MHDModel";
+    // template<typename MHDModel>
+    // std::string const MHDMessenger<MHDModel>::stratName = "MHDModel-MHDModel";
+
 } // namespace amr
 } // namespace PHARE
 #endif

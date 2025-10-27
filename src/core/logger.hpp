@@ -1,18 +1,25 @@
 #ifndef PHARE_CORE_LOGGER_HPP
 #define PHARE_CORE_LOGGER_HPP
 
+
+#include <chrono>
+#include <string>
+#include <utility>
 #include <cstdint>
+#include <sstream>
+#include <iostream>
 
 #if !defined(PHARE_LOG_LEVEL)
-#define PHARE_LOG_LEVEL 0 // 0 == off
+#define PHARE_LOG_LEVEL 2 // 0 == off
 #endif
 
 namespace PHARE
 {
 constexpr static std::uint8_t LOG_LEVEL = PHARE_LOG_LEVEL;
-}
+} // namespace PHARE
 
-#if !defined(NDEBUG) || defined(PHARE_FORCE_DEBUG_DO)
+#if !defined(NDEBUG) || defined(PHARE_FORCE_DEBUG_DO) || defined(PHARE_FORCE_LOG_LINE)
+
 #define PHARE_LOG_LINE_STR(str)                                                                    \
     std::cout << __FILE__ << ":" << __LINE__ << " - " << str << std::endl;
 #define PHARE_LOG_LINE_SS(s) PHARE_LOG_LINE_STR((std::stringstream{} << s).str());
@@ -22,7 +29,9 @@ constexpr static std::uint8_t LOG_LEVEL = PHARE_LOG_LEVEL;
 #endif
 #define PHARE_LOG_LINE PHARE_LOG_LINE_STR("")
 
+
 #if PHARE_WITH_CALIPER
+
 #include "caliper/cali.h"
 
 #define PHARE_LOG_START(lvl, str) CALI_MARK_BEGIN(str)
@@ -36,8 +45,7 @@ constexpr static std::uint8_t LOG_LEVEL = PHARE_LOG_LEVEL;
 
 #endif // PHARE_WITH_CALIPER
 
-#include <string>
-#include <utility>
+
 
 namespace PHARE
 {
@@ -63,6 +71,46 @@ struct scope_log
     int i;
     std::string key;
 };
+
+
+struct ScopeTimer
+{
+    std::string key;
+    std::size_t start_time = now();
+
+    std::string static inline const FORMAT = ":%Y-%m-%d-%H:%M:%S";
+
+    ~ScopeTimer()
+    {
+        std::cout << formated_time() << " PHARE SCOPE TIMER: " << key
+                  << " time: " << (now() - start_time) / 1e6 << " ms" << std::endl;
+    }
+
+    std::uint64_t static now()
+    {
+        return std::chrono::duration_cast<std::chrono::nanoseconds>(
+                   std::chrono::steady_clock::now().time_since_epoch())
+            .count();
+    }
+
+    std::string static formated_time()
+    {
+        char date[256];
+        auto now       = std::chrono::system_clock::now();
+        auto in_time_t = std::chrono::system_clock::to_time_t(now);
+
+        std::strftime(date, sizeof(date), FORMAT.c_str(), std::gmtime(&in_time_t));
+        return date;
+    }
+};
+
+
 } // namespace PHARE
+
+#if !defined(NDEBUG) || defined(PHARE_FORCE_DEBUG_DO) || defined(PHARE_FORCE_LOG_LINE)
+#define PHARE_FN_TIMER(key) PHARE::ScopeTimer PHARE_STR_CAT(__phare_scope_, __LINE__)(key)
+#else
+#define PHARE_FN_TIMER(key) // noop
+#endif                      //
 
 #endif /* PHARE_CORE_LOGGER_H */

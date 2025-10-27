@@ -93,3 +93,15 @@ def conserve_existing(sim):
 
 
 # ------------------------------------------------------------------------------
+
+
+def get_restart_time(dir):
+    from pathlib import Path
+
+    file_list = []  # A list for storing files existing in directories
+
+    for x in Path(dir).iterdir():
+        if x.is_dir():
+            file_list.append(x)
+
+    return file_list

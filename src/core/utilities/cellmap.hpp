@@ -1,39 +1,87 @@
 #ifndef PHARE_CELLMAP_H
 #define PHARE_CELLMAP_H
-#include <cstddef>
-#include <string>
-#include <iterator>
+
+// #include "core/data/particles/particle_array_def.hpp"
+// #include "core/data/ndarray/ndarray_view.hpp"
+#include "core/def.hpp"
+// #include "core/data/particles/particle_array_def.hpp"
+// #include "core/logger.hpp"
+#include "core/utilities/indexer.hpp"
+#include "core/utilities/box/box.hpp"
+// #include "core/utilities/range/range.hpp"
+#include "core/utilities/meta/meta_utilities.hpp"
+#include "core/data/ndarray/ndarray_vector.hpp"
+
 #include <array>
+#include <cstddef>
+// #include <algorithm>
 #include <type_traits>
 #include <unordered_map>
-#include <vector>
-#include <algorithm>
-#include <numeric>
-#include <optional>
-
-#include "core/data/ndarray/ndarray_vector.hpp"
-#include "core/utilities/box/box.hpp"
-#include "core/utilities/indexer.hpp"
-#include "core/logger.hpp"
-#include "core/utilities/meta/meta_utilities.hpp"
-#include "core/utilities/range/range.hpp"
-#include "core/def.hpp"
-
 
 namespace PHARE::core
 {
-template<std::size_t dim, typename cell_index_t = int>
-class CellMap
+template<bool is_span, std::size_t dim, typename cell_index_t>
+struct CellMapStorage;
+
+
+template<std::size_t dim, typename cell_index_t>
+struct CellMapStorage</*is_span=*/false, dim, cell_index_t>
 {
+    bool constexpr static c_order = true;
+
+
+    CellMapStorage(Box<cell_index_t, dim> const& box)
+        : box_{box}
+        , cellIndexes_{box.shape().template toArray<std::uint32_t>()}
+    {
+    }
+
+    Box<cell_index_t, dim> box_;
+    NdArrayVector<dim, Indexer<>, c_order, default_allocator_mode()> cellIndexes_;
+};
+
+template<std::size_t dim, typename cell_index_t>
+struct CellMapStorage</*is_span=*/true, dim, cell_index_t>
+{
+    bool constexpr static c_order = true;
+
+    // CellMapStorage() = default;
+    CellMapStorage(auto& cellmap)
+        : box_{cellmap.box_}
+        , cellIndexes_{box_.shape().template toArray<std::uint32_t>()}
+    // , cellIndexes_{generate_from<default_allocator_mode()>(
+    //       [&](auto const& i) {
+    //           return Indexer<StorageMode::SPAN>{make_span(cellmap.cellIndexes_.data()[i])};
+    //       },
+    //       cellmap.cellIndexes_)}
+    {
+        for (std::size_t i = 0; i < cellmap.cellIndexes_.size(); ++i)
+            cellIndexes_.data()[i].set_from(cellmap.cellIndexes_.data()[i]);
+    }
+
+
+    Box<cell_index_t, dim> box_;
+    NdArrayVector<dim, Indexer<StorageMode::SPAN>, c_order, default_allocator_mode()> cellIndexes_;
+};
+
+
+template<std::size_t dim, typename cell_index_t = int, bool is_span = false>
+class CellMap : public CellMapStorage<is_span, dim, cell_index_t>
+{
+    using Super = CellMapStorage<is_span, dim, cell_index_t>;
+    using Super::box_;
+    using Super::cellIndexes_;
+
+    template<bool, std::size_t, typename>
+    friend struct CellMapStorage;
+
 private:
     using cell_t = std::array<cell_index_t, dim>;
     using box_t  = Box<cell_index_t, dim>;
 
-
 public:
-    CellMap(Box<cell_index_t, dim> box)
-        : box_{box}
-        , cellIndexes_{box.shape().template toArray<std::uint32_t>()}
+    CellMap(Box<cell_index_t, dim> const& box)
+        : Super{box}
     {
     }
 
@@ -41,6 +89,16 @@ public:
     CellMap(CellMap&& from)                 = default;
     CellMap& operator=(CellMap const& from) = default;
     CellMap& operator=(CellMap&& from)      = default;
+
+
+    template<typename... Args>
+    CellMap(Args&&... args)
+        requires std::is_constructible_v<Super, Args&&...>
+    _PHARE_ALL_FN_ : Super{std::forward<Args>(args)...}
+    {
+    }
+
+
 
     NO_DISCARD auto nbr_cells() const { return cellIndexes_.size(); }
 
@@ -78,8 +136,9 @@ public:
     template<typename CellIndex>
     void addToCell(CellIndex const& cell, std::size_t itemIndex);
 
-    static auto constexpr default_extractor = [](auto const& item) -> auto& { return item.iCell; };
-    using DefaultExtractor                  = decltype(default_extractor);
+    static auto constexpr default_extractor
+        = [](auto const& item) -> auto& { return item.iCell(); };
+    using DefaultExtractor = decltype(default_extractor);
 
 
     // same as above but cell is found with the CellExtractor
@@ -166,6 +225,8 @@ public:
     auto partition(Range range, Predicate&& pred, CellExtractor = default_extractor);
 
 
+    void erase(auto& items, box_t const& box);
+
 
     // erase all items indexed in the given range from both the cellmap and the
     // array the range is for.
@@ -196,6 +257,19 @@ public:
     NO_DISCARD auto begin() { return cellIndexes_.begin(); }
     NO_DISCARD auto end() { return cellIndexes_.end(); }
 
+
+    template<template<typename, std::size_t> typename Arr>
+    NO_DISCARD auto& operator()(Arr<std::uint32_t, dim> const& arr)
+    {
+        return cellIndexes_(arr);
+    }
+
+    template<template<typename, std::size_t> typename Arr>
+    NO_DISCARD auto& operator()(Arr<std::uint32_t, dim> const& arr) const
+    {
+        return cellIndexes_(arr);
+    }
+
     template<typename Cell>
     NO_DISCARD auto& operator()(Cell const& cell)
     {
@@ -214,21 +288,19 @@ private:
     template<typename Cell>
     auto local_(Cell const& cell) const
     {
-        auto loc{cell};
-        for (std::size_t i = 0; i < loc.size(); ++i)
-        {
-            loc[i] -= box_.lower[i];
-        }
-        return loc;
+        return (Point{cell} - box_.lower).as_unsigned();
     }
-    Box<cell_index_t, dim> box_;
-    NdArrayVector<dim, Indexer> cellIndexes_;
+
+
+    // Box<cell_index_t, dim> box_;
+    // bool constexpr static c_order = true;
+    // NdArrayVector<dim, Indexer, c_order, default_allocator_mode()> cellIndexes_;
 };
 
 
-template<std::size_t dim, typename cell_index_t>
-void CellMap<dim, cell_index_t>::swap(cell_t const a, cell_t const b, std::size_t const i0,
-                                      std::size_t i1)
+template<std::size_t dim, typename cell_index_t, bool is_span>
+void CellMap<dim, cell_index_t, is_span>::swap(cell_t const a, cell_t const b, std::size_t const i0,
+                                               std::size_t i1)
 {
     assert(cellIndexes_(local_(a)).is_indexed(i0));
     assert(cellIndexes_(local_(b)).is_indexed(i1));
@@ -237,18 +309,19 @@ void CellMap<dim, cell_index_t>::swap(cell_t const a, cell_t const b, std::size_
 }
 
 
-template<std::size_t dim, typename cell_index_t>
+template<std::size_t dim, typename cell_index_t, bool is_span>
 template<typename CellIndex>
-inline void CellMap<dim, cell_index_t>::addToCell(CellIndex const& cell, std::size_t itemIndex)
+inline void CellMap<dim, cell_index_t, is_span>::addToCell(CellIndex const& cell,
+                                                           std::size_t itemIndex)
 {
     if (!box_.isEmpty() and isIn(Point{cell}, box_))
         cellIndexes_(local_(cell)).add(itemIndex);
 }
 
 
-template<std::size_t dim, typename cell_index_t>
+template<std::size_t dim, typename cell_index_t, bool is_span>
 template<typename Array, typename CellExtractor, typename>
-inline void CellMap<dim, cell_index_t>::add(Array const& items, CellExtractor extract)
+inline void CellMap<dim, cell_index_t, is_span>::add(Array const& items, CellExtractor extract)
 {
     for (std::size_t itemIndex = 0; itemIndex < items.size(); ++itemIndex)
     {
@@ -256,10 +329,10 @@ inline void CellMap<dim, cell_index_t>::add(Array const& items, CellExtractor ex
     }
 }
 
-template<std::size_t dim, typename cell_index_t>
+template<std::size_t dim, typename cell_index_t, bool is_span>
 template<typename Array, typename CellExtractor, typename>
-inline void CellMap<dim, cell_index_t>::add(Array const& items, std::size_t first, std::size_t last,
-                                            CellExtractor extract)
+inline void CellMap<dim, cell_index_t, is_span>::add(Array const& items, std::size_t first,
+                                                     std::size_t last, CellExtractor extract)
 
 {
     for (auto itemIndex = first; itemIndex <= last; ++itemIndex)
@@ -269,38 +342,38 @@ inline void CellMap<dim, cell_index_t>::add(Array const& items, std::size_t firs
 }
 
 
-template<std::size_t dim, typename cell_index_t>
+template<std::size_t dim, typename cell_index_t, bool is_span>
 template<typename Array, typename CellExtractor, typename>
-inline void CellMap<dim, cell_index_t>::add(Array const& items, std::size_t itemIndex,
-                                            CellExtractor extract)
+inline void CellMap<dim, cell_index_t, is_span>::add(Array const& items, std::size_t itemIndex,
+                                                     CellExtractor extract)
 {
     addToCell(extract(items[itemIndex]), itemIndex);
 }
 
 
 
-template<std::size_t dim, typename cell_index_t>
+template<std::size_t dim, typename cell_index_t, bool is_span>
 template<typename Array, typename CellExtractor, typename>
-inline void CellMap<dim, cell_index_t>::erase(Array const& items, std::size_t itemIndex,
-                                              CellExtractor extract)
+inline void CellMap<dim, cell_index_t, is_span>::erase(Array const& items, std::size_t itemIndex,
+                                                       CellExtractor extract)
 {
     auto& blist = cellIndexes_(local_(extract(items[itemIndex])));
     blist.remove(itemIndex);
 }
 
 
-template<std::size_t dim, typename cell_index_t>
+template<std::size_t dim, typename cell_index_t, bool is_span>
 template<typename Array, typename>
-inline void CellMap<dim, cell_index_t>::erase(Array const& items, cell_t const oldCell,
-                                              std::size_t const itemIndex)
+inline void CellMap<dim, cell_index_t, is_span>::erase(Array const& items, cell_t const oldCell,
+                                                       std::size_t const itemIndex)
 {
     auto& blist = cellIndexes_(local_(oldCell));
     blist.remove(itemIndex);
 }
 
 
-template<std::size_t dim, typename cell_index_t>
-inline auto CellMap<dim, cell_index_t>::size() const
+template<std::size_t dim, typename cell_index_t, bool is_span>
+inline auto CellMap<dim, cell_index_t, is_span>::size() const
 {
     PHARE_LOG_SCOPE(3, "CellMap::size()");
     std::size_t s = 0;
@@ -311,8 +384,8 @@ inline auto CellMap<dim, cell_index_t>::size() const
     return s;
 }
 
-template<std::size_t dim, typename cell_index_t>
-inline auto CellMap<dim, cell_index_t>::size(box_t const& box) const
+template<std::size_t dim, typename cell_index_t, bool is_span>
+inline auto CellMap<dim, cell_index_t, is_span>::size(box_t const& box) const
 {
     PHARE_LOG_SCOPE(3, "CellMap::size(box)");
     std::size_t s = 0;
@@ -326,9 +399,9 @@ inline auto CellMap<dim, cell_index_t>::size(box_t const& box) const
 
 
 
-template<std::size_t dim, typename cell_index_t>
+template<std::size_t dim, typename cell_index_t, bool is_span>
 template<typename CellIndex>
-inline void CellMap<dim, cell_index_t>::print(CellIndex const& cell) const
+inline void CellMap<dim, cell_index_t, is_span>::print(CellIndex const& cell) const
 {
     auto& blist = cellIndexes_(local_(cell));
     for (auto itemIndex : blist)
@@ -338,10 +411,10 @@ inline void CellMap<dim, cell_index_t>::print(CellIndex const& cell) const
 }
 
 
-template<std::size_t dim, typename cell_index_t>
+template<std::size_t dim, typename cell_index_t, bool is_span>
 template<typename Src, typename Dst>
-inline void CellMap<dim, cell_index_t>::export_to(box_t const& box, Src const& from,
-                                                  Dst& dest) const
+inline void CellMap<dim, cell_index_t, is_span>::export_to(box_t const& box, Src const& from,
+                                                           Dst& dest) const
 {
     for (auto const& cell : box)
     {
@@ -353,10 +426,10 @@ inline void CellMap<dim, cell_index_t>::export_to(box_t const& box, Src const& f
     }
 }
 
-template<std::size_t dim, typename cell_index_t>
+template<std::size_t dim, typename cell_index_t, bool is_span>
 template<typename Src, typename Dst, typename Transformation>
-inline void CellMap<dim, cell_index_t>::export_to(box_t const& box, Src const& from, Dst& dest,
-                                                  Transformation&& Fn) const
+inline void CellMap<dim, cell_index_t, is_span>::export_to(box_t const& box, Src const& from,
+                                                           Dst& dest, Transformation&& Fn) const
 {
     for (auto const& cell : box)
     {
@@ -368,10 +441,10 @@ inline void CellMap<dim, cell_index_t>::export_to(box_t const& box, Src const& f
     }
 }
 
-template<std::size_t dim, typename cell_index_t>
+template<std::size_t dim, typename cell_index_t, bool is_span>
 template<typename Src, typename Dst, typename Predicate>
-inline void CellMap<dim, cell_index_t>::export_if(Src const& from, Dst& dest,
-                                                  Predicate&& pred) const
+inline void CellMap<dim, cell_index_t, is_span>::export_if(Src const& from, Dst& dest,
+                                                           Predicate&& pred) const
 {
     for (auto const& cell : box_)
     {
@@ -389,8 +462,8 @@ inline void CellMap<dim, cell_index_t>::export_if(Src const& from, Dst& dest,
 
 
 
-template<std::size_t dim, typename cell_index_t>
-inline auto CellMap<dim, cell_index_t>::capacity() const
+template<std::size_t dim, typename cell_index_t, bool is_span>
+inline auto CellMap<dim, cell_index_t, is_span>::capacity() const
 {
     std::size_t tot = 0;
     for (auto const& cell : box_)
@@ -400,8 +473,8 @@ inline auto CellMap<dim, cell_index_t>::capacity() const
     return tot;
 }
 
-template<std::size_t dim, typename cell_index_t>
-inline void CellMap<dim, cell_index_t>::empty()
+template<std::size_t dim, typename cell_index_t, bool is_span>
+inline void CellMap<dim, cell_index_t, is_span>::empty()
 {
     for (auto const& cell : box_)
     {
@@ -412,10 +485,11 @@ inline void CellMap<dim, cell_index_t>::empty()
 
 
 
-template<std::size_t dim, typename cell_index_t>
+template<std::size_t dim, typename cell_index_t, bool is_span>
 template<typename Array, typename CellIndex, typename CellExtractor>
-inline void CellMap<dim, cell_index_t>::update(Array& items, std::size_t itemIndex,
-                                               CellIndex const& oldCell, CellExtractor /*extract*/)
+inline void CellMap<dim, cell_index_t, is_span>::update(Array& items, std::size_t itemIndex,
+                                                        CellIndex const& oldCell,
+                                                        CellExtractor /*extract*/)
 {
     // we want to check first if the particle is in the map
     // already. if is, needs to remove it before inserting it again
@@ -430,10 +504,10 @@ inline void CellMap<dim, cell_index_t>::update(Array& items, std::size_t itemInd
 
 
 
-template<std::size_t dim, typename cell_index_t>
+template<std::size_t dim, typename cell_index_t, bool is_span>
 template<typename Range, typename Predicate, typename CellExtractor>
-inline auto CellMap<dim, cell_index_t>::partition(Range range, Predicate&& pred,
-                                                  CellExtractor extract)
+inline auto CellMap<dim, cell_index_t, is_span>::partition(Range range, Predicate&& pred,
+                                                           CellExtractor extract)
 {
     std::size_t toSwapIndex = range.iend() - 1;
     auto pivot              = range.iend();
@@ -476,11 +550,36 @@ inline auto CellMap<dim, cell_index_t>::partition(Range range, Predicate&& pred,
 }
 
 
+template<std::size_t dim, typename cell_index_t, bool is_span>
+void CellMap<dim, cell_index_t, is_span>::erase(auto& items, box_t const& box)
+{
+    int prev_idx = 0; // to throw if not sorted
+
+    for (auto const& cell : box)
+    {
+        auto& blist = cellIndexes_(local_(cell));
+        if (blist.size() == 0)
+            continue;
+        prev_idx = blist.back();
+        for (std::size_t i = blist.size(); i-- > 0;) // reverse loop
+        {
+            auto const& idx = blist[i];
+            PHARE_LOG_LINE_SS(i << " " << idx << " " << items.size());
+            if (idx > prev_idx)
+                throw std::runtime_error("Index list is not sorted");
+            if (idx > items.size())
+                throw std::runtime_error("Index list is invalid");
+            items.erase(items.begin() + idx);
+            prev_idx = idx;
+        }
+        blist.clear();
+    }
+}
 
 
-template<std::size_t dim, typename cell_index_t>
+template<std::size_t dim, typename cell_index_t, bool is_span>
 template<typename Range>
-inline void CellMap<dim, cell_index_t>::erase(Range range)
+inline void CellMap<dim, cell_index_t, is_span>::erase(Range range)
 {
     auto& items = range.array();
 
@@ -496,8 +595,8 @@ inline void CellMap<dim, cell_index_t>::erase(Range range)
 
 
 
-template<std::size_t dim, typename cell_index_t>
-inline void CellMap<dim, cell_index_t>::sort()
+template<std::size_t dim, typename cell_index_t, bool is_span>
+inline void CellMap<dim, cell_index_t, is_span>::sort()
 {
     for (auto const& cell : box_)
     {
