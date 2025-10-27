@@ -51,7 +51,7 @@ CARGS="${CARGS} $(mkn_get_opts)"
   [ ! -f "bin/amr/libphare_amr.a" ] && (
       mkn clean build -KOgqtdp py,test_amr -a "-fPIC" ${CARGS}
   )
-  mkn -p test_diagnostics ${TEST} ${CARGS} "$@"
+  mkn -qp test_diagnostics ${TEST} ${CARGS} "$@"
   echo "ok"
 ) 1> >(tee $CWD/.mkn.sh.out ) 2> >(tee $CWD/.mkn.sh.err >&2 )
 

@@ -97,10 +97,31 @@ namespace amr
         {
             int idx = -1;
 
-            core::for_N<std::tuple_size_v<ResourceUserTypes>>([&](auto i) {
-                if (idx == -1 and core::is_field_v<ResourceView>)
-                    idx = i;
-            });
+            if constexpr (std::tuple_size_v<ResourceUserTypes>)
+                core::for_N<std::tuple_size_v<ResourceUserTypes>>([&](auto i) {
+                    using UserType_t = std::tuple_element_t<i, ResourceUserTypes>;
+
+                    if constexpr (core::is_field_v<ResourceView>)
+                        if (idx == -1)
+                            idx = i;
+
+                    using PatchData_t = UserType_t::patch_data_type;
+                    using Data_ptr    = decltype(std::declval<PatchData_t>().getPointer());
+                    // using Data_ptr    = std::invoke_result_t<Fn>;
+                    using Data_t = std::decay_t<std::remove_pointer_t<Data_ptr>>;
+                    // static_assert(std::is_same_v<ResourceView, Data_t>);
+                    // if constexpr (std::is_same_v<ResourceView, Data_t>)
+
+                    if constexpr (is_tensor_field_v<ResourceView>)
+                        if constexpr (is_tensor_field_v<Data_t>)
+                            if constexpr (ResourceView::rank == Data_t::rank)
+                                if (idx == -1)
+                                    idx = i;
+
+
+                    // idx = i;
+                });
+
             return idx;
         }
 

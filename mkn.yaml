@@ -1,4 +1,4 @@
-#! clean build -x mpi -dtKOp py
+#! clean build -qx mpi -dtKOp py
 
 name: phare
 

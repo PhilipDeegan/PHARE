@@ -338,12 +338,9 @@ void SolverPPC<HybridModel, AMR_Types>::reflux(IPhysicalModel_t& model,
 
     for (auto& patch : level)
     {
-        core::Faraday<GridLayout> faraday;
-        auto layout = amr::layoutFromPatch<GridLayout>(*patch);
-        auto _sp    = hybridModel.resourcesManager->setOnPatch(*patch, Bold_, Eavg, B);
-        auto _sl    = core::SetLayout(&layout, faraday);
-        auto dt     = time - oldTime_[level.getLevelNumber()];
-        faraday_(Bold_, Eavg, B, dt);
+        auto layout   = amr::layoutFromPatch<GridLayout>(*patch);
+        auto const dt = time - oldTime_[level.getLevelNumber()];
+        core::FaradaySingleTransformer{}(layout, Bold_, Eavg, B, dt);
     };
 }
 

@@ -149,6 +149,7 @@ namespace amr
         using Grid_t     = HybridModel::Super::storage_t::grid_type;
         using Field_t    = HybridModel::Super::storage_t::field_type;
         using VecField_t = HybridModel::Super::storage_t::vecfield_type;
+        // using TensorField_t = HybridModel::Super::storage_t::tensor_field_type;
 
         using FieldData_t       = FieldData<GridLayoutT, Grid_t>;
         using VectorFieldData_t = TensorFieldData<1, GridLayoutT, Grid_t, core::HybridQuantity>;
@@ -957,6 +958,8 @@ namespace amr
 
         Field_t scratch_field{"phare_scratch_field", core::HybridQuantity::Scalar::rho};
         VecField_t scratch_vecfield{"phare_scratch_vec_field", core::HybridQuantity::Vector::V};
+        // TensorField_t scratch_tensor_field{"phare_scratch_tensor_field",
+        //                                    core::HybridQuantity::Tensor::M};
 
 
 

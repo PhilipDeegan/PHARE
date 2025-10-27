@@ -239,8 +239,7 @@ public:
             throw std::runtime_error("Error - isothermal closure pressure not usable");
 
         auto const& Ne_ = ions_.chargeDensity();
-        std::transform(std::begin(Ne_), std::end(Ne_), std::begin(Pe_),
-                       [this](auto n) { return n * Te_; });
+        transform(Ne_, Pe_, [this](auto n) { return n * Te_; });
     }
 
 private:

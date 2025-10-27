@@ -8,5 +8,5 @@ mkn_get_opts () {
   # [ -z "$ARGS" ] && which clang 2>&1 > /dev/null && clang -v 2>&1 | grep -q "Found CUDA" && ARGS="res/mkn/clang_cuda"
   [ -n "$ARGS" ] && ARGS="-P mkn.base=gpu_ -x $ARGS"
   [ -z "$ARGS" ] && ARGS="-x res/mkn/mpi" # default
-  echo "$ARGS"
+  echo "-w mkn.gpu $ARGS"
 }

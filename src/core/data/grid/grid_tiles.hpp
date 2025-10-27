@@ -200,7 +200,7 @@ public:
 
     void setBuffer(std::nullptr_t ptr) _PHARE_ALL_FN_
     {
-        setBuffer(static_cast<FieldTileSet*>(nullptr));
+        super() = Super{{}, nullptr, 0, nullptr, {}};
     }
 
     template<typename FieldLike>

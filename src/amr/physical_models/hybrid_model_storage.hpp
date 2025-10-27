@@ -31,8 +31,13 @@ struct hybrid_model_storage<core::LayoutMode::AoSTS, TiledIons, Grid_t>
 
 
     using UserField_t = amr::UserFieldType<grid_type, gridlayout_type>;
+    using UserVecField_t
+        = amr::UserTensorFieldType<1, grid_type, gridlayout_type, core::HybridQuantity>;
+    using UserTensorField_t
+        = amr::UserTensorFieldType<2, grid_type, gridlayout_type, core::HybridQuantity>;
 
-    using resources_manager_type = amr::ResourcesManager<gridlayout_type, Grid_t, UserField_t>;
+    using resources_manager_type = amr::ResourcesManager<gridlayout_type, Grid_t, UserField_t,
+                                                         UserVecField_t, UserTensorField_t>;
 
     NO_DISCARD auto getCompileTimeResourcesViewList() const
     {
