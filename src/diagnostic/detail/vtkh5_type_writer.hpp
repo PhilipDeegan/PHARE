@@ -2,6 +2,7 @@
 #define PHARE_DIAGNOSTIC_DETAIL_VTK_H5_TYPE_WRITER_HPP
 
 #include "core/logger.hpp"
+#include "core/utilities/algorithm.hpp"
 #include "core/utilities/box/box.hpp"
 #include "core/utilities/mpi_utils.hpp"
 #include "core/data/tensorfield/tensorfield.hpp"
@@ -18,7 +19,7 @@
 
 // TODO:
 //     remove logging
-//     write as column major/Fortran memory ordering
+//     write as column major/Fortran memory ordering - done. but badly
 
 
 namespace PHARE::diagnostic::vtkh5::detail
@@ -45,7 +46,7 @@ class H5TypeWriter : public PHARE::diagnostic::TypeWriter
 
 public:
     static constexpr auto dimension = Writer::dimension;
-    using Attributes                = typename Writer::Attributes;
+    using GridLayout                = Writer::GridLayout;
     using Box_t                     = core::Box<int, dimension>;
 
     H5TypeWriter(Writer& h5Writer)
@@ -89,8 +90,9 @@ protected:
 
     struct VTKFileFieldInfo // assumes all primal
     {
-        VTKFileFieldInfo(auto const& field, auto const& layout)
-            : lvl{std::to_string(layout.levelNumber())}
+        VTKFileFieldInfo(auto const& field, auto const& lyout)
+            : lvl{std::to_string(lyout.levelNumber())}
+            , layout{lyout}
             , ghost_box{layout.AMRGhostBoxFor(field)}
             , local_box{layout.AMRToLocal(core::grow(ghost_box, -1 * layout.nbrGhosts()))}
         {
@@ -116,6 +118,7 @@ protected:
         }
 
         std::string lvl;
+        GridLayout const& layout;
         Box_t const ghost_box;
         core::Box<std::uint32_t, dimension> const local_box;
         std::uint32_t const primal_row_len = local_box.shape(dimension - 1);
@@ -127,17 +130,12 @@ protected:
     {
         void write2D(auto const& field)
         {
-            PHARE_LOG_LINE_SS(finfo.ghost_box << " " << finfo.local_box << " "
-                                              << finfo.primal_row_len);
             auto ds          = fw->h5file.getDataSet(finfo.path);
             auto const write = [&]() {
                 auto bit = finfo.local_box.begin();
                 for (std::uint32_t i = 0; i < finfo.local_box.rows();
                      ++i, bit += finfo.primal_row_len, data_offset += finfo.primal_row_len)
-                {
-                    PHARE_LOG_LINE_SS(data_offset << " " << finfo.primal_row_len << " " << *bit);
                     ds.select({data_offset}, {finfo.primal_row_len}).write_raw(&field(*bit));
-                }
             };
             write();
             write();
@@ -155,10 +153,12 @@ protected:
         }
         void operator()(auto const& field)
         {
+            auto& tmp         = fw->typewriter->h5Writer_.modelView().tmpField();
+            auto const frimal = core::convert_to_fortran_primal(tmp, field, finfo.layout);
             if constexpr (dimension == 2)
-                write2D(field);
+                write2D(frimal);
             if constexpr (dimension == 3)
-                write3D(field);
+                write3D(frimal);
         }
 
         VTKFileWriter* fw;
@@ -201,6 +201,8 @@ protected:
         }
         void operator()(auto const& tf)
         {
+            auto& tmp = fw->typewriter->h5Writer_.modelView().template tmpTensorField<rank>();
+            auto const frimal = core::convert_to_fortran_primal(tmp, tf, finfo.layout);
             if constexpr (dimension == 2)
                 write2D(tf);
             if constexpr (dimension == 3)
@@ -257,17 +259,13 @@ protected:
 
         void writeField(auto const& field, auto const& layout)
         {
-            PHARE_LOG_LINE_SS("writeField " << field.name());
             VTKFileFieldWriter{this, {field, layout}}(field);
-            PHARE_LOG_LINE_SS("done");
         }
 
         template<std::size_t rank = 2> // TODO convert duals to primals
         void writeTensorField(auto const& tf, auto const& layout)
         {
-            PHARE_LOG_LINE_SS("writeTensorField " << tf.name());
             VTKFileTensorFieldWriter<rank>{this, {tf[0], layout}}(tf);
-            PHARE_LOG_LINE_SS("done");
         }
 
         template<typename T = FloatType>
@@ -308,7 +306,6 @@ protected:
 
         void initFieldFileLevel(int const level, auto& boxes)
         {
-            PHARE_LOG_LINE_SS("initFieldFileLevel");
             initDSDefault(level_base + std::to_string(level) + "/PointData/data");
             resize(level, boxes);
         }
@@ -316,7 +313,6 @@ protected:
         template<std::size_t rank = 2>
         void initTensorFieldFileLevel(auto const level, auto& boxes)
         {
-            PHARE_LOG_LINE_SS("initTensorFieldFileLevel");
             auto constexpr N = core::detail::tensor_field_dim_from_rank<rank>();
             auto const path  = level_base + std::to_string(level) + "/PointData/data";
             h5file.template create_chunked_data_set<FloatType>(
@@ -336,7 +332,6 @@ protected:
             //  and 1d data is * 4
             constexpr static auto X_TIMES = std::array{4, 2, /* 3d noop */ 1}[dimension - 1];
 
-            PHARE_LOG_LINE_SS("resize_data");
             auto const lvl       = std::to_string(ilvl);
             auto const data_path = level_base + lvl + "/PointData/data";
             auto point_data_ds   = h5file.getDataSet(data_path);
@@ -353,21 +348,17 @@ protected:
                 core::sum_from(boxes, [](auto const& b) { return b.size() * X_TIMES; }));
             auto const new_size = data_offset + core::sum(rank_data_size);
 
-            PHARE_LOG_LINE_SS(new_size);
             if constexpr (N == 1)
                 point_data_ds.resize({new_size});
             else
                 point_data_ds.resize({new_size, N});
             for (int i = 0; i < core::mpi::rank(); ++i)
                 data_offset += rank_data_size[i];
-            PHARE_LOG_LINE_SS("done");
         }
 
 
         void resize_boxes(auto const ilvl, auto const& boxes)
         {
-            PHARE_LOG_LINE_SS("resize_boxes");
-
             auto const lvl           = std::to_string(ilvl);
             auto const rank_box_size = core::mpi::collect(boxes.size());
             auto const total_boxes   = core::sum(rank_box_size);
@@ -389,17 +380,12 @@ protected:
                 ds.select({old_size}, {1}).write(box_offset);
             }
 
-
             amrbox_ds.resize({box_offset + total_boxes, 6});
-            PHARE_LOG_LINE_SS("resize");
             for (int i = 0; i < core::mpi::rank(); ++i)
                 box_offset += rank_box_size[i];
 
-            PHARE_LOG_LINE_SS("writeBoxesForLevel");
             auto const vtk_boxes = VTKBoxes{boxes};
             amrbox_ds.select({box_offset, 0}, {boxes.size(), dimension * 2}).write(vtk_boxes.data);
-
-            PHARE_LOG_LINE_SS("done");
         }
 
         template<std::size_t N = 1>
