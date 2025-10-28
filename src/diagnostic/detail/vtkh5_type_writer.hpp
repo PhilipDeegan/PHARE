@@ -22,6 +22,7 @@
 #endif
 
 
+
 namespace PHARE::diagnostic::vtkh5
 {
 
@@ -41,6 +42,7 @@ class H5TypeWriter : public PHARE::diagnostic::TypeWriter
 
 public:
     static constexpr auto dimension = Writer::dimension;
+
 
     H5TypeWriter(Writer& h5Writer)
         : h5Writer_{h5Writer}
