@@ -162,12 +162,11 @@ class DiagnosticsTest(SimulatorTest):
         self.simulator = Simulator(simulation).run().reset()
         self.simulator = None
         ph.global_vars.sim = None
-        eg_file = Path(local_out) / "ions_mass_density.h5"
-        eg_file = Path(local_out) / "EM_E.h5"
-        print("eg_file", eg_file)
 
         if cpp.mpi_rank() == 0:
-            phc.tovtk.convert("./" + str(eg_file))
+            # convert to test
+            phc.tovtk.convert("./" + str(Path(local_out) / "EM_E.h5"))
+            # phc.tovtk.convert("./" + str(Path(local_out) / "EM_B.h5")) # fails in tovtk?
         cpp.mpi_barrier()
 
         local_out = self.unique_diag_dir_for_test_case(f"{out}/test_vtk", ndim, interp)

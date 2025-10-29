@@ -11,35 +11,32 @@ from pyphare.simulator.simulator import Simulator, startMPI
 
 from tests.simulator import SimulatorTest
 
-# ph.NO_GUI()
+ph.NO_GUI()
 
 cpp = cpp_lib()
 
 
-cells = (100, 100)
+cells = (200, 100)
 time_step = 0.005
-final_time = 0.0050
+final_time = 50
 timestamps = np.arange(0, final_time + time_step, final_time / 5)
-diag_dir = "phare_outputs/harris_vtk"  # _vtk
-timestamps = [0, final_time]
+diag_dir = "phare_outputs/harris"
 
 
 def config():
     L = 0.5
 
     sim = ph.Simulation(
-        smallest_patch_size=50,
-        largest_patch_size=50,
         time_step=time_step,
         final_time=final_time,
         cells=cells,
         dl=(0.40, 0.40),
         refinement="tagging",
-        max_nbr_levels=1,
+        max_nbr_levels=2,
         hyper_resistivity=0.002,
         resistivity=0.001,
         diag_options={
-            "format": "pharevtkh5",
+            "format": "phareh5",
             "options": {"dir": diag_dir, "mode": "overwrite"},
         },
         strict=True,
@@ -216,12 +213,12 @@ class HarrisTest(SimulatorTest):
         ph.global_vars.sim = None
 
     def test_run(self):
-        # self.register_diag_dir_for_cleanup(diag_dir)
+        self.register_diag_dir_for_cleanup(diag_dir)
         Simulator(config()).run().reset()
-        # if cpp.mpi_rank() == 0:
-        #     plot_dir = Path(f"{diag_dir}_plots") / str(cpp.mpi_size())
-        #     plot_dir.mkdir(parents=True, exist_ok=True)
-        #     plot(diag_dir, plot_dir)
+        if cpp.mpi_rank() == 0:
+            plot_dir = Path(f"{diag_dir}_plots") / str(cpp.mpi_size())
+            plot_dir.mkdir(parents=True, exist_ok=True)
+            plot(diag_dir, plot_dir)
         cpp.mpi_barrier()
         return self
 

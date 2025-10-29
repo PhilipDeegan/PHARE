@@ -77,41 +77,47 @@ auto convert_to_primal(        //
 )
 {
     using PQ = PhysicalQuantity;
-    constexpr std::array valid_quantities{PQ::Bx, PQ::By, PQ::Bz, PQ::Ex, PQ::Ey, PQ::Ez};
 
-    if (qty == PQ::Ex)
+    if (qty == PQ::Bx)
+        return layout.project(src, lix, layout.BxToMoments());
+    else if (qty == PQ::By)
+        return layout.project(src, lix, layout.ByToMoments());
+    else if (qty == PQ::Bz)
+        return layout.project(src, lix, layout.BzToMoments());
+
+    else if (qty == PQ::Ex)
         return layout.project(src, lix, layout.ExToMoments());
     else if (qty == PQ::Ey)
         return layout.project(src, lix, layout.EyToMoments());
     else if (qty == PQ::Ez)
         return layout.project(src, lix, layout.EzToMoments());
 
-    return 1e-5; // todo
+    throw std::runtime_error("Quantity not supported for conversion to primal.");
 }
 
 template<std::size_t dim, typename... Ts>
 auto& _convert_to_fortran_primal( // DOES NOT WORK ON GHOST BOX!
-    Field<dim, Ts...>& dst,       // TEMPORARY TYPE - Quantity not valid!
+    Field<dim, Ts...>& dst,       //
     Field<dim, Ts...> const& src, //
     auto const& layout            //
 )
 {
     bool static constexpr c_ordering = false;
-    auto const qty                   = src.physicalQuantity();
-    dst.setShape(src.shape());
 
-    auto lb_view = core::make_array_view<c_ordering>(dst.data(), src.shape());
+    assert(all(layout.centering(dst), [](auto const c) { return c == QtyCentering::primal; }));
+
+    auto lb_view = core::make_array_view<c_ordering>(dst.data(), dst.shape());
     auto const all_primal
         = all(layout.centering(src), [](auto const c) { return c == QtyCentering::primal; });
-    auto const& amr_gbox = layout.AMRGhostBoxFor(src);
-    auto const lcl_box   = layout.AMRToLocal(layout.AMRBoxFor(src));
+
+    auto const lcl_box = layout.AMRToLocal(layout.AMRBoxFor(dst));
 
     if (all_primal)
         for (auto const lix : lcl_box)
-            dst(lix) = src(lix);
+            lb_view(lix) = src(lix);
     else
         for (auto const lix : lcl_box)
-            dst(lix) = convert_to_primal(src, layout, lix, qty);
+            lb_view(lix) = convert_to_primal(src, layout, lix, src.physicalQuantity());
 
     return dst;
 }

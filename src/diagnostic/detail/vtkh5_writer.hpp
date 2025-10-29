@@ -31,15 +31,16 @@ namespace PHARE::diagnostic::vtkh5
 using namespace hdf5::h5;
 
 
-template<typename ModelView>
+template<typename _ModelView>
 class H5Writer
 {
     using FloatType = std::conditional_t<PHARE_DIAG_DOUBLES, double, float>;
 
 public:
+    using ModelView  = _ModelView;
     using This       = H5Writer<ModelView>;
-    using GridLayout = typename ModelView::GridLayout;
-    using Attributes = typename ModelView::PatchProperties;
+    using GridLayout = ModelView::GridLayout;
+    using Attributes = ModelView::PatchProperties;
 
     static constexpr auto dimension   = GridLayout::dimension;
     static constexpr auto interpOrder = GridLayout::interp_order;
