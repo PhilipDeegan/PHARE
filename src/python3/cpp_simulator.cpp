@@ -12,6 +12,9 @@ namespace PHARE::pydata
 
 PYBIND11_MODULE(PHARE_CPP_MOD_NAME, m)
 {
+    declarePatchData<py_array_t<double>, 1>(m, "PatchPyArrayDouble_1D");
+    declarePatchData<py_array_t<double>, 2>(m, "PatchPyArrayDouble_2D");
+    declarePatchData<py_array_t<double>, 3>(m, "PatchPyArrayDouble_3D");
     declarePatchData<std::vector<double>, 1>(m, "PatchDataVectorDouble_1D");
     declarePatchData<std::vector<double>, 2>(m, "PatchDataVectorDouble_2D");
     declarePatchData<std::vector<double>, 3>(m, "PatchDataVectorDouble_3D");

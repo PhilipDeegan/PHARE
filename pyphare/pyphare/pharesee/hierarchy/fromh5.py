@@ -140,22 +140,6 @@ def get_times_from_h5(filepath, as_float=True):
     return times
 
 
-def create_from_all_times(time, hier):
-    return time is None and hier is None
-
-
-def create_from_times(times, hier):
-    return times is not None and hier is None
-
-
-def load_all_times(time, hier):
-    return time is None and hier is not None
-
-
-def load_one_time(time, hier):
-    return time is not None and hier is not None
-
-
 def patch_levels_from_h5(h5f, time, selection_box=None):
     """
     creates a dictionary of PatchLevels from a given time in a h5 file
@@ -296,6 +280,22 @@ def new_from_h5(filepath, times, **kwargs):
     )
 
     return hier
+
+
+def create_from_all_times(time, hier):
+    return time is None and hier is None
+
+
+def create_from_times(times, hier):
+    return times is not None and hier is None
+
+
+def load_all_times(time, hier):
+    return time is None and hier is not None
+
+
+def load_one_time(time, hier):
+    return time is not None and hier is not None
 
 
 def hierarchy_fromh5(h5_filename, time=None, hier=None, silent=True, **kwargs):

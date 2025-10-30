@@ -200,8 +200,12 @@ def is_root_lvl(patch_level):
     return patch_level.level_number == 0
 
 
-def quantidic(ilvl, wrangler):
-    pl = wrangler.getPatchLevel(ilvl)
+def quantidic_mhd(ilvl, wrangler):
+    raise RuntimeError("todo")
+
+
+def quantidic_hybrid(ilvl, wrangler):
+    pl = wrangler.getHybridPatchLevel(ilvl)
 
     return {
         "density": pl.getDensity,
@@ -221,6 +225,15 @@ def quantidic(ilvl, wrangler):
     }
 
 
+def quantidic(ilvl, wrangler, model="Hybrid"):
+    assert model in ["Hybrid", "MHD"]
+
+    if model == "MHD":
+        return quantidic_mhd(ilvl, wrangler)
+
+    return quantidic_hybrid(ilvl, wrangler)
+
+
 def isFieldQty(qty):
     return qty in (
         "density",
@@ -233,6 +246,9 @@ def isFieldQty(qty):
         "EM_E_x",
         "EM_E_y",
         "EM_E_z",
+        "Vi_x",
+        "Vi_y",
+        "Vi_z",
         "flux_x",
         "flux_y",
         "flux_z",

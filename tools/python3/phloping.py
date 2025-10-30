@@ -203,6 +203,17 @@ def print_scope_timings(scope_timer_filepath=None, sort_worst_first=True, root_i
     phst.print_scope_timings(scope_timer_filepath, sort_worst_first, root_id)
 
 
+def print_scope_timings(scope_timer_filepath=None):
+    if scope_timer_filepath is None:  # assume cli
+        parser = argparse.ArgumentParser()
+        parser.add_argument("-f", "--file", default=None, help="timer file")
+        scope_timer_filepath = parser.parse_args().file
+        if not scope_timer_filepath:
+            parser.print_help()
+            sys.exit(1)
+    st.print_scope_timings(scope_timer_filepath)
+
+
 if __name__ == "__main__":
     if len(sys.argv) == 1:
         print("usage: $function_name -h")
