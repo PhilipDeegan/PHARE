@@ -25,7 +25,7 @@ dl = (0.1, 0.1, 0.1)
 
 name = "bowler"
 diag_outputs = f"phare_outputs/test/{name}"
-time_step_nbr = 1
+time_step_nbr = 1000
 time_step = 0.001
 final_time = time_step * time_step_nbr
 
@@ -38,6 +38,77 @@ if time_step_nbr > 50:
 print("timestamps=", timestamps)
 plot_dir = Path(f"{diag_outputs}_plots")
 plot_dir.mkdir(parents=True, exist_ok=True)
+
+
+def b3(sim, x, y, z, lx, ly, lz):
+    L = sim.simulation_domain()[0]
+    mid = L / 2
+
+    X = (x - mid).reshape(lx, ly, lz)
+    Y = (y - mid).reshape(lx, ly, lz)
+    Z = (z - mid).reshape(lx, ly, lz)
+
+    U, V, W = -X, -Y, -Z
+
+    # Normalize vectors to unit length
+    magnitude = np.sqrt(U**2 + V**2 + W**2) + 1e-5  # Avoid division by zero
+
+    # Normalize vectors (unit length)
+    U /= magnitude
+    V /= magnitude
+    W /= magnitude
+
+    # Define circular mask (radius = 25)
+    radius = L * 0.4
+    diff = 0.2
+
+    # outer mask
+    mask = X**2 + Y**2 + Z**2 <= (radius + diff) ** 2
+    U[~mask] = 0
+    V[~mask] = 0
+    W[~mask] = 0
+
+    # inner mask
+    mask = X**2 + Y**2 + Z**2 >= (radius - diff) ** 2
+    U[~mask] = 0
+    V[~mask] = 0
+    W[~mask] = 0
+
+    U *= 0.001
+    V *= 0.001
+    W *= 0.001
+
+    return U, V, W
+
+
+_globals = dict(ts=0)
+
+
+def update(postOp):
+    from pyphare.pharesee.hierarchy.fromsim import hierarchy_from_sim
+
+    live = postOp.live
+    sim = live.simulation
+
+    _globals["ts"] += 1
+    ts = _globals["ts"]
+
+    print("ts", ts)
+    if ts % 100 != 0:
+        return
+    print("ts++", ts)
+
+    hier = None
+    for i, c in enumerate(["x", "y", "z"]):
+        hier = hierarchy_from_sim(live, qty=f"EM_B_{c}", hier=hier)
+    for lvl_nbr, level in hier.levels(hier.times()[0]).items():
+        for ip, patch in enumerate(level.patches):
+            pdata_names = list(patch.patch_datas.keys())
+            for i, name in enumerate(pdata_names):
+                pd = patch.patch_datas[name]
+                nbrGhosts = pd.ghosts_nbr
+                select = tuple([slice(nbrGhost, -(nbrGhost)) for nbrGhost in nbrGhosts])
+                pd[pd.box] += b3(sim, *pd.meshgrid(), *pd.size)[i][select]
 
 
 def config():
@@ -54,6 +125,13 @@ def config():
             "format": "phareh5",
             "options": {"dir": diag_outputs, "mode": "overwrite"},
         },
+        restart_options={
+            "dir": "checkpoints",
+            "mode": "overwrite",
+            # "elapsed_timestamps": elapsed_restart_timestamps,
+            "timestamps": [final_time],
+            # "restart_time":start_time
+        },
     )
 
     def density(x, y, z):
@@ -61,44 +139,7 @@ def config():
         return 0.5
 
     def b(x, y, z, lx, ly, lz):
-        L = sim.simulation_domain()[0]
-        mid = L / 2
-
-        X = (x - mid).reshape(lx, ly, lz)
-        Y = (y - mid).reshape(lx, ly, lz)
-        Z = (z - mid).reshape(lx, ly, lz)
-
-        U, V, W = -X, -Y, -Z
-
-        # Normalize vectors to unit length
-        magnitude = np.sqrt(U**2 + V**2 + W**2) + 1e-5  # Avoid division by zero
-
-        # Normalize vectors (unit length)
-        U /= magnitude
-        V /= magnitude
-        W /= magnitude
-
-        # Define circular mask (radius = 25)
-        radius = L * 0.4
-        diff = 0.2
-
-        # outer mask
-        mask = X**2 + Y**2 + Z**2 <= (radius + diff) ** 2
-        U[~mask] = 0
-        V[~mask] = 0
-        W[~mask] = 0
-
-        # inner mask
-        mask = X**2 + Y**2 + Z**2 >= (radius - diff) ** 2
-        U[~mask] = 0
-        V[~mask] = 0
-        W[~mask] = 0
-
-        U *= 0.001
-        V *= 0.001
-        W *= 0.001
-
-        return U, V, W
+        return b3(sim, x, y, z, lx, ly, lz)
 
     def bx(x, y, z):
         return b(x, y, z, cells[0] + 5, cells[0] + 4, cells[0] + 4)
@@ -119,7 +160,7 @@ def config():
     vvv = {
         **{f"vbulk{c}": vxyz for c in C},
         **{f"vth{c}": vthxyz for c in C},
-        "nbr_part_per_cell": 50,
+        "nbr_part_per_cell": 100,
     }
     protons = {
         "charge": 1,
@@ -131,8 +172,9 @@ def config():
     ph.MaxwellianFluidModel(bx=bx, by=by, bz=bz, protons=protons)
     ph.ElectronModel(closure="isothermal", Te=0.0)
 
-    for quantity in ["density", "bulkVelocity"]:
+    for quantity in ["mass_density", "bulkVelocity"]:
         ph.FluidDiagnostics(quantity=quantity, write_timestamps=timestamps)
+
     ph.FluidDiagnostics(
         quantity="density", write_timestamps=timestamps, population_name="protons"
     )

@@ -299,6 +299,7 @@ auto constexpr is_hybrid_model_v = is_hybrid_model(static_cast<Model*>(nullptr))
 
 
 
+
 } // namespace PHARE::solver
 
 #endif

@@ -4,12 +4,12 @@
 import os
 import unittest
 import numpy as np
+from functools import wraps
 from datetime import datetime
 
 import pyphare.pharein as ph
 from pyphare.core.box import Box
-from pyphare.pharein import ElectronModel
-from pyphare.core.box import Box
+from pyphare.pharesee import run
 
 
 def parse_cli_args(pop_from_sys=True):
@@ -165,7 +165,7 @@ def populate_simulation(dim, interp, **input):
     if "diags_fn" in input:
         input["diags_fn"](model)
 
-    ElectronModel(closure="isothermal", Te=0.12)
+    ph.ElectronModel(closure="isothermal", Te=0.12)
 
     return simulation
 
@@ -202,6 +202,35 @@ def diff_boxes(slice1, slice2, box, atol=None):
             z = z + box.lower[2]
             boxes += [Box([x, y, z], [x, y, z])]
     return boxes
+
+
+class SimulatorTestRunInterop(run.Run):
+    """
+    Intercept calls to Run and catch FileNotFound errors for when
+     diags are not active/etc
+    """
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+    @staticmethod
+    def _wrapper(func, func_name):
+        @wraps(func)
+        def wrapped(*args, **kwargs):
+            try:
+                return func(*args, **kwargs)
+            except FileNotFoundError:
+                print(f"{func_name} : file not found, maybe diagnostic is not active")
+
+        return wrapped
+
+    def __getattribute__(self, name):
+        import types
+
+        attr = super(SimulatorTestRunInterop, self).__getattribute__(name)
+        if isinstance(attr, types.MethodType) and not name.startswith("_"):
+            attr = SimulatorTestRunInterop._wrapper(attr, name)
+        return attr
 
 
 class SimulatorTest(unittest.TestCase):
@@ -249,7 +278,7 @@ class SimulatorTest(unittest.TestCase):
         self.diag_dirs = []  # cleanup after tests
         self.success = True
 
-    def run(self, result=None):
+    def run(self, result=None):  # override superclass function
         self._outcome = result
         super().run(result)
 
@@ -274,6 +303,9 @@ class SimulatorTest(unittest.TestCase):
                 if os.path.exists(diag_dir):
                     shutil.rmtree(diag_dir)
         cpp_lib().mpi_barrier()
+
+    def getRun(self, diag_dir):
+        return SimulatorTestRunInterop(diag_dir)
 
 
 def debug_tracer():
