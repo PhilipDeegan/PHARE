@@ -1,31 +1,56 @@
 #ifndef PHARE_SOLVER_PPC_HPP
 #define PHARE_SOLVER_PPC_HPP
 
-#include "core/def/phare_mpi.hpp"
+#include "core/def/phare_mpi.hpp" // IWYU pragma: keep
 
-#include "core/numerics/ion_updater/ion_updater.hpp"
-#include "core/numerics/ampere/ampere.hpp"
-#include "core/numerics/faraday/faraday.hpp"
+
+
 #include "core/numerics/ohm/ohm.hpp"
-
+#include "core/utilities/algorithm.hpp"
+#include "core/numerics/ampere/ampere.hpp"
 #include "core/data/vecfield/vecfield.hpp"
+#include "core/numerics/faraday/faraday.hpp"
+#include "core/data/electromag/electromag.hpp"
 #include "core/data/grid/gridlayout_utils.hpp"
+#include "core/data/tensorfield/tensorfield.hpp"
+#include "core/numerics/ion_updater/ion_updaters.hpp"
+#include "core/data/particles/particle_array_def.hpp"
+#include "core/numerics/ion_updater/ion_updater_def.hpp"
+#include "core/numerics/ion_updater/ion_updater_multi_ts.hpp"
 
-#include "amr/messengers/hybrid_messenger.hpp"
-#include "amr/messengers/hybrid_messenger_info.hpp"
-#include "amr/resources_manager/amr_utils.hpp"
 
 #include "amr/solvers/solver.hpp"
+#include "amr/messengers/hybrid_messenger.hpp"
+#include "amr/resources_manager/amr_utils.hpp"
 #include "amr/solvers/solver_ppc_model_view.hpp"
+#include "amr/messengers/hybrid_messenger_info.hpp"
 
 #include <SAMRAI/hier/Patch.h>
 
+#include <stdexcept>
 #include <unordered_map>
 
 
 namespace PHARE::solver
 {
 // -----------------------------------------------------------------------------
+
+
+template<typename GridLayout, typename Boxing_t>
+auto make_selection_boxes_for(auto const& hierarchy, auto& level)
+{
+    std::unordered_map<std::string, Boxing_t> levelBoxing;
+    for (auto const& patch : level)
+        if (auto [it, suc] = levelBoxing.try_emplace(
+                core::to_string(patch->getGlobalId()),
+                Boxing_t{amr::layoutFromPatch<GridLayout>(*patch),
+                         amr::makeNonLevelGhostBoxFor<GridLayout>(*patch, hierarchy)});
+            !suc)
+            throw std::runtime_error("boxing map insertion failure");
+
+    return levelBoxing;
+}
+
 
 template<typename HybridModel, typename AMR_Types>
 class SolverPPC : public ISolver<AMR_Types>
@@ -48,16 +73,23 @@ private:
     using Faraday_t    = ModelViews_t::Faraday_t;
     using Ampere_t     = ModelViews_t::Ampere_t;
     using Ohm_t        = ModelViews_t::Ohm_t;
-    using IonUpdater_t = PHARE::core::IonUpdater<Ions, Electromag, GridLayout>;
+
+    using IonUpdater_t = core::IonUpdaterImplResolver<Ions, Electromag, GridLayout>::IonUpdater_t;
+
 
     Electromag electromagPred_{"EMPred"};
     Electromag electromagAvg_{"EMAvg"};
+
+    VecFieldT Bold_{this->name() + "_Bold", core::HybridQuantity::Vector::B};
+    VecFieldT fluxSumE_{this->name() + "_fluxSumE", core::HybridQuantity::Vector::E};
+    std::unordered_map<std::size_t, double> oldTime_;
 
     Faraday_t faraday_;
     Ampere_t ampere_;
     Ohm_t ohm_;
 
     IonUpdater_t ionUpdater_;
+
 
 
 public:
@@ -89,7 +121,16 @@ public:
     void allocate(IPhysicalModel_t& model, SAMRAI::hier::Patch& patch,
                   double const allocateTime) const override;
 
+    void prepareStep(IPhysicalModel_t& model, SAMRAI::hier::PatchLevel& level,
+                     double const currentTime) override;
 
+    void accumulateFluxSum(IPhysicalModel_t& model, SAMRAI::hier::PatchLevel& level,
+                           double const coef) override;
+
+    void resetFluxSum(IPhysicalModel_t& model, SAMRAI::hier::PatchLevel& level) override;
+
+    void reflux(IPhysicalModel_t& model, SAMRAI::hier::PatchLevel& level,
+                double const time) override;
 
     void advanceLevel(hierarchy_t const& hierarchy, int const levelNumber, ISolverModelView& views,
                       IMessenger& fromCoarserMessenger, double const currentTime,
@@ -106,6 +147,16 @@ public:
     std::shared_ptr<ISolverModelView> make_view(level_t& level, IPhysicalModel_t& model) override
     {
         return std::make_shared<ModelViews_t>(level, dynamic_cast<HybridModel&>(model));
+    }
+
+    NO_DISCARD auto getCompileTimeResourcesViewList()
+    {
+        return std::forward_as_tuple(Bold_, fluxSumE_);
+    }
+
+    NO_DISCARD auto getCompileTimeResourcesViewList() const
+    {
+        return std::forward_as_tuple(Bold_, fluxSumE_);
     }
 
 
@@ -129,12 +180,9 @@ private:
                   double const newTime);
 
 
+
     void moveIons_(level_t& level, ModelViews_t& views, Messenger& fromCoarser,
                    double const currentTime, double const newTime, core::UpdaterMode mode);
-
-
-    void saveState_(level_t& level, ModelViews_t& views);
-    void restoreState_(level_t& level, ModelViews_t& views);
 
 
     struct TimeSetter
@@ -150,21 +198,15 @@ private:
         double newTime;
     };
 
+
     void make_boxes(hierarchy_t const& hierarchy, level_t& level)
     {
         int const lvlNbr = level.getLevelNumber();
         if (boxing.count(lvlNbr))
             return;
 
-        auto& levelBoxing = boxing[lvlNbr]; // creates if missing
-
-        for (auto const& patch : level)
-            if (auto [it, suc] = levelBoxing.try_emplace(
-                    amr::to_string(patch->getGlobalId()),
-                    Boxing_t{amr::layoutFromPatch<GridLayout>(*patch),
-                             amr::makeNonLevelGhostBoxFor<GridLayout>(*patch, hierarchy)});
-                !suc)
-                throw std::runtime_error("boxing map insertion failure");
+        boxing.try_emplace(lvlNbr,
+                           make_selection_boxes_for<GridLayout, Boxing_t>(hierarchy, level));
     }
 
     auto& setup_level(hierarchy_t const& hierarchy, int const levelNumber)
@@ -176,7 +218,8 @@ private:
     }
 
 
-    using Boxing_t = core::UpdaterSelectionBoxing<IonUpdater_t, GridLayout>;
+    using Boxing_t
+        = std::decay_t<decltype(*core::selection_boxing_impl<IonUpdater_t, GridLayout>())>;
     std::unordered_map<int /*level*/, std::unordered_map<std::string /*patchid*/, Boxing_t>> boxing;
 
 
@@ -186,12 +229,17 @@ private:
 
 // -----------------------------------------------------------------------------
 
+
+
 template<typename HybridModel, typename AMR_Types>
 void SolverPPC<HybridModel, AMR_Types>::registerResources(IPhysicalModel_t& model)
 {
     auto& hmodel = dynamic_cast<HybridModel&>(model);
     hmodel.resourcesManager->registerResources(electromagPred_);
     hmodel.resourcesManager->registerResources(electromagAvg_);
+
+    hmodel.resourcesManager->registerResources(Bold_);
+    hmodel.resourcesManager->registerResources(fluxSumE_);
 }
 
 
@@ -205,6 +253,9 @@ void SolverPPC<HybridModel, AMR_Types>::allocate(IPhysicalModel_t& model,
     auto& hmodel = dynamic_cast<HybridModel&>(model);
     hmodel.resourcesManager->allocate(electromagPred_, patch, allocateTime);
     hmodel.resourcesManager->allocate(electromagAvg_, patch, allocateTime);
+
+    hmodel.resourcesManager->allocate(Bold_, patch, allocateTime);
+    hmodel.resourcesManager->allocate(fluxSumE_, patch, allocateTime);
 }
 
 
@@ -219,10 +270,79 @@ void SolverPPC<HybridModel, AMR_Types>::fillMessengerInfo(
     auto const& Eavg  = electromagAvg_.E;
     auto const& Bpred = electromagPred_.B;
 
-    hybridInfo.ghostElectric.emplace_back(core::VecFieldNames{Eavg});
-    hybridInfo.initMagnetic.emplace_back(core::VecFieldNames{Bpred});
+    hybridInfo.ghostElectric.emplace_back(Eavg.name());
+    hybridInfo.initMagnetic.emplace_back(Bpred.name());
+    hybridInfo.refluxElectric  = Eavg.name();
+    hybridInfo.fluxSumElectric = fluxSumE_.name();
 }
 
+
+
+template<typename HybridModel, typename AMR_Types>
+void SolverPPC<HybridModel, AMR_Types>::prepareStep(IPhysicalModel_t& model,
+                                                    SAMRAI::hier::PatchLevel& level,
+                                                    double const currentTime)
+{
+    oldTime_[level.getLevelNumber()] = currentTime;
+
+    auto& hybridModel = dynamic_cast<HybridModel&>(model);
+    auto& B           = hybridModel.state.electromag.B;
+
+    for (auto& patch : level)
+    {
+        auto dataOnPatch = hybridModel.resourcesManager->setOnPatch(*patch, B, Bold_);
+
+        hybridModel.resourcesManager->setTime(Bold_, *patch, currentTime);
+
+        Bold_.copyData(B);
+    }
+}
+
+
+template<typename HybridModel, typename AMR_Types>
+void SolverPPC<HybridModel, AMR_Types>::accumulateFluxSum(IPhysicalModel_t& model,
+                                                          SAMRAI::hier::PatchLevel& level,
+                                                          double const coef)
+{
+    PHARE_LOG_SCOPE(1, "SolverPPC::accumulateFluxSum");
+
+    auto& hybridModel = dynamic_cast<HybridModel&>(model);
+    auto& rm          = *hybridModel.resourcesManager;
+    auto& Eavg        = electromagAvg_.E;
+    for (auto& patch : rm.enumerate(level, fluxSumE_, Eavg))
+        accumulate(fluxSumE_, Eavg, coef);
+}
+
+
+
+template<typename HybridModel, typename AMR_Types>
+void SolverPPC<HybridModel, AMR_Types>::resetFluxSum(IPhysicalModel_t& model,
+                                                     SAMRAI::hier::PatchLevel& level)
+{
+    PHARE_LOG_SCOPE(1, "SolverPPC::resetFluxSum");
+
+    auto& hybridModel = dynamic_cast<HybridModel&>(model);
+    auto& rm          = *hybridModel.resourcesManager;
+    for (auto& patch : rm.enumerate(level, fluxSumE_))
+        fluxSumE_.zero();
+}
+
+
+template<typename HybridModel, typename AMR_Types>
+void SolverPPC<HybridModel, AMR_Types>::reflux(IPhysicalModel_t& model,
+                                               SAMRAI::hier::PatchLevel& level, double const time)
+{
+    auto& hybridModel = dynamic_cast<HybridModel&>(model);
+    auto& Eavg        = electromagAvg_.E;
+    auto& B           = hybridModel.state.electromag.B;
+
+    for (auto& patch : level)
+    {
+        auto layout   = amr::layoutFromPatch<GridLayout>(*patch);
+        auto const dt = time - oldTime_[level.getLevelNumber()];
+        core::FaradaySingleTransformer{}(layout, Bold_, Eavg, B, dt);
+    };
+}
 
 
 
@@ -245,7 +365,6 @@ void SolverPPC<HybridModel, AMR_Types>::advanceLevel(hierarchy_t const& hierarch
     moveIons_(level, modelView, fromCoarser, currentTime, newTime, core::UpdaterMode::domain_only);
 
     predictor2_(level, modelView, fromCoarser, currentTime, newTime);
-
 
     average_(level, modelView, fromCoarser, newTime);
 
@@ -277,7 +396,7 @@ void SolverPPC<HybridModel, AMR_Types>::predictor1_(level_t& level, ModelViews_t
         PHARE_LOG_SCOPE(1, "SolverPPC::predictor1_.ampere");
         ampere_(views.layouts, views.electromagPred_B, views.J);
         setTime([](auto& state) -> auto& { return state.J; });
-        fromCoarser.fillCurrentGhosts(views.model().state.J, level.getLevelNumber(), newTime);
+        fromCoarser.fillCurrentGhosts(views.model().state.J, level, newTime);
     }
 
     {
@@ -312,7 +431,7 @@ void SolverPPC<HybridModel, AMR_Types>::predictor2_(level_t& level, ModelViews_t
         PHARE_LOG_SCOPE(1, "SolverPPC::predictor2_.ampere");
         ampere_(views.layouts, views.electromagPred_B, views.J);
         setTime([](auto& state) -> auto& { return state.J; });
-        fromCoarser.fillCurrentGhosts(views.model().state.J, level.getLevelNumber(), newTime);
+        fromCoarser.fillCurrentGhosts(views.model().state.J, level, newTime);
     }
 
     {
@@ -349,7 +468,9 @@ void SolverPPC<HybridModel, AMR_Types>::corrector_(level_t& level, ModelViews_t&
         PHARE_LOG_SCOPE(1, "SolverPPC::corrector_.ampere");
         ampere_(views.layouts, views.electromag_B, views.J);
         setTime([](auto& state) -> auto& { return state.J; });
-        fromCoarser.fillCurrentGhosts(views.model().state.J, levelNumber, newTime);
+
+        PHARE_LOG_SCOPE(1, "SolverPPC::corrector_.ampere-fill");
+        fromCoarser.fillCurrentGhosts(views.model().state.J, level, newTime);
     }
 
     {
@@ -360,7 +481,8 @@ void SolverPPC<HybridModel, AMR_Types>::corrector_(level_t& level, ModelViews_t&
              views.electromag_E);
         setTime([](auto& state) -> auto& { return state.electromag.E; });
 
-        fromCoarser.fillElectricGhosts(views.model().state.electromag.E, levelNumber, newTime);
+        PHARE_LOG_SCOPE(1, "SolverPPC::corrector_.ohm-fill");
+        fromCoarser.fillElectricGhosts(views.model().state.electromag.E, level, newTime);
     }
 }
 
@@ -372,16 +494,21 @@ void SolverPPC<HybridModel, AMR_Types>::average_(level_t& level, ModelViews_t& v
 {
     PHARE_LOG_SCOPE(1, "SolverPPC::average_");
 
+    TimeSetter setTime{views, newTime};
+
     for (auto& state : views)
     {
         PHARE::core::average(state.electromag.B, state.electromagPred.B, state.electromagAvg.B);
         PHARE::core::average(state.electromag.E, state.electromagPred.E, state.electromagAvg.E);
     }
 
+    setTime([](auto& state) -> auto& { return state.electromagAvg.B; });
+    setTime([](auto& state) -> auto& { return state.electromagAvg.E; });
+
     // the following will fill E on all edges of all ghost cells, including those
     // on domain border. For level ghosts, electric field will be obtained from
     // next coarser level E average
-    fromCoarser.fillElectricGhosts(electromagAvg_.E, level.getLevelNumber(), newTime);
+    fromCoarser.fillElectricGhosts(electromagAvg_.E, level, newTime);
 }
 
 
@@ -415,30 +542,40 @@ void SolverPPC<HybridModel, AMR_Types>::moveIons_(level_t& level, ModelViews_t& 
                                                   Messenger& fromCoarser, double const currentTime,
                                                   double const newTime, core::UpdaterMode mode)
 {
+    using enum core::LayoutMode;
+    using ParticleArray_t = Ions::particle_array_type;
+
     PHARE_LOG_SCOPE(1, "SolverPPC::moveIons_");
     PHARE_DEBUG_DO(_debug_log_move_ions(views);)
 
     TimeSetter setTime{views, newTime};
-    auto const& levelBoxing = boxing[level.getLevelNumber()];
 
-    {
-        auto dt = newTime - currentTime;
+    auto const& levelBoxing = boxing[level.getLevelNumber()];
+    auto const dt           = newTime - currentTime;
+
+    if constexpr (ParticleArray_t::layout_mode == AoSMapped)
         for (auto& state : views)
             ionUpdater_.updatePopulations(
                 state.ions, state.electromagAvg,
-                levelBoxing.at(amr::to_string(state.patch->getGlobalId())), dt, mode);
-    }
+
+                levelBoxing.at(core::to_string(state.patch->getGlobalId())), dt, mode);
+
+    else
+        ionUpdater_.updatePopulations(views, levelBoxing, dt, mode);
+
 
     // this needs to be done before calling the messenger
     setTime([](auto& state) -> auto& { return state.ions; });
 
+    fromCoarser.fillIonPopMomentGhosts(views.model().state.ions, level, newTime);
     fromCoarser.fillFluxBorders(views.model().state.ions, level, newTime);
     fromCoarser.fillDensityBorders(views.model().state.ions, level, newTime);
-    fromCoarser.fillIonPopMomentGhosts(views.model().state.ions, level, newTime);
-    fromCoarser.fillIonGhostParticles(views.model().state.ions, level, newTime);
+    if (mode != core::UpdaterMode::domain_only)
+        fromCoarser.fillIonGhostParticles(views.model().state.ions, level, newTime);
 
     for (auto& state : views)
-        ionUpdater_.updateIons(state.ions);
+        IonUpdater_t::updateIons(state.ions);
+
     // no need to update time, since it has been done before
 
     // now Ni and Vi are calculated we can fill pure ghost nodes

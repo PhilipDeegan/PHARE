@@ -1,10 +1,18 @@
 #ifndef PHARE_CORE_UTILITIES_META_META_UTILITIES_HPP
 #define PHARE_CORE_UTILITIES_META_META_UTILITIES_HPP
 
+#include "core/utilities/types.hpp"
+
+
+#include <tuple>
+#include <cassert>
 #include <iterator>
 #include <type_traits>
 
-#include "core/utilities/types.hpp"
+
+#if !defined(PHARE_SIMULATORS)
+#define PHARE_SIMULATORS 3
+#endif
 
 namespace PHARE
 {
@@ -74,16 +82,23 @@ namespace core
         // inner tuple = dim, interp, list[possible nbrParticles for dim/interp]
         return std::tuple<SimulatorOption<DimConst<1>, InterpConst<1>, 2, 3>,
                           SimulatorOption<DimConst<1>, InterpConst<2>, 2, 3, 4>,
-                          SimulatorOption<DimConst<1>, InterpConst<3>, 2, 3, 4, 5>,
+                          SimulatorOption<DimConst<1>, InterpConst<3>, 2, 3, 4, 5>
 
+#if PHARE_SIMULATORS > 1
+                          ,
                           SimulatorOption<DimConst<2>, InterpConst<1>, 4, 5, 8, 9>,
                           SimulatorOption<DimConst<2>, InterpConst<2>, 4, 5, 8, 9, 16>,
-                          SimulatorOption<DimConst<2>, InterpConst<3>, 4, 5, 8, 9, 25>,
+                          SimulatorOption<DimConst<2>, InterpConst<3>, 4, 5, 8, 9, 25>
+#endif
 
-                          SimulatorOption<DimConst<3>, InterpConst<1>, 6, 12>,
+        // TODO add in the rest of 3d nbrParticles permutations
+        // possibly consider compile time activation for uncommon cases
+#if PHARE_SIMULATORS > 2
+                          ,
+                          SimulatorOption<DimConst<3>, InterpConst<1>, 6, 12 /*, 27*/>,
                           SimulatorOption<DimConst<3>, InterpConst<2>, 6, 12>,
                           SimulatorOption<DimConst<3>, InterpConst<3>, 6, 12>
-
+#endif
                           >{};
     }
 
@@ -110,6 +125,7 @@ namespace core
 
         return nbRefinedPart;
     }
+
 
 
     template<typename Maker> // used from PHARE::amr::Hierarchy

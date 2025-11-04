@@ -1,17 +1,17 @@
 #ifndef PHARE_AMR_TOOLS_RESOURCES_MANAGER_HPP
 #define PHARE_AMR_TOOLS_RESOURCES_MANAGER_HPP
 
-#include "core/def/phare_mpi.hpp"
+#include "core/def/phare_mpi.hpp" // IWYU pragma: keep
 
+#include "core/def.hpp"
 #include "core/logger.hpp"
+#include "core/hybrid/hybrid_quantities.hpp"
 
 #include "field_resource.hpp"
-#include "core/hybrid/hybrid_quantities.hpp"
-#include "particle_resource.hpp"
 #include "resources_guards.hpp"
+#include "particle_resource.hpp"
+#include "tensor_field_resource.hpp"
 #include "resources_manager_utilities.hpp"
-#include "core/def.hpp"
-
 
 #include <SAMRAI/hier/Patch.h>
 #include <SAMRAI/hier/VariableDatabase.h>
@@ -19,6 +19,7 @@
 
 #include <map>
 #include <optional>
+#include <stdexcept>
 
 
 namespace PHARE
@@ -79,21 +80,30 @@ namespace amr
      *
      * obj1 and obj2 become unusable again at the end of the scope of dataOnPatch
      *
-     *
+     *  struct ResourcesUserTypes{
+     *     using patch_data_type = SAMRAI::hier::PatchData;  // subclass thereof
+     *     using variable_type   = SAMRAI::hier::Variable;   // subclass thereof
+     *  };
      */
-    template<typename GridLayoutT, typename Grid_t>
+    template<typename GridLayoutT, typename Grid_t, typename... ResourcesUserTypes>
     class ResourcesManager
     {
-        using This = ResourcesManager<GridLayoutT, Grid_t>;
+        using This = ResourcesManager<GridLayoutT, Grid_t, ResourcesUserTypes...>;
 
     public:
         static constexpr std::size_t dimension    = GridLayoutT::dimension;
         static constexpr std::size_t interp_order = GridLayoutT::interp_order;
 
+        using ResourceUserTypes = std::tuple<ResourcesUserTypes...>;
+
         using UserField_t = UserFieldType<Grid_t, GridLayoutT>;
 
         template<typename ResourcesView>
         using UserParticle_t = UserParticleType<ResourcesView, interp_order>;
+
+        template<std::size_t rank>
+        using UserTensorField_t
+            = UserTensorFieldType<rank, Grid_t, GridLayoutT, core::HybridQuantity>;
 
 
         ResourcesManager()
@@ -280,6 +290,27 @@ namespace amr
         }
 
 
+        auto getIDsList(auto&&... keys)
+        {
+            auto const Fn = [&](auto& key) {
+                if (key.size() == 0)
+                    throw std::runtime_error("Resource Manager key cannot be empty");
+                if (auto const id = getID(key))
+                    return *id;
+                throw std::runtime_error("Resource Manager has no key: " + key);
+            };
+            return std::array{Fn(keys)...};
+        }
+
+        void print_resources() const
+        {
+            for (auto& [key, _] : nameToResourceInfo_)
+            {
+                PHARE_LOG_LINE_SS(key);
+            }
+        }
+
+
 
         ~ResourcesManager()
         {
@@ -320,6 +351,7 @@ namespace amr
         }
 
 
+
         auto getIDsList(auto&&... keys) const
         {
             auto const Fn = [&](auto& key) {
@@ -333,16 +365,21 @@ namespace amr
 
         // iterate per patch and set args on patch
         template<typename... Args>
+        auto inline enumerate(SAMRAI::hier::PatchLevel const& level, Args&&... args)
+        {
+            return LevelLooper<SAMRAI::hier::PatchLevel const, Args...>{*this, level, args...};
+        }
+        template<typename... Args>
         auto inline enumerate(SAMRAI::hier::PatchLevel& level, Args&&... args)
         {
-            return LevelLooper<Args...>{*this, level, args...};
+            return LevelLooper<SAMRAI::hier::PatchLevel, Args...>{*this, level, args...};
         }
 
     private:
-        template<typename... Args>
+        template<typename Level_t, typename... Args>
         struct LevelLooper
         {
-            LevelLooper(ResourcesManager& rm, SAMRAI::hier::PatchLevel& lvl, Args&... arrgs)
+            LevelLooper(ResourcesManager& rm, Level_t& lvl, Args&... arrgs)
                 : rm{rm}
                 , level{lvl}
                 , args{std::forward_as_tuple(arrgs...)}
@@ -381,9 +418,10 @@ namespace amr
             auto end() { return Iterator{this, level.end()}; };
 
             ResourcesManager& rm;
-            SAMRAI::hier::PatchLevel& level;
+            Level_t& level;
             std::tuple<Args&...> args;
         };
+
 
 
 
@@ -434,9 +472,11 @@ namespace amr
         auto getPatchData_(ResourcesInfo const& resourcesVariableInfo,
                            SAMRAI::hier::Patch const& patch) const
         {
-            auto patchData = patch.getPatchData(resourcesVariableInfo.variable, context_);
-            return (std::dynamic_pointer_cast<typename ResourceType::patch_data_type>(patchData))
-                ->getPointer();
+            using PatchData_t = ResourceType::patch_data_type;
+            auto patchData    = patch.getPatchData(resourcesVariableInfo.variable, context_);
+            if (auto casted = std::dynamic_pointer_cast<PatchData_t>(patchData))
+                return casted->getPointer();
+            throw std::runtime_error("Resource Manager bad cast");
         }
 
 
@@ -452,14 +492,6 @@ namespace amr
             return getPatchData_<ResourceType>(resourcesVariableInfo, patch);
         }
 
-        template<typename ResourceType>
-        auto getResourcesNullPointer_(ResourcesInfo const& resourcesVariableInfo) const
-        {
-            using patch_data_type            = ResourceType::patch_data_type;
-            auto constexpr patch_data_ptr_fn = &patch_data_type::getPointer;
-            using PointerType = std::invoke_result_t<decltype(patch_data_ptr_fn), patch_data_type>;
-            return static_cast<PointerType>(nullptr);
-        }
 
 
         void static handle_sub_resources(auto fn, auto& obj, auto&&... args)
@@ -514,6 +546,9 @@ namespace amr
         {
             using ResourcesResolver_t = ResourceResolver<This, ResourcesView>;
 
+            if (view.name().size() == 0)
+                throw std::runtime_error("Resource Manager key cannot be empty");
+
             if (nameToResourceInfo_.count(view.name()) == 0)
             {
                 ResourcesInfo info;
@@ -534,7 +569,10 @@ namespace amr
         void setResourcesInternal_(ResourcesView& obj, SAMRAI::hier::Patch const& patch) const
         {
             using ResourceResolver_t = ResourceResolver<This, ResourcesView>;
-            using ResourcesType      = typename ResourceResolver_t::type;
+            using ResourcesType      = ResourceResolver_t::type;
+
+            if (obj.name().size() == 0)
+                throw std::runtime_error("Resource Manager key cannot be empty");
 
             auto const& resourceInfoIt = nameToResourceInfo_.find(obj.name());
             if (resourceInfoIt == nameToResourceInfo_.end())
@@ -546,14 +584,14 @@ namespace amr
         template<typename ResourcesView>
         void unsetResourcesInternal_(ResourcesView& obj) const
         {
-            using ResourceResolver_t = ResourceResolver<This, ResourcesView>;
-            using ResourcesType      = typename ResourceResolver_t::type;
+            if (obj.name().size() == 0)
+                throw std::runtime_error("Resource Manager key cannot be empty");
 
             auto const& resourceInfoIt = nameToResourceInfo_.find(obj.name());
             if (resourceInfoIt == nameToResourceInfo_.end())
                 throw std::runtime_error("Resources not found !");
 
-            obj.setBuffer(getResourcesNullPointer_<ResourcesType>(resourceInfoIt->second));
+            obj.setBuffer(nullptr);
         }
 
 
@@ -563,7 +601,11 @@ namespace amr
         void allocate_(ResourcesView const& obj, SAMRAI::hier::Patch& patch,
                        double const allocateTime) const
         {
-            std::string const& resourcesName  = obj.name();
+            std::string const& resourcesName = obj.name();
+
+            if (obj.name().size() == 0)
+                throw std::runtime_error("Resource Manager key cannot be empty");
+
             auto const& resourceVariablesInfo = nameToResourceInfo_.find(resourcesName);
             if (resourceVariablesInfo != nameToResourceInfo_.end())
             {

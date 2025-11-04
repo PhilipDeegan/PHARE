@@ -1,3 +1,4 @@
+.mkn*
 bin
 build
 subprojects
@@ -25,3 +26,4 @@ PHARE_REPORT.zip
 .cache
 .gdbinit
 .phlop
+*.off

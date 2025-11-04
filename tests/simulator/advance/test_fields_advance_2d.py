@@ -23,7 +23,7 @@ def per_interp(dic):
 
 
 @ddt
-class AdvanceTest(AdvanceTestBase):
+class Advance2DTest(AdvanceTestBase):
     @data(
         *per_interp({}),
         *per_interp({"L0": [Box2D(10, 19)]}),
@@ -85,8 +85,8 @@ class AdvanceTest(AdvanceTestBase):
             (
                 {
                     "L0": {"B0": Box2D(5, 20)},
-                    "L1": {"B0": Box2D(12, 38)},
-                    "L2": {"B0": Box2D(30, 52)},
+                    "L1": {"B0": Box2D(12, 39)},
+                    "L2": {"B0": Box2D(35, 49)},
                 }
             )
         ),
@@ -98,7 +98,7 @@ class AdvanceTest(AdvanceTestBase):
             ndim, interp_order, refinement_boxes, dl=0.3
         )
 
-    @unittest.skip("should change to work with moments")
+    # @unittest.skip("should change to work with moments")
     @data(  # only supports a hierarchy with 2 levels
         *per_interp(({"L0": [Box2D(0, 4)]})),
         *per_interp(({"L0": [Box2D(10, 14)]})),

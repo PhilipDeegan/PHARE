@@ -2,7 +2,9 @@
 #define INTEGRATOR_HPP
 
 #include "core/logger.hpp"
-#include "core/def/phare_mpi.hpp"
+#include "core/def/phare_mpi.hpp" // IWYU pragma: keep
+#include "core/utilities/mpi_utils.hpp"
+
 
 #include <SAMRAI/mesh/BalanceUtilities.h>
 #include <SAMRAI/algs/TimeRefinementIntegrator.h>

@@ -12,8 +12,8 @@
 
 namespace PHARE::core
 {
-std::size_t static constexpr cells = 3;
-std::size_t static constexpr ppc   = 10;
+std::uint32_t static constexpr cells = 3;
+std::size_t static constexpr ppc     = 10;
 
 
 template<std::size_t dim, typename ICell>
@@ -62,13 +62,13 @@ TYPED_TEST(ParticleArrayConsistencyTest, test_is_consistent_after_swap_copy)
     using ParticleArray_t     = TestFixture::ParticleArray_t;
     auto static constexpr dim = ParticleArray_t::dimension;
 
-    auto levelGhostParticles = ParticleArray<dim>{this->layout.AMRBox()};
+    auto levelGhostParticles = ParticleArrayOptions{dim} {this->layout.AMRBox()};
     add_particles_in(levelGhostParticles, this->layout.AMRBox());
 
-    auto levelGhostParticlesNew = ParticleArray<dim>{this->layout.AMRBox()};
+    auto levelGhostParticlesNew = ParticleArrayOptions{dim} {this->layout.AMRBox()};
     add_particles_in(levelGhostParticlesNew, this->layout.AMRBox());
 
-    auto levelGhostParticlesOld = ParticleArray<dim>{this->layout.AMRBox()};
+    auto levelGhostParticlesOld = ParticleArrayOptions{dim} {this->layout.AMRBox()};
     add_particles_in(levelGhostParticlesOld, this->layout.AMRBox());
 
     std::swap(levelGhostParticlesNew, levelGhostParticlesOld);

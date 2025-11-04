@@ -24,18 +24,21 @@ struct Obj
 template<std::size_t dim>
 struct Particle
 {
-    std::array<int, dim> iCell;
+    std::array<int, dim> iCell_;
     double delta;
     bool operator==(Particle const& other) const
     {
         bool equal = true;
         for (auto i = 0u; i < dim; ++i)
         {
-            equal &= (iCell[i] == other.iCell[i]);
+            equal &= (iCell_[i] == other.iCell_[i]);
         }
         equal &= (std::abs(delta - other.delta) < 1e-12);
         return delta;
     }
+
+    auto& iCell() { return iCell_; }
+    auto& iCell() const { return iCell_; }
 };
 
 
@@ -99,11 +102,11 @@ TEST(CellMap, canSortCells)
 TEST(CellMap, itemCanBeRemoved)
 {
     std::array<Particle<2>, 2> particles;
-    particles[0].iCell[0] = 14;
-    particles[0].iCell[1] = 27;
-    particles[1].iCell[0] = 14;
-    particles[1].iCell[1] = 26;
-    auto constexpr dim    = 2u;
+    particles[0].iCell_[0] = 14;
+    particles[0].iCell_[1] = 27;
+    particles[1].iCell_[0] = 14;
+    particles[1].iCell_[1] = 26;
+    auto constexpr dim     = 2u;
     Box<int, 2> b{{10, 12}, {30, 32}};
     CellMap<dim, int> cm{b};
     cm.addToCell(std::array<int, 2>{14, 27}, 0);
@@ -144,7 +147,7 @@ auto make_particles_in(PHARE::core::Box<int, dim> box, std::size_t nppc)
             Particle<dim> p;
             for (auto idim = 0u; idim < dim; ++idim)
             {
-                p.iCell[idim] = cell[idim];
+                p.iCell_[idim] = cell[idim];
             }
             p.delta = dis(gen);
             particles.push_back(p);
@@ -204,7 +207,7 @@ TEST(CellMap, givesAccessToAllParticlesInACell)
         EXPECT_EQ(blist.size(), nppc);
         for (auto particleIndex : blist)
         {
-            EXPECT_EQ(Point{particles[particleIndex].iCell}, cell);
+            EXPECT_EQ(Point{particles[particleIndex].iCell()}, cell);
         }
     }
 }
@@ -314,7 +317,7 @@ TEST_F(CellMapExportFix, exportItems)
     EXPECT_EQ(selected.size(), selected.capacity());
     for (auto const& p : selected)
     {
-        EXPECT_TRUE(isIn(Point{p.iCell}, selectionBox));
+        EXPECT_TRUE(isIn(Point{p.iCell()}, selectionBox));
     }
 }
 
@@ -328,7 +331,7 @@ TEST_F(CellMapExportFix, exportWithTransform)
     EXPECT_EQ(selected.capacity(), capa);
     cm.export_to(selectionBox, particles, selected, [&](auto const& part) {
         auto copy{part};
-        copy.iCell[0] += 100;
+        copy.iCell()[0] += 100;
         return copy;
     });
     EXPECT_EQ(selected.size(), selected.capacity());
@@ -337,7 +340,7 @@ TEST_F(CellMapExportFix, exportWithTransform)
     offsetedSelectionBox.upper[0] += 100;
     for (auto const& p : selected)
     {
-        EXPECT_TRUE(isIn(Point{p.iCell}, offsetedSelectionBox));
+        EXPECT_TRUE(isIn(Point{p.iCell()}, offsetedSelectionBox));
     }
 }
 
@@ -349,7 +352,7 @@ TEST_F(CellMapExportFix, exportWithPredicate)
     cm.export_if(particles, selected, [&](auto const& cell) { return isIn(cell, selectionBox); });
     for (auto const& p : selected)
     {
-        EXPECT_TRUE(isIn(Point{p.iCell}, selectionBox));
+        EXPECT_TRUE(isIn(Point{p.iCell()}, selectionBox));
     }
 }
 
@@ -401,14 +404,14 @@ TEST_F(CellMappedParticleBox, trackParticle)
 {
     EXPECT_EQ(cm.size(), particles.size());
     // pretends the particle change cell in x
-    auto oldcell = particles[200].iCell;
-    particles[200].iCell[0] += 1;
+    auto oldcell = particles[200].iCell();
+    particles[200].iCell()[0] += 1;
 
     cm.update(particles, 200, oldcell);
 
     EXPECT_EQ(cm.size(), particles.size());
 
-    auto& blist = cm(particles[200].iCell);
+    auto& blist = cm(particles[200].iCell());
     auto found  = false;
     for (auto particleIndex : blist)
     {
@@ -434,11 +437,11 @@ TEST_F(CellMappedParticleBox, partitionsParticlesInPatchBox)
 
     for (std::size_t idx = inPatchRange.ibegin(); idx < inPatchRange.iend(); ++idx)
     {
-        EXPECT_TRUE(isIn(Point{particles[idx].iCell}, patchBox));
+        EXPECT_TRUE(isIn(Point{particles[idx].iCell()}, patchBox));
     }
     for (std::size_t idx = inPatchRange.iend(); idx < particles.size(); ++idx)
     {
-        EXPECT_FALSE(isIn(Point{particles[idx].iCell}, patchBox));
+        EXPECT_FALSE(isIn(Point{particles[idx].iCell()}, patchBox));
     }
 }
 
@@ -456,7 +459,7 @@ TEST_F(CellMappedParticleBox, allButOneParticleSatisfyPredicate)
 
     for (std::size_t idx = singleParticleRange.ibegin(); idx < singleParticleRange.iend(); ++idx)
     {
-        EXPECT_NE(Point{particles[idx].iCell}, patchBox.lower);
+        EXPECT_NE(Point{particles[idx].iCell()}, patchBox.lower);
     }
 }
 
@@ -464,7 +467,7 @@ TEST_F(CellMappedParticleBox, allButLastAlreadySatisfyPredicate)
 {
     EXPECT_EQ(cm.size(), particles.size());
 
-    auto lastParticleCell      = particles[particles.size() - 1].iCell;
+    auto lastParticleCell      = particles[particles.size() - 1].iCell();
     auto doNotTakeThatParticle = [&](auto const& cell) { return cell != lastParticleCell; };
     auto allParts              = makeIndexRange(particles);
     auto singleParticleRange   = cm.partition(allParts, doNotTakeThatParticle);
@@ -475,7 +478,7 @@ TEST_F(CellMappedParticleBox, allButLastAlreadySatisfyPredicate)
 
     for (std::size_t idx = singleParticleRange.ibegin(); idx < singleParticleRange.iend(); ++idx)
     {
-        EXPECT_NE(Point{particles[idx].iCell}, lastParticleCell);
+        EXPECT_NE(Point{particles[idx].iCell()}, lastParticleCell);
     }
 }
 
@@ -515,11 +518,11 @@ TEST_F(CellMappedParticleBox, rangeBasedPartition)
 
     for (std::size_t idx = inpatch.ibegin(); idx < inpatch.iend(); ++idx)
     {
-        EXPECT_TRUE(isIn(Point{partRange.array()[idx].iCell}, patchBox));
+        EXPECT_TRUE(isIn(Point{partRange.array()[idx].iCell()}, patchBox));
     }
     for (std::size_t idx = inpatch.iend(); idx < partRange.iend(); ++idx)
     {
-        EXPECT_FALSE(isIn(Point{partRange.array()[idx].iCell}, patchBox));
+        EXPECT_FALSE(isIn(Point{partRange.array()[idx].iCell()}, patchBox));
     }
 }
 
@@ -537,18 +540,18 @@ TEST_F(CellMappedParticleBox, getPatchParticlesFromNonLeavingPartition)
     EXPECT_EQ(inGhostBoxRange.size(), nppc * ghostBox.size());
     for (auto idx = inGhostBoxRange.ibegin(); idx < inGhostBoxRange.iend(); ++idx)
     {
-        EXPECT_TRUE(isIn(Point{particles[idx].iCell}, ghostBox));
+        EXPECT_TRUE(isIn(Point{particles[idx].iCell()}, ghostBox));
     }
 
     for (auto idx = inGhostBoxRange.iend(); idx < particles.size(); ++idx)
     {
-        EXPECT_TRUE(isIn(Point{particles[idx].iCell}, outBox)
-                    and !isIn(Point{particles[idx].iCell}, ghostBox));
+        EXPECT_TRUE(isIn(Point{particles[idx].iCell()}, outBox)
+                    and !isIn(Point{particles[idx].iCell()}, ghostBox));
     }
 
     for (auto idx = inPatchRange.ibegin(); idx < inPatchRange.iend(); ++idx)
     {
-        EXPECT_TRUE(isIn(Point{particles[idx].iCell}, patchBox));
+        EXPECT_TRUE(isIn(Point{particles[idx].iCell()}, patchBox));
     }
 
     EXPECT_EQ(0, inPatchRange.ibegin());
@@ -564,7 +567,7 @@ TEST_F(CellMappedParticleBox, eraseOutOfPatchRange)
     cm.erase(toErase);
 
     for (auto const& part : particles)
-        EXPECT_TRUE(isIn(Point{part.iCell}, patchBox));
+        EXPECT_TRUE(isIn(Point{part.iCell()}, patchBox));
 
     EXPECT_EQ(particles.size(), patchBox.size() * nppc);
 }
