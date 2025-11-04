@@ -60,10 +60,14 @@ struct FieldScheduleHierarchyTest : public ::testing::Test
 
 // clang-format off
 using FieldDatas = testing::Types<
+    TestParam<SimOpts{1}>,
+    TestParam<SimOpts{2}>,
     TestParam<SimOpts{3}>
-PHARE_WITH_MKN_GPU(
-   ,TestParam<SimOpts{.dimension=3, .layout_mode=LayoutMode::AoSTS}>
-)
+// PHARE_WITH_MKN_GPU(
+//    ,TestParam<SimOpts{.dimension=1, .layout_mode=LayoutMode::AoSTS}>
+//    ,TestParam<SimOpts{.dimension=2, .layout_mode=LayoutMode::AoSTS}>
+//    ,TestParam<SimOpts{.dimension=3, .layout_mode=LayoutMode::AoSTS}>
+// )
 
 >;
 // clang-format on

@@ -33,13 +33,14 @@ namespace PHARE::amr
 template<std::size_t rank, typename GridLayoutT, typename Grid_t, typename PhysicalQuantity>
 class TensorFieldData : public SAMRAI::hier::PatchData
 {
-    using This  = TensorFieldData<rank, GridLayoutT, Grid_t, PhysicalQuantity>;
-    using Super = SAMRAI::hier::PatchData;
-
     static constexpr auto NO_ROTATE = SAMRAI::hier::Transformation::NO_ROTATE;
-
-    using tensor_t             = typename PhysicalQuantity::template TensorType<rank>;
-    using TensorFieldOverlap_t = TensorFieldOverlap<rank>;
+    using This                      = TensorFieldData<rank, GridLayoutT, Grid_t, PhysicalQuantity>;
+    using Super                     = SAMRAI::hier::PatchData;
+    using tensor_t                  = PhysicalQuantity::template TensorType<rank>;
+    using TensorFieldOverlap_t      = TensorFieldOverlap<rank>;
+    using value_type                = Grid_t::type;
+    using field_type                = Grid_t::field_type;
+    using SetEqualOp                = core::Equals<value_type>;
 
     template<typename ComponentNames, typename GridLayout>
     auto static make_grids(ComponentNames const& compNames, GridLayout const& layout, tensor_t qty)
@@ -49,9 +50,6 @@ class TensorFieldData : public SAMRAI::hier::PatchData
             [&](auto i) { return Grid_t{compNames[i], layout, qts[i]}; });
     }
 
-    using value_type = Grid_t::type;
-    using SetEqualOp = core::Equals<value_type>;
-
 public:
     static constexpr std::size_t dimension    = GridLayoutT::dimension;
     static constexpr std::size_t interp_order = GridLayoutT::interp_order;
@@ -59,6 +57,7 @@ public:
 
     using Geometry        = TensorFieldGeometry<rank, GridLayoutT, PhysicalQuantity>;
     using gridlayout_type = GridLayoutT;
+    using data_type       = core::TensorField<field_type, PhysicalQuantity, rank>;
 
     /*** \brief Construct a TensorFieldData from information associated to a patch
      *
@@ -75,13 +74,10 @@ public:
     {
     }
 
-
     TensorFieldData()                                  = delete;
     TensorFieldData(TensorFieldData const&)            = delete;
     TensorFieldData(TensorFieldData&&)                 = default;
     TensorFieldData& operator=(TensorFieldData const&) = delete;
-
-
 
     void getFromRestart(std::shared_ptr<SAMRAI::tbox::Database> const& restart_db) override
     {

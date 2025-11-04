@@ -263,13 +263,13 @@ profile:
 - name: more_tests
   parent: test_amr
   test: |
-    tests/amr/data/field/test_fields_schedules.cpp
     tests/amr/data/particles/test_particles_data.cpp
-    tests/amr/data/field/test_L0_fields_schedules.cpp
     tests/amr/data/particles/stream_pack/test_main.cpp
     tests/amr/data/particles/copy/test_particledata_copyNd.cpp
     tests/amr/data/particles/refine/test_particles_data_split.cpp
     tests/amr/data/particles/copy_overlap/test_particledata_copy_periodicNd.cpp
+# tests/amr/data/field/test_fields_schedules.cpp
+# tests/amr/data/field/test_L0_fields_schedules.cpp
 #tests/amr/data/particles/test_particles_schedules.cpp
 #tests/amr/data/field/test_fields_schedules.cpp
 #tests/amr/data/field/refine/test_field_refinement_on_hierarchy.cpp

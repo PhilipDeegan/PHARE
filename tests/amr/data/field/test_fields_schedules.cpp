@@ -87,9 +87,6 @@ TYPED_TEST(FieldScheduleHierarchyTest, testing_hyhy_schedules)
     auto& rm   = *this->hierarchy.resourcesManagerHybrid;
     auto& ions = this->hierarchy.hybridModel->state.ions;
 
-    auto proton_flux_x_id = *rm.getID("protons_flux_x");
-
-
     Interpolating_t interpolate;
 
     for (auto& patch : *lvl0)
@@ -99,9 +96,6 @@ TYPED_TEST(FieldScheduleHierarchyTest, testing_hyhy_schedules)
         resetMoments(ions);
 
         core::depositParticles(ions, layout, interpolate, core::DomainDeposit{});
-
-        auto const field_data = SAMRAI_SHARED_PTR_CAST<FieldData_t, SAMRAI::hier::PatchData>(
-            patch->getPatchData(proton_flux_x_id));
 
         for (auto& pop : ions)
             if (pop.name() == "protons")
@@ -117,9 +111,6 @@ TYPED_TEST(FieldScheduleHierarchyTest, testing_hyhy_schedules)
     for (auto& patch : *lvl0)
     {
         auto dataOnPatch = rm.setOnPatch(*patch, ions);
-
-        auto const field_data = SAMRAI_SHARED_PTR_CAST<FieldData_t, SAMRAI::hier::PatchData>(
-            patch->getPatchData(proton_flux_x_id));
 
         if (mpi::rank() == 0)
             for (auto& pop : ions)
@@ -153,7 +144,7 @@ TYPED_TEST(FieldScheduleHierarchyTest, testing_hyhy_field_refine_schedules)
     auto& ions       = this->hierarchy.hybridModel->state.ions;
 
 
-    this->hierarchy.messenger->fillElectricGhosts(electromag.E, 1, 0);
+    this->hierarchy.messenger->fillElectricGhosts(electromag.E, *lvl1, 0);
 
 
     auto Bx_id = *rm.getID("EM_B_x");

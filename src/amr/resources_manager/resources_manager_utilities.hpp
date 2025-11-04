@@ -91,35 +91,20 @@ namespace amr
     template<typename ResourceManager, typename ResourceView>
     class ResourceResolver
     {
-        using ResourceUserTypes = ResourceManager::ResourceUserTypes;
+        using ResourceUserTypes          = ResourceManager::ResourceUserTypes;
+        auto constexpr static tuple_size = std::tuple_size_v<ResourceUserTypes>;
 
         int constexpr static tuple_idx()
         {
             int idx = -1;
 
-            if constexpr (std::tuple_size_v<ResourceUserTypes>)
-                core::for_N<std::tuple_size_v<ResourceUserTypes>>([&](auto i) {
-                    using UserType_t = std::tuple_element_t<i, ResourceUserTypes>;
-
-                    if constexpr (core::is_field_v<ResourceView>)
-                        if (idx == -1)
-                            idx = i;
-
+            if constexpr (tuple_size)
+                core::for_N<tuple_size>([&](auto i) {
+                    using UserType_t  = std::tuple_element_t<i, ResourceUserTypes>;
                     using PatchData_t = UserType_t::patch_data_type;
-                    using Data_ptr    = decltype(std::declval<PatchData_t>().getPointer());
-                    // using Data_ptr    = std::invoke_result_t<Fn>;
-                    using Data_t = std::decay_t<std::remove_pointer_t<Data_ptr>>;
-                    // static_assert(std::is_same_v<ResourceView, Data_t>);
-                    // if constexpr (std::is_same_v<ResourceView, Data_t>)
-
-                    if constexpr (is_tensor_field_v<ResourceView>)
-                        if constexpr (is_tensor_field_v<Data_t>)
-                            if constexpr (ResourceView::rank == Data_t::rank)
-                                if (idx == -1)
-                                    idx = i;
-
-
-                    // idx = i;
+                    using Data_t      = PatchData_t::data_type;
+                    if constexpr (std::is_same_v<ResourceView, Data_t>)
+                        idx = i;
                 });
 
             return idx;

@@ -44,20 +44,18 @@ namespace amr
     class FieldData : public SAMRAI::hier::PatchData
     {
         static_assert(core::is_field_v<Grid_t> || core::is_field_tile_set_v<Grid_t>);
-
-        using Super      = SAMRAI::hier::PatchData;
-        using value_type = Grid_t::type;
-        using SetEqualOp = core::Equals<value_type>;
-
-
+        static constexpr auto NO_ROTATE = SAMRAI::hier::Transformation::NO_ROTATE;
+        using Super                     = SAMRAI::hier::PatchData;
+        using value_type                = Grid_t::type;
+        using SetEqualOp                = core::Equals<value_type>;
+        using field_type                = Grid_t::field_type;
 
     public:
         static constexpr std::size_t dimension    = GridLayoutT::dimension;
         static constexpr std::size_t interp_order = GridLayoutT::interp_order;
         using Geometry                            = FieldGeometry<GridLayoutT, PhysicalQuantity>;
         using gridlayout_type                     = GridLayoutT;
-        static constexpr auto NO_ROTATE           = SAMRAI::hier::Transformation::NO_ROTATE;
-
+        using data_type                           = field_type;
 
 
         /*** \brief Construct a FieldData from information associated to a patch

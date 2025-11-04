@@ -188,27 +188,6 @@ namespace amr
         }
 
     public:
-        // template<typename ParticlesInitializer>
-        // ParticlesData(SAMRAI::hier::Box const& box, SAMRAI::hier::IntVector const& ghost,
-        //               std::string const& name, ParticlesInitializer const initializer)
-        //     : SAMRAI::hier::PatchData::PatchData(box, ghost)
-        //     , domainParticles{initializer()}
-        //     , patchGhostParticles{initializer()}
-        //     , levelGhostParticles{initializer()}
-        //     , levelGhostParticlesOld{initializer()}
-        //     , levelGhostParticlesNew{initializer()}
-        //     , pack{name,
-        //            &domainParticles,
-        //            &patchGhostParticles,
-        //            &levelGhostParticles,
-        //            &levelGhostParticlesOld,
-        //            &levelGhostParticlesNew}
-        //     , interiorLocalBox_{AMRToLocal(box, this->getGhostBox())}
-        //     , name_{name}
-        // {
-        //     validate_ghosts(ghost);
-        // }
-
         ParticlesData(SAMRAI::hier::Box const& box, SAMRAI::hier::IntVector const& ghost,
                       std::string const& name)
             : SAMRAI::hier::PatchData::PatchData(box, ghost)
@@ -847,7 +826,7 @@ void ParticlesData<ParticleArray>::copyMappedParticles(
     SAMRAI::hier::BoxContainer ghostLayerBoxes{};
     ghostLayerBoxes.removeIntersections(overlapBox, myDomainBox);
 
-    new_size = patchGhostParticles.size();
+    new_size = domainParticles.size();
     for (auto& selectionBox : ghostLayerBoxes)
     {
         if (!selectionBox.empty())
@@ -856,8 +835,8 @@ void ParticlesData<ParticleArray>::copyMappedParticles(
             new_size += srcDomainParticles.nbr_particles_in(selectionBox_p);
         }
     }
-    if (patchGhostParticles.capacity() < new_size)
-        patchGhostParticles.reserve(new_size);
+    if (domainParticles.capacity() < new_size)
+        domainParticles.reserve(new_size);
 
 
     for (auto const& selectionBox : ghostLayerBoxes)
@@ -865,7 +844,7 @@ void ParticlesData<ParticleArray>::copyMappedParticles(
         if (!selectionBox.empty())
         {
             auto selectionBox_p = phare_box_from<dim>(selectionBox);
-            srcDomainParticles.export_particles(selectionBox_p, patchGhostParticles);
+            srcDomainParticles.export_particles(selectionBox_p, domainParticles);
         }
     }
     PHARE_LOG_STOP(3, "ParticlesData::copy_ DomainToGhosts");
@@ -886,42 +865,23 @@ void ParticlesData<ParticleArray>::copyPartitionedParticles(
 
         auto newParticle = particle.copy();
         for (auto iDir = 0u; iDir < newParticle.iCell().size(); ++iDir)
-        {
             newParticle.iCell()[iDir] += offset[iDir];
-        }
 
         if (isInBox(intersectionBox, newParticle))
-        {
-            // now we now the particle is in the intersection
-            // we need to know whether it is in the domain part of that
-            // intersection. If it is not, then it must be in the ghost part
-
-
-            if (isInBox(myDomainBox, newParticle))
-            {
-                domainParticles.push_back(newParticle);
-            }
-            else
-            {
-                patchGhostParticles.push_back(newParticle);
-            }
-        }
+            domainParticles.push_back(newParticle);
     };
 
-    std::array const particlesArrays{&sourceData.domainParticles, &sourceData.patchGhostParticles};
     using enum core::LayoutMode;
-    for (auto const& sourceParticlesArray : particlesArrays)
+    auto const& sourceParticlesArray = sourceData.domainParticles;
+    if constexpr (any_in(ParticleArray::layout_mode, AoSTS, SoATS))
     {
-        if constexpr (any_in(ParticleArray::layout_mode, AoSTS, SoATS))
-        {
-            for (auto const& tile : (*sourceParticlesArray)())
-                for (auto const& particle : tile())
-                    per_particle(particle);
-        }
-        else
-            for (auto const& particle : *sourceParticlesArray)
+        for (auto const& tile : sourceParticlesArray())
+            for (auto const& particle : tile())
                 per_particle(particle);
     }
+    else
+        for (auto const& particle : sourceParticlesArray)
+            per_particle(particle);
 }
 
 template<typename ParticleArray>
@@ -982,7 +942,7 @@ void ParticlesData<ParticleArray>::copyMappedParticles(
     SAMRAI::hier::BoxContainer ghostLayerBoxes{};
     ghostLayerBoxes.removeIntersections(overlapBox, myDomainBox);
 
-    new_size = patchGhostParticles.size();
+    new_size = domainParticles.size();
     for (auto& selectionBox : ghostLayerBoxes)
     {
         if (!selectionBox.empty())
@@ -992,8 +952,8 @@ void ParticlesData<ParticleArray>::copyMappedParticles(
             new_size += srcDomainParticles.nbr_particles_in(selectionBox_p);
         }
     }
-    if (patchGhostParticles.capacity() < new_size)
-        patchGhostParticles.reserve(new_size);
+    if (domainParticles.capacity() < new_size)
+        domainParticles.reserve(new_size);
 
 
     // ghostLayer boxes already have been inverse transformed
@@ -1003,7 +963,7 @@ void ParticlesData<ParticleArray>::copyMappedParticles(
         if (!selectionBox.empty())
         {
             auto selectionBox_p = phare_box_from<dim>(selectionBox);
-            srcDomainParticles.export_particles(selectionBox_p, patchGhostParticles, offseter);
+            srcDomainParticles.export_particles(selectionBox_p, domainParticles, offseter);
         }
     }
 
@@ -1049,24 +1009,20 @@ void ParticlesData<ParticleArray>::packPartitionedParticles(
     SamBox transformedSource{sourceGhostBox};
     transformation.transform(transformedSource);
 
-    std::array const particlesArrays{&domainParticles, &patchGhostParticles};
     using enum core::LayoutMode;
     for (auto const& overlapBox : boxContainer)
     {
         SamBox const intersectionBox{transformedSource * overlapBox};
 
-        for (auto const& sourceParticlesArray : particlesArrays)
+        if constexpr (any_in(ParticleArray::layout_mode, AoSTS, SoATS))
         {
-            if constexpr (any_in(ParticleArray::layout_mode, AoSTS, SoATS))
-            {
-                for (auto const& tile : (*sourceParticlesArray)())
-                    for (auto const& particle : tile())
-                        per_particle_overlap(particle, intersectionBox);
-            }
-            else
-                for (auto const& particle : *sourceParticlesArray)
+            for (auto const& tile : domainParticles())
+                for (auto const& particle : tile())
                     per_particle_overlap(particle, intersectionBox);
         }
+        else
+            for (auto const& particle : domainParticles)
+                per_particle_overlap(particle, intersectionBox);
     }
 }
 
@@ -1144,19 +1100,9 @@ void ParticlesData<ParticleArray>::unpackMappedParticles(SAMRAI::tbox::MessageSt
                 auto const intersect = getGhostBox() * overlapBox;
 
                 for (auto const& particle : particleArray)
-                {
                     if (isInBox(intersect, particle))
-                    {
-                        if (isInBox(myBox, particle))
-                        {
-                            domainParticles.push_back(particle);
-                        }
-                        else
-                        {
-                            patchGhostParticles.push_back(particle);
-                        }
-                    }
-                } // end species loop
+                        domainParticles.push_back(particle);
+
             } // end box loop
         } // end no rotation
     } // end overlap not empty
@@ -1180,12 +1126,7 @@ void ParticlesData<ParticleArray_t>::unpackAnyParticles(SAMRAI::tbox::MessageStr
     auto const myBox                = getBox();
     auto const per_particle_overlap = [&](auto const& particle, auto const& intersect) {
         if (isInBox(intersect, particle))
-        {
-            if (isInBox(myBox, particle))
-                domainParticles.push_back(particle);
-            else
-                patchGhostParticles.push_back(particle);
-        }
+            domainParticles.push_back(particle);
     };
 
     std::size_t numberParticles = 0;
@@ -1250,11 +1191,11 @@ void ParticlesData<ParticleArray_t>::pack_from_ghost(SAMRAI::tbox::MessageStream
         return;
     }
 
-    PackArray outBuffer;
     auto& src_particles = patchGhostParticles;
     auto const& offset  = as_point<dim>(pOverlap.getTransformation());
     auto const& noffset = offset * -1;
 
+    PackArray outBuffer;
     for (auto const& overlapBox : pOverlap.getDestinationBoxContainer())
         core::select_particles(src_particles, outBuffer,
                                shift(phare_box_from<dim>(overlapBox), noffset), offset);

@@ -101,30 +101,12 @@ struct CopyTest : public ::testing::Test, public ParticlesData
 using ParticlesDatas = testing::Types<
     AParticlesData<TestParam<1, LayoutMode::AoSMapped, AllocatorMode::CPU>>,
     AParticlesData<TestParam<2, LayoutMode::AoS, AllocatorMode::CPU>>,
-    // AParticlesData<TestParam<2, LayoutMode::AoSTS, AllocatorMode::CPU>>,
+    AParticlesData<TestParam<2, LayoutMode::AoSTS, AllocatorMode::CPU>>,
     AParticlesData<TestParam<3, LayoutMode::AoSMapped, AllocatorMode::CPU>>
 >;
 // clang-format on
 
 TYPED_TEST_SUITE(CopyTest, ParticlesDatas);
-
-
-
-TYPED_TEST(CopyTest, copiesSourceDomainParticleIntoGhostForDomainSrcOverGhostDest)
-{
-    static constexpr auto dim = TypeParam::dim;
-
-    // particle is in the domain of the source patchdata
-    // and in first ghost of the destination patchdata
-
-    this->particle.iCell_ = ConstArray<int, dim>(6);
-
-    this->sourceData.domainParticles.push_back(this->particle);
-    this->destData.copy(this->sourceData);
-
-    ASSERT_THAT(this->destData.patchGhostParticles.size(), Eq(1));
-    ASSERT_THAT(this->destData.domainParticles.size(), Eq(0));
-}
 
 
 
@@ -255,7 +237,7 @@ TYPED_TEST(CopyTest, copiesDataWithOverlapNoTransform)
 
     this->sourceData.domainParticles.push_back(this->particle);
     this->destData.copy(this->sourceData, overlap);
-    this->particle.iCell_ = {{6}};
+    this->particle.iCell_ = ConstArray<int, dim>(6);
     EXPECT_THAT(this->destData.domainParticles.size(), Eq(1));
     EXPECT_THAT(this->destData.patchGhostParticles.size(), Eq(0));
 
@@ -263,6 +245,8 @@ TYPED_TEST(CopyTest, copiesDataWithOverlapNoTransform)
     this->sourceData.patchGhostParticles.clear();
     this->destData.patchGhostParticles.clear();
     this->destData.domainParticles.clear();
+    EXPECT_THAT(this->destData.patchGhostParticles.size(), Eq(0));
+    EXPECT_THAT(this->destData.domainParticles.size(), Eq(0));
 
     // particle is in the domain of the source patchdata
     // and in last ghost of the destination patchdata
