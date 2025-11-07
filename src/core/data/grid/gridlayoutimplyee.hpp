@@ -539,7 +539,7 @@ namespace core
 
         NO_DISCARD auto static constexpr ByToMoments()
         {
-            // Bx is dual primal dual
+            // By is dual primal dual
             // moments are primal primal primal
             // operation is thus Dpd to Ppp
 
@@ -570,7 +570,7 @@ namespace core
 
         NO_DISCARD auto static constexpr BzToMoments()
         {
-            // Bx is dual dual primal
+            // Bz is dual dual primal
             // moments are primal primal primal
             // operation is thus Ddp to Ppp
 
