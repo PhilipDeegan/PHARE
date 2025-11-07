@@ -111,24 +111,6 @@ struct H5TypeWriter<Writer>::VTKFileFieldInfo
     {
     }
 
-    auto static flat_cell(auto const& shape, auto const& icell)
-    {
-        if constexpr (dimension == 2)
-            return icell[1] + icell[0] * shape[1];
-        if constexpr (dimension == 3)
-            return icell[2] + icell[1] * shape[2] + icell[0] * shape[1] * shape[2];
-        return icell[0];
-    }
-
-    auto z_jump(auto const& shape, auto const& local_box) // only called in a 3d context
-    {
-        auto const second_slab_start = [&]() {
-            auto lo = local_box.lower;
-            lo[0] += 1;
-            return lo;
-        }();
-        return flat_cell(shape, second_slab_start) - flat_cell(shape, local_box.lower);
-    }
 
     std::string lvl;
     GridLayout const& layout;
@@ -145,12 +127,13 @@ struct H5TypeWriter<Writer>::VTKFileFieldWriter
 {
     void write2D(auto const& field)
     {
-        auto ds          = fw->h5file.getDataSet(finfo.path);
-        auto const write = [&]() {
-            auto bit = finfo.local_box.begin();
-            for (std::uint32_t i = 0; i < finfo.local_box.rows();
-                 ++i, bit += finfo.primal_row_len, data_offset += finfo.primal_row_len)
-                ds.select({data_offset}, {finfo.primal_row_len}).write_raw(&field(*bit));
+        auto ds            = fw->h5file.getDataSet(finfo.path);
+        auto const lcl_box = finfo.local_box;
+        auto const write   = [&]() {
+            for (std::uint32_t i = lcl_box.lower[0]; i <= lcl_box.upper[0];
+                 ++i, data_offset += finfo.primal_row_len)
+                ds.select({data_offset}, {finfo.primal_row_len})
+                    .write_raw(&field(i, lcl_box.lower[1]));
         };
         write();
         write();
@@ -159,14 +142,13 @@ struct H5TypeWriter<Writer>::VTKFileFieldWriter
 
     void write3D(auto const& field)
     {
-        auto ds             = fw->h5file.getDataSet(finfo.path);
-        auto const gb_shape = finfo.ghost_box.shape().as_unsigned().toArray();
-        auto const z_jump   = finfo.z_jump(gb_shape, finfo.local_box);
-        auto bit            = finfo.local_box.begin();
-        for (std::uint32_t s = 0; s < finfo.local_box.slabs(); ++s, bit += z_jump)
-            for (std::uint32_t i = 0; i < finfo.local_box.rows();
-                 ++i, bit += finfo.primal_row_len, data_offset += finfo.primal_row_len)
-                ds.select({data_offset}, {finfo.primal_row_len}).write_raw(&field(*bit));
+        auto ds            = fw->h5file.getDataSet(finfo.path);
+        auto const lcl_box = finfo.local_box;
+        for (std::uint32_t i = lcl_box.lower[0]; i <= lcl_box.upper[0]; ++i)
+            for (std::uint32_t j = lcl_box.lower[1]; j <= lcl_box.upper[1];
+                 ++j, data_offset += finfo.primal_row_len)
+                ds.select({data_offset}, {finfo.primal_row_len})
+                    .write_raw(&field(i, j, lcl_box.lower[2]));
     }
 
 
@@ -193,14 +175,14 @@ struct H5TypeWriter<Writer>::VTKFileTensorFieldWriter
 
     void write2D(auto const& tf)
     {
-        auto ds = fw->h5file.getDataSet(finfo.path);
-
-        auto const write = [&]() {
-            auto bit = finfo.local_box.begin();
-            for (std::uint32_t i = 0; i < finfo.local_box.rows();
-                 ++i, bit += finfo.primal_row_len, data_offset += finfo.primal_row_len)
+        auto ds            = fw->h5file.getDataSet(finfo.path);
+        auto const lcl_box = finfo.local_box;
+        auto const write   = [&]() {
+            for (std::uint32_t i = lcl_box.lower[0]; i <= lcl_box.upper[0];
+                 ++i, data_offset += finfo.primal_row_len)
                 for (std::uint32_t c = 0; c < N; ++c)
-                    ds.select({data_offset, c}, {finfo.primal_row_len, 1}).write_raw(&tf[c](*bit));
+                    ds.select({data_offset, c}, {finfo.primal_row_len, 1})
+                        .write_raw(&tf[c](i, lcl_box.lower[1]));
         };
         write();
         write();
@@ -209,15 +191,14 @@ struct H5TypeWriter<Writer>::VTKFileTensorFieldWriter
 
     void write3D(auto const& tf)
     {
-        auto ds             = fw->h5file.getDataSet(finfo.path);
-        auto const gb_shape = finfo.ghost_box.shape().as_unsigned().toArray();
-        auto const z_jump   = finfo.z_jump(gb_shape, finfo.local_box);
-        auto bit            = finfo.local_box.begin();
-        for (std::uint32_t s = 0; s < finfo.local_box.slabs(); ++s, bit += z_jump)
-            for (std::uint32_t i = 0; i < finfo.local_box.rows();
-                 ++i, bit += finfo.primal_row_len, data_offset += finfo.primal_row_len)
+        auto ds            = fw->h5file.getDataSet(finfo.path);
+        auto const lcl_box = finfo.local_box;
+        for (std::uint32_t i = lcl_box.lower[0]; i <= lcl_box.upper[0]; ++i)
+            for (std::uint32_t j = lcl_box.lower[1]; j <= lcl_box.upper[1];
+                 ++j, data_offset += finfo.primal_row_len)
                 for (std::uint32_t c = 0; c < N; ++c)
-                    ds.select({data_offset, c}, {finfo.primal_row_len, 1}).write_raw(&tf[c](*bit));
+                    ds.select({data_offset, c}, {finfo.primal_row_len, 1})
+                        .write_raw(&tf[c](i, j, lcl_box.lower[2]));
     }
 
 
@@ -282,6 +263,14 @@ struct H5TypeWriter<Writer>::VTKFileWriter
             root.template createAttribute<std::string>("GridDescription", "XYZ");
     }
 
+
+    auto level_spacing(std::size_t const lvl) const
+    {
+        auto const mesh_size = typewriter->h5Writer_.modelView().cellWidth();
+        return core::for_N_make_array<dimension>(
+            [&](auto i) { return static_cast<float>(mesh_size[i] / std::pow(2, lvl)); });
+    }
+
     void writeField(auto const& field, auto const& layout)
     {
         VTKFileFieldWriter{this, {layout}}(field);
@@ -327,6 +316,20 @@ struct H5TypeWriter<Writer>::VTKFileWriter
             h5file.template create_chunked_data_set<int>(
                 path, std::vector<hsize_t>{detail::CHUNK_SIZE},
                 HighFive::DataSpace({0}, {HighFive::DataSpace::UNLIMITED}));
+        }
+
+        auto level_group = h5file.file().getGroup(level_base + lvl);
+        if (!level_group.hasAttribute("Spacing"))
+        {
+            level_group.template createAttribute<std::array<float, dimension>>(
+                "Spacing", level_spacing(level));
+
+            level_group.createGroup("CellData");
+            level_group.createGroup("FieldData");
+
+            auto steps_group = h5file.file().getGroup(step_level + lvl);
+            steps_group.createGroup("CellDataOffset");
+            steps_group.createGroup("FieldDataOffset");
         }
     }
 

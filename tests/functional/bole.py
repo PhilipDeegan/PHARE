@@ -20,22 +20,23 @@ cpp = cpp_lib()
 startMPI()
 
 cells = (100, 100, 100)
+# cells = (41, 41, 41)
 dl = (0.1, 0.1, 0.1)
 
 
 name = "bowler"
 diag_outputs = f"phare_outputs/test/{name}"
-time_step_nbr = 1000
+time_step_nbr = 1
 time_step = 0.001
 final_time = time_step * time_step_nbr
 
 timestamps = [0, final_time]
-if time_step_nbr > 50:
-    dump_step = 1
-    nbr_dump_step = final_time / dump_step
-    timestamps = dump_step * np.arange(nbr_dump_step + 1)
+# if time_step_nbr > 50:
+#     dump_step = 1
+#     nbr_dump_step = final_time / dump_step
+#     timestamps = dump_step * np.arange(nbr_dump_step + 1)
 
-print("timestamps=", timestamps)
+# print("timestamps=", timestamps)
 plot_dir = Path(f"{diag_outputs}_plots")
 plot_dir.mkdir(parents=True, exist_ok=True)
 
@@ -44,9 +45,9 @@ def b3(sim, x, y, z, lx, ly, lz):
     L = sim.simulation_domain()[0]
     mid = L / 2
 
-    X = (x - mid).reshape(lx, ly, lz)
-    Y = (y - mid).reshape(lx, ly, lz)
-    Z = (z - mid).reshape(lx, ly, lz)
+    X = x - mid  # .reshape(lx, ly, lz)
+    Y = y - mid  # .reshape(lx, ly, lz)
+    Z = z - mid  # .reshape(lx, ly, lz)
 
     U, V, W = -X, -Y, -Z
 
@@ -122,7 +123,7 @@ def config():
         hyper_resistivity=0.001,
         resistivity=0.001,
         diag_options={
-            "format": "phareh5",
+            "format": "pharevtkhdf",
             "options": {"dir": diag_outputs, "mode": "overwrite"},
         },
         restart_options={
@@ -142,13 +143,17 @@ def config():
         return b3(sim, x, y, z, lx, ly, lz)
 
     def bx(x, y, z):
-        return b(x, y, z, cells[0] + 5, cells[0] + 4, cells[0] + 4)
+        # print("bx")
+        # print(x.shape)
+        # print(y.shape)
+        # print(z.shape)
+        return b(x, y, z, cells[0] + 5, cells[0] + 4, cells[0] + 4)[0]
 
     def by(x, y, z):
-        return b(x, y, z, cells[0] + 4, cells[0] + 5, cells[0] + 4)
+        return b(x, y, z, cells[0] + 4, cells[0] + 5, cells[0] + 4)[1]
 
     def bz(x, y, z):
-        return b(x, y, z, cells[0] + 4, cells[0] + 4, cells[0] + 5)
+        return b(x, y, z, cells[0] + 4, cells[0] + 4, cells[0] + 5)[2]
 
     def vxyz(x, y, z):
         return 0.0
@@ -180,7 +185,8 @@ def config():
     )
     for quantity in ["E", "B"]:
         ph.ElectromagDiagnostics(quantity=quantity, write_timestamps=timestamps)
-    ph.InfoDiagnostics(quantity="particle_count")  # defaults all coarse time steps
+
+    # ph.InfoDiagnostics(quantity="particle_count")  # defaults all coarse time steps
 
     return sim
 
@@ -224,9 +230,9 @@ def plot(diag_dir):
 def main():
     Simulator(config()).run()
 
-    if cpp.mpi_rank() == 0:
-        plot(diag_outputs)
-    cpp.mpi_barrier()
+    # if cpp.mpi_rank() == 0:
+    #     plot(diag_outputs)
+    # cpp.mpi_barrier()
 
 
 if __name__ == "__main__":

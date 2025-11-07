@@ -14,12 +14,12 @@ cpp = cpp_lib()
 
 start_time = 0.0
 
-# cells = (100, 50, 25)
 cells = (100, 100, 100)
+cells = (100, 50, 25)
 dl = (0.4, 0.4, 0.4)
 diag_outputs = "phare_outputs/harris_3d"
 time_step = 0.002
-time_step_nbr = 0
+time_step_nbr = 10
 final_time = time_step * time_step_nbr
 timestamps = [0, final_time]
 
@@ -45,7 +45,7 @@ def config():
         largest_patch_size=5,
         # dry_run=1,
         time_step=time_step,
-        time_step_nbr=0,
+        time_step_nbr=time_step_nbr,
         # final_time=final_time,
         dl=dl,
         cells=cells,
@@ -59,8 +59,8 @@ def config():
         hyper_mode="constant",
         resistivity=0.001,
         diag_options={
-            "format": "phareh5",
-            "options": {"dir": ".", "mode": "overwrite"},
+            "format": "pharevtkhdf",
+            "options": {"dir": diag_outputs, "mode": "overwrite"},
         },
         # restart_options={
         #     "dir": "checkpoints",

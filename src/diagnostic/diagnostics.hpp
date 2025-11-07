@@ -53,7 +53,6 @@ struct DiagnosticsManagerResolver
 #if PHARE_HAS_HIGHFIVE
         using ModelView_t = ModelView<Hierarchy, Model>;
         auto const format = cppdict::get_value(dict, "format", std::string{"phareh5"});
-        PHARE_LOG_LINE_SS(format);
         if (format == "phareh5")
             return DiagnosticsManager<h5::H5Writer<ModelView_t>>::make_unique(hier, model, dict);
         if (format == "pharevtkhdf")
