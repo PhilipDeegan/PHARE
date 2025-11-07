@@ -879,10 +879,7 @@ namespace core
             return GridLayoutImpl::centering(hybridQuantity);
         }
 
-        NO_DISCARD constexpr static auto centering(auto const& hasQuantity)
-        {
-            return centering(hasQuantity.physicalQuantity());
-        }
+
 
         NO_DISCARD constexpr static std::array<std::array<QtyCentering, dimension>, 6>
         centering(HybridQuantity::Tensor hybridQuantity)
@@ -890,6 +887,7 @@ namespace core
             return for_N_make_array<6>(
                 [](auto) { return ConstArray<QtyCentering, dimension>(QtyCentering::primal); });
         }
+
 
         template<typename HasQuantity>
         NO_DISCARD constexpr static auto centering(HasQuantity const& hasQuantity)

@@ -2,13 +2,15 @@
 #define PHARE_HDF5_H5FILE_HPP
 
 #include "core/def.hpp"
+#include "core/logger.hpp"
 #include "core/def/phare_mpi.hpp" // IWYU pragma: keep
-#include "highfive/H5File.hpp"
-#include "highfive/H5Easy.hpp"
-
 #include "core/utilities/types.hpp"
 #include "core/utilities/mpi_utils.hpp"
 #include "core/utilities/meta/meta_utilities.hpp"
+
+#include "highfive/H5File.hpp"
+#include "highfive/H5Easy.hpp"
+
 
 namespace PHARE::hdf5::h5
 {
@@ -29,11 +31,15 @@ NO_DISCARD auto vector_for_dim()
 
 class HighFiveFile
 {
+    static inline core::FunctionCountMonitor mon{"HighFiveFile"};
+
 public:
     template<typename FileAccessProps>
     static auto createHighFiveFile(std::string const path, FileOp flags, bool para,
                                    FileAccessProps& fapl)
     {
+        PHARE_FUNC_COUNT(mon, "createHighFiveFile");
+        PHARE_LOG_SCOPE(1, "HighFiveFile::createHighFiveFile");
         if (para)
         {
 #if defined(H5_HAVE_PARALLEL)
@@ -41,9 +47,7 @@ public:
 #else
             std::cout << "WARNING: PARALLEL HDF5 not available" << std::endl;
             if (core::mpi::size() > 1)
-            {
                 throw std::runtime_error("HDF5 NOT PARALLEL!");
-            }
 #endif
         }
         return HiFile{path, flags, fapl};
@@ -80,6 +84,8 @@ public:
     template<std::size_t dim = 1, typename Data>
     auto& write_data_set(std::string path, Data const& data)
     {
+        PHARE_FUNC_COUNT(mon, "write_data_set_flat");
+        PHARE_LOG_SCOPE(1, "HighFiveFile::write_data_set");
         h5file_.getDataSet(path).write(data);
         return *this;
     }
@@ -87,6 +93,8 @@ public:
     template<std::size_t dim = 1, typename Data>
     auto& write_data_set_flat(std::string path, Data const& data)
     {
+        PHARE_FUNC_COUNT(mon, "write_data_set_flat");
+        PHARE_LOG_SCOPE(1, "HighFiveFile::write_data_set_flat");
         h5file_.getDataSet(path).write_raw(data);
         return *this;
     }
@@ -97,6 +105,10 @@ public:
     {
         if (exist(path))
             return h5file_.getDataSet(path);
+
+        PHARE_FUNC_COUNT(mon, "create_data_set");
+        PHARE_LOG_SCOPE(1, "HighFiveFile::create_data_set");
+
         createGroupsToDataSet(path);
         return h5file_.createDataSet<Type>(path, HighFive::DataSpace(dataSetSize));
     }
@@ -155,6 +167,9 @@ public:
         constexpr bool data_is_vector = core::is_std_vector_v<Data>;
 
         auto doAttribute = [&](auto node, auto const& _key, auto const& value) {
+            PHARE_LOG_SCOPE(1, "HighFiveFile::createAttribute");
+            PHARE_FUNC_COUNT(mon, "createAttribute");
+            mon("createAttribute");
             if constexpr (data_is_vector)
                 node.template createAttribute<typename Data::value_type>(
                         _key, HighFive::DataSpace::From(value))
@@ -194,6 +209,8 @@ public:
         constexpr bool data_is_vector = core::is_std_vector_v<Data>;
 
         auto doAttribute = [&](auto node, auto const& _key, auto const& value) {
+            PHARE_LOG_SCOPE(1, "HighFiveFile::createAttribute");
+            PHARE_FUNC_COUNT(mon, "createAttribute");
             if constexpr (data_is_vector)
             {
                 if (value.size())
