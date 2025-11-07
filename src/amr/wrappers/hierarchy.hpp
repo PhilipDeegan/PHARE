@@ -3,6 +3,7 @@
 
 #include <algorithm>
 
+#include "core/logger.hpp"
 #include "core/def/phare_mpi.hpp"
 
 #include <SAMRAI/algs/TimeRefinementIntegrator.h>
@@ -18,8 +19,6 @@
 #include <SAMRAI/tbox/DatabaseBox.h>
 #include <SAMRAI/tbox/InputManager.h>
 #include <SAMRAI/tbox/MemoryDatabase.h>
-#include <SAMRAI/tbox/RestartManager.h>
-#include "SAMRAI/hier/PatchDataRestartManager.h"
 
 
 #include "core/def.hpp"
@@ -27,6 +26,7 @@
 #include "initializer/data_provider.hpp"
 #include "core/utilities/meta/meta_utilities.hpp"
 
+#include "amr/samrai.hpp"
 
 
 namespace PHARE::amr
@@ -40,7 +40,8 @@ namespace PHARE::amr
 class HierarchyRestarter
 {
 public:
-    HierarchyRestarter(initializer::PHAREDict const& sim_dict)
+    HierarchyRestarter(initializer::PHAREDict const& _sim_dict)
+        : sim_dict{_sim_dict}
     {
         if (sim_dict["simulation"].contains("restarts"))
         {
@@ -61,11 +62,27 @@ public:
         }
     }
 
+    ~HierarchyRestarter()
+    {
+        if (sim_dict["simulation"].contains("restarts"))
+        {
+            auto& dict = sim_dict["simulation"]["restarts"];
+
+            if (dict.contains("loadPath"))
+            {
+                auto pdrm = SAMRAI::hier::PatchDataRestartManager::getManager();
+
+                for (auto& id : dict["restart_ids"].template to<std::vector<int>>())
+                    pdrm->unregisterPatchDataForRestart(id);
+            }
+        }
+    }
+
     NO_DISCARD auto static getRestartFileFullPath(std::string path, int idx = 0)
     {
         // https://github.com/LLNL/SAMRAI/pull/198
         // there's a PR for this next line, but until then the code below is the same
-        // return SAMRAI::tbox::RestartManager::getManager()->getRestartFileFullPath(path, idx);
+        // return SamraiLifeCycle::getRestartManager()->getRestartFileFullPath(path, idx);
 
         return path                                                                   //
                + "/restore." + SAMRAI::tbox::Utilities::intToString(idx, 6)           //
@@ -79,6 +96,9 @@ public:
     {
         return SAMRAI::tbox::RestartManager::getManager()->isFromRestart();
     }
+
+private:
+    initializer::PHAREDict sim_dict;
 };
 
 
@@ -194,8 +214,14 @@ inline auto Hierarchy::make()
 {
     PHARE::initializer::PHAREDict const& theDict
         = PHARE::initializer::PHAREDictHandler::INSTANCE().dict();
-    auto dim = theDict["simulation"]["dimension"].template to<int>();
-    return core::makeAtRuntime<HierarchyMaker>(dim, HierarchyMaker{theDict});
+    auto dim  = theDict["simulation"]["dimension"].template to<int>();
+    auto hier = core::makeAtRuntime<HierarchyMaker>(dim, HierarchyMaker{theDict});
+    if (hier)
+        return hier;
+    PHARE_LOG_LINE_SS("hierarchy not found for params:\n"
+                      << dim << " " << theDict["simulation"]["interp_order"].template to<int>()
+                      << " " << theDict["simulation"]["refined_particle_nbr"].template to<int>());
+    throw std::runtime_error("Likely unsupported template parameters");
 }
 
 
@@ -394,15 +420,15 @@ auto patchHierarchyDatabase(PHARE::initializer::PHAREDict const& amr)
 template<std::size_t _dimension>
 DimHierarchy<_dimension>::DimHierarchy(PHARE::initializer::PHAREDict const& dict)
     : Hierarchy{
-        dict,
-        std::make_shared<SAMRAI::geom::CartesianGridGeometry>(
-            SAMRAI::tbox::Dimension{dimension}, "CartesianGridGeom",
-            griddingAlgorithmDatabase<dimension>(dict["simulation"]["grid"])),
-        patchHierarchyDatabase<dimension>(dict["simulation"]["AMR"]),
-        shapeToBox(parseDimXYZType<int, dimension>(dict["simulation"]["grid"], "nbr_cells")),
-        parseDimXYZType<double, dimension>(dict["simulation"]["grid"], "origin"),
-        parseDimXYZType<double, dimension>(dict["simulation"]["grid"], "meshsize"),
-        parseDimXYZType<std::string, dimension>(dict["simulation"]["grid"], "boundary_type")}
+          dict,
+          std::make_shared<SAMRAI::geom::CartesianGridGeometry>(
+              SAMRAI::tbox::Dimension{dimension}, "CartesianGridGeom",
+              griddingAlgorithmDatabase<dimension>(dict["simulation"]["grid"])),
+          patchHierarchyDatabase<dimension>(dict["simulation"]["AMR"]),
+          shapeToBox(parseDimXYZType<int, dimension>(dict["simulation"]["grid"], "nbr_cells")),
+          parseDimXYZType<double, dimension>(dict["simulation"]["grid"], "origin"),
+          parseDimXYZType<double, dimension>(dict["simulation"]["grid"], "meshsize"),
+          parseDimXYZType<std::string, dimension>(dict["simulation"]["grid"], "boundary_type")}
 {
 }
 

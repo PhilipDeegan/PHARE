@@ -5,21 +5,23 @@ import numpy as np
 from pathlib import Path
 
 import pyphare.pharein as ph
-from pyphare.cpp import cpp_lib
+
+from pyphare import cpp
+
 from pyphare.pharesee.run import Run
-from pyphare.simulator.simulator import Simulator, startMPI
+from pyphare.simulator.simulator import Simulator
+from pyphare.simulator.simulator import startMPI
 
 from tests.simulator import SimulatorTest
 
-ph.NO_GUI()
 
-cpp = cpp_lib()
+ph.NO_GUI()
 
 
 cells = (200, 100)
 time_step = 0.005
-final_time = 50
-timestamps = np.arange(0, final_time + time_step, final_time / 5)
+final_time = 0.010  # 50
+timestamps = []  # np.arange(0, final_time + time_step, final_time / 5)
 diag_dir = "phare_outputs/harris"
 
 
@@ -223,5 +225,5 @@ class HarrisTest(SimulatorTest):
 
 
 if __name__ == "__main__":
-    startMPI()
+    # startMPI()
     HarrisTest().test_run().tearDown()

@@ -16,6 +16,7 @@ jobs:
       matrix:
         os: [ubuntu-latest]
         cc: [gcc, clang]
+        lib_mode: [static, shared]
 
     steps:
     - name: Build Info
@@ -74,6 +75,8 @@ jobs:
         set -ex
         export CC=gcc CXX=g++
         [ "${{ matrix.cc }}" = "clang" ] && export CC=clang CXX=clang++
+        export SHARED_LIB_MODE=ON
+        [ "${{ matrix.lib_mode }}" = "static" ] && export SHARED_LIB_MODE=OFF
         cmake $GITHUB_WORKSPACE
         cd ${{github.workspace}}/subprojects/samrai && mkdir build && cd build
         cmake .. -DENABLE_SAMRAI_TESTS=OFF -DCMAKE_BUILD_TYPE=RelWithDebInfo
@@ -84,12 +87,21 @@ jobs:
               -DCMAKE_C_COMPILER_LAUNCHER=ccache \
               -DCMAKE_CXX_COMPILER_LAUNCHER=ccache \
               -DlowResourceTests=ON -DdevMode=ON -Dbench=ON \
-              -DCMAKE_CXX_FLAGS="-O3 -DPHARE_DIAG_DOUBLES=1 " -Dphare_configurator=ON
+              -DCMAKE_CXX_FLAGS="-O3 -DPHARE_DIAG_DOUBLES=1 " -Dphare_configurator=ON \
+              -DSAMRAI_BUILD_SHARED_LIBS=$SHARED_LIB_MODE
 
     - name: Build
       working-directory: ${{github.workspace}}/build
       run: cmake --build . -j 1
 
     - name: Test
+      if: ${{ matrix.lib_mode == 'static' }}
+      working-directory: ${{github.workspace}}
+      run: |
+        python -m pip install phlop
+        python -m phlop.run.test_cases --cmake -i build -c 2
+
+    - name: Test
+      if: ${{ matrix.lib_mode == 'shared' }}
       working-directory: ${{github.workspace}}/build
       run: ctest -j 2 --output-on-failure

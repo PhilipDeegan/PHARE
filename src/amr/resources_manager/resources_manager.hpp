@@ -1,17 +1,16 @@
 #ifndef PHARE_AMR_TOOLS_RESOURCES_MANAGER_HPP
 #define PHARE_AMR_TOOLS_RESOURCES_MANAGER_HPP
 
+#include "core/def.hpp"
+#include "core/logger.hpp"
 #include "core/def/phare_mpi.hpp"
 
-#include "core/logger.hpp"
+#include "amr/samrai.hpp"
 
 #include "field_resource.hpp"
-#include "core/hybrid/hybrid_quantities.hpp"
-#include "particle_resource.hpp"
 #include "resources_guards.hpp"
+#include "particle_resource.hpp"
 #include "resources_manager_utilities.hpp"
-#include "core/def.hpp"
-
 
 #include <SAMRAI/hier/Patch.h>
 #include <SAMRAI/hier/VariableDatabase.h>
@@ -19,6 +18,7 @@
 
 #include <map>
 #include <optional>
+#include <unordered_map>
 
 
 namespace PHARE
@@ -298,6 +298,17 @@ namespace amr
             for (auto const& id : restart_patch_data_ids(view))
                 pdrm->registerPatchDataForRestart(id);
         }
+
+
+        template<typename ResourcesView>
+        void unRegisterForRestarts(ResourcesView const& view) const
+        {
+            auto pdrm = SAMRAI::hier::PatchDataRestartManager::getManager();
+
+            for (auto const& id : restart_patch_data_ids(view))
+                pdrm->unregisterPatchDataForRestart(id);
+        }
+
 
         template<typename ResourcesView>
         NO_DISCARD auto restart_patch_data_ids(ResourcesView const& view) const

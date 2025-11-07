@@ -1,16 +1,16 @@
 #ifndef PHARE_LOAD_BALANCER_MANAGER_HPP
 #define PHARE_LOAD_BALANCER_MANAGER_HPP
 
-#include <memory>
-#include <vector>
-#include <algorithm>
+#include "initializer/data_provider.hpp"
+#include "load_balancer_estimator.hpp"
+
+#include "amr/samrai.hpp"
 
 #include <SAMRAI/hier/PatchLevel.h>
 #include <SAMRAI/pdat/CellVariable.h>
 
-#include "initializer/data_provider.hpp"
-#include "load_balancer_estimator.hpp"
-
+#include <memory>
+#include <vector>
 
 namespace PHARE::amr
 {
