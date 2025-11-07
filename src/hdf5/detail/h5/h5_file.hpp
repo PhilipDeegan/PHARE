@@ -8,7 +8,6 @@
 #include "core/utilities/mpi_utils.hpp"
 #include "core/utilities/meta/meta_utilities.hpp"
 
-
 #include "highfive/H5File.hpp"
 #include "highfive/H5Easy.hpp"
 
