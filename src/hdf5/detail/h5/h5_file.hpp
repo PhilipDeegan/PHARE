@@ -252,10 +252,10 @@ public:
         return h5file_.getDataSet(s);
     }
 
-    HighFiveFile(HighFiveFile const&)             = delete;
-    HighFiveFile(HighFiveFile const&&)            = delete;
-    HighFiveFile& operator=(HighFiveFile const&)  = delete;
-    HighFiveFile& operator=(HighFiveFile const&&) = delete;
+    HighFiveFile(HighFiveFile const&)       = delete;
+    HighFiveFile(HighFiveFile const&&)      = delete;
+    HighFiveFile& operator=(HighFiveFile&)  = delete;
+    HighFiveFile& operator=(HighFiveFile&&) = delete;
 
 private:
     HighFive::FileAccessProps fapl_;

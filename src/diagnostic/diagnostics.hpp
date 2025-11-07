@@ -56,7 +56,7 @@ struct DiagnosticsManagerResolver
         PHARE_LOG_LINE_SS(format);
         if (format == "phareh5")
             return DiagnosticsManager<h5::H5Writer<ModelView_t>>::make_unique(hier, model, dict);
-        if (format == "pharevtkh5")
+        if (format == "pharevtkhdf")
             return DiagnosticsManager<vtkh5::H5Writer<ModelView_t>>::make_unique(hier, model, dict);
         throw std::runtime_error("DiagnosticsManagerResolver - unknown format " + format);
 #else

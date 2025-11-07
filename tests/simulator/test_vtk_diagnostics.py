@@ -171,7 +171,7 @@ class DiagnosticsTest(SimulatorTest):
 
         local_out = self.unique_diag_dir_for_test_case(f"{out}/test_vtk", ndim, interp)
         simInput["diag_options"]["options"]["dir"] = local_out
-        simInput["diag_options"]["format"] = "pharevtkh5"
+        simInput["diag_options"]["format"] = "pharevtkhdf"
         simulation = ph.Simulation(**simInput)
         self.assertTrue(len(simulation.cells) == ndim)
         dump_all_diags(setup_model().populations)
