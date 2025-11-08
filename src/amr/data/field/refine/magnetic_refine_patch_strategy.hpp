@@ -1,17 +1,21 @@
 #ifndef PHARE_AMR_MAGNETIC_REFINE_PATCH_STRATEGY_HPP
 #define PHARE_AMR_MAGNETIC_REFINE_PATCH_STRATEGY_HPP
 
+#include "amr/data/field/field_geometry.hpp"
 #include "core/utilities/constants.hpp"
 #include "core/utilities/types.hpp"
 
 #include "amr/data/field/field_geometry.hpp"
 #include "amr/utilities/box/amr_box.hpp"
+#include "amr/data/field/field_geometry.hpp"
 #include "amr/resources_manager/amr_utils.hpp"
 
 #include "SAMRAI/xfer/RefinePatchStrategy.h"
+#include "core/utilities/types.hpp"
 
 #include <array>
 #include <cassert>
+#include <cmath>
 
 namespace PHARE::amr
 {
@@ -50,6 +54,7 @@ public:
     SAMRAI::hier::IntVector
     getRefineOpStencilWidth(SAMRAI::tbox::Dimension const& dim) const override
     {
+        // return SAMRAI::hier::IntVector(dim, 0); // hard-coded 0th order base interpolation
         return SAMRAI::hier::IntVector(dim, 1); // hard-coded 0th order base interpolation
     }
 

@@ -81,10 +81,13 @@ namespace amr
      *
      *
      */
+
     template<typename GridLayoutT, typename Grid_t>
     class ResourcesManager
     {
         using This = ResourcesManager<GridLayoutT, Grid_t>;
+        using QuantityType =
+            typename extract_quantity_type<typename Grid_t::physical_quantity_type>::type;
 
     public:
         static constexpr std::size_t dimension    = GridLayoutT::dimension;
@@ -96,8 +99,7 @@ namespace amr
         using UserParticle_t = UserParticleType<ResourcesView, interp_order>;
 
         template<std::size_t rank>
-        using UserTensorField_t
-            = UserTensorFieldType<rank, Grid_t, GridLayoutT, core::HybridQuantity>;
+        using UserTensorField_t = UserTensorFieldType<rank, Grid_t, GridLayoutT, QuantityType>;
 
 
         ResourcesManager()
@@ -298,6 +300,17 @@ namespace amr
         {
             auto pdrm = SAMRAI::hier::PatchDataRestartManager::getManager();
             for (auto const& id : restart_patch_data_ids())
+                pdrm->registerPatchDataForRestart(id);
+        }
+
+        // needed as long as we have different resource managers dealing with different physical
+        // quantities
+        template<typename ResourcesView>
+        void registerForRestarts(ResourcesView const& view) const
+        {
+            auto pdrm = SAMRAI::hier::PatchDataRestartManager::getManager();
+
+            for (auto const& id : restart_patch_data_ids(view))
                 pdrm->registerPatchDataForRestart(id);
         }
 
@@ -540,7 +553,7 @@ namespace amr
 
             auto const& resourceInfoIt = nameToResourceInfo_.find(obj.name());
             if (resourceInfoIt == nameToResourceInfo_.end())
-                throw std::runtime_error("Resources not found !");
+                throw std::runtime_error("Resources not found ! " + obj.name());
 
             obj.setBuffer(getResourcesPointer_<ResourcesType>(resourceInfoIt->second, patch));
         }
@@ -578,7 +591,7 @@ namespace amr
             }
             else
             {
-                throw std::runtime_error("Resources not found !");
+                throw std::runtime_error("Resources not found ! " + resourcesName);
             }
         }
 
