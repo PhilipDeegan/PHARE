@@ -56,7 +56,6 @@ public:
         resourcesManager->allocate(P_diag_, patch, allocateTime);
     }
 
-    auto patch_data_ids() const { return resourcesManager->restart_patch_data_ids(*this); }
 
     void fillMessengerInfo(std::unique_ptr<amr::IMessengerInfo> const& info) const override;
 
@@ -110,7 +109,6 @@ void MHDModel<GridLayoutT, VecFieldT, AMR_Types, Grid_t>::initialize(level_t& le
 
         state.initialize(layout);
     }
-    resourcesManager->registerForRestarts(*this);
 }
 
 template<typename GridLayoutT, typename VecFieldT, typename AMR_Types, typename Grid_t>

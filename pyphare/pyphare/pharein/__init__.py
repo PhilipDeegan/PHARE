@@ -85,16 +85,9 @@ def populateDict():
     from .global_vars import sim
 
     initialize.general.populateDict(sim)
-
-    if not sim.model_options:
-        sim.model_options = ["HybridModel"]
+    add_vector_string("simulation/models", sim.model_options)
 
     if "HybridModel" in sim.model_options:
         initialize.hybrid.populateDict(sim)
     if "MHDModel" in sim.model_options:
         initialize.mhd.populateDict(sim)
-
-    if not ("HybridModel" in sim.model_options or "MHDModel" in sim.model_options):
-        raise ValueError("Unknown simulation type")
-
-    add_vector_string("simulation/models", sim.model_options)

@@ -626,10 +626,7 @@ def check_max_mhd_level(**kwargs):
 
 
 def check_model_options(**kwargs):
-    model_options = kwargs.get("model_options", None)
-
-    if model_options is None:
-        return None
+    model_options = phare_utilities.listify(kwargs.get("model_options", "HybridModel"))
 
     valid_options = {"MHDModel", "HybridModel"}
 

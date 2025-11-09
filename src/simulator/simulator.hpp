@@ -25,6 +25,7 @@
 
 #include "restarts/restarts.hpp"
 
+#include <stdexcept>
 #include <vector>
 #include <string>
 
@@ -414,40 +415,34 @@ Simulator<opts>::Simulator(PHARE::initializer::PHAREDict const& dict,
     , functors_{functors_setup(dict)}
     , multiphysInteg_{std::make_shared<MultiPhysicsIntegrator>(dict["simulation"], functors_)}
 {
-    hyb_resman_ptr = std::make_shared<HybridResourceManager_t>();
-    mhd_resman_ptr = std::make_shared<MHDResourceManager_t>();
-    currentTime_   = restart_time(dict);
+    currentTime_ = restart_time(dict);
     finalTime_ += currentTime_;
 
-    bool initialized = false;
 
     // we would need a different restart manager for mhd and hybrid if both models are used
+
     if (find_model("HybridModel"))
     {
+        hyb_resman_ptr = std::make_shared<HybridResourceManager_t>();
         hybrid_init(dict);
-
         if (dict["simulation"].contains("restarts"))
             rMan = restarts::RestartsManagerResolver::make_unique(*hierarchy_, *hyb_resman_ptr,
                                                                   dict["simulation"]["restarts"]);
-        hyb_resman_ptr->registerForRestarts(*hybridModel_);
-
-        initialized = true;
     }
 
     if (find_model("MHDModel"))
     {
+        mhd_resman_ptr = std::make_shared<MHDResourceManager_t>();
         mhd_init(dict);
-
         if (dict["simulation"].contains("restarts"))
             rMan = restarts::RestartsManagerResolver::make_unique(*hierarchy_, *mhd_resman_ptr,
                                                                   dict["simulation"]["restarts"]);
-        mhd_resman_ptr->registerForRestarts(*mhdModel_);
-
-        initialized = true;
     }
 
-    if (!initialized)
+    if (!hyb_resman_ptr and !mhd_resman_ptr)
         throw std::runtime_error("unsupported model");
+
+    amr::ResourcesManagerGlobals::registerForRestarts();
 }
 
 
@@ -558,6 +553,8 @@ double Simulator<opts>::advance(double dt)
 template<auto opts>
 auto Simulator<opts>::find_model(std::string name)
 {
+    if (modelNames_.empty())
+        throw std::runtime_error("Simulator: No models found!");
     return std::find(std::begin(modelNames_), std::end(modelNames_), name) != std::end(modelNames_);
 }
 
