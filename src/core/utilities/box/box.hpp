@@ -2,15 +2,15 @@
 #define PHARE_CORE_UTILITIES_BOX_BOX_HPP
 
 
+#include "core/def.hpp"
 #include "core/utilities/types.hpp"
 #include "core/utilities/point/point.hpp"
 #include "core/utilities/meta/meta_utilities.hpp"
-#include "core/def.hpp"
 
 #include <cstddef>
-#include <algorithm>
 #include <optional>
 #include <iostream>
+#include <algorithm>
 
 namespace PHARE::core
 {
@@ -93,8 +93,10 @@ struct Box
         return *this;
     }
 
+
+    NO_DISCARD auto shape(std::size_t const i) const { return upper[i] - lower[i] + 1; }
     NO_DISCARD auto shape() const { return upper - lower + 1; }
-    NO_DISCARD auto size() const { return core::product(shape()); }
+    NO_DISCARD auto size() const { return core::product(shape(), std::size_t{1}); }
 
 
     using iterator = box_iterator<Type, dim>;
@@ -188,6 +190,7 @@ public:
         return *this;
     }
 
+
     bool operator!=(box_iterator const& other) const
     {
         return box_ != other.box_ or index_ != other.index_;
@@ -265,6 +268,7 @@ NO_DISCARD bool isIn(Point<Type, SIZE> const& point, Box<Type, SIZE> const& box)
 
     return false;
 }
+
 
 
 

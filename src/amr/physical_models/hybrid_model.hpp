@@ -28,15 +28,15 @@ public:
     using Interface              = IPhysicalModel<AMR_Types>;
     using amr_types              = AMR_Types;
     using electrons_t            = Electrons;
-    using patch_t                = typename AMR_Types::patch_t;
-    using level_t                = typename AMR_Types::level_t;
+    using patch_t                = AMR_Types::patch_t;
+    using level_t                = AMR_Types::level_t;
     using gridlayout_type        = GridLayoutT;
     using electromag_type        = Electromag;
-    using vecfield_type          = typename Electromag::vecfield_type;
-    using field_type             = typename vecfield_type::field_type;
+    using vecfield_type          = Electromag::vecfield_type;
+    using field_type             = vecfield_type::field_type;
     using grid_type              = Grid_t;
     using ions_type              = Ions;
-    using particle_array_type    = typename Ions::particle_array_type;
+    using particle_array_type    = Ions::particle_array_type;
     using resources_manager_type = amr::ResourcesManager<gridlayout_type, grid_type>;
     using ParticleInitializerFactory
         = core::ParticleInitializerFactory<particle_array_type, gridlayout_type>;
@@ -135,6 +135,10 @@ void HybridModel<GridLayoutT, Electromag, Ions, Electrons, AMR_Types, Grid_t>::i
         }
 
         state.electromag.initialize(layout);
+        // data initialized to NaN on construction
+        // and in 1D Jx is not worked on in Ampere so
+        // we need to zero J before anything happens
+        state.J.zero();
     }
 }
 
@@ -198,6 +202,7 @@ auto constexpr is_hybrid_model(Args...)
 
 template<typename Model>
 auto constexpr is_hybrid_model_v = is_hybrid_model(static_cast<Model*>(nullptr));
+
 
 
 

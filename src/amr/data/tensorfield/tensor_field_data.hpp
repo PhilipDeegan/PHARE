@@ -8,16 +8,15 @@
 #include "core/data/grid/gridlayoutdefs.hpp"
 #include "core/data/tensorfield/tensorfield.hpp"
 
-#include "amr/data/field/field_geometry.hpp"
-#include "amr/data/tensorfield/tensor_field_overlap.hpp"
-#include "amr/resources_manager/amr_utils.hpp"
 #include "amr/data/field/field_overlap.hpp"
+#include "amr/data/field/field_geometry.hpp"
+#include "amr/resources_manager/amr_utils.hpp"
+#include "amr/data/tensorfield/tensor_field_overlap.hpp"
 #include "amr/data/tensorfield/tensor_field_geometry.hpp"
 
 #include <SAMRAI/hier/PatchData.h>
 #include <SAMRAI/tbox/MemoryUtilities.h>
 
-#include <optional>
 #include <type_traits>
 
 

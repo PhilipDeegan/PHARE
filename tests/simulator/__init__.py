@@ -4,10 +4,12 @@
 import os
 import unittest
 import numpy as np
+from functools import wraps
 from datetime import datetime
 
 import pyphare.pharein as ph
-from pyphare.pharein import ElectronModel
+from pyphare.core.box import Box
+from pyphare.pharesee import run
 
 
 def parse_cli_args(pop_from_sys=True):
@@ -99,12 +101,17 @@ def density_2d_periodic(sim, x, y):
     )
 
 
-# def density_3d_periodic(sim, x, y, z):
-#     xmax, ymax, zmax = sim.simulation_domain()
-#     background_particles = 0.3  # avoids 0 density
-#     xx, yy, zz = meshify(x, y, z)
-#     r = np.exp(-(xx-0.5*xmax)**2)*np.exp(-(yy-ymax/2.)**2)*np.exp(-(zz-zmax/2.)**2) + background_particles
-#     return r
+def density_3d_periodic(sim, x, y, z):
+    xmax, ymax, zmax = sim.simulation_domain()
+    background_particles = 0.3  # avoids 0 density
+    xx, yy, zz = meshify(x, y, z)
+    r = (
+        np.exp(-((xx - 0.5 * xmax) ** 2))
+        * np.exp(-((yy - ymax / 2.0) ** 2))
+        * np.exp(-((zz - zmax / 2.0) ** 2))
+        + background_particles
+    )
+    return r
 
 
 def defaultPopulationSettings(sim, density_fn, vbulk_fn):
@@ -158,7 +165,7 @@ def populate_simulation(dim, interp, **input):
     if "diags_fn" in input:
         input["diags_fn"](model)
 
-    ElectronModel(closure="isothermal", Te=0.12)
+    ph.ElectronModel(closure="isothermal", Te=0.12)
 
     return simulation
 
@@ -195,6 +202,35 @@ def diff_boxes(slice1, slice2, box, atol=None):
             z = z + box.lower[2]
             boxes += [Box([x, y, z], [x, y, z])]
     return boxes
+
+
+class SimulatorTestRunInterop(run.Run):
+    """
+    Intercept calls to Run and catch FileNotFound errors for when
+     diags are not active/etc
+    """
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+
+    @staticmethod
+    def _wrapper(func, func_name):
+        @wraps(func)
+        def wrapped(*args, **kwargs):
+            try:
+                return func(*args, **kwargs)
+            except FileNotFoundError:
+                print(f"{func_name} : file not found, maybe diagnostic is not active")
+
+        return wrapped
+
+    def __getattribute__(self, name):
+        import types
+
+        attr = super(SimulatorTestRunInterop, self).__getattribute__(name)
+        if isinstance(attr, types.MethodType) and not name.startswith("_"):
+            attr = SimulatorTestRunInterop._wrapper(attr, name)
+        return attr
 
 
 class SimulatorTest(unittest.TestCase):
@@ -242,7 +278,7 @@ class SimulatorTest(unittest.TestCase):
         self.diag_dirs = []  # cleanup after tests
         self.success = True
 
-    def run(self, result=None):
+    def run(self, result=None):  # override superclass function
         self._outcome = result
         super().run(result)
 
@@ -264,3 +300,36 @@ class SimulatorTest(unittest.TestCase):
                 if os.path.exists(diag_dir):
                     shutil.rmtree(diag_dir)
         cpp_lib().mpi_barrier()
+
+    def getRun(self, diag_dir):
+        return SimulatorTestRunInterop(diag_dir)
+
+
+def debug_tracer():
+    """
+    print live stack trace during execution
+    """
+
+    import sys, os
+
+    def tracefunc(frame, event, arg, indent=[0]):
+        filename = os.path.basename(frame.f_code.co_filename)
+        line_number = frame.f_lineno
+        if event == "call":
+            indent[0] += 2
+            print(
+                "-" * indent[0] + "> enter function",
+                frame.f_code.co_name,
+                f"{filename} {line_number}",
+            )
+        elif event == "return":
+            print(
+                "<" + "-" * indent[0],
+                "exit function",
+                frame.f_code.co_name,
+                f"{filename} {line_number}",
+            )
+            indent[0] -= 2
+        return tracefunc
+
+    sys.setprofile(tracefunc)

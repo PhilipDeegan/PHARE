@@ -880,12 +880,14 @@ namespace core
         }
 
 
+
         NO_DISCARD constexpr static std::array<std::array<QtyCentering, dimension>, 6>
         centering(HybridQuantity::Tensor hybridQuantity)
         {
             return for_N_make_array<6>(
                 [](auto) { return ConstArray<QtyCentering, dimension>(QtyCentering::primal); });
         }
+
 
         template<typename HasQuantity>
         NO_DISCARD constexpr static auto centering(HasQuantity const& hasQuantity)
@@ -1024,6 +1026,29 @@ namespace core
          * interpolation necessary to project moments onto Ez.
          */
         NO_DISCARD auto static constexpr momentsToEz() { return GridLayoutImpl::momentsToEz(); }
+
+
+
+        /**
+         * @brief BxToMoments return the indexes and associated coef to compute the linear
+         * interpolation necessary to project Bx onto moments.
+         */
+        NO_DISCARD auto static constexpr BxToMoments() { return GridLayoutImpl::BxToMoments(); }
+
+
+        /**
+         * @brief ByToMoments return the indexes and associated coef to compute the linear
+         * interpolation necessary to project By onto moments.
+         */
+        NO_DISCARD auto static constexpr ByToMoments() { return GridLayoutImpl::ByToMoments(); }
+
+
+        /**
+         * @brief BzToMoments return the indexes and associated coef to compute the linear
+         * interpolation necessary to project Bz onto moments.
+         */
+        NO_DISCARD auto static constexpr BzToMoments() { return GridLayoutImpl::BzToMoments(); }
+
 
 
 
@@ -1180,6 +1205,8 @@ namespace core
                             return -1 * nbrGhosts(centerings[i]);
                         }));
         }
+
+
 
         template<typename Field, typename Fn>
         void evalOnBox(Field& field, Fn&& fn) const

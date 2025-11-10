@@ -346,6 +346,9 @@ Simulator<opts>::Simulator(PHARE::initializer::PHAREDict const& dict,
     , functors_{functors_setup(dict)}
     , multiphysInteg_{std::make_shared<MultiPhysicsIntegrator>(dict["simulation"], functors_)}
 {
+    if (!hierarchy_)
+        throw std::runtime_error("NO HIERARCHY!");
+
     resman_ptr   = std::make_shared<ResourceManager_t>();
     currentTime_ = restart_time(dict);
     finalTime_ += currentTime_;
