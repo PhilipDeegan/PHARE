@@ -237,4 +237,4 @@ void FluidDiagnosticWriter<H5Writer>::write(DiagnosticProperties& diagnostic)
 
 
 
-#endif /* PHARE_DIAGNOSTIC_DETAIL_VTK_TYPES_FLUID_H */
+#endif /* PHARE_DIAGNOSTIC_DETAIL_VTK_TYPES_FLUID_HPP */
