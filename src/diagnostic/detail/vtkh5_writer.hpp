@@ -101,7 +101,6 @@ public:
                                               file_flags[diagnostic.type + diagnostic.quantity]);
     }
 
-
     auto& modelView() { return modelView_; }
     auto timestamp() const { return timestamp_; }
 

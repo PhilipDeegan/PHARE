@@ -7,9 +7,9 @@
 #include "amr/physical_models/hybrid_model.hpp"
 #include "diagnostic/detail/vtkh5_type_writer.hpp"
 
-#include <stdexcept>
 #include <string>
 #include <optional>
+#include <stdexcept>
 #include <unordered_map>
 
 namespace PHARE::diagnostic::vtkh5

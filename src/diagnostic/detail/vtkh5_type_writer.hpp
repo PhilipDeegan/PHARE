@@ -117,7 +117,6 @@ class H5TypeWriter : public PHARE::diagnostic::TypeWriter
     auto static inline const level_data_path
         = [](auto const ilvl) { return level_base + std::to_string(ilvl) + "/PointData/data"; };
 
-
 public:
     static constexpr auto dimension = Writer::dimension;
 
@@ -130,7 +129,6 @@ public:
 
 protected:
     class VTKFileInitializer;
-
     class VTKFileWriter;
 
 
@@ -225,8 +223,6 @@ public:
     template<std::size_t rank = 2>
     void writeTensorField(auto const& tf, auto const& layout);
 
-
-
 private:
     auto local_box(auto const& layout) const
     {
@@ -318,7 +314,6 @@ void H5TypeWriter<Writer>::VTKFileWriter::writeField(auto const& field, auto con
         data_offset += size;
     }
 }
-
 
 template<typename Writer>
 template<std::size_t rank>

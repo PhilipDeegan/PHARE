@@ -141,17 +141,6 @@ public:
     }
 
 
-    // auto localLevelBoxes(auto const ilvl)
-    // {
-    //     std::vector<core::Box<int, dimension>> boxes;
-    //     auto const& lvl = *hierarchy_.getPatchLevel(ilvl);
-    //     boxes.reserve(lvl.getLocalNumberOfPatches());
-    //     visitHierarchy(
-    //         [&](auto& layout, auto const&, auto const) { boxes.emplace_back(layout.AMRBox()); },
-    //         ilvl, ilvl);
-    //     return boxes;
-    // }
-
     auto& tmpField() { return tmpField_; }
     auto& tmpVecField() { return tmpVec_; }
 
