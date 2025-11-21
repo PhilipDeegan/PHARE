@@ -17,7 +17,7 @@
 #include "highfive/highfive.hpp"
 
 
-std::string const FILE_NAME("slooooow.h5");
+std::string const FILE_NAME("flat.h5");
 std::string const DATASET_NAME("dset");
 
 /* float byte size table
@@ -98,33 +98,48 @@ void run(auto const size)
     if (size % mpi::size() != 0)
         throw std::runtime_error("size is not divisible by ranks");
 
-    CSV csv;
-    TIME("tools/bench/diagnostic/slow.cpp       ");
-
-
-    FileAccessProps fapl;
-    fapl.add(MPIOFileAccess{MPI_COMM_WORLD, MPI_INFO_NULL});
-    std::unique_ptr<File> fileptr
-        = std::make_unique<File>(FILE_NAME, File::ReadWrite | File::Create | File::Truncate, fapl);
-    auto& file = *fileptr;
-
-    // precreate
-    file.createDataSet(DATASET_NAME, DataSpace({size}, {size}), create_datatype<float>());
-
-    Timer timer{"tools/bench/diagnostic/slow.cpp::write"};
-    {
-        auto dataset                    = file.getDataSet(DATASET_NAME);
-        auto const&& [per_rank, offset] = rank_bits(size);
-        std::vector<float> data(per_rank, offset);
-        for (std::size_t i = 0; i < per_rank; ++i)
-            data[i] += i;
-        dataset.select({offset}, {per_rank}).write(data);
-        csv << (std::to_string(size) + "," + std::to_string(timer()));
-    }
-    fileptr.reset();
-
     if (mpi::rank() == 0)
-        CSV{"total.csv"} << (std::to_string(size) + "," + std::to_string(timer()));
+        std::cout << std::endl;
+
+    auto const&& [per_rank, offset] = rank_bits(size);
+    std::vector<float> data(per_rank, offset);
+    for (std::size_t i = 0; i < per_rank; ++i)
+        data[i] += i;
+
+    CSV csv;
+
+    std::size_t total_time = 0, write_time = 0;
+
+    {
+        Timer total_timer{"tools/bench/diagnostic/slow.cpp::total"};
+        {
+            FileAccessProps fapl;
+            fapl.add(MPIOFileAccess{MPI_COMM_WORLD, MPI_INFO_NULL});
+            std::unique_ptr<File> fileptr = std::make_unique<File>(
+                FILE_NAME, File::ReadWrite | File::Create | File::Truncate, fapl);
+            auto& file = *fileptr;
+
+            // precreate
+            file.createDataSet(DATASET_NAME, DataSpace({size}, {size}), create_datatype<float>());
+
+            auto const select = [](auto ds, auto const off, auto const siz) {
+                Timer select_timer{"tools/bench/diagnostic/slow.cpp::select"};
+                return ds.select({off}, {siz});
+            };
+
+            {
+                auto place = select(file.getDataSet(DATASET_NAME), offset, per_rank);
+                Timer write_timer{"tools/bench/diagnostic/slow.cpp::write"};
+                place.write(data);
+                write_time = write_timer();
+            }
+        }
+        total_time = total_timer();
+    }
+
+    csv << (std::to_string(size) + "," + std::to_string(write_time));
+    if (mpi::rank() == 0)
+        CSV{"total.csv"} << (std::to_string(size) + "," + std::to_string(total_time));
 }
 
 } // namespace PHARE::core
