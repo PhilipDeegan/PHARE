@@ -1,0 +1,283 @@
+#! build -M tools/bench/diagnostic/slow.cpp -p diagnostic -x mpi dbg
+#! clean build -x mpi -dtKOp py
+
+name: phare
+
+scm: https://github.com/philipdeegan/phare
+version: mkn
+
+inc: src
+
+property:
+  HDF5_INC: /opt/mpi/hdf5/include
+  HDF5_PTH: /opt/mpi/hdf5/lib
+  # HDF5_INC: /opt/mpi/rocm_hdf5/include
+  # HDF5_PTH: /opt/mpi/rocm_hdf5/lib
+  mkn.base: base_
+  mkn.args: -DPHARE_HAS_HIGHFIVE=1 -DPHARE_DIAG_DOUBLES=1
+  mkn.flag: "" # -Wno-macro-redefined
+  samrai.ver: master
+
+
+profile:
+- name: base_
+  arg:  ${mkn.flag} ${mkn.args}
+
+- name: gpu_
+  parent: base_
+  dep: mkn.gpu
+  arg: -Wno-unknown-cuda-version
+
+- name: base
+  parent: ${mkn.base}
+
+
+
+- name: all
+  parent: base
+  src:
+      src/core
+      src/amr
+      src/python3/cpp_simulator.cpp
+  inc:
+      src
+      subprojects
+      subprojects/highfive/include
+      ${HDF5_INC}
+  arg: -DPHARE_SIM_ID=1_1_2 -DPHARE_SIM_STR=1,1,2
+  mode: shared
+  dep: llnl.samrai#${samrai.ver}(https://github.com/mkn-nix/llnl.samrai) lang.pybind11
+  mod: python3.module lang.python3
+  env: |
+    MKN_LIB_LINK_LIB=1
+    MKN_PYTHON_LIB_EMBED=1
+  path: ${HDF5_PTH}
+  sub: |
+      h5#main&subprojects/highfive(https://github.com/highfive-devs/highfive)
+      cppdict#master&subprojects/cppdict(https://github.com/LaboratoryOfPlasmaPhysics/cppdict)
+  install: build/pybindlibs
+  out: cpp_1_1_2
+
+
+- name: core
+  parent: base
+  inc: src subprojects
+  src: src/core
+  out: phare_core
+  sub:
+      cppdict#master&subprojects/cppdict(https://github.com/LaboratoryOfPlasmaPhysics/cppdict)
+
+
+- name: amr
+  parent: base
+  self: core
+  dep: llnl.samrai#${samrai.ver}(https://github.com/mkn-nix/llnl.samrai)
+  src: src/amr
+  out: phare_amr
+
+- name: diagnostic
+  self: amr
+  sub: h5#main&subprojects/highfive(https://github.com/highfive-devs/highfive)
+  inc: subprojects/highfive/include ${HDF5_INC}
+  path: ${HDF5_PTH}
+
+
+- name: simulator
+  parent: base
+  self: diagnostic
+
+- name: exe
+  parent: base
+  self: simulator init
+  dep: lang.pybind11 
+  main: src/phare/phare.cpp
+  mod: lang.python3
+  env: PYTHONPATH=${MKN_ROOT}:${MKN_ROOT}/tests/diagnostic:${MKN_ROOT}/build:${MKN_ROOT}/pyphare
+
+- name: init
+  self: core
+  src: src/initializer/data_provider.cpp
+  mode: shared # static singleton dict lives here
+  out: phare_initializer
+
+- name: pybind
+  parent: base
+  mode: shared
+  dep: lang.pybind11
+  mod: python3.module lang.python3
+  env: |
+    MKN_LIB_LINK_LIB=1
+    MKN_PYTHON_LIB_EMBED=1
+
+- name: dictator
+  parent: pybind
+  self: init
+  src: src/initializer/dictator.cpp
+  install: build/pybindlibs
+  out: dictator
+
+- name: cpp
+  parent: pybind
+  self: simulator init
+  src: src/python3/cpp_simulator.cpp
+  install: build/pybindlibs
+  out: cpp
+
+- name: cpp_etc
+  parent: pybind
+  self: simulator
+  src: src/python3/cpp_etc.cpp
+  install: build/pybindlibs
+  out: cpp_etc
+
+- name: py
+  self: dictator cpp_etc cpp
+
+- name: test
+  parent: base
+  self: core
+  inc: .
+
+- name: test_cpp
+  parent: test
+  dep: google.test
+
+- name: test_core
+  parent: test_cpp
+  self: core
+  mode: none
+  # test: tests/core/(\w)/(test_.*).cpp
+
+- name: test_amr
+  parent: test_cpp
+  self: diagnostic init
+  mode: none
+  # lib: ${HDF5_LIB}
+
+- name: test_diagnostics
+  parent: test_amr
+  mode: none
+  mod: lang.python3
+  dep: lang.pybind11
+  env: |
+      MKN_LIB_LINK_LIB=1
+      MKN_PYTHON_LIB_EMBED=1
+      PYTHONPATH=${MKN_ROOT}:${MKN_ROOT}/tests/diagnostic:${MKN_ROOT}/build:${MKN_ROOT}/pyphare
+  # lib: ${HDF5_LIB}
+  # test:
+  #   tests/diagnostic/test-diagnostics_1d.cpp
+  #   tests/diagnostic/test-diagnostics_2d.cpp
+
+- name: bench
+  self: core
+  inc: . tools
+  dep: google.benchmark
+  test: tools/bench/core/(\w).cpp
+  link: -pthread
+
+- name: gpu_pusher
+  parent: test
+  self: bench
+  inc: .
+  dep: mkn.gpu
+  arg: -DPHARE_WITH_GPU
+  env: PYTHONPATH=${MKN_ROOT}:${MKN_ROOT}/tools/bench/core/numerics/pusher:${MKN_ROOT}/build:${MKN_ROOT}/pyphare
+
+- name: rocm_pusher
+  parent: gpu_pusher
+  main: tools/bench/core/numerics/pusher/gpu.cpp
+  arg: -DKUL_GPU_ROCM
+  env: PYTHONPATH=${MKN_ROOT}:${MKN_ROOT}/tools/bench/core/numerics/pusher:${MKN_ROOT}/build:${MKN_ROOT}/pyphare
+
+- name: cuda_pusher
+  parent: gpu_pusher
+  main: tests/amr/solvers/ppc/test_gpu_solverppc.cpp #tools/bench/core/numerics/pusher/gpu.cpp
+  arg: -DKUL_GPU_CUDA
+  inc: subprojects/thrust
+  env: PYTHONPATH=${MKN_ROOT}:${MKN_ROOT}/tools/bench/core/numerics/pusher:${MKN_ROOT}/build:${MKN_ROOT}/pyphare
+
+# - name: cuda_bandwidth_test
+#   main: subprojects/cuda-samples/Samples/bandwidthTest/bandwidthTest.cu
+#   inc: subprojects/cuda-samples/Common
+
+- name: c_depositor
+  test: tools/hw/gpu/bench/depositor.cpp
+
+- name: mkn.gpu_depositor
+  dep: mkn.gpu
+  test: tools/hw/gpu/bench/depositor.mkn.gpu.cpp
+
+# mkn clean build test run -p mkn.sheath.hip -x res/mkn/hcc.yaml -O
+- name: mkn.sheath.hip
+  dep: mkn.gpu
+  test: tools/hw/gpu/bench/sheath-gpu.hip.cpp
+
+- name: mkn.sheath.cuda
+  dep: mkn.gpu
+  test: tools/hw/gpu/bench/sheath-gpu.cuda.cpp
+
+- name: test_core_gpu_mkn
+  self: core
+  arg: -DPHARE_WITH_GPU=1 -DPHARE_HAVE_MKN_GPU=1 -DMKN_GPU_CUDA=1
+  dep: google.test mkn.gpu nvidia.thrust
+  main: tests/core/data/test_vector.cpp
+
+
+- name: gpu_test
+  parent: test
+  self: simulator init
+  arg: |
+      -DHAVE_RAJA
+      -DHAVE_UMPIRE
+      -DRAJA_ENABLE_CUDA=1
+      -DUMPIRE_ENABLE_CUDA=1
+      -DPHARE_WITH_GPU=1
+      -DPHARE_HAS_HIGHFIVE=1
+      -DPHARE_WITH_KUL=1
+      -DKUL_GPU_CUDA=1
+  test:
+    tests/core/data/ndarray/test_main.cpp
+
+- name: format
+  mod: |
+    clang.format{init{style: file, paths: src}}
+
+- name: test_core_fields
+  parent: test_core
+  test: |
+    tests/core/numerics/faraday/test_tileset_faraday.cpp
+    tests/core/numerics/ampere/test_tileset_ampere.cpp
+    tests/core/numerics/ohm/test_tileset_ohm.cpp
+    tests/core/numerics/test_field_evolution.cpp
+  # mkn -p test_core_fields -x res/mkn/mpi -gOa -fPIC -qw mkn.gpu clean build run test
+
+- name: core_tests
+  parent: test_core
+  test: |
+    tests/core/data/test_vector.cpp
+    tests/core/data/tiles/test_tile.cpp
+    tests/core/data/grid/test_grid_tile_set.cpp
+    tests/core/numerics/ohm/test_tileset_ohm.cpp
+    tests/core/data/tiles/test_tile_set_mapper.cpp
+    tests/core/data/vecfield/test_vecfield_init.cpp
+    tests/core/numerics/ampere/test_tileset_ampere.cpp
+    tests/core/numerics/faraday/test_tileset_faraday.cpp
+    tests/core/data/particles/test_particles_selecting.cpp
+    tests/core/numerics/ion_updater/test_multi_updater.cpp
+    tests/core/data/particles/test_particles_construction.cpp
+    tests/core/data/particles/test_particles_serialization.cpp
+    tests/core/data/tiles/test_tile_set_ghost_box_overlaps.cpp
+    tests/core/data/particles/sorting/test_particle_sorting.cpp
+#tests/core/numerics/ion_updater/test_updater_pp_main.cpp
+
+- name: more_tests
+  parent: test_amr
+  test: |
+    tests/amr/data/particles/test_particles_data.cpp
+    tests/amr/data/particles/stream_pack/test_main.cpp
+    tests/amr/data/particles/copy/test_particledata_copyNd.cpp
+    tests/amr/data/particles/refine/test_particles_data_split.cpp
+    tests/amr/data/particles/copy_overlap/test_particledata_copy_periodicNd.cpp
+#tests/amr/data/particles/test_particles_schedules.cpp
+#tests/amr/data/field/test_fields_schedules.cpp
+#tests/amr/data/field/refine/test_field_refinement_on_hierarchy.cpp

@@ -3,6 +3,7 @@
 #ifndef PHARE_CORE_UTILITIES_LOGGER_LOGGER_DEFAULTS_HPP
 #define PHARE_CORE_UTILITIES_LOGGER_LOGGER_DEFAULTS_HPP
 
+#include "core/def.hpp"
 #include "core/def/phlop.hpp"
 
 #if PHARE_HAVE_PHLOP
@@ -10,8 +11,8 @@
 #endif // PHARE_WITH_PHLOP
 
 #ifndef PHARE_SCOPE_TIMER
-#define PHARE_SCOPE_TIMER(str) // nothing
-#endif                         // PHARE_SCOPE_TIMER
+#define PHARE_SCOPE_TIMER(str) PHARE_LOG_LINE_SS(str)
+#endif // PHARE_SCOPE_TIMER
 
 
 #if PHARE_LOG_LEVEL >= 1

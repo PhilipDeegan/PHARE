@@ -17,8 +17,10 @@ constexpr static std::uint8_t LOG_LEVEL = PHARE_LOG_LEVEL;
     std::cout << __FILE__ << ":" << __LINE__ << " - " << str << std::endl;
 #define PHARE_LOG_LINE_SS(s) PHARE_LOG_LINE_STR((std::stringstream{} << s).str());
 #else
-#define PHARE_LOG_LINE_STR(str)
-#define PHARE_LOG_LINE_SS(str)
+// clang-format off
+#define PHARE_LOG_LINE_STR(str) {}
+#define PHARE_LOG_LINE_SS(str)  {}
+// clang-format on
 #endif
 #define PHARE_LOG_LINE PHARE_LOG_LINE_STR("")
 
