@@ -25,11 +25,11 @@ std::string const DATASET_NAME("dset");
    200MB = 52424000
    500MB = 131060000
      1GB = 262120000
+     5GB = 1310600000
 */
 
-std::array static inline const SIZES = { //
-    262120ull,   2621200ull,  13106000ull,  19659000ull,
-    26212000ull, 52424000ull, 131060000ull, 262120000ull};
+std::array static inline const SIZES = {262120ull,   2621200ull,  13106000ull,  19659000ull,
+                                        26212000ull, 52424000ull, 131060000ull, 262120000ull};
 
 namespace PHARE::core
 {
@@ -67,7 +67,6 @@ struct CSV
     std::ofstream static setup(auto const& csv)
     {
         bool const newFile = !std::ofstream(csv, std::ios::out | std::ios::in);
-
         std::ofstream of(csv, std::ios::out | std::ios::app);
         if (newFile)
             of << "time" << std::endl;
@@ -75,18 +74,12 @@ struct CSV
         return of;
     }
 
-
     void operator<<(auto const line) { of << line << std::endl; }
 
     std::string const csv = "csv." + std::to_string(mpi::rank()) + ".csv";
     std::ofstream of{setup(csv)};
 };
 
-
-
-// clang-format off
-#define TIME(s) Timer PHARE_STR_CAT(_, __LINE__){s}
-// clang-format on
 
 void run(auto const size)
 {
