@@ -1,17 +1,13 @@
-#include <memory>
 #define PHARE_FORCE_LOG_LINE 1
-
 
 #include "core/logger.hpp"
 #include "core/utilities/mpi_utils.hpp"
 
 #include <tuple>
 #include <chrono>
-#include <memory>
 #include <string>
 #include <vector>
 #include <fstream>
-
 #include <stdexcept>
 
 #include "highfive/highfive.hpp"
@@ -28,11 +24,12 @@ std::string const DATASET_NAME("dset");
    100MB = 26212000
    200MB = 52424000
    500MB = 131060000
+     1GB = 262120000
 */
 
-std::array static inline const SIZES = {
-    262120ull, 2621200ull, 13106000ull, 19659000ull, 26212000ull, 52424000ull, 131060000ull,
-};
+std::array static inline const SIZES = { //
+    262120ull,   2621200ull,  13106000ull,  19659000ull,
+    26212000ull, 52424000ull, 131060000ull, 262120000ull};
 
 namespace PHARE::core
 {
@@ -110,32 +107,31 @@ void run(auto const size)
 
     std::size_t total_time = 0, write_time = 0;
 
+    Timer total_timer{"tools/bench/diagnostic/slow.cpp::total"};
     {
-        Timer total_timer{"tools/bench/diagnostic/slow.cpp::total"};
+        FileAccessProps fapl;
+        fapl.add(MPIOFileAccess{MPI_COMM_WORLD, MPI_INFO_NULL});
+        // fapl.add(MPIOCollectiveMetadata {});
+        File file{FILE_NAME, File::ReadWrite | File::Create | File::Truncate, fapl};
+        file.createDataSet(DATASET_NAME, DataSpace({size}, {size}), create_datatype<float>());
+
+        auto const select = [](auto ds, auto const off, auto const siz) {
+            Timer select_timer{"tools/bench/diagnostic/slow.cpp::select"};
+            return ds.select({off}, {siz});
+        };
+
+        // DataTransferProps xfer;
+        // xfer.add(UseCollectiveIO{});
+
         {
-            FileAccessProps fapl;
-            fapl.add(MPIOFileAccess{MPI_COMM_WORLD, MPI_INFO_NULL});
-            std::unique_ptr<File> fileptr = std::make_unique<File>(
-                FILE_NAME, File::ReadWrite | File::Create | File::Truncate, fapl);
-            auto& file = *fileptr;
-
-            // precreate
-            file.createDataSet(DATASET_NAME, DataSpace({size}, {size}), create_datatype<float>());
-
-            auto const select = [](auto ds, auto const off, auto const siz) {
-                Timer select_timer{"tools/bench/diagnostic/slow.cpp::select"};
-                return ds.select({off}, {siz});
-            };
-
-            {
-                auto place = select(file.getDataSet(DATASET_NAME), offset, per_rank);
-                Timer write_timer{"tools/bench/diagnostic/slow.cpp::write"};
-                place.write(data);
-                write_time = write_timer();
-            }
+            auto place = select(file.getDataSet(DATASET_NAME), offset, per_rank);
+            Timer write_timer{"tools/bench/diagnostic/slow.cpp::write"};
+            place.write(data /*, xfer*/);
+            write_time = write_timer();
         }
-        total_time = total_timer();
     }
+    mpi::barrier();
+    total_time = total_timer();
 
     csv << (std::to_string(size) + "," + std::to_string(write_time));
     if (mpi::rank() == 0)
