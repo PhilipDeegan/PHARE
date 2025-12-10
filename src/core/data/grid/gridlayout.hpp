@@ -336,7 +336,7 @@ namespace core
         NO_DISCARD auto physicalEndIndex(QtyCentering centering) const
         {
             std::uint32_t icentering = static_cast<std::uint32_t>(centering);
-            return physicalStartIndexTable_[icentering];
+            return physicalEndIndexTable_[icentering];
         }
 
         /**

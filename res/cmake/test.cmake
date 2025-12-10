@@ -11,6 +11,7 @@ if (test AND ${PHARE_EXEC_LEVEL_MIN} GREATER 0) # 0 = no tests
   add_subdirectory(tests/core/data/grid)
   add_subdirectory(tests/core/data/gridlayout)
   add_subdirectory(tests/core/data/vecfield)
+  add_subdirectory(tests/core/data/tensorfield)
   add_subdirectory(tests/core/data/particles)
   add_subdirectory(tests/core/data/ions)
   add_subdirectory(tests/core/data/electrons)
@@ -48,6 +49,7 @@ if (test AND ${PHARE_EXEC_LEVEL_MIN} GREATER 0) # 0 = no tests
   add_subdirectory(tests/amr/models)
   add_subdirectory(tests/amr/multiphysics_integrator)
   add_subdirectory(tests/amr/tagging)
+  add_subdirectory(tests/amr/data/tensorfield/tensor_field_data)
 
   add_subdirectory(tests/diagnostic)
 

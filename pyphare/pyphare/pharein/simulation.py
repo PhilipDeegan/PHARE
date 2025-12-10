@@ -240,7 +240,7 @@ def check_path(**kwargs):
 
 
 def check_boundaries(ndim, **kwargs):
-    valid_boundary_types = ("periodic",)
+    valid_boundary_types = ("periodic","physical")
     boundary_types = kwargs.get("boundary_types", ["periodic"] * ndim)
     phare_utilities.check_iterables(boundary_types)
 

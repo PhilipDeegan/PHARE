@@ -7,6 +7,7 @@
 #include "core/utilities/mpi_utils.hpp"
 #include "core/models/hybrid_state.hpp"
 #include "core/data/ions/particle_initializers/particle_initializer_factory.hpp"
+#include "core/boundary/boundary_manager.hpp"
 
 #include "initializer/data_provider.hpp"
 
@@ -18,6 +19,7 @@
 #include <string>
 #include <sstream>
 #include <algorithm>
+#include <initializer_list>
 
 namespace PHARE::solver
 {
@@ -47,6 +49,7 @@ public:
     using ions_type              = Ions;
     using particle_array_type    = Ions::particle_array_type;
     using resources_manager_type = amr::ResourcesManager<gridlayout_type, grid_type>;
+    using boundary_manager_type  = core::BoundaryManager<field_type, gridlayout_type>;
     using ParticleInitializerFactory
         = core::ParticleInitializerFactory<particle_array_type, gridlayout_type>;
 
@@ -56,6 +59,7 @@ public:
 
     core::HybridState<Electromag, Ions, Electrons> state;
     std::shared_ptr<resources_manager_type> resourcesManager;
+    std::shared_ptr<boundary_manager_type> boundaryManager;
 
 
     void initialize(level_t& level) override;
@@ -92,6 +96,9 @@ public:
         , state{dict}
         , resourcesManager{std::move(_resourcesManager)}
     {
+        std::initializer_list<core::HybridQuantity::Scalar> quantities = {};
+
+        boundaryManager = std::make_shared<boundary_manager_type>(dict, quantities);
     }
 
 

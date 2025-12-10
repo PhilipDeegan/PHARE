@@ -1,0 +1,49 @@
+#ifndef PHARE_CORE_DATA_TENSOR_FIELD_TRAITS
+#define PHARE_CORE_DATA_TENSOR_FIELD_TRAITS
+
+#include "core/data/field/field_traits.hpp"
+#include "core/data/vecfield/vecfield_component.hpp"
+
+#include <concepts>
+#include <string>
+
+namespace PHARE::core
+{
+template<typename T>
+concept IsTensorField = requires(T tf, T const ctf, T const& crtf, Component component, size_t i) {
+    // public type aliases
+    requires IsField<typename T::field_type>;
+    typename T::value_type;
+    typename T::tensor_t;
+
+    // public static variables
+    requires std::same_as<decltype(T::dimension), std::size_t const>;
+    requires std::same_as<decltype(T::rank), std::size_t const>;
+    { T::size() } -> std::convertible_to<std::size_t>;
+    requires std::bool_constant<(T::size() >= 0)>::value;
+
+    // API
+    { tf.name() } -> std::same_as<std::string const&>;
+    { tf.getComponent(component) } -> std::same_as<typename T::field_type&>;
+    { ctf.getComponent(component) } -> std::same_as<typename T::field_type const&>;
+    { tf(component) } -> std::same_as<typename T::field_type&>;
+    { tf.getComponentName(component) } -> std::same_as<std::string>;
+    { tf[i] } -> std::same_as<typename T::field_type&>;
+    // missing 'components' overloads
+    { tf.copyData(crtf) } -> std::same_as<void>;
+
+    {
+        tf.begin()
+    } -> std::same_as<typename std::array<typename T::field_type, T::size()>::iterator>;
+    { tf.end() } -> std::same_as<decltype(tf.begin())>;
+    {
+        ctf.cbegin()
+    } -> std::same_as<typename std::array<typename T::field_type, T::size()>::const_iterator>;
+    { ctf.cend() } -> std::same_as<decltype(ctf.cbegin())>;
+
+    { ctf.componentNames() } -> std::same_as<std::array<std::string, T::size()> const&>;
+    { ctf.physicalQuantity() } -> std::same_as<typename T::tensor_t const&>;
+};
+} // namespace PHARE::core
+
+#endif // PHARE_CORE_DATA_TENSOR_FIELD_TRAITS
