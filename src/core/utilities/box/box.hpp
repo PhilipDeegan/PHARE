@@ -100,6 +100,7 @@ struct Box
     NO_DISCARD auto shape() const { return upper - lower + 1; }
     NO_DISCARD auto size() const { return core::product(shape(), std::size_t{1}); }
 
+
     NO_DISCARD auto begin() { return iterator{this, lower}; }
 
     //   // since the 1D scan of the multidimensional box is done assuming C ordering

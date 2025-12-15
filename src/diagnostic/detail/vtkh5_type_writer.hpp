@@ -22,7 +22,6 @@
 #endif
 
 
-
 namespace PHARE::diagnostic::vtkh5
 {
 
@@ -40,10 +39,8 @@ class H5TypeWriter : public PHARE::diagnostic::TypeWriter
     auto static inline const level_data_path
         = [](auto const ilvl) { return level_base + std::to_string(ilvl) + "/PointData/data"; };
 
-
 public:
     static constexpr auto dimension = Writer::dimension;
-
 
     H5TypeWriter(Writer& h5Writer)
         : h5Writer_{h5Writer}
@@ -390,8 +387,6 @@ void H5TypeWriter<Writer>::VTKFileInitializer::resize_boxes(auto const& level, a
     PHARE_LOG_SCOPE(3, "VTKFileInitializer::resize_boxes::3");
     amrbox_ds.select({box_offset, 0}, {boxes.size(), dimension * 2}).write(vtk_boxes);
 }
-
-
 
 
 } // namespace PHARE::diagnostic::vtkh5
