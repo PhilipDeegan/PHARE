@@ -104,6 +104,9 @@ option(bench "Compile PHARE Benchmarks" OFF)
 # -Dphare_configurator=OFF
 option(phare_configurator "Best guess setup for compile" OFF)
 
+# -Dbuild_phare_exe=OFF
+option(build_phare_exe "Build C++ frontend" OFF)
+
 
 # print options
 function(print_phare_options)

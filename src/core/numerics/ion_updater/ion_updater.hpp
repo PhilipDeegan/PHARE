@@ -32,10 +32,10 @@ public:
 
     using Box               = PHARE::core::Box<int, dimension>;
     using Interpolator      = PHARE::core::Interpolator<dimension, interp_order>;
-    using VecField          = typename Ions::vecfield_type;
-    using ParticleArray     = typename Ions::particle_array_type;
-    using Particle_t        = typename ParticleArray::Particle_t;
-    using PartIterator      = typename ParticleArray::iterator;
+    using VecField          = Ions::vecfield_type;
+    using ParticleArray     = Ions::particle_array_type;
+    using Particle_t        = ParticleArray::Particle_t;
+    using PartIterator      = ParticleArray::iterator;
     using ParticleRange     = IndexRange<ParticleArray>;
     using BoundaryCondition = PHARE::core::BoundaryCondition<dimension, interp_order>;
     using Pusher = PHARE::core::Pusher<dimension, ParticleRange, Electromag, Interpolator,
@@ -121,6 +121,7 @@ struct UpdaterSelectionBoxing
 {
     auto constexpr static partGhostWidth = GridLayout::nbrParticleGhosts();
     using GridLayout_t                   = GridLayout;
+    using Particle_t                     = IonUpdater_t::Particle_t;
     using Box_t                          = IonUpdater_t::Box;
     using Selector_t                     = IonUpdater_t::Pusher::ParticleSelector;
 
@@ -130,6 +131,10 @@ struct UpdaterSelectionBoxing
     Box_t const ghostBox  = grow(domainBox, partGhostWidth);
 
     Selector_t const noop = [](auto& particleRange) { return particleRange; };
+
+    bool isInGhostBox(Particle_t& p) const { return isIn(p, ghostBox); };
+    bool isInDomainBox(Particle_t& p) const { return isIn(p, domainBox); };
+    bool isInNonLevelGhostBox(auto const& icell) const { return isIn(icell, nonLevelGhostBox); };
 
     // lambda copy captures to detach from above references in case of class copy construct
     Selector_t const inDomainBox = [domainBox = domainBox](auto& particleRange) {

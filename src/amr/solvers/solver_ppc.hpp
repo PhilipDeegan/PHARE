@@ -10,6 +10,7 @@
 #include "core/numerics/faraday/faraday.hpp"
 #include "core/data/grid/gridlayout_utils.hpp"
 #include "core/numerics/ion_updater/ion_updater.hpp"
+#include "core/numerics/ion_updater/ino_updater.hpp"
 
 #include "amr/solvers/solver.hpp"
 #include "amr/messengers/hybrid_messenger.hpp"
@@ -24,6 +25,14 @@
 #include <tuple>
 #include <unordered_map>
 
+
+namespace PHARE::solver::detail
+{
+
+// https://support.hdfgroup.org/documentation/hdf5/latest/hdf5_chunking.html
+static inline auto const UPDATER_ID = core::get_env_as("PHARE_UPDATER_ID", std::size_t{1});
+
+} // namespace PHARE::solver::detail
 
 namespace PHARE::solver
 {
@@ -51,6 +60,7 @@ private:
     using Ampere_t     = ModelViews_t::Ampere_t;
     using Ohm_t        = ModelViews_t::Ohm_t;
     using IonUpdater_t = PHARE::core::IonUpdater<Ions, Electromag, GridLayout>;
+    using InoUpdater_t = PHARE::core::InoUpdater<Ions, Electromag, GridLayout>;
 
     Electromag electromagPred_{"EMPred"};
     Electromag electromagAvg_{"EMAvg"};
@@ -63,8 +73,23 @@ private:
     Ampere_t ampere_;
     Ohm_t ohm_;
 
-    IonUpdater_t ionUpdater_;
 
+
+    IonUpdater_t ionUpdater_;
+    InoUpdater_t inoUpdater_;
+
+
+    void update_populations(auto&&... args)
+    {
+        if (detail::UPDATER_ID > 1)
+            throw std::runtime_error("Unknown updater ID");
+
+        if (detail::UPDATER_ID == 0) // default
+            ionUpdater_.updatePopulations(args...);
+
+        else
+            inoUpdater_.updatePopulations(args...);
+    }
 
 public:
     using patch_t     = AMR_Types::patch_t;
@@ -558,9 +583,9 @@ void SolverPPC<HybridModel, AMR_Types>::moveIons_(level_t& level, ModelViews_t& 
     {
         auto dt = newTime - currentTime;
         for (auto& state : views)
-            ionUpdater_.updatePopulations(
-                state.ions, state.electromagAvg,
-                levelBoxing.at(amr::to_string(state.patch->getGlobalId())), dt, mode);
+            update_populations(state.ions, state.electromagAvg,
+                               levelBoxing.at(amr::to_string(state.patch->getGlobalId())), dt,
+                               mode);
     }
     catch (core::DictionaryException const& ex)
     {
@@ -575,7 +600,8 @@ void SolverPPC<HybridModel, AMR_Types>::moveIons_(level_t& level, ModelViews_t& 
     fromCoarser.fillFluxBorders(views.model().state.ions, level, newTime);
     fromCoarser.fillDensityBorders(views.model().state.ions, level, newTime);
     fromCoarser.fillIonPopMomentGhosts(views.model().state.ions, level, newTime);
-    fromCoarser.fillIonGhostParticles(views.model().state.ions, level, newTime);
+    if (mode == core::UpdaterMode::all) // skip schedules for particle copy
+        fromCoarser.fillIonGhostParticles(views.model().state.ions, level, newTime);
 
     for (auto& state : views)
         ionUpdater_.updateIons(state.ions);

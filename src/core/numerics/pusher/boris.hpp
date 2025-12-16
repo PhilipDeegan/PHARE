@@ -15,11 +15,111 @@
 #include <algorithm>
 #include <exception>
 
+
+namespace PHARE::core::boris
+{
+
+
+struct MoveTwoCellException : std::exception
+{
+    MoveTwoCellException(double const d, double const v)
+        : delta{d}
+        , vel{v}
+    {
+    }
+
+    double delta, vel;
+};
+
+
+template<typename Particle_t, typename Float, std::size_t dim>
+auto static advance(Particle_t& p, std::array<Float, dim> const& halfDtOverDl)
+{
+    std::array<int, dim> newCell;
+    for (std::size_t iDim = 0; iDim < dim; ++iDim)
+    {
+        double const delta = p.delta[iDim] + static_cast<double>(halfDtOverDl[iDim] * p.v[iDim]);
+
+        if (std::abs(delta) > 2)
+            throw MoveTwoCellException{delta, p.v[iDim]};
+
+        auto const iCell = static_cast<int>(std::floor(delta));
+
+        p.delta[iDim] = delta - iCell;
+        newCell[iDim] = iCell + p.iCell[iDim];
+    }
+    return newCell;
+}
+
+
+
+/** Accelerate the particles in rangeIn and put the new velocity in rangeOut
+ */
+template<typename Particle, typename ParticleEB, typename Float>
+void accelerate(Particle& p, ParticleEB const& eb, Float const& dto2m)
+{
+    static constexpr Float one = 1;
+    static constexpr Float two = 2;
+
+    auto& [pE, pB]        = eb;
+    auto& [pEx, pEy, pEz] = pE;
+    auto& [pBx, pBy, pBz] = pB;
+
+    Float const coef1 = p.charge * dto2m;
+
+    // We now apply the 3 steps of the BORIS PUSHER
+    // 1st half push of the electric field
+    Float const velx1 = p.v[0] + coef1 * pEx;
+    Float const vely1 = p.v[1] + coef1 * pEy;
+    Float const velz1 = p.v[2] + coef1 * pEz;
+
+    // preparing variables for magnetic rotation
+    Float const rx = coef1 * pBx;
+    Float const ry = coef1 * pBy;
+    Float const rz = coef1 * pBz;
+
+    Float const rx2  = rx * rx;
+    Float const ry2  = ry * ry;
+    Float const rz2  = rz * rz;
+    Float const rxry = rx * ry;
+    Float const rxrz = rx * rz;
+    Float const ryrz = ry * rz;
+
+    Float const invDet = one / (one + rx2 + ry2 + rz2);
+
+    // preparing rotation matrix due to the magnetic field
+    // m = invDet*(I + r*r - r x I) - I where x denotes the cross product
+    Float const mxx = one + rx2 - ry2 - rz2;
+    Float const mxy = two * (rxry + rz);
+    Float const mxz = two * (rxrz - ry);
+
+    Float const myx = two * (rxry - rz);
+    Float const myy = one + ry2 - rx2 - rz2;
+    Float const myz = two * (ryrz + rx);
+
+    Float const mzx = two * (rxrz + ry);
+    Float const mzy = two * (ryrz - rx);
+    Float const mzz = one + rz2 - rx2 - ry2;
+
+    // magnetic rotation
+    Float const velx2 = (mxx * velx1 + mxy * vely1 + mxz * velz1) * invDet;
+    Float const vely2 = (myx * velx1 + myy * vely1 + myz * velz1) * invDet;
+    Float const velz2 = (mzx * velx1 + mzy * vely1 + mzz * velz1) * invDet;
+
+    // 2nd half push of the electric field / Update particle velocity
+    p.v[0] = velx2 + coef1 * pEx;
+    p.v[1] = vely2 + coef1 * pEy;
+    p.v[2] = velz2 + coef1 * pEz;
+}
+
+
+} // namespace PHARE::core::boris
+
+
 namespace PHARE::core
 {
-class BorisException : public DictionaryException
-{
-};
+
+
 
 
 template<std::size_t dim, typename ParticleRange, typename Electromag, typename Interpolator,
@@ -27,17 +127,6 @@ template<std::size_t dim, typename ParticleRange, typename Electromag, typename 
 class BorisPusher
     : public Pusher<dim, ParticleRange, Electromag, Interpolator, BoundaryCondition, GridLayout>
 {
-    struct MoveTwoCellException : std::exception
-    {
-        MoveTwoCellException(double const d, double const v)
-            : delta{d}
-            , vel{v}
-        {
-        }
-
-        double delta, vel;
-    };
-
 public:
     using Super
         = Pusher<dim, ParticleRange, Electromag, Interpolator, BoundaryCondition, GridLayout>;
@@ -116,7 +205,7 @@ public:
             //  get electromagnetic fields interpolated on the particles of rangeOut stop at newEnd.
             //  get the particle velocity from t=n to t=n+1
             auto const& local_em = interpolator(currPart, emFields, layout);
-            accelerate_(currPart, local_em, dto2m);
+            boris::accelerate(currPart, local_em, dto2m);
 
             // now advance the particles from t=n+1/2 to t=n+1 using v_{n+1} just calculated
             // and get a pointer to the first leaving particle
@@ -165,7 +254,7 @@ private:
                 = partIn.delta[iDim] + static_cast<double>(halfDtOverDl_[iDim] * partIn.v[iDim]);
 
             if (std::abs(delta) > 2)
-                throw MoveTwoCellException{delta, partIn.v[iDim]};
+                throw boris::MoveTwoCellException{delta, partIn.v[iDim]};
 
             auto const iCell = static_cast<int>(std::floor(delta));
 
@@ -208,7 +297,7 @@ private:
                 if (newCell != inParticles[inIdx].iCell)
                     outParticles.change_icell(newCell, outIdx);
             }
-            catch (MoveTwoCellException const& e)
+            catch (boris::MoveTwoCellException const& e)
             {
                 std::stringstream ss;
                 ss << "PrePush Particle moved 2 cells with delta/vel: ";
@@ -228,7 +317,7 @@ private:
             if (newCell != particles[idx].iCell)
                 particles.change_icell(newCell, idx);
         }
-        catch (MoveTwoCellException const& e)
+        catch (boris::MoveTwoCellException const& e)
         {
             std::stringstream ss;
             ss << "PostPush Particle moved 2 cells with delta/vel: ";
@@ -236,73 +325,6 @@ private:
             throw DictionaryException{}("cause", ss.str());
         }
     }
-
-
-    /** Accelerate the particles in rangeIn and put the new velocity in rangeOut
-     */
-    template<typename Particle_t, typename ParticleEB>
-    void accelerate_(Particle_t& part, ParticleEB const& particleEB, double const& dto2m)
-    {
-        auto& [pE, pB]        = particleEB;
-        auto& [pEx, pEy, pEz] = pE;
-        auto& [pBx, pBy, pBz] = pB;
-
-
-        double const coef1 = part.charge * dto2m;
-
-        // We now apply the 3 steps of the BORIS PUSHER
-
-        // 1st half push of the electric field
-        double velx1 = part.v[0] + coef1 * pEx;
-        double vely1 = part.v[1] + coef1 * pEy;
-        double velz1 = part.v[2] + coef1 * pEz;
-
-
-        // preparing variables for magnetic rotation
-        double const rx = coef1 * pBx;
-        double const ry = coef1 * pBy;
-        double const rz = coef1 * pBz;
-
-        double const rx2  = rx * rx;
-        double const ry2  = ry * ry;
-        double const rz2  = rz * rz;
-        double const rxry = rx * ry;
-        double const rxrz = rx * rz;
-        double const ryrz = ry * rz;
-
-        double const invDet = 1. / (1. + rx2 + ry2 + rz2);
-
-        // preparing rotation matrix due to the magnetic field
-        // m = invDet*(I + r*r - r x I) - I where x denotes the cross product
-        double const mxx = 1. + rx2 - ry2 - rz2;
-        double const mxy = 2. * (rxry + rz);
-        double const mxz = 2. * (rxrz - ry);
-
-        double const myx = 2. * (rxry - rz);
-        double const myy = 1. + ry2 - rx2 - rz2;
-        double const myz = 2. * (ryrz + rx);
-
-        double const mzx = 2. * (rxrz + ry);
-        double const mzy = 2. * (ryrz - rx);
-        double const mzz = 1. + rz2 - rx2 - ry2;
-
-        // magnetic rotation
-        double const velx2 = (mxx * velx1 + mxy * vely1 + mxz * velz1) * invDet;
-        double const vely2 = (myx * velx1 + myy * vely1 + myz * velz1) * invDet;
-        double const velz2 = (mzx * velx1 + mzy * vely1 + mzz * velz1) * invDet;
-
-
-        // 2nd half push of the electric field
-        velx1 = velx2 + coef1 * pEx;
-        vely1 = vely2 + coef1 * pEy;
-        velz1 = velz2 + coef1 * pEz;
-
-        // Update particle velocity
-        part.v[0] = velx1;
-        part.v[1] = vely1;
-        part.v[2] = velz1;
-    }
-
 
 
 

@@ -34,7 +34,7 @@ NO_DISCARD auto cellAsPoint(Particle const& particle)
 }
 
 
-template<size_t dim>
+template<std::size_t dim>
 struct Particle
 {
     static_assert(dim > 0 and dim < 4, "Only dimensions 1,2,3 are supported.");

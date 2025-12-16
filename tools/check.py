@@ -1,4 +1,6 @@
-#!/usr/bin/env python3
+#
+#
+
 
 import subprocess
 import numpy as np
@@ -20,21 +22,26 @@ cpp = cpp_lib()
 
 cells = (200, 100)
 time_step = 0.005
-final_time = .01
-timestamps = [0, final_time/2,final_time]
+final_time = 0.01
+timestamps = [0, final_time / 2, final_time]
+
 
 def _run(s):
     args = s.split(" ")
-    result = subprocess.run(args, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True)
+    result = subprocess.run(
+        args, stdout=subprocess.PIPE, stderr=subprocess.PIPE, universal_newlines=True
+    )
     if result.returncode > 0:
         raise RuntimeError("subprocess error:", result.stderr)
     return result.stdout.strip()
 
+
 commit_hash = _run("git rev-parse --short HEAD")
 commit_date = _run("git log --no-show-signature -1 --format=%cI")
 
-diag_dir = f"phare_outputs/harris/4/{commit_date}_{commit_hash}"
+diag_dir = f"phare_outputs/harris/new/{commit_date}_{commit_hash}"
 # diag_dir = "phare_outputs/harris"
+
 
 def config():
     L = 0.5
@@ -151,12 +158,19 @@ def config():
 
     for quantity in ["E", "B"]:
         ph.ElectromagDiagnostics(quantity=quantity, write_timestamps=timestamps)
+
     # for quantity in ["mass_density", "bulkVelocity"]:
     #     ph.FluidDiagnostics(quantity=quantity, write_timestamps=timestamps)
     # for quantity in ["density", "pressure_tensor"]:
     #     ph.FluidDiagnostics(
     #         quantity=quantity, write_timestamps=timestamps, population_name="protons"
     #     )
+
+    for quantity in ["domain", "levelGhost"]:
+        ph.ParticleDiagnostics(
+            quantity=quantity, write_timestamps=timestamps, population_name="protons"
+        )
+
     ph.InfoDiagnostics(quantity="particle_count")
     ph.LoadBalancer(active=True, auto=True, mode="nppc", tol=0.05)
 
@@ -168,47 +182,54 @@ def box_as_filename_string(box):
     U = [str(v) for v in box.upper]
     return f"L{"_".join(L)}_U{"_".join(U)}"
 
+
 def plot_file_for_qty(plot_dir, qty, time, extra=""):
     return f"{plot_dir}/harris_t{"{:.10f}".format(time)}_{qty}_{extra}.png"
+
 
 def plot_time(run, time, diag_dir, plot_dir, **kwargs):
     qty = "Ey"
     hier = run.GetE(time, all_primal=False)
 
     for ilvl, lvl in hier.levels(time).items():
-        hier.plot(filename=plot_file_for_qty(
-                                plot_dir, qty, time, f"L{ilvl}"
-                            ),
-                            plot_patches=True,
-                            # vmin=0,
-                            # vmax=+1e-16,
-                            # vmin=-2,
-                            # vmax=2,
-                            qty=qty,
-                            levels=(ilvl,),
-                            dpi=1000,
-                        )
+        hier.plot(
+            filename=plot_file_for_qty(plot_dir, qty, time, f"L{ilvl}"),
+            plot_patches=True,
+            # vmin=0,
+            # vmax=+1e-16,
+            # vmin=-2,
+            # vmax=2,
+            qty=qty,
+            levels=(ilvl,),
+            dpi=1000,
+        )
 
     hier = (list(hier.time_hier.values()))[0]
 
-    for patch in hier[1]:
-        if patch.box.lower[0] != 0:
-            continue
-        print("patch.box", patch.box)
-        fig, ax = plt.subplots()
-        pdat = patch.patch_datas[qty]
-        layout = pdat.layout
-        im = ax.pcolormesh(
-            layout.yeeCoordsFor(qty, "x", withGhosts=True),
-            layout.yeeCoordsFor(qty, "y", withGhosts=True),
-            pdat.dataset[:].T,
-            cmap=kwargs.get("cmap", "Spectral_r"),
-            vmin=kwargs.get("vmin", np.min(pdat.dataset) - 1e-6),
-            vmax=kwargs.get("vmax", np.max(pdat.dataset) + 1e-6),
-        )
-        plt.colorbar(im, ax=ax)
-        fig.savefig(plot_file_for_qty(plot_dir, qty, time, f"L1_{box_as_filename_string(patch.box)}"), dpi=kwargs.get("dpi", 200))
-        # return
+    if 1 in hier:
+        for patch in hier[1]:
+            if patch.box.lower[0] != 0:
+                continue
+            print("patch.box", patch.box)
+            fig, ax = plt.subplots()
+            pdat = patch.patch_datas[qty]
+            layout = pdat.layout
+            im = ax.pcolormesh(
+                layout.yeeCoordsFor(qty, "x", withGhosts=True),
+                layout.yeeCoordsFor(qty, "y", withGhosts=True),
+                pdat.dataset[:].T,
+                cmap=kwargs.get("cmap", "Spectral_r"),
+                vmin=kwargs.get("vmin", np.min(pdat.dataset) - 1e-6),
+                vmax=kwargs.get("vmax", np.max(pdat.dataset) + 1e-6),
+            )
+            plt.colorbar(im, ax=ax)
+            fig.savefig(
+                plot_file_for_qty(
+                    plot_dir, qty, time, f"L1_{box_as_filename_string(patch.box)}"
+                ),
+                dpi=kwargs.get("dpi", 200),
+            )
+            # return
 
 
 def plot(diag_dir, plot_dir, **kwargs):
@@ -216,8 +237,6 @@ def plot(diag_dir, plot_dir, **kwargs):
 
     for time in run.all_times()["B"]:
         plot_time(run, time, diag_dir, plot_dir)
-
-
 
 
 class HarrisTest(SimulatorTest):

@@ -261,39 +261,6 @@ struct boxes_iterator
 
 
 
-/** this overload of isIn takes a Point and a Container of boxes
- * and returns true if the Point is at least in one of the boxes.
- * Returns occurs at the first box the point is in.
- */
-template<typename Point, typename BoxContainer, is_iterable<BoxContainer> = dummy::value>
-bool isIn(Point const& point, BoxContainer const& boxes)
-{
-    if (boxes.size() == 0)
-        return false;
-
-
-    static_assert(std::is_same<typename Point::value_type,
-                               typename BoxContainer::value_type::value_type>::value,
-                  "Box and Point should have the same data type");
-
-
-    auto isIn1D = [](typename Point::value_type pos, typename Point::value_type lower,
-                     typename Point::value_type upper) { return pos >= lower && pos <= upper; };
-
-    for (auto const& box : boxes)
-    {
-        bool pointInBox = true;
-
-        for (auto iDim = 0u; iDim < Point::dimension; ++iDim)
-        {
-            pointInBox = pointInBox && isIn1D(point[iDim], box.lower[iDim], box.upper[iDim]);
-        }
-        if (pointInBox)
-            return pointInBox;
-    }
-
-    return false;
-}
 
 template<typename Particle, typename Type>
 NO_DISCARD auto isIn(Particle const& particle, Box<Type, Particle::dimension> const& box)
@@ -302,11 +269,13 @@ NO_DISCARD auto isIn(Particle const& particle, Box<Type, Particle::dimension> co
     return isIn(particle.iCell, box);
 }
 
+
+
 /** This overload of isIn does the same as the one above but takes only
  * one box.
  */
-template<template<typename, std::size_t> typename Point, typename Type, std::size_t SIZE>
-NO_DISCARD bool isIn(Point<Type, SIZE> const& point, Box<Type, SIZE> const& box)
+template<template<typename, std::size_t> typename Point_t, typename Type, std::size_t SIZE>
+NO_DISCARD bool isIn(Point_t<Type, SIZE> const& point, Box<Type, SIZE> const& box)
 {
     auto isIn1D = [](auto const pos, auto const lower, auto const upper) {
         return pos >= lower && pos <= upper;
@@ -323,6 +292,33 @@ NO_DISCARD bool isIn(Point<Type, SIZE> const& point, Box<Type, SIZE> const& box)
 }
 
 
+/** this overload of isIn takes a Point and a Container of boxes
+ * and returns true if the Point is at least in one of the boxes.
+ * Returns occurs at the first box the point is in.
+ */
+template<template<typename, std::size_t> typename ICell, typename T, std::size_t S,
+         typename BoxContainer, is_iterable<BoxContainer> = dummy::value>
+bool isIn(ICell<T, S> const& icell, BoxContainer const& boxes)
+{
+    if (boxes.size() == 0)
+        return false;
+
+    auto constexpr isIn1D = [](auto const& pos, auto const& lower, auto const& upper) {
+        return pos >= lower && pos <= upper;
+    };
+
+    for (auto const& box : boxes)
+    {
+        bool pointInBox = true;
+
+        for (auto iDim = 0u; iDim < S; ++iDim)
+            pointInBox = pointInBox && isIn1D(icell[iDim], box.lower[iDim], box.upper[iDim]);
+        if (pointInBox)
+            return pointInBox;
+    }
+
+    return false;
+}
 
 
 template<typename Type, std::size_t dim, typename OType>

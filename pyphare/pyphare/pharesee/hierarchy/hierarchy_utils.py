@@ -599,6 +599,7 @@ def _compute_scalardiv(patch_datas, **kwargs):
 
 @dataclass
 class EqualityReport:
+    atol: float
     failed: List[Tuple[str, Any, Any]] = field(default_factory=lambda: [])
 
     def __bool__(self):
@@ -609,10 +610,13 @@ class EqualityReport:
             print(msg)
             try:
                 if type(ref) is FieldData:
-                    phut.assert_fp_any_all_close(ref[:], cmp[:], atol=1e-16)
+                    phut.assert_fp_any_all_close(
+                        ref[ref.box], cmp[ref.box], atol=self.atol
+                    )
             except AssertionError as e:
                 print(e)
-        return self.failed[0][0]
+
+        return self.failed[0][0] if self.failed else "=="
 
     def __call__(self, reason, ref=None, cmp=None):
         self.failed.append((reason, ref, cmp))
@@ -692,7 +696,7 @@ def diff_hierarchy(hier, domain_only=False):
 
 
 def hierarchy_compare(this, that, atol=1e-16):
-    eqr = EqualityReport()
+    eqr = EqualityReport(atol)
 
     if not isinstance(this, PatchHierarchy) or not isinstance(that, PatchHierarchy):
         return eqr("class type mismatch")
