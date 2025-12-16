@@ -2,15 +2,16 @@
 #define PHARE_CORE_UTILITIES_BOX_BOX_HPP
 
 
+#include "core/def.hpp"
 #include "core/utilities/types.hpp"
 #include "core/utilities/point/point.hpp"
 #include "core/utilities/meta/meta_utilities.hpp"
-#include "core/def.hpp"
 
+#include <tuple>
 #include <cstddef>
-#include <algorithm>
 #include <optional>
 #include <iostream>
+#include <algorithm>
 
 namespace PHARE::core
 {
@@ -26,6 +27,7 @@ template<typename Type, std::size_t dim>
 struct Box
 {
     using value_type                = Type;
+    using iterator                  = box_iterator<Type, dim>;
     static constexpr auto dimension = dim;
 
 
@@ -93,11 +95,12 @@ struct Box
         return *this;
     }
 
+
+    NO_DISCARD auto shape(std::size_t const i) const { return upper[i] - lower[i] + 1; }
     NO_DISCARD auto shape() const { return upper - lower + 1; }
-    NO_DISCARD auto size() const { return core::product(shape()); }
+    NO_DISCARD auto size() const { return core::product(shape(), std::size_t{1}); }
 
 
-    using iterator = box_iterator<Type, dim>;
     NO_DISCARD auto begin() { return iterator{this, lower}; }
 
     //   // since the 1D scan of the multidimensional box is done assuming C ordering
@@ -188,6 +191,7 @@ public:
         return *this;
     }
 
+
     bool operator!=(box_iterator const& other) const
     {
         return box_ != other.box_ or index_ != other.index_;
@@ -203,41 +207,60 @@ private:
 template<typename T, std::size_t s>
 Box(Point<T, s> lower, Point<T, s> upper) -> Box<T, s>;
 
-
-
-/** this overload of isIn takes a Point and a Container of boxes
- * and returns true if the Point is at least in one of the boxes.
- * Returns occurs at the first box the point is in.
- */
-template<typename Point, typename BoxContainer, is_iterable<BoxContainer> = dummy::value>
-bool isIn(Point const& point, BoxContainer const& boxes)
+template<typename... Boxes>
+struct boxes_iterator
 {
-    if (boxes.size() == 0)
-        return false;
+    auto constexpr static N = sizeof...(Boxes);
 
-
-    static_assert(std::is_same<typename Point::value_type,
-                               typename BoxContainer::value_type::value_type>::value,
-                  "Box and Point should have the same data type");
-
-
-    auto isIn1D = [](typename Point::value_type pos, typename Point::value_type lower,
-                     typename Point::value_type upper) { return pos >= lower && pos <= upper; };
-
-    for (auto const& box : boxes)
+    boxes_iterator(Boxes const&... boxes)
+        : boxes{std::forward_as_tuple(boxes...)}
     {
-        bool pointInBox = true;
-
-        for (auto iDim = 0u; iDim < Point::dimension; ++iDim)
-        {
-            pointInBox = pointInBox && isIn1D(point[iDim], box.lower[iDim], box.upper[iDim]);
-        }
-        if (pointInBox)
-            return pointInBox;
     }
 
-    return false;
-}
+    struct iterator
+    {
+        using Tuple_t = std::tuple<typename Boxes::iterator...>;
+        static_assert(N == std::tuple_size_v<Tuple_t>);
+
+        iterator(std::tuple<typename Boxes::iterator...> iterators)
+            : its{iterators}
+        {
+        }
+
+        void operator++()
+        {
+            for_N<N>([&](auto i) { ++std::get<i>(its); });
+        }
+
+        auto operator*()
+        {
+            return for_N<N>([&](auto i) { return *std::get<i>(its); });
+        }
+
+        auto operator!=(iterator const& that) const
+        {
+            return for_N_any<N>([&](auto i) { return std::get<i>(its) != std::get<i>(that.its); });
+        }
+
+        Tuple_t its;
+    };
+
+
+
+    auto begin()
+    {
+        return iterator{for_N<N>([&](auto i) { return std::get<i>(boxes).begin(); })};
+    }
+    auto end()
+    {
+        return iterator{for_N<N>([&](auto i) { return std::get<i>(boxes).end(); })};
+    }
+
+    std::tuple<Boxes...> boxes;
+};
+
+
+
 
 template<typename Particle, typename Type>
 NO_DISCARD auto isIn(Particle const& particle, Box<Type, Particle::dimension> const& box)
@@ -246,11 +269,13 @@ NO_DISCARD auto isIn(Particle const& particle, Box<Type, Particle::dimension> co
     return isIn(particle.iCell, box);
 }
 
+
+
 /** This overload of isIn does the same as the one above but takes only
  * one box.
  */
-template<template<typename, std::size_t> typename Point, typename Type, std::size_t SIZE>
-NO_DISCARD bool isIn(Point<Type, SIZE> const& point, Box<Type, SIZE> const& box)
+template<template<typename, std::size_t> typename Point_t, typename Type, std::size_t SIZE>
+NO_DISCARD bool isIn(Point_t<Type, SIZE> const& point, Box<Type, SIZE> const& box)
 {
     auto isIn1D = [](auto const pos, auto const lower, auto const upper) {
         return pos >= lower && pos <= upper;
@@ -266,6 +291,34 @@ NO_DISCARD bool isIn(Point<Type, SIZE> const& point, Box<Type, SIZE> const& box)
     return false;
 }
 
+
+/** this overload of isIn takes a Point and a Container of boxes
+ * and returns true if the Point is at least in one of the boxes.
+ * Returns occurs at the first box the point is in.
+ */
+template<template<typename, std::size_t> typename ICell, typename T, std::size_t S,
+         typename BoxContainer, is_iterable<BoxContainer> = dummy::value>
+bool isIn(ICell<T, S> const& icell, BoxContainer const& boxes)
+{
+    if (boxes.size() == 0)
+        return false;
+
+    auto constexpr isIn1D = [](auto const& pos, auto const& lower, auto const& upper) {
+        return pos >= lower && pos <= upper;
+    };
+
+    for (auto const& box : boxes)
+    {
+        bool pointInBox = true;
+
+        for (auto iDim = 0u; iDim < S; ++iDim)
+            pointInBox = pointInBox && isIn1D(icell[iDim], box.lower[iDim], box.upper[iDim]);
+        if (pointInBox)
+            return pointInBox;
+    }
+
+    return false;
+}
 
 
 template<typename Type, std::size_t dim, typename OType>

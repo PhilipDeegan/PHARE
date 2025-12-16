@@ -405,8 +405,9 @@ def check_patch_size(ndim, **kwargs):
     small_invalid_patch_size = phare_utilities.np_array_ify(max_ghosts, ndim)
     largest_patch_size = kwargs.get("largest_patch_size", None)
 
-    # to prevent primal ghost overlaps of non adjacent patches, we need smallest_patch_size+=1
-    smallest_patch_size = phare_utilities.np_array_ify(max_ghosts, ndim) + 1
+    # to prevent primal ghost overlaps of non adjacent patches, we need smallest_patch_size * 2 + 1
+    min_per_dim = [6, 9, 9]  # # phare_utilities.np_array_ify(max_ghosts, ndim) * 2 + 1
+    smallest_patch_size = phare_utilities.np_array_ify(min_per_dim[ndim - 1], ndim)
     if "smallest_patch_size" in kwargs and kwargs["smallest_patch_size"] is not None:
         smallest_patch_size = phare_utilities.np_array_ify(
             kwargs["smallest_patch_size"], ndim
@@ -481,7 +482,7 @@ def check_directory(directory, key):
 # diag_options = {"format":"phareh5", "options": {"dir": "phare_ouputs/"}}
 def check_diag_options(**kwargs):
     diag_options = kwargs.get("diag_options", None)
-    formats = ["phareh5"]
+    formats = ["phareh5", "pharevtkhdf"]
     if diag_options is not None and "format" in diag_options:
         if diag_options["format"] not in formats:
             raise ValueError("Error - diag_options format is invalid")
@@ -510,9 +511,10 @@ def check_restart_options(**kwargs):
         "restart_time",  # number or "auto"
         "keep_last",  # delete obsolete
     ]
-    restart_options = kwargs.get("restart_options", None)
 
-    if restart_options is not None:
+    restart_options = kwargs.get("restart_options", {})
+
+    if "restart_options" in kwargs:
         for key in restart_options.keys():
             if key not in valid_keys:
                 raise ValueError(
@@ -532,8 +534,8 @@ def check_restart_options(**kwargs):
                 f"Invalid restart mode {mode}, valid modes are {valid_modes}"
             )
 
-        if restart_time := restarts.restart_time(restart_options):
-            restart_options["restart_time"] = restart_time
+        if "restart_time" in restart_options:
+            restart_options["restart_time"] = restarts.restart_time(restart_options)
 
     return restart_options
 
@@ -629,7 +631,7 @@ def check_clustering(**kwargs):
 
 
 def checker(func):
-    def wrapper(simulation_object, **kwargs):
+    def wrapper(simulation_object, **kwargs_in):
         accepted_keywords = [
             "domain_size",
             "cells",
@@ -663,6 +665,7 @@ def checker(func):
             "write_reports",
         ]
 
+        kwargs = deepcopy(dict(**kwargs_in))  # local copy - dictionaries are weird
         accepted_keywords += check_optional_keywords(**kwargs)
 
         wrong_kwds = phare_utilities.not_in_keywords_list(accepted_keywords, **kwargs)
@@ -681,6 +684,8 @@ def checker(func):
 
         kwargs["clustering"] = check_clustering(**kwargs)
 
+        kwargs["restart_options"] = check_restart_options(**kwargs)
+
         time_step_nbr, time_step, final_time = check_time(**kwargs)
         kwargs["time_step_nbr"] = time_step_nbr
         kwargs["time_step"] = time_step
@@ -695,7 +700,6 @@ def checker(func):
 
         ndim = compute_dimension(cells)
         kwargs["diag_options"] = check_diag_options(**kwargs)
-        kwargs["restart_options"] = check_restart_options(**kwargs)
 
         kwargs["boundary_types"] = check_boundaries(ndim, **kwargs)
 
@@ -999,9 +1003,9 @@ class Simulation(object):
         return 0
 
     def is_from_restart(self):
-        return (
-            self.restart_options is not None and "restart_time" in self.restart_options
-        )
+        if self.restart_options is not None and "restart_time" in self.restart_options:
+            return self.restart_options["restart_time"] > 0
+        return False
 
     def __getattr__(
         self, name

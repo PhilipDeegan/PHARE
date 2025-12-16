@@ -1,18 +1,16 @@
 #ifndef PHARE_CORE_DATA_PARTICLES_PARTICLE_HPP
 #define PHARE_CORE_DATA_PARTICLES_PARTICLE_HPP
 
-#include <array>
-#include <random>
-#include <iomanip>
-#include <iostream>
-#include <algorithm>
-#include <type_traits>
-#include <iostream>
 
 #include "core/def.hpp"
 #include "core/utilities/point/point.hpp"
-#include "core/utilities/span.hpp"
-#include "core/utilities/types.hpp"
+
+
+#include <array>
+#include <random>
+#include <iostream>
+#include <algorithm>
+#include <type_traits>
 
 
 namespace PHARE::core
@@ -36,7 +34,7 @@ NO_DISCARD auto cellAsPoint(Particle const& particle)
 }
 
 
-template<size_t dim>
+template<std::size_t dim>
 struct Particle
 {
     static_assert(dim > 0 and dim < 4, "Only dimensions 1,2,3 are supported.");
@@ -57,9 +55,10 @@ struct Particle
     double weight = 0;
     double charge = 0;
 
-    std::array<int, dim> iCell    = ConstArray<int, dim>();
-    std::array<double, dim> delta = ConstArray<double, dim>();
-    std::array<double, 3> v       = ConstArray<double, 3>();
+    // {} zero initialization
+    std::array<int, dim> iCell{};
+    std::array<double, dim> delta{};
+    std::array<double, 3> v{};
 
     NO_DISCARD bool operator==(Particle<dim> const& that) const
     {

@@ -32,10 +32,10 @@ public:
 
     using Box               = PHARE::core::Box<int, dimension>;
     using Interpolator      = PHARE::core::Interpolator<dimension, interp_order>;
-    using VecField          = typename Ions::vecfield_type;
-    using ParticleArray     = typename Ions::particle_array_type;
-    using Particle_t        = typename ParticleArray::Particle_t;
-    using PartIterator      = typename ParticleArray::iterator;
+    using VecField          = Ions::vecfield_type;
+    using ParticleArray     = Ions::particle_array_type;
+    using Particle_t        = ParticleArray::Particle_t;
+    using PartIterator      = ParticleArray::iterator;
     using ParticleRange     = IndexRange<ParticleArray>;
     using BoundaryCondition = PHARE::core::BoundaryCondition<dimension, interp_order>;
     using Pusher = PHARE::core::Pusher<dimension, ParticleRange, Electromag, Interpolator,
@@ -121,6 +121,7 @@ struct UpdaterSelectionBoxing
 {
     auto constexpr static partGhostWidth = GridLayout::nbrParticleGhosts();
     using GridLayout_t                   = GridLayout;
+    using Particle_t                     = IonUpdater_t::Particle_t;
     using Box_t                          = IonUpdater_t::Box;
     using Selector_t                     = IonUpdater_t::Pusher::ParticleSelector;
 
@@ -130,6 +131,10 @@ struct UpdaterSelectionBoxing
     Box_t const ghostBox  = grow(domainBox, partGhostWidth);
 
     Selector_t const noop = [](auto& particleRange) { return particleRange; };
+
+    bool isInGhostBox(Particle_t& p) const { return isIn(p, ghostBox); };
+    bool isInDomainBox(Particle_t& p) const { return isIn(p, domainBox); };
+    bool isInNonLevelGhostBox(auto const& icell) const { return isIn(icell, nonLevelGhostBox); };
 
     // lambda copy captures to detach from above references in case of class copy construct
     Selector_t const inDomainBox = [domainBox = domainBox](auto& particleRange) {
@@ -155,6 +160,11 @@ struct UpdaterSelectionBoxing
                   return isIn(cell, ghostBox) and !isIn(cell, domainBox);
               });
           };
+
+    Selector_t const outsideGhostBox = [ghostBox = ghostBox](auto& particleRange) {
+        return particleRange.array().partition(
+            particleRange, [&](auto const& cell) { return !isIn(cell, ghostBox); });
+    };
 };
 
 /**
@@ -247,6 +257,24 @@ void IonUpdater<Ions, Electromag, GridLayout>::updateAndDepositAll_(Ions& ions,
         auto& patchGhost = pop.patchGhostParticles();
         patchGhost.reserve(patchGhost.size() + not_level_ghosts.size());
         std::copy(not_level_ghosts.begin(), not_level_ghosts.end(), std::back_inserter(patchGhost));
+
+        // TORM or make optional?
+        {
+            auto const outsideGhostBox = boxing.outsideGhostBox(now_ghosts);
+            for (auto const& particle : outsideGhostBox)
+            {
+                PHARE_LOG_LINE_SS(particle);
+                auto const nearbyBox = grow(Box(particle.iCell, particle.iCell), 3);
+                for (auto const& xyz : em.E)
+                    if (auto const overlap = nearbyBox * layout.AMRGhostBoxFor(xyz))
+                        for (auto const [bix, lix] : layout.amr_lcl_idx(*overlap))
+                        {
+                            PHARE_LOG_LINE_SS(xyz.name() << " at:" << bix << ":" << xyz(lix));
+                        }
+            }
+            if (outsideGhostBox.size())
+                throw core::DictionaryException{}("ID", "Updater::outsideGhostBox");
+        } // TORM
 
         domainParticles.erase(now_ghosts); // drop all ghosts
 

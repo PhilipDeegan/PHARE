@@ -200,8 +200,12 @@ def is_root_lvl(patch_level):
     return patch_level.level_number == 0
 
 
-def quantidic(ilvl, wrangler):
-    pl = wrangler.getPatchLevel(ilvl)
+def quantidic_mhd(ilvl, wrangler):
+    raise RuntimeError("todo")
+
+
+def quantidic_hybrid(ilvl, wrangler):
+    pl = wrangler.getHybridPatchLevel(ilvl)
 
     return {
         "density": pl.getDensity,
@@ -221,6 +225,15 @@ def quantidic(ilvl, wrangler):
     }
 
 
+def quantidic(ilvl, wrangler, model="Hybrid"):
+    assert model in ["Hybrid", "MHD"]
+
+    if model == "MHD":
+        return quantidic_mhd(ilvl, wrangler)
+
+    return quantidic_hybrid(ilvl, wrangler)
+
+
 def isFieldQty(qty):
     return qty in (
         "density",
@@ -233,6 +246,9 @@ def isFieldQty(qty):
         "EM_E_x",
         "EM_E_y",
         "EM_E_z",
+        "Vi_x",
+        "Vi_y",
+        "Vi_z",
         "flux_x",
         "flux_y",
         "flux_z",
@@ -583,6 +599,7 @@ def _compute_scalardiv(patch_datas, **kwargs):
 
 @dataclass
 class EqualityReport:
+    atol: float
     failed: List[Tuple[str, Any, Any]] = field(default_factory=lambda: [])
 
     def __bool__(self):
@@ -593,10 +610,13 @@ class EqualityReport:
             print(msg)
             try:
                 if type(ref) is FieldData:
-                    phut.assert_fp_any_all_close(ref[:], cmp[:], atol=1e-16)
+                    phut.assert_fp_any_all_close(
+                        ref[ref.box], cmp[ref.box], atol=self.atol
+                    )
             except AssertionError as e:
                 print(e)
-        return self.failed[0][0]
+
+        return self.failed[0][0] if self.failed else "=="
 
     def __call__(self, reason, ref=None, cmp=None):
         self.failed.append((reason, ref, cmp))
@@ -612,8 +632,71 @@ class EqualityReport:
         return reversed(self.failed)
 
 
+def diff_hierarchy(hier, domain_only=False):
+    import pyphare.core.box as boxm
+    from pyphare.pharesee.geometry import hierarchy_overlaps
+
+    diff_hier = hier.zeros_like()
+    time = list(diff_hier.time_hier.keys())[0]
+
+    def diff_patch_for(box, ilvl):
+        for patch in diff_hier.time_hier[time][ilvl]:
+            if patch.box == box:
+                return patch
+        raise RuntimeError("Patch not found")
+
+    found = 0
+    for ilvl, overlaps in hierarchy_overlaps(hier, time).items():
+        for overlap in overlaps:
+            pd1, pd2 = overlap["pdatas"]
+            ovrlp_box = overlap["box"]
+            offsets = overlap["offset"]
+            patch0, patch1 = overlap["patches"]
+            name = overlap["name"]
+
+            box_pd1 = boxm.amr_to_local(
+                ovrlp_box, boxm.shift(pd1.ghost_box, offsets[0])
+            )
+            box_pd2 = boxm.amr_to_local(
+                ovrlp_box, boxm.shift(pd2.ghost_box, offsets[1])
+            )
+
+            slice1 = boxm.select(pd1.dataset, box_pd1)
+            slice2 = boxm.select(pd2.dataset, box_pd2)
+
+            diff = np.abs(slice1 - slice2)
+
+            diff_patch0 = diff_patch_for(patch0.box, ilvl)
+            diff_patch1 = diff_patch_for(patch1.box, ilvl)
+
+            diff_data0 = diff_patch0.patch_datas[name].dataset
+            diff_data1 = diff_patch1.patch_datas[name].dataset
+
+            dif0 = boxm.select(diff_data0, box_pd1)
+            dif1 = boxm.select(diff_data1, box_pd2)
+
+            if len(np.nonzero(diff)[0]):
+                boxm.DataSelector(diff_data0)[box_pd1] = np.maximum(dif0, diff)
+                boxm.DataSelector(diff_data1)[box_pd2] = np.maximum(dif1, diff)
+
+                assert len(np.nonzero(diff_patch0.patch_datas[name].dataset)[0])
+                assert len(np.nonzero(diff_patch1.patch_datas[name].dataset)[0])
+                found = 1
+
+    if found:
+        assert diff_hier.has_non_zero()
+        if domain_only:
+            for ilvl, lvl in diff_hier.time_hier[time].items():
+                for patch in lvl:
+                    for key, pd in patch.patch_datas.items():
+                        pd.dataset = pd[patch.box]
+                        assert np.array(pd.dataset.shape).all(), f"{pd.dataset.shape}"
+
+    return diff_hier
+
+
 def hierarchy_compare(this, that, atol=1e-16):
-    eqr = EqualityReport()
+    eqr = EqualityReport(atol)
 
     if not isinstance(this, PatchHierarchy) or not isinstance(that, PatchHierarchy):
         return eqr("class type mismatch")
