@@ -137,6 +137,6 @@ python3 tools/python3/phloping.py print_variance_across -f ".phare/timings/rank.
  DiagnosticsManager::dump 2218 2054245
 ```
 
-Here each line prints the standard deviation for the scope start time, and run time for all ranks. <br />
+Here each line prints the standard deviation for the scope start time, and run time for all ranks, in nanoseconds <br />
 This feature only works if there is a constant number of scope calls across all ranks. <br />
 i.e. there are no patch based loop stack logs which would likely vary across ranks.
