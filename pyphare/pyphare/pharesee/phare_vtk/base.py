@@ -48,6 +48,7 @@ def all_times_in(reader):
         raise RuntimeError("VTK Error: cannot get times from file")
 
     times = info.Get(time_key)
+
     return times
 
 

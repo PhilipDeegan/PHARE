@@ -20,8 +20,10 @@ cells = (40, 80, 20)
 dl = (0.4, 0.4, 0.4)
 diag_dir = "phare_outputs/harris_3d"
 time_step = 0.002
-final_time = 0.004
-timestamps = [0, final_time / 2, final_time]  # np.arange(start_time, 11, .002)
+final_time = 1.0
+timestamps = [0, final_time / 2, final_time]
+# timestamps = np.arange(start_time, final_time + time_step, 0.002)
+print("timestamps", timestamps)
 
 hs = hour_seconds = 3600.0
 elapsed_restart_timestamps = [
@@ -46,7 +48,7 @@ def config():
         dl=dl,
         cells=cells,
         refinement="tagging",
-        max_nbr_levels=3,
+        max_nbr_levels=2,
         nesting_buffer=1,
         tagging_threshold=0.5,
         hyper_resistivity=0.008,
