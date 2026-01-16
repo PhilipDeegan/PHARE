@@ -117,7 +117,6 @@ class H5TypeWriter : public PHARE::diagnostic::TypeWriter
     auto static inline const level_data_path
         = [](auto const ilvl) { return level_base + std::to_string(ilvl) + "/PointData/data"; };
 
-
 public:
     static constexpr auto dimension = Writer::dimension;
 

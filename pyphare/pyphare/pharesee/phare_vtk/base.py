@@ -5,6 +5,16 @@
 import vtk
 
 
+class Phase:
+    def __init__(self, λ, *args, **kwargs):
+        self.λ = λ
+        self.args = args
+        self.kwargs = {**kwargs}
+
+    def __call__(self, *args, **kwargs):
+        self.λ(*args, *self.args, **kwargs, **self.kwargs)
+
+
 class PhaseOutput:
     def __init__(self, **kwargs):
         self.kwargs = {**kwargs}
@@ -48,6 +58,7 @@ def all_times_in(reader):
         raise RuntimeError("VTK Error: cannot get times from file")
 
     times = info.Get(time_key)
+
     return times
 
 

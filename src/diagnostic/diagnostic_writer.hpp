@@ -4,7 +4,6 @@
 #include "diagnostic_props.hpp"
 
 
-
 namespace PHARE::diagnostic
 {
 class TypeWriter

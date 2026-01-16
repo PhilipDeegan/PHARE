@@ -7,7 +7,7 @@
 
 #include "amr/physical_models/mhd_model.hpp"
 #include "amr/physical_models/hybrid_model.hpp"
-#include "amr/messengers/field_sum_transaction.hpp"
+#include "amr/messengers/field_operate_transaction.hpp"
 #include "amr/data/field/field_variable_fill_pattern.hpp"
 
 #include "dict.hpp"
@@ -141,16 +141,6 @@ public:
     }
 
 
-    // auto localLevelBoxes(auto const ilvl)
-    // {
-    //     std::vector<core::Box<int, dimension>> boxes;
-    //     auto const& lvl = *hierarchy_.getPatchLevel(ilvl);
-    //     boxes.reserve(lvl.getLocalNumberOfPatches());
-    //     visitHierarchy(
-    //         [&](auto& layout, auto const&, auto const) { boxes.emplace_back(layout.AMRBox()); },
-    //         ilvl, ilvl);
-    //     return boxes;
-    // }
 
     auto& tmpField() { return tmpField_; }
     auto& tmpVecField() { return tmpVec_; }
@@ -200,12 +190,14 @@ protected:
     {
         auto& getOrCreateSchedule(auto& hierarchy, int const ilvl)
         {
+            using PlusEqualsOp = core::PlusEquals<typename VecField::value_type>;
             if (not MTschedules.count(ilvl))
                 MTschedules.try_emplace(
-                    ilvl, MTalgo->createSchedule(
-                              hierarchy.getPatchLevel(ilvl), 0,
-                              std::make_shared<
-                                  amr::FieldBorderSumTransactionFactory<TensorFieldData_t>>()));
+                    ilvl,
+                    MTalgo->createSchedule(
+                        hierarchy.getPatchLevel(ilvl), 0,
+                        std::make_shared<amr::FieldBorderOpTransactionFactory<TensorFieldData_t,
+                                                                              PlusEqualsOp>>()));
             return *MTschedules[ilvl];
         }
 
