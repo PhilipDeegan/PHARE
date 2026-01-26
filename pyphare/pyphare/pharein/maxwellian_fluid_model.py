@@ -189,6 +189,8 @@ class MaxwellianFluidModel(object):
 
     def validate(self, sim, atol=1e-15):
         phare_utilities.debug_print(f"validating dim={sim.ndim}")
+        if sim.strict == "very":
+            atol = 0
         if sim.ndim == 1:
             self.validate1d(sim, atol)
         elif sim.ndim == 2:

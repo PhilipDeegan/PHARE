@@ -489,6 +489,7 @@ class PatchHierarchy(object):
         if not isinstance(linestyles, dict):
             linestyles = dict(zip(usr_lvls, linestyles))
 
+        im = None
         for lvl_nbr, lvl in self.levels(time).items():
             if lvl_nbr not in usr_lvls:
                 continue
@@ -545,6 +546,9 @@ class PatchHierarchy(object):
 
         divider = make_axes_locatable(ax)
         cax = divider.append_axes("right", size="5%", pad=0.08)
+        if not im:
+            print("No level found to plot")
+            return None, None
         plt.colorbar(im, ax=ax, cax=cax)
 
         if kwargs.get("legend", None) is not None:
