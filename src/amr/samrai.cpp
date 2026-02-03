@@ -16,7 +16,7 @@ SamraiLifeCycle::SamraiLifeCycle(int argc, char** argv)
     SAMRAI::tbox::Logger::getInstance()->setWarningAppender(appender);
     PHARE_WITH_PHLOP( //
         if (auto e = core::get_env("PHARE_SCOPE_TIMING", "false"); e == "1" || e == "true")
-            phlop::ScopeTimerMan::INSTANCE()
+            phlop::threaded::ScopeTimerMan::INSTANCE()
                 .file_name(".phare/timings/rank." + std::to_string(core::mpi::rank()) + ".txt")
                 .init(); //
     )
@@ -32,7 +32,6 @@ SamraiLifeCycle::~SamraiLifeCycle()
 
 void SamraiLifeCycle::reset()
 {
-    PHARE_WITH_PHLOP(phlop::ScopeTimerMan::reset());
     PHARE::initializer::PHAREDictHandler::INSTANCE().stop();
     SAMRAI::tbox::SAMRAIManager::shutdown();
     SAMRAI::tbox::SAMRAIManager::startup();
