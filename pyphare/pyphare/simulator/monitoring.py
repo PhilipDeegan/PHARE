@@ -5,6 +5,7 @@
 import os
 from pathlib import Path
 
+from pyphare import cpp
 from pyphare.logger import getLogger
 
 logger = getLogger(__name__)
@@ -54,6 +55,7 @@ def monitoring_shutdown(cpplib):
         return
 
     if _globals.stats_man:
+        cpp.mpi_barrier()  # stats consistency across ranks
         _globals.stats_man.kill().join()
 
 

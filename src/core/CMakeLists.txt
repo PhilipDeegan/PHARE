@@ -58,13 +58,13 @@ set( SOURCES_CPP
 
 set( CORE_EXTRA_SOURCES_CPP )
 if (withPhlop)
-  set( CORE_EXTRA_SOURCES_CPP ${PHARE_PROJECT_DIR}/subprojects/phlop/src/phlop/timing/scope_timer.cpp )
+  set( CORE_EXTRA_SOURCES_CPP ${PHARE_PROJECT_DIR}/subprojects/phlop/src/phlop/timing/threaded_scope_timer.cpp )
 endif(withPhlop)
 
 add_library(${PROJECT_NAME}  ${SOURCES_INC} ${SOURCES_CPP} ${CORE_EXTRA_SOURCES_CPP} )
 target_compile_options(${PROJECT_NAME}  PRIVATE ${PHARE_WERROR_FLAGS})
-target_link_libraries(${PROJECT_NAME}  PRIVATE phare_initializer MPI::MPI_C cppdict
-    PUBLIC ${PHARE_BASE_LIBS}
+target_link_libraries(${PROJECT_NAME}  PRIVATE phare_initializer MPI::MPI_C
+    PUBLIC ${PHARE_BASE_LIBS} cppdict magic_enum
   )
 
 # skip mpicxx in compile command if not configured with configurator
