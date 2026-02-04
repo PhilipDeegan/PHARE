@@ -44,6 +44,52 @@ concept IsTensorField = requires(T tf, T const ctf, T const& crtf, Component com
     { ctf.componentNames() } -> std::same_as<std::array<std::string, T::size()> const&>;
     { ctf.physicalQuantity() } -> std::same_as<typename T::tensor_t const&>;
 };
+
+template<typename ScalarOrTensorFieldT, bool is_scalar>
+struct PhysicalQuantityTypeSelector;
+
+template<typename ScalarOrTensorFieldT>
+struct PhysicalQuantityTypeSelector<ScalarOrTensorFieldT, true>
+{
+    using type = ScalarOrTensorFieldT::physical_quantity_type;
+};
+
+template<typename ScalarOrTensorFieldT>
+struct PhysicalQuantityTypeSelector<ScalarOrTensorFieldT, false>
+{
+    using type = ScalarOrTensorFieldT::tensor_t;
+};
+
+template<typename ScalarOrTensorFieldT, bool is_scalar>
+struct FieldTypeSelector;
+
+template<typename ScalarOrTensorFieldT>
+struct FieldTypeSelector<ScalarOrTensorFieldT, true>
+{
+    using type = ScalarOrTensorFieldT;
+};
+
+template<typename ScalarOrTensorFieldT>
+struct FieldTypeSelector<ScalarOrTensorFieldT, false>
+{
+    using type = ScalarOrTensorFieldT::field_type;
+};
+
 } // namespace PHARE::core
+
+template<typename ScalarOrTensorFieldT, bool is_scalar>
+struct NumberOfComponentsSelector;
+
+template<typename ScalarOrTensorFieldT>
+struct NumberOfComponentsSelector<ScalarOrTensorFieldT, true>
+{
+    static constexpr size_t value = 1;
+};
+
+template<typename ScalarOrTensorFieldT>
+struct NumberOfComponentsSelector<ScalarOrTensorFieldT, false>
+{
+    static constexpr size_t value = ScalarOrTensorFieldT::size();
+};
 
 #endif // PHARE_CORE_DATA_TENSOR_FIELD_TRAITS

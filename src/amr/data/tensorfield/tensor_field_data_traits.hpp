@@ -72,6 +72,20 @@ namespace amr
         using type = ScalarOrTensorFieldDataT::Geometry::FieldGeometry_t;
     };
 
+    template<typename ScalarOrTensorFieldDataT, bool is_scalar>
+    struct ScalarOrTensorFieldSelector;
+
+    template<typename ScalarOrTensorFieldDataT>
+    struct ScalarOrTensorFieldSelector<ScalarOrTensorFieldDataT, true>
+    {
+        using type = ScalarOrTensorFieldDataT::grid_type::field_type;
+    };
+
+    template<typename ScalarOrTensorFieldDataT>
+    struct ScalarOrTensorFieldSelector<ScalarOrTensorFieldDataT, false>
+    {
+        using type = ScalarOrTensorFieldDataT::tensor_field_type;
+    };
 
 } // namespace amr
 } // namespace PHARE

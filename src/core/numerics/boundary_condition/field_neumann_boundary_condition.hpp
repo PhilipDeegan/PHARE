@@ -1,26 +1,34 @@
 #ifndef PHARE_CORE_NUMERICS_BOUNDARY_CONDITION_FIELD_NEUMANN_BOUNDARY_CONDITION_HPP
 #define PHARE_CORE_NUMERICS_BOUNDARY_CONDITION_FIELD_NEUMANN_BOUNDARY_CONDITION_HPP
 
+#include "core/data/grid/gridlayoutdefs.hpp"
 #include "core/numerics/boundary_condition/field_boundary_condition_dispatcher.hpp"
+
+#include <cstddef>
+#include <tuple>
 
 namespace PHARE::core
 {
-template<IsField FieldT, IsGridLayout GridLayoutT>
+template<typename ScalarOrTensorFieldT, typename GridLayoutT>
 class FieldNeumannBoundaryCondition
-    : public FieldBoundaryConditionDispatcher<FieldT, GridLayoutT,
-                                              FieldNeumannBoundaryCondition<FieldT, GridLayoutT>>
+    : public FieldBoundaryConditionDispatcher<
+          ScalarOrTensorFieldT, GridLayoutT,
+          FieldNeumannBoundaryCondition<ScalarOrTensorFieldT, GridLayoutT>>
 {
 public:
-    using PhysicalQuantityT = FieldT::physical_quantity_type;
-    using Super
-        = FieldBoundaryConditionDispatcher<FieldT, GridLayoutT,
-                                           FieldNeumannBoundaryCondition<FieldT, GridLayoutT>>;
+    using Super = FieldBoundaryConditionDispatcher<
+        ScalarOrTensorFieldT, GridLayoutT,
+        FieldNeumannBoundaryCondition<ScalarOrTensorFieldT, GridLayoutT>>;
+    using physical_quantity_type = Super::physical_quantity_type;
+    using field_type             = Super::field_type;
 
-    using Super::dimension;
+    static constexpr size_t dimension = Super::dimension;
+    static constexpr size_t N         = Super::N;
+    static constexpr bool is_scalar   = Super::is_scalar;
 
     FieldNeumannBoundaryCondition() = delete;
     FieldNeumannBoundaryCondition(BdryLoc::Type const& location,
-                                  PhysicalQuantityT const& physicalQuantity)
+                                  physical_quantity_type const& physicalQuantity)
         : Super(location, physicalQuantity)
     {
     } //
@@ -32,22 +40,40 @@ public:
 
     virtual ~FieldNeumannBoundaryCondition() = default;
 
-    template<Direction direction, Side side, QtyCentering centering>
-    void apply_specialized(FieldT& field, Box<std::uint32_t, dimension> const& localGhostBox,
+    template<Direction direction, Side side, QtyCentering... Centerings>
+    void apply_specialized(ScalarOrTensorFieldT& scalarOrTensorField,
+                           Box<std::uint32_t, dimension> const& localGhostBox,
                            GridLayoutT const& gridLayout, double const time)
     {
         using Index = Point<std::uint32_t, dimension>;
 
-        Index physicalLimitIndex = (side == Side::LOWER) ? gridLayout.physicalStartIndex(centering)
-                                                         : gridLayout.physicalEndIndex(centering);
-        for (Index const& index : localGhostBox)
-        {
-            Index mirrorIndex = boundary_mirrored<dimension, direction, side, centering>(
-                index, physicalLimitIndex);
-            field(index) = field(mirrorIndex);
-        };
+        constexpr std::array<QtyCentering, N> centerings = {Centerings...};
+
+        // no other way than using a lambda builder
+        auto fields = [&]() {
+            if constexpr (is_scalar)
+                return std::make_tuple(scalarOrTensorField);
+            else
+                return scalarOrTensorField.components();
+        }();
+
+        for_N<N>([&](auto i) {
+            constexpr QtyCentering centering = centerings[i];
+            field_type& field                = std::get<i>(fields);
+            auto fieldBox = gridLayout.toFieldBox(localGhostBox, field.physicalQuantity());
+            Index physicalLimitIndex = (side == Side::LOWER)
+                                           ? gridLayout.physicalStartIndex(centering)
+                                           : gridLayout.physicalEndIndex(centering);
+            for (Index const& index : fieldBox)
+            {
+                Index mirrorIndex = boundary_mirrored<dimension, direction, side, centering>(
+                    index, physicalLimitIndex);
+                field(index) = field(mirrorIndex);
+            }
+        });
     }
-};
+}; // class FieldNeumannBoundaryCondition
 
 } // namespace PHARE::core
+
 #endif // PHARE_CORE_NUMERICS_BOUNDARY_CONDITION_FIELD_NEUMANN_BOUNDARY_CONDITION_HPP

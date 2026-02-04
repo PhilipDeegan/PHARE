@@ -928,6 +928,25 @@ namespace core
         }
 
         /**
+         * @brief toFieldBox takes a local cell-centered box and creates a box
+         * that is adequate for the specified quantity. The layout is used to know
+         * the centering, nbr of ghosts of the specified quantity.
+         *
+         */
+        NO_DISCARD Box<std::uint32_t, dimension> toFieldBox(Box<std::uint32_t, dimension> box,
+                                                            Quantity::Scalar qty) const
+        {
+            auto const centerings = centering(qty);
+            core::for_N<dimension>([&](auto i) {
+                auto const is_primal = (centerings[i] == core::QtyCentering::primal) ? 1 : 0;
+                box.upper[i]         = box.upper[i] + is_primal;
+            } //
+            );
+
+            return box;
+        }
+
+        /**
          * @brief momentsToEx return the indexes and associated coef to compute the linear
          * interpolation necessary to project moments onto Ex.
          */

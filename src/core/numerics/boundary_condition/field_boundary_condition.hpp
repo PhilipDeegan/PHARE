@@ -3,6 +3,7 @@
 
 #include "core/boundary/boundary_defs.hpp"
 #include "core/data/field/field_traits.hpp"
+#include "core/data/tensorfield/tensorfield_traits.hpp"
 #include "core/data/grid/gridlayout_traits.hpp"
 #include "core/utilities/box/box.hpp"
 
@@ -11,24 +12,36 @@
 
 namespace PHARE::core
 {
-template<IsField FieldT, IsGridLayout GridLayoutT>
+/**
+ * @brief Interface for applying boundary conditions to (tensor) fields.
+ *        This class provides a common interface for both Fields and TensorFields.
+ * @tparam ScalarOrTensorFieldT The type of the field (must satisfy IsField or IsTensorField).
+ * @tparam GridLayoutT The layout type of the grid (must satisfy IsGridLayout).
+ */
+template<typename ScalarOrTensorFieldT, IsGridLayout GridLayoutT>
+    requires(IsField<ScalarOrTensorFieldT> || IsTensorField<ScalarOrTensorFieldT>)
 class IFieldBoundaryCondition
 {
 public:
-    static constexpr std::size_t dimension = GridLayoutT::dimension;
-    using PhysicalQuantityT                = FieldT::physical_quantity_type;
+    /// Boolean flag indicating if the field is a scalar.
+    static constexpr bool is_scalar   = IsField<ScalarOrTensorFieldT>;
+    static constexpr size_t dimension = GridLayoutT::dimension;
+    static constexpr size_t N = NumberOfComponentsSelector<ScalarOrTensorFieldT, is_scalar>::value;
 
-    static_assert(std::is_same_v<PhysicalQuantityT, typename GridLayoutT::Quantity::Scalar>);
+    using physical_quantity_type
+        = PhysicalQuantityTypeSelector<ScalarOrTensorFieldT, is_scalar>::type;
+    using field_type = FieldTypeSelector<ScalarOrTensorFieldT, is_scalar>::type;
 
-    virtual void apply(FieldT& field, Box<std::uint32_t, dimension> const& localGhostBox,
+    virtual void apply(ScalarOrTensorFieldT& field,
+                       Box<std::uint32_t, dimension> const& localGhostBox,
                        GridLayoutT const& gridLayout, double const& time)
         = 0;
 
-    virtual BdryLoc::Type getLocation() const             = 0;
-    virtual Direction getDirection() const                = 0;
-    virtual Side getSide() const                          = 0;
-    virtual PhysicalQuantityT getPhysicalQuantity() const = 0;
-    virtual QtyCentering getQtyCentering() const          = 0;
+    virtual BdryLoc::Type getLocation() const                    = 0;
+    virtual Direction getDirection() const                       = 0;
+    virtual Side getSide() const                                 = 0;
+    virtual physical_quantity_type getPhysicalQuantity() const   = 0;
+    virtual std::array<QtyCentering, N> getQtyCenterings() const = 0;
 
     virtual ~IFieldBoundaryCondition() = default;
 };

@@ -3,6 +3,7 @@
 
 #include "core/def.hpp"
 #include "core/def/phare_mpi.hpp" // IWYU pragma: keep
+#include "core/mhd/mhd_quantities.hpp"
 #include "core/models/mhd_state.hpp"
 #include "core/boundary/boundary_manager.hpp"
 
@@ -13,6 +14,7 @@
 #include <SAMRAI/hier/PatchLevel.h>
 
 #include <initializer_list>
+#include <span>
 #include <string>
 #include <string_view>
 
@@ -36,7 +38,8 @@ public:
     using gridlayout_type        = GridLayoutT;
     using grid_type              = Grid_t;
     using resources_manager_type = amr::ResourcesManager<gridlayout_type, Grid_t>;
-    using boundary_manager_type  = core::BoundaryManager<field_type, gridlayout_type>;
+    using boundary_manager_type
+        = core::BoundaryManager<core::MHDQuantity, field_type, gridlayout_type>;
 
     static constexpr std::string_view model_type_name = "MHDModel";
     static inline std::string const model_name{model_type_name};
@@ -76,19 +79,34 @@ public:
         resourcesManager->registerResources(V_diag_);
         resourcesManager->registerResources(P_diag_);
         // this is really ugly
-        std::initializer_list<core::MHDQuantity::Scalar> quantities
-            = {core::MHDQuantity::Scalar::rho,          core::MHDQuantity::Scalar::Vx,
-               core::MHDQuantity::Scalar::Vy,           core::MHDQuantity::Scalar::Vz,
-               core::MHDQuantity::Scalar::Bx,           core::MHDQuantity::Scalar::By,
-               core::MHDQuantity::Scalar::Bz,           core::MHDQuantity::Scalar::P,
-               core::MHDQuantity::Scalar::rhoVx,        core::MHDQuantity::Scalar::rhoVy,
-               core::MHDQuantity::Scalar::rhoVz,        core::MHDQuantity::Scalar::Etot,
-               core::MHDQuantity::Scalar::Ex,           core::MHDQuantity::Scalar::Ey,
-               core::MHDQuantity::Scalar::Ez,           core::MHDQuantity::Scalar::Jx,
-               core::MHDQuantity::Scalar::Jy,           core::MHDQuantity::Scalar::Jz,
-               core::MHDQuantity::Scalar::ScalarFlux_x, core::MHDQuantity::Scalar::VecFluxX_x,
-               core::MHDQuantity::Scalar::VecFluxY_x,   core::MHDQuantity::Scalar::VecFluxZ_x};
-        boundaryManager = std::make_shared<boundary_manager_type>(dict, quantities);
+        std::vector<core::MHDQuantity::Scalar> scalarQuantities
+            = {core::MHDQuantity::Scalar::rho, core::MHDQuantity::Scalar::Etot};
+        auto vectorQuantities = [&]() {
+            if constexpr (dimension == 1)
+            {
+                return std::vector<core::MHDQuantity::Vector>{
+                    core::MHDQuantity::Vector::B, core::MHDQuantity::Vector::J,
+                    core::MHDQuantity::Vector::E, core::MHDQuantity::Vector::rhoV,
+                    core::MHDQuantity::Vector::VecFlux_x};
+            }
+            else if constexpr (dimension == 2)
+            {
+                return std::vector<core::MHDQuantity::Vector>{
+                    core::MHDQuantity::Vector::B,         core::MHDQuantity::Vector::J,
+                    core::MHDQuantity::Vector::E,         core::MHDQuantity::Vector::rhoV,
+                    core::MHDQuantity::Vector::VecFlux_x, core::MHDQuantity::Vector::VecFlux_y};
+            }
+            else
+            {
+                std::vector<core::MHDQuantity::Vector>{
+                    core::MHDQuantity::Vector::B,         core::MHDQuantity::Vector::J,
+                    core::MHDQuantity::Vector::E,         core::MHDQuantity::Vector::rhoV,
+                    core::MHDQuantity::Vector::VecFlux_x, core::MHDQuantity::Vector::VecFlux_y,
+                    core::MHDQuantity::Vector::VecFlux_z};
+            };
+        }();
+        boundaryManager
+            = std::make_shared<boundary_manager_type>(dict, scalarQuantities, vectorQuantities);
     }
 
     ~MHDModel() override = default;
