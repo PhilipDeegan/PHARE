@@ -932,7 +932,9 @@ namespace core
          * that is adequate for the specified quantity. The layout is used to know
          * the centering, nbr of ghosts of the specified quantity.
          *
-         */
+         * @see FieldGeometry::toFieldBox
+         *
+         * */
         NO_DISCARD Box<std::uint32_t, dimension> toFieldBox(Box<std::uint32_t, dimension> box,
                                                             Quantity::Scalar qty) const
         {

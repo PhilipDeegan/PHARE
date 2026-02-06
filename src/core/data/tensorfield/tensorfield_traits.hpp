@@ -9,20 +9,22 @@
 
 namespace PHARE::core
 {
+/**
+ * @brief Define the requirements for a tensor field type.
+ *
+ * @see TensorField
+ */
 template<typename T>
 concept IsTensorField = requires(T tf, T const ctf, T const& crtf, Component component, size_t i) {
-    // public type aliases
     requires IsField<typename T::field_type>;
     typename T::value_type;
     typename T::tensor_t;
 
-    // public static variables
     requires std::same_as<decltype(T::dimension), std::size_t const>;
     requires std::same_as<decltype(T::rank), std::size_t const>;
     { T::size() } -> std::convertible_to<std::size_t>;
     requires std::bool_constant<(T::size() >= 0)>::value;
 
-    // API
     { tf.name() } -> std::same_as<std::string const&>;
     { tf.getComponent(component) } -> std::same_as<typename T::field_type&>;
     { ctf.getComponent(component) } -> std::same_as<typename T::field_type const&>;
@@ -45,51 +47,63 @@ concept IsTensorField = requires(T tf, T const ctf, T const& crtf, Component com
     { ctf.physicalQuantity() } -> std::same_as<typename T::tensor_t const&>;
 };
 
+
+/**
+ * @brief Select the physical quantity type based on tensoriality.
+ */
 template<typename ScalarOrTensorFieldT, bool is_scalar>
 struct PhysicalQuantityTypeSelector;
-
+/** @brief Specialization for scalar fields */
 template<typename ScalarOrTensorFieldT>
 struct PhysicalQuantityTypeSelector<ScalarOrTensorFieldT, true>
 {
     using type = ScalarOrTensorFieldT::physical_quantity_type;
 };
-
+/** @brief Specialization for tensor fields */
 template<typename ScalarOrTensorFieldT>
 struct PhysicalQuantityTypeSelector<ScalarOrTensorFieldT, false>
 {
     using type = ScalarOrTensorFieldT::tensor_t;
 };
 
+
+/**
+ * @brief Select the underlying field type based on tensoriality.
+ */
 template<typename ScalarOrTensorFieldT, bool is_scalar>
 struct FieldTypeSelector;
-
+/** @brief Specialization for scalar fields */
 template<typename ScalarOrTensorFieldT>
 struct FieldTypeSelector<ScalarOrTensorFieldT, true>
 {
     using type = ScalarOrTensorFieldT;
 };
-
+/** @brief Specialization for tensor fields */
 template<typename ScalarOrTensorFieldT>
 struct FieldTypeSelector<ScalarOrTensorFieldT, false>
 {
     using type = ScalarOrTensorFieldT::field_type;
 };
 
-} // namespace PHARE::core
 
+/**
+ * @brief Select the underlying field type based on tensoriality.
+ */
 template<typename ScalarOrTensorFieldT, bool is_scalar>
 struct NumberOfComponentsSelector;
-
+/** @brief Specialization for scalar fields */
 template<typename ScalarOrTensorFieldT>
 struct NumberOfComponentsSelector<ScalarOrTensorFieldT, true>
 {
     static constexpr size_t value = 1;
 };
-
+/** @brief Specialization for tensor fields */
 template<typename ScalarOrTensorFieldT>
 struct NumberOfComponentsSelector<ScalarOrTensorFieldT, false>
 {
     static constexpr size_t value = ScalarOrTensorFieldT::size();
 };
+
+} // namespace PHARE::core
 
 #endif // PHARE_CORE_DATA_TENSOR_FIELD_TRAITS

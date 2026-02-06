@@ -27,6 +27,17 @@ using core::dirX;
 using core::dirY;
 using core::dirZ;
 
+/**
+ * @brief Strategy for filling physical boundary conditions and customizing patch refinment.
+ *
+ * This class implements the SAMRAI::xfer::RefinePatchStrategy interface to
+ * specify how physical boundary conditions must be enforced for patches that touch
+ * the domain boundaries. Refinement customization is deferred to child classes.
+ *
+ * @tparam ResMan The resources manager type.
+ * @tparam ScalarOrTensorFieldDataT The data type for fields or tensor fields.
+ * @tparam BoundaryManagerT Manager responsible for providing boundary condition objects.
+ */
 template<typename ResMan, typename ScalarOrTensorFieldDataT, typename BoundaryManagerT>
     requires(IsFieldData<ScalarOrTensorFieldDataT> || IsTensorFieldData<ScalarOrTensorFieldDataT>)
 class FieldRefinePatchStrategy : public SAMRAI::xfer::RefinePatchStrategy
@@ -36,19 +47,27 @@ public:
     static constexpr bool is_tensor = !is_scalar;
 
     using field_geometry_type = FieldGeometrySelector<ScalarOrTensorFieldDataT, is_scalar>::type;
-    using grid_layout_type    = ScalarOrTensorFieldDataT::gridlayout_type;
+    using gridlayout_type     = ScalarOrTensorFieldDataT::gridlayout_type;
     using grid_type           = ScalarOrTensorFieldDataT::grid_type;
     using field_type          = grid_type::field_type;
     using scalar_or_tensor_field_type
         = ScalarOrTensorFieldSelector<ScalarOrTensorFieldDataT, is_scalar>::type;
+
     using patch_geometry_type           = SAMRAI::hier::PatchGeometry;
     using cartesian_patch_geometry_type = SAMRAI::geom::CartesianPatchGeometry;
-    using boundary_condition_type
-        = core::IFieldBoundaryCondition<scalar_or_tensor_field_type, grid_layout_type>;
-    static constexpr std::size_t dimension      = ScalarOrTensorFieldDataT::dimension;
-    static constexpr int boundaries_codimension = 1; // only handle codimension 1 boundaries at
-                                                     ///< the momement
 
+    using boundary_condition_type
+        = core::IFieldBoundaryCondition<scalar_or_tensor_field_type, gridlayout_type>;
+
+    static constexpr std::size_t dimension = ScalarOrTensorFieldDataT::dimension;
+    /// @todo to remove
+    static constexpr int boundaries_codimension = 1;
+
+    /**
+     * @brief Constructor.
+     * @param resources_manager Simulation resources manager.
+     * @param boundary_manager Manager handling boundary conditions.
+     */
     FieldRefinePatchStrategy(ResMan& resourcesManager, BoundaryManagerT& boundaryManager)
         : rm_{resourcesManager}
         , boundaryManager_{boundaryManager}
@@ -56,28 +75,34 @@ public:
     {
     }
 
+    /**
+     * @brief Check that the patch data identifier is registered.
+     */
     void assertIDsSet() const
     {
         assert(data_id_ >= 0 && "FieldRefinePatchStrategy: IDs must be registered before use");
     }
 
+    /**
+     * @brief Register the SAMRAI patch data identifier.
+     * @param field_id Integer ID from the SAMRAI variable database.
+     */
     void registerIDs(int const field_id) { data_id_ = field_id; }
 
+    /**
+     * @brief Apply physical boundary conditions via SAMRAI callback.
+     *
+     * Iterate over patch boundaries that touch a physical domain boundary and apply the appropriate
+     * PHARE boundary condition to ghost regions.
+     *
+     * @param patch The fine patch being refined.
+     * @param fill_time Simulation time for BC application.
+     * @param ghost_width_to_fill Width of ghost cell layer to be filled.
+     */
     void setPhysicalBoundaryConditions(SAMRAI::hier::Patch& patch, double const fill_time,
                                        SAMRAI::hier::IntVector const& ghost_width_to_fill) override
     {
-        // Retrieve the FieldData ...
-        // std::shared_ptr<SAMRAI::hier::PatchData> patchData = patch.getPatchData(data_id_);
-        // if (patchData == nullptr)
-        //     throw std::runtime_error("no patch data for the corresponding id "
-        //                              + std::to_string(data_id_) + " on patch "
-        //                              + std::to_string(patch.getLocalId().getValue()));
-        // std::shared_ptr<ScalarOrTensorFieldDataT> fieldData =
-        // std::dynamic_pointer_cast<ScalarOrTensorFieldDataT>(patchData); if (!fieldData)
-        //     throw std::runtime_error("cannot cast to FieldData");
-
-        // ... to retrieve the gridLayout.
-        grid_layout_type const& gridLayout = ScalarOrTensorFieldDataT::getLayout(patch, data_id_);
+        gridlayout_type const& gridLayout = ScalarOrTensorFieldDataT::getLayout(patch, data_id_);
 
         // consistency check on the number of ghosts
         // SAMRAI::hier::IntVector dataGhostWidths = patchData->getGhostCellWidth();
@@ -126,7 +151,7 @@ public:
     SAMRAI::hier::IntVector
     getRefineOpStencilWidth(SAMRAI::tbox::Dimension const& dim) const override
     {
-        return SAMRAI::hier::IntVector(dim, 1); // hard-coded 0th order base interpolation
+        return SAMRAI::hier::IntVector{dim, 1};
     }
 
 
@@ -144,17 +169,15 @@ public:
     }
 
 
-    static auto isNewFineFace(auto const& amrIdx, auto const dir)
-    {
-        // amr index can be negative so test !=0 and not ==1
-        // to see if this is odd or even
-        return amrIdx[dir] % 2 != 0;
-    }
+    static auto isNewFineFace(auto const& amrIdx, auto const dir) {}
 
 
 protected:
+    /// Reference to the resources manager.
     ResMan& rm_;
+    /// Reference to the boundary manager.
     BoundaryManagerT& boundaryManager_;
+    /// SAMRAI patch data identifier.
     int data_id_;
 };
 

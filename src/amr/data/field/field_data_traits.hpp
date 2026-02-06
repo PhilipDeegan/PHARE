@@ -11,8 +11,6 @@ namespace amr
 {
     /**
      * @brief Concept ensuring a type satisfies the PHARE FieldData interface.
-     * This allows templates like RefineFieldPatchStrategy to accept either
-     * FieldData or TensorFieldData.
      */
     template<typename T>
     concept IsFieldData

@@ -18,7 +18,17 @@
 
 namespace PHARE::core
 {
-
+/**
+ * @brief Manage the lifecycle and retrieval of physical boundary conditions.
+ *
+ * Store and provide access to boundary condition objects for both
+ * scalar and vector fields based on the boundary location and physical quantity.
+ *
+ * @tparam PhysicalQuantityT Type defining scalar and vector quantities (MHDQuantity or
+ * HybridQuantity).
+ * @tparam FieldT The scalar field type.
+ * @tparam GridLayoutT The grid layout type.
+ */
 template<typename PhysicalQuantityT, IsField FieldT, IsGridLayout GridLayoutT>
 class BoundaryManager
 {
@@ -30,6 +40,13 @@ public:
     using vector_condition_type = IFieldBoundaryCondition<vector_field_type, GridLayoutT>;
 
     BoundaryManager() = delete;
+
+    /**
+     * @brief Constructor. Register boundary conditions based on inputfile data.
+     * @param dict Configuration dictionary.
+     * @param scalar_quantities List of scalar quantities to manage.
+     * @param vector_quantities List of vector quantities to manage.
+     */
     BoundaryManager(PHARE::initializer::PHAREDict const& dict,
                     std::vector<typename PhysicalQuantityT::Scalar> const& scalarQuantities,
                     std::vector<typename PhysicalQuantityT::Vector> const& vectorQuantities)
@@ -56,6 +73,13 @@ public:
         };
     }
 
+    /**
+     * @brief Retrieve the boundary condition for a specific location and quantity.
+     * @tparam TensorPhysicalQuantity The type of the quantity (Scalar or Vector).
+     * @param location The physical boundary location.
+     * @param quantity The physical quantity identifier.
+     * @return Shared pointer to the matching boundary condition, or nullptr if not found.
+     */
     template<typename TensorPhysicalQuantity>
     auto getBoundaryCondition(BdryLoc::Type location, TensorPhysicalQuantity quantity) const
     {
@@ -77,6 +101,9 @@ public:
 
 
 private:
+    /**
+     * @brief Internal key used for mapping locations and quantities to conditions.
+     */
     template<typename TensorPhysicalQuantityT>
     struct _Key
     {
@@ -96,7 +123,9 @@ private:
     using _vector_condition_map_type
         = std::map<_vector_key_type, std::shared_ptr<vector_condition_type>>;
 
+    /// Collection of boundary conditions for scalar fields.
     _scalar_condition_map_type scalar_conditions_;
+    /// Collection of boundary conditions for vector fields.
     _vector_condition_map_type vector_conditions_;
 };
 

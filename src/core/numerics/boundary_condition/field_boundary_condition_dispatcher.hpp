@@ -9,7 +9,32 @@
 
 namespace PHARE::core
 {
-
+/**
+ * @brief Intermediate dispatcher for field boundary conditions class, inheriting from @link
+ * PHARE::core::IFieldBoundaryCondition @endlink, and whom concrete implementations must inherit
+ * from.
+ *
+ * Provides a mechanism to dispatch runtime boundary information (location, centering)
+ * to compile-time specialized methods in concrete implementations. It implements the Curious
+ * Recurring Template Pattern so the complicated dispatching code is not duplicated in concrete
+ * implementations of field boundary conditions. Actual implementations are expected to implement
+ * an @c apply_specialized templated function with the following interface:
+ *
+ * @code
+ * template<Direction dir, Side side, QtyCentering... centerings>
+ * void apply_specialized(
+ *      ScalarOrTensorFieldT& field,
+ *      Box<std::uint32_t, dimension> const& local_ghost_box,
+ *      GridLayoutT const& grid_layout,
+ *      double const& time
+ * );
+ * @endcode
+ *
+ * @tparam ScalarOrTensorFieldT Type of field managed.
+ * @tparam GridLayoutT Grid layout configuration.
+ * @tparam Derived The concrete class inheriting from this dispatcher.
+ *
+ */
 template<typename ScalarOrTensorFieldT, IsGridLayout GridLayoutT, typename Derived>
 class FieldBoundaryConditionDispatcher
     : public IFieldBoundaryCondition<ScalarOrTensorFieldT, GridLayoutT>
@@ -23,6 +48,11 @@ public:
     static constexpr bool is_scalar   = Super::is_scalar;
     static constexpr size_t N         = Super::N;
 
+    /**
+     * @brief Construct the dispatcher and initialize centering information.
+     * @param location Boundary location.
+     * @param physical_quantity Physical quantity.
+     */
     FieldBoundaryConditionDispatcher(BdryLoc::Type const& location,
                                      physical_quantity_type const& physicalQuantity)
         : location_{location}
@@ -53,6 +83,13 @@ public:
 
     std::array<QtyCentering, N> getQtyCenterings() const override { return centerings_; };
 
+    /**
+     * @brief Implements the @link PHARE::core::IFieldBoundaryCondition::apply @endlink abstract
+     * function.
+     *
+     * Triggers the recursive dispatching of centerings, directions, and sides to
+     * specialized implementations.
+     */
     void apply(ScalarOrTensorFieldT& field, Box<std::uint32_t, dimension> const& localGhostBox,
                GridLayoutT const& gridLayout, double const& time) override
     {
@@ -60,6 +97,13 @@ public:
     }
 
 protected:
+    /**
+     * @brief Helper that recursively promote runtime centerings, direction and side to compile-time
+     * tags.
+     *
+     * The recursive character of this helper is necessary because we need to promote the centering
+     * of all components of the (tensor) field in the direction normal to the boundary.
+     */
     template<QtyCentering... AlreadyPromoted>
     void dispatch_centerings(ScalarOrTensorFieldT& field,
                              Box<std::uint32_t, dimension> const& localGhostBox,
@@ -67,8 +111,8 @@ protected:
     {
         constexpr size_t nAlreadyPromoted = sizeof...(AlreadyPromoted);
 
-        // base case: all directional centerings have been promoted
         if constexpr (nAlreadyPromoted == N)
+        // base case: all directional centerings have been promoted
         {
             auto d_v = promote<Direction::X, Direction::Y, Direction::Z>(direction_);
             auto s_v = promote<Side::LOWER, Side::UPPER>(side_);
@@ -82,6 +126,8 @@ protected:
                 d_v, s_v);
         }
         else
+        // we grow the list of promoted centerings to call the next recursive version of the
+        // function
         {
             auto c_v
                 = promote<QtyCentering::primal, QtyCentering::dual>(centerings_[nAlreadyPromoted]);

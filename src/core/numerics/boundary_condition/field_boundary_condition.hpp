@@ -13,17 +13,25 @@
 namespace PHARE::core
 {
 /**
- * @brief Interface for applying boundary conditions to (tensor) fields.
- *        This class provides a common interface for both Fields and TensorFields.
- * @tparam ScalarOrTensorFieldT The type of the field (must satisfy IsField or IsTensorField).
- * @tparam GridLayoutT The layout type of the grid (must satisfy IsGridLayout).
+ * @brief Interface for applying boundary conditions to scalar or tensor fields.
+ *
+ * A FieldBoundaryCondition is associated to both a boundary location (XLOWER for instance) and
+ * physical quantity (Scalar Or Tensor). Concrete boundary conditions are provided by
+ * implementations of this interface.
+ *
+ * @tparam ScalarOrTensorFieldT The type of the scalarOrTensorField (must satisfy IsField or
+ * IsTensorField).
+ *
+ * @todo Attaching boundary location and physical quantity to the boundary condition is not actually
+ * necessary: this could be removed by simply adding a @c boundaryLocation arguemnt to the
+ * main method @apply. @tparam GridLayoutT The layout type of the grid (must satisfy IsGridLayout).
+ *
  */
 template<typename ScalarOrTensorFieldT, IsGridLayout GridLayoutT>
     requires(IsField<ScalarOrTensorFieldT> || IsTensorField<ScalarOrTensorFieldT>)
 class IFieldBoundaryCondition
 {
 public:
-    /// Boolean flag indicating if the field is a scalar.
     static constexpr bool is_scalar   = IsField<ScalarOrTensorFieldT>;
     static constexpr size_t dimension = GridLayoutT::dimension;
     static constexpr size_t N = NumberOfComponentsSelector<ScalarOrTensorFieldT, is_scalar>::value;
@@ -32,7 +40,18 @@ public:
         = PhysicalQuantityTypeSelector<ScalarOrTensorFieldT, is_scalar>::type;
     using field_type = FieldTypeSelector<ScalarOrTensorFieldT, is_scalar>::type;
 
-    virtual void apply(ScalarOrTensorFieldT& field,
+    /**
+     * @brief Enforce the boundary condition on the provided scalar/tensor @p scalarOrTensorField,
+     * by filling accordingly the ghost cells contained in the local box @p localGhostBox, at the
+     * physical time @p time.
+     *
+     * @param scalarOrTensorField The scalar or tensor to which we apply the boundary condition.
+     * @param localGhostBox The box containing the ghost cells/nodes to fill.
+     * @param gridLayout The grid layout.
+     * @param time The physical time, useful for time-dependant boundary conditions.
+     *
+     */
+    virtual void apply(ScalarOrTensorFieldT& scalarOrTensorField,
                        Box<std::uint32_t, dimension> const& localGhostBox,
                        GridLayoutT const& gridLayout, double const& time)
         = 0;

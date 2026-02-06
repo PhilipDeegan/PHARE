@@ -9,6 +9,16 @@
 
 namespace PHARE::core
 {
+/**
+ * @brief Neumann boundary condition implementation for fields and tensor fields.
+ *
+ * This class implements a zero-gradient boundary condition by mirroring values
+ * from the physical domain into the ghost regions.
+ *
+ * @tparam ScalarOrTensorFieldT Type of the field or tensor field.
+ * @tparam GridLayoutT Grid layout configuration.
+ *
+ */
 template<typename ScalarOrTensorFieldT, typename GridLayoutT>
 class FieldNeumannBoundaryCondition
     : public FieldBoundaryConditionDispatcher<
@@ -27,6 +37,14 @@ public:
     static constexpr bool is_scalar   = Super::is_scalar;
 
     FieldNeumannBoundaryCondition() = delete;
+
+    /**
+     * @brief Construct the Neumann boundary condition.
+     *
+     * @param location Boundary location.
+     * @param physical_quantity Physical quantity identifier.
+     *
+     */
     FieldNeumannBoundaryCondition(BdryLoc::Type const& location,
                                   physical_quantity_type const& physicalQuantity)
         : Super(location, physicalQuantity)
@@ -40,6 +58,14 @@ public:
 
     virtual ~FieldNeumannBoundaryCondition() = default;
 
+    /**
+     * @brief Apply the Neumann condition using compile-time specialized parameters.
+     *
+     * @tparam direction Normal direction of the boundary.
+     * @tparam side Boundary side (LOWER or UPPER).
+     * @tparam Centerings Component-wise centerings.
+     *
+     */
     template<Direction direction, Side side, QtyCentering... Centerings>
     void apply_specialized(ScalarOrTensorFieldT& scalarOrTensorField,
                            Box<std::uint32_t, dimension> const& localGhostBox,

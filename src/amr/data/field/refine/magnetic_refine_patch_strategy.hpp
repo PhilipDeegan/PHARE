@@ -16,28 +16,46 @@ using core::dirX;
 using core::dirY;
 using core::dirZ;
 
-template<typename ResMan, IsVecFieldData VecFieldDataT, typename BoundaryManagerT>
+/**
+ * @brief Strategy for magnetic field refinement in AMR patches.
+ *
+ * Implement Divergence-Preserving refinement (Toth and Roe, 2002) to
+ * ensure the null divergence property of the magnetic field across refinement levels.
+ *
+ * @tparam ResManT Resource manager type.
+ * @tparam VecFieldDataT Vector field data type.
+ * @tparam BoundaryManagerT Boundary manager type.
+ */
+template<typename ResManT, IsVecFieldData VecFieldDataT, typename BoundaryManagerT>
 class MagneticRefinePatchStrategy
-    : public FieldRefinePatchStrategy<ResMan, VecFieldDataT, BoundaryManagerT>
+    : public FieldRefinePatchStrategy<ResManT, VecFieldDataT, BoundaryManagerT>
 {
 public:
-    using Geometry        = VecFieldDataT::Geometry;
-    using FieldGeometry   = Geometry::FieldGeometry_t;
-    using gridlayout_type = VecFieldDataT::gridlayout_type;
-    using Super           = FieldRefinePatchStrategy<ResMan, VecFieldDataT, BoundaryManagerT>;
+    using geometry_type       = VecFieldDataT::Geometry;
+    using field_geometry_type = geometry_type::FieldGeometry_t;
+    using gridlayout_type     = VecFieldDataT::gridlayout_type;
+    using Super               = FieldRefinePatchStrategy<ResManT, VecFieldDataT, BoundaryManagerT>;
 
     static constexpr size_t dimension = VecFieldDataT::dimension;
     static constexpr size_t N         = VecFieldDataT::N;
 
     using Super::data_id_;
 
-    MagneticRefinePatchStrategy(ResMan& resourcesManager, BoundaryManagerT& boundaryManager)
+    /**
+     * @brief Construct the magnetic refinement strategy.
+     * @param resources_manager Simulation resources manager.
+     * @param boundary_manager Manager handling boundary conditions.
+     */
+    MagneticRefinePatchStrategy(ResManT& resourcesManager, BoundaryManagerT& boundaryManager)
         : Super(resourcesManager, boundaryManager)
     {
     }
-
-    // We compute the values of the new fine magnetic faces using what was already refined, ie
-    // the values on the old coarse faces.
+    /**
+     * @brief Compute fine magnetic face values using refined coarse faces.
+     *
+     * We compute the values of the new fine magnetic faces using what was already refined, ie
+     * the values on the old coarse faces.
+     */
     void postprocessRefine(SAMRAI::hier::Patch& fine, SAMRAI::hier::Patch const& coarse,
                            SAMRAI::hier::Box const& fine_box,
                            SAMRAI::hier::IntVector const& ratio) override
@@ -48,10 +66,11 @@ public:
         auto& [bx, by, bz] = fields;
 
         auto layout        = PHARE::amr::layoutFromPatch<gridlayout_type>(fine);
-        auto fineBoxLayout = Geometry::layoutFromBox(fine_box, layout);
+        auto fineBoxLayout = geometry_type::layoutFromBox(fine_box, layout);
 
         auto const fine_field_box = core::for_N_make_array<N>([&](auto i) {
-            return FieldGeometry::toFieldBox(fine_box, fields[i].physicalQuantity(), fineBoxLayout);
+            return field_geometry_type::toFieldBox(fine_box, fields[i].physicalQuantity(),
+                                                   fineBoxLayout);
         });
 
         if constexpr (dimension == 1)

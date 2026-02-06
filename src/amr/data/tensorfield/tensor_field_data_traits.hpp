@@ -13,8 +13,6 @@ namespace amr
 {
     /**
      * @brief Concept ensuring a type satisfies the PHARE FieldData interface.
-     * This allows templates like RefineFieldPatchStrategy to accept either
-     * FieldData or TensorFieldData.
      */
     template<typename T>
     concept IsTensorFieldData
@@ -47,9 +45,7 @@ namespace amr
     concept IsVecFieldData = IsTensorFieldData<T> && (T::N == 3);
 
     /**
-     * @brief Compile-time utility to select the correct Geometry type based on field data rank.
-     * This meta-function extracts the geometric representation of a field data. It distinguishes
-     * between scalar field data and tensor field data to resolve nested type aliases correctly.
+     * @brief Compile-time utility to select the correct Geometry type.
      * @tparam ScalarOrTensorFieldDataT The data structure representing the field data.
      * @tparam is_scalar Boolean flag; true if the field is a scalar, false if it is a tensor.
      */
@@ -72,15 +68,24 @@ namespace amr
         using type = ScalarOrTensorFieldDataT::Geometry::FieldGeometry_t;
     };
 
+    /**
+     * @brief Compile-time utility to select the Field or TensorField type.
+     * @tparam ScalarOrTensorFieldDataT The data structure representing the field data.
+     * @tparam is_scalar Boolean flag; true if the field is a scalar, false if it is a tensor.
+     */
     template<typename ScalarOrTensorFieldDataT, bool is_scalar>
     struct ScalarOrTensorFieldSelector;
-
+    /**
+     * @brief Specialization for scalar field data
+     */
     template<typename ScalarOrTensorFieldDataT>
     struct ScalarOrTensorFieldSelector<ScalarOrTensorFieldDataT, true>
     {
         using type = ScalarOrTensorFieldDataT::grid_type::field_type;
     };
-
+    /**
+     * @brief Specialization for tensor field data
+     */
     template<typename ScalarOrTensorFieldDataT>
     struct ScalarOrTensorFieldSelector<ScalarOrTensorFieldDataT, false>
     {
