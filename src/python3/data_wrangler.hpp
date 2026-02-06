@@ -72,11 +72,18 @@ public:
     using Simulator   = PHARE::Simulator<opts>;
     using HybridModel = Simulator::HybridModel;
 
+
+    DataWrangler(std::shared_ptr<Simulator> const& simulator,
+                 std::shared_ptr<amr::Hierarchy> const& hierarchy)
+        : simulator_{*simulator}
+        , hierarchy_{hierarchy}
+    {
+    }
+
     DataWrangler(std::shared_ptr<ISimulator> const& simulator,
                  std::shared_ptr<amr::Hierarchy> const& hierarchy)
         : simulator_{cast_simulator(simulator)}
         , hierarchy_{hierarchy}
-
     {
     }
 
@@ -113,15 +120,15 @@ public:
 
     auto sync(std::vector<PatchData<std::vector<double>, dimension>> const& input)
     {
-        int mpi_size = core::mpi::size();
+        auto const mpi_size = core::mpi::size();
         std::vector<PatchData<std::vector<double>, dimension>> collected;
 
-        auto reinterpret_array = [&](auto& py_array) {
+        auto const reinterpret_array = [&](auto& py_array) {
             return reinterpret_cast<std::array<std::size_t, dimension>&>(
                 *static_cast<std::size_t*>(py_array.request().ptr));
         };
 
-        auto collect = [&](PatchData<std::vector<double>, dimension> const& patch_data) {
+        auto const collect = [&](PatchData<std::vector<double>, dimension> const& patch_data) {
             auto patchIDs = core::mpi::collect(patch_data.patchID, mpi_size);
             auto origins  = core::mpi::collect(patch_data.origin, mpi_size);
             auto lower    = core::mpi::collect_raw(makeSpan(patch_data.lower), mpi_size);
@@ -138,7 +145,7 @@ public:
             }
         };
 
-        std::size_t max = core::mpi::max(input.size(), mpi_size);
+        auto const max = core::mpi::max(input.size());
 
         PatchData<std::vector<double>, dimension> empty;
 
@@ -178,7 +185,7 @@ private:
             simDict["dimension"].template to<int>(), simDict["interp_order"].template to<int>(),
             simDict["refined_particle_nbr"].template to<int>(), SimulatorCaster{simulator});
         if (!simulator_ptr)
-            throw std::runtime_error("Data Wranger creation error: failed to cast Simulator");
+            throw std::runtime_error("Data Wrangler creation error: failed to cast Simulator");
 
         return *simulator_ptr;
     }

@@ -314,7 +314,8 @@ namespace solver
             auto level              = hierarchy->getPatchLevel(levelNumber);
 
 
-            PHARE_LOG_LINE_SS("init level " << levelNumber << " with regriding = " << isRegridding);
+            PHARE_LOG_LINE_SS("init level " << levelNumber << " with regriding = " << isRegridding
+                                            << " and initial time = " << initialTime);
 
             PHARE_LOG_START(3, "initializeLevelData::allocate block");
             if (allocateData)
@@ -384,8 +385,7 @@ namespace solver
             // handle samrai restarts / schedule creation
             // allocation of patch datas which may not want to be saved to restart files will
             // likely need to go here somehow https://github.com/PHAREHUB/PHARE/issues/664
-            if (!restartInitialized_
-                and SAMRAI::tbox::RestartManager::getManager()->isFromRestart())
+            if (!restartInitialized_ and SamraiLifeCycle::getRestartManager()->isFromRestart())
             {
                 auto& messenger = getMessengerWithCoarser_(coarsestLevel);
                 for (auto ilvl = coarsestLevel; ilvl <= finestLevel; ++ilvl)

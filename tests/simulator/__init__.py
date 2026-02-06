@@ -1,13 +1,14 @@
 #
 #
 
-import os
 import unittest
 import numpy as np
 from datetime import datetime
 
 import pyphare.pharein as ph
+from pyphare.core.box import Box
 from pyphare.pharein import ElectronModel
+from pyphare.core.box import Box
 
 
 def parse_cli_args(pop_from_sys=True):
@@ -42,7 +43,7 @@ def basicSimulatorArgs(dim: int, interp: int, **kwargs):
 
     _, smallest_patch_size = check_patch_size(dim, interp_order=interp, cells=cells)
     dl = [1.0 / v for v in cells]
-    b0 = [[3] * dim, [8] * dim]
+    b0 = [[3] * dim, [12] * dim]
     args = {
         "interp_order": interp,
         "smallest_patch_size": smallest_patch_size,
@@ -99,12 +100,17 @@ def density_2d_periodic(sim, x, y):
     )
 
 
-# def density_3d_periodic(sim, x, y, z):
-#     xmax, ymax, zmax = sim.simulation_domain()
-#     background_particles = 0.3  # avoids 0 density
-#     xx, yy, zz = meshify(x, y, z)
-#     r = np.exp(-(xx-0.5*xmax)**2)*np.exp(-(yy-ymax/2.)**2)*np.exp(-(zz-zmax/2.)**2) + background_particles
-#     return r
+def density_3d_periodic(sim, x, y, z):
+    xmax, ymax, zmax = sim.simulation_domain()
+    background_particles = 0.3  # avoids 0 density
+    xx, yy, zz = meshify(x, y, z)
+    r = (
+        np.exp(-((xx - 0.5 * xmax) ** 2))
+        * np.exp(-((yy - ymax / 2.0) ** 2))
+        * np.exp(-((zz - zmax / 2.0) ** 2))
+        + background_particles
+    )
+    return r
 
 
 def defaultPopulationSettings(sim, density_fn, vbulk_fn):
@@ -164,6 +170,8 @@ def populate_simulation(dim, interp, **input):
 
 
 def diff_boxes(slice1, slice2, box, atol=None):
+    from pyphare.core.box import Box
+
     if atol is not None:
         ignore = np.isclose(slice1, slice2, atol=atol, rtol=0)
 
@@ -247,20 +255,22 @@ class SimulatorTest(unittest.TestCase):
         super().run(result)
 
     def unique_diag_dir_for_test_case(self, base_path, ndim, interp, post_path=""):
-        from pyphare.cpp import cpp_lib
+        from pyphare import cpp
 
-        cpp = cpp_lib()
-        return f"{base_path}/{self._testMethodName}/{cpp.mpi_size()}/{ndim}/{interp}/{post_path}"
+        base = f"{base_path}/{self._testMethodName}/{cpp.mpi_size()}/{ndim}/{interp}"
+        if post_path:
+            return f"{base}/{post_path}"
+        return base
 
     def clean_up_diags_dirs(self):
-        from pyphare.cpp import cpp_lib
+        from pyphare import cpp
 
-        cpp_lib().mpi_barrier()
-        if cpp_lib().mpi_rank() == 0 and self.success:
+        cpp.mpi_barrier()
+        if cpp.mpi_rank() == 0 and self.success:
             import os
             import shutil
 
             for diag_dir in self.diag_dirs:
                 if os.path.exists(diag_dir):
                     shutil.rmtree(diag_dir)
-        cpp_lib().mpi_barrier()
+        cpp.mpi_barrier()

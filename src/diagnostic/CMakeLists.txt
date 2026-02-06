@@ -17,12 +17,14 @@ if (HighFive)
    ${PROJECT_SOURCE_DIR}/detail/types/electromag.hpp
    ${PROJECT_SOURCE_DIR}/detail/types/fluid.hpp
    ${PROJECT_SOURCE_DIR}/detail/types/meta.hpp
+   ${PROJECT_SOURCE_DIR}/detail/types/mhd.hpp
  )
 endif()
 
 add_library(${PROJECT_NAME} INTERFACE)
+
 target_link_libraries(${PROJECT_NAME} INTERFACE phare_amr)
 
 if (HighFive)
   target_link_libraries(${PROJECT_NAME} INTERFACE HighFive)
-endif()
+endif (HighFive)

@@ -59,6 +59,7 @@ namespace solver
             auto& hybMessenger        = dynamic_cast<HybridMessenger&>(messenger);
             bool const isRegriddingL0 = isRegridding and levelNumber == 0;
 
+            PHARE_LOG_SCOPE(1, "HybridLevelInitializer::initialize_level");
             if (isRegridding)
             {
                 PHARE_LOG_LINE_STR("regriding level " + std::to_string(levelNumber));
@@ -100,7 +101,7 @@ namespace solver
 
             for (auto& patch : rm.enumerate(level, ions))
             {
-                auto layout = amr::layoutFromPatch<GridLayoutT>(*patch);
+                auto const layout = amr::layoutFromPatch<GridLayoutT>(*patch);
                 core::resetMoments(ions);
                 core::depositParticles(ions, layout, interpolate_, core::DomainDeposit{});
             }
@@ -118,7 +119,7 @@ namespace solver
             {
                 if (!isRootLevel(levelNumber))
                 {
-                    auto layout = amr::layoutFromPatch<GridLayoutT>(*patch);
+                    auto const layout = amr::layoutFromPatch<GridLayoutT>(*patch);
                     core::depositParticles(ions, layout, interpolate_, core::LevelGhostDeposit{});
                 }
 
@@ -128,6 +129,7 @@ namespace solver
                 ions.computeChargeDensity();
                 ions.computeBulkVelocity();
             }
+            hybMessenger.fillIonBorders(ions, level, initDataTime);
 
             // on level i>0, this relies on 'prepareStep' having been called on when
             // level i-1 was initialized (at the end of this function)

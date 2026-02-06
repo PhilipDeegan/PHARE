@@ -1,17 +1,18 @@
 import os
+from copy import deepcopy
+
 import numpy as np
 
-from ..core import phare_utilities
-from . import global_vars
 from ..core import box as boxm
+from ..core import phare_utilities
 from ..core.box import Box
-from copy import deepcopy
+from . import global_vars
 
 # ------------------------------------------------------------------------------
 
 
 def supported_dimensions():
-    return [1, 2]
+    return [1, 2, 3]
 
 
 def compute_dimension(cells):
@@ -160,31 +161,35 @@ def check_time(**kwargs):
         and "time_step" not in kwargs
     )
 
+    if not any([final_and_dt, final_and_nsteps, nsteps_and_dt]):
+        raise ValueError(
+            "Error: Specify either 'final_time' and 'time_step' or 'time_step_nbr' and 'time_step'"
+            + " or 'final_time' and 'time_step_nbr'"
+        )
+
     start_time = kwargs.get("restart_options", {}).get("restart_time", 0)
 
+    def _final_time():
+        if "final_time" in kwargs:
+            return kwargs["final_time"]
+        return start_time + kwargs["time_step"] * kwargs["time_step_nbr"]
+
+    final_time = _final_time()
+    total_time = final_time - start_time
+
     if final_and_dt:
-        time_step_nbr = int(kwargs["final_time"] / kwargs["time_step"])
-        time_step = kwargs["final_time"] / time_step_nbr
+        time_step_nbr = int(total_time / kwargs["time_step"])
+        time_step = total_time / time_step_nbr
 
     elif final_and_nsteps:
-        time_step = kwargs["final_time"] / kwargs["time_step_nbr"]
+        time_step = total_time / kwargs["time_step_nbr"]
         time_step_nbr = kwargs["time_step_nbr"]
 
     elif nsteps_and_dt:
         time_step = kwargs["time_step"]
         time_step_nbr = kwargs["time_step_nbr"]
 
-    else:
-        raise ValueError(
-            "Error: Specify either 'final_time' and 'time_step' or 'time_step_nbr' and 'time_step'"
-            + " or 'final_time' and 'time_step_nbr'"
-        )
-
-    return (
-        time_step_nbr,
-        time_step,
-        kwargs.get("final_time", start_time + time_step * time_step_nbr),
-    )
+    return time_step_nbr, time_step, final_time
 
 
 # ------------------------------------------------------------------------------
@@ -405,8 +410,9 @@ def check_patch_size(ndim, **kwargs):
     small_invalid_patch_size = phare_utilities.np_array_ify(max_ghosts, ndim)
     largest_patch_size = kwargs.get("largest_patch_size", None)
 
-    # to prevent primal ghost overlaps of non adjacent patches, we need smallest_patch_size+=1
-    smallest_patch_size = phare_utilities.np_array_ify(max_ghosts, ndim) + 1
+    # to prevent primal ghost overlaps of non adjacent patches, we need smallest_patch_size * 2 + 1
+    min_per_dim = [6, 9, 9]  # # phare_utilities.np_array_ify(max_ghosts, ndim) * 2 + 1
+    smallest_patch_size = phare_utilities.np_array_ify(min_per_dim[ndim - 1], ndim)
     if "smallest_patch_size" in kwargs and kwargs["smallest_patch_size"] is not None:
         smallest_patch_size = phare_utilities.np_array_ify(
             kwargs["smallest_patch_size"], ndim
@@ -481,7 +487,7 @@ def check_directory(directory, key):
 # diag_options = {"format":"phareh5", "options": {"dir": "phare_ouputs/"}}
 def check_diag_options(**kwargs):
     diag_options = kwargs.get("diag_options", None)
-    formats = ["phareh5"]
+    formats = ["phareh5", "pharevtkhdf"]
     if diag_options is not None and "format" in diag_options:
         if diag_options["format"] not in formats:
             raise ValueError("Error - diag_options format is invalid")
@@ -519,9 +525,10 @@ def check_restart_options(**kwargs):
         "restart_time",  # number or "auto"
         "keep_last",  # delete obsolete
     ]
-    restart_options = kwargs.get("restart_options", None)
 
-    if restart_options is not None:
+    restart_options = kwargs.get("restart_options", {})
+
+    if "restart_options" in kwargs:
         for key in restart_options.keys():
             if key not in valid_keys:
                 raise ValueError(
@@ -541,8 +548,8 @@ def check_restart_options(**kwargs):
                 f"Invalid restart mode {mode}, valid modes are {valid_modes}"
             )
 
-        if restart_time := restarts.restart_time(restart_options):
-            restart_options["restart_time"] = restart_time
+        if "restart_time" in restart_options:
+            restart_options["restart_time"] = restarts.restart_time(restart_options)
 
     return restart_options
 
@@ -634,11 +641,60 @@ def check_clustering(**kwargs):
     return clustering
 
 
+def check_max_mhd_level(**kwargs):
+    max_mhd_level = kwargs.get("max_mhd_level", 0)
+
+    if max_mhd_level > kwargs["max_nbr_levels"]:
+        raise ValueError(
+            f"Error: max_mhd_level({max_mhd_level}) should be less or equal to max_nbr_levels({kwargs['max_nbr_levels']})"
+        )
+
+    return max_mhd_level
+
+
+def check_model_options(**kwargs):
+    model_options = phare_utilities.listify(kwargs.get("model_options", "HybridModel"))
+
+    valid_options = {"MHDModel", "HybridModel"}
+
+    if not set(model_options).issubset(valid_options):
+        raise ValueError(
+            f"Invalid model options: {model_options}. Allowed values are {valid_options}."
+        )
+
+    return model_options
+
+
+def check_mhd_constants(**kwargs):
+    gamma = kwargs.get("gamma", 5.0 / 3.0)
+    eta = kwargs.get("eta", 0.0)
+    nu = kwargs.get("nu", 0.0)
+
+    return gamma, eta, nu
+
+
+def check_mhd_terms(**kwargs):
+    hall = kwargs.get("hall", False)
+    res = kwargs.get("res", False)
+    hyper_res = kwargs.get("hyper_res", False)
+
+    return hall, res, hyper_res
+
+
+def check_mhd_parameters(**kwargs):
+    reconstruction = kwargs.get("reconstruction", "")
+    limiter = kwargs.get("limiter", "")
+    riemann = kwargs.get("riemann", "")
+    mhd_timestepper = kwargs.get("mhd_timestepper", "")
+
+    return reconstruction, limiter, riemann, mhd_timestepper
+
+
 # ------------------------------------------------------------------------------
 
 
 def checker(func):
-    def wrapper(simulation_object, **kwargs):
+    def wrapper(simulation_object, **kwargs_in):
         accepted_keywords = [
             "domain_size",
             "cells",
@@ -670,8 +726,21 @@ def checker(func):
             "description",
             "dry_run",
             "write_reports",
+            "max_mhd_level",
+            "model_options",
+            "gamma",
+            "eta",
+            "nu",
+            "hall",
+            "res",
+            "hyper_res",
+            "reconstruction",
+            "limiter",
+            "riemann",
+            "mhd_timestepper",
         ]
 
+        kwargs = deepcopy(dict(**kwargs_in))  # local copy - dictionaries are weird
         accepted_keywords += check_optional_keywords(**kwargs)
 
         wrong_kwds = phare_utilities.not_in_keywords_list(accepted_keywords, **kwargs)
@@ -690,6 +759,8 @@ def checker(func):
 
         kwargs["clustering"] = check_clustering(**kwargs)
 
+        kwargs["restart_options"] = check_restart_options(**kwargs)
+
         time_step_nbr, time_step, final_time = check_time(**kwargs)
         kwargs["time_step_nbr"] = time_step_nbr
         kwargs["time_step"] = time_step
@@ -704,7 +775,6 @@ def checker(func):
 
         ndim = compute_dimension(cells)
         kwargs["diag_options"] = check_diag_options(**kwargs)
-        kwargs["restart_options"] = check_restart_options(**kwargs)
 
         kwargs["boundary_types"] = check_boundaries(ndim, **kwargs)
 
@@ -727,8 +797,10 @@ def checker(func):
                 kwargs["max_nbr_levels"],
             ) = check_refinement_boxes(ndim, **kwargs)
         else:
-            kwargs["max_nbr_levels"] = kwargs.get("max_nbr_levels", None)
-            assert kwargs["max_nbr_levels"] is not None  # this needs setting otherwise
+            if "max_nbr_levels" not in kwargs:
+                print("WARNING, 'max_nbr_levels' is not set, defaulting to 1")
+            kwargs["max_nbr_levels"] = kwargs.get("max_nbr_levels", 1)
+
             kwargs["refinement_boxes"] = None
             kwargs["tagging_threshold"] = kwargs.get("tagging_threshold", 0.1)
 
@@ -744,6 +816,28 @@ def checker(func):
 
         # is per rank, not per node (yet)
         kwargs["write_reports"] = kwargs.get("write_reports", False)
+
+        kwargs["max_mhd_level"] = check_max_mhd_level(**kwargs)
+
+        kwargs["model_options"] = check_model_options(**kwargs)
+
+        gamma, eta, nu = check_mhd_constants(**kwargs)
+        kwargs["gamma"] = gamma
+        kwargs["eta"] = eta
+        kwargs["nu"] = nu
+
+        hall, res, hyper_res = check_mhd_terms(**kwargs)
+        kwargs["hall"] = hall
+        kwargs["res"] = res
+        kwargs["hyper_res"] = hyper_res
+
+        reconstruction, limiter, riemann, mhd_timestepper = check_mhd_parameters(
+            **kwargs
+        )
+        kwargs["reconstruction"] = reconstruction
+        kwargs["limiter"] = limiter
+        kwargs["riemann"] = riemann
+        kwargs["mhd_timestepper"] = mhd_timestepper
 
         return func(simulation_object, **kwargs)
 
@@ -967,7 +1061,9 @@ class Simulation(object):
         self.ndim = compute_dimension(self.cells)
 
         self.diagnostics = {}
-        self.model = None
+        self.uniform_model = None
+        self.maxwellian_fluid_model = None
+        self.mhd_model = None
         self.electrons = None
         self.load_balancer = None
 
@@ -1008,9 +1104,9 @@ class Simulation(object):
         return 0
 
     def is_from_restart(self):
-        return (
-            self.restart_options is not None and "restart_time" in self.restart_options
-        )
+        if self.restart_options is not None and "restart_time" in self.restart_options:
+            return self.restart_options["restart_time"] != None
+        return False
 
     def __getattr__(
         self, name
@@ -1075,12 +1171,26 @@ class Simulation(object):
 
     # ------------------------------------------------------------------------------
 
-    def set_model(self, model):
+    def set_uniform_model(self, mhd_model):
         """
 
         :meta private:
         """
-        self.model = model
+        self.uniform_model = mhd_model
+
+    def set_maxwellian_fluid_model(self, maxwellian_fluid_model):
+        """
+
+        :meta private:
+        """
+        self.maxwellian_fluid_model = maxwellian_fluid_model
+
+    def set_mhd_model(self, mhd_model):
+        """
+
+        :meta private:
+        """
+        self.mhd_model = mhd_model
 
     def set_electrons(self, electrons):
         """
@@ -1099,8 +1209,9 @@ def serialize(sim):
     :meta private:
     """
     # pickle cannot handle simulation objects
-    import dill
     import codecs
+
+    import dill
 
     return codecs.encode(dill.dumps(de_numpify_simulation(deepcopy(sim))), "hex")
 

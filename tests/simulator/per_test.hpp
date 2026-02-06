@@ -1,9 +1,11 @@
 #ifndef PHARE_TEST_SIMULATOR_PER_TEST_HPP
 #define PHARE_TEST_SIMULATOR_PER_TEST_HPP
 
-#include "phare/phare.hpp"
+#include "amr/samrai.hpp"
+#include "simulator/simulator.hpp"
 #include "initializer/python_data_provider.hpp"
 #include "tests/core/data/field/test_field.hpp"
+
 
 #include "gtest/gtest.h"
 
@@ -111,8 +113,19 @@ using Simulators2d = testing::Types<
 >;
 
 TYPED_TEST_SUITE(Simulator2dTest, Simulators2d);
-// clang-format on
 
+
+template<typename Simulator>
+struct Simulator3dTest : public ::testing::Test
+{
+};
+
+using Simulator3d = testing::Types<
+    SimulatorTestParam<SimOpts{3, 1, 6}>, SimulatorTestParam<SimOpts{3, 2, 6}>,
+    SimulatorTestParam<SimOpts{3, 3, 6}>>;
+
+TYPED_TEST_SUITE(Simulator3dTest, Simulator3d);
+// clang-format on
 
 
 #endif /* PHARE_TEST_SIMULATOR_PER_TEST_H */

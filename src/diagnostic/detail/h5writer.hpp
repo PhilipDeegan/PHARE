@@ -1,17 +1,24 @@
 #ifndef PHARE_DETAIL_DIAGNOSTIC_HIGHFIVE_HPP
 #define PHARE_DETAIL_DIAGNOSTIC_HIGHFIVE_HPP
 
-
-#include "core/data/vecfield/vecfield_component.hpp"
-#include "core/utilities/mpi_utils.hpp"
 #include "core/utilities/types.hpp"
-#include "core/utilities/meta/meta_utilities.hpp"
+#include "core/utilities/mpi_utils.hpp"
+#include "core/data/vecfield/vecfield_component.hpp"
 
+#include "initializer/data_provider.hpp"
+
+#include "diagnostic/diagnostic_model_view.hpp"
 #include "hdf5/detail/h5/h5_file.hpp"
 
-#include "diagnostic/detail/h5typewriter.hpp"
-#include "diagnostic/diagnostic_manager.hpp"
+
 #include "diagnostic/diagnostic_props.hpp"
+#include "diagnostic/detail/h5typewriter.hpp"
+#include "diagnostic/detail/types/info.hpp"
+#include "diagnostic/detail/types/meta.hpp"
+#include "diagnostic/detail/types/fluid.hpp"
+#include "diagnostic/detail/types/particle.hpp"
+#include "diagnostic/detail/types/electromag.hpp"
+#include "diagnostic/detail/types/mhd.hpp"
 
 
 #if !defined(PHARE_DIAG_DOUBLES)
@@ -23,18 +30,6 @@ namespace PHARE::diagnostic::h5
 {
 using namespace hdf5::h5;
 
-template<typename Writer>
-class ElectromagDiagnosticWriter;
-template<typename Writer>
-class FluidDiagnosticWriter;
-template<typename Writer>
-class ParticlesDiagnosticWriter;
-template<typename Writer>
-class MetaDiagnosticWriter;
-template<typename Writer>
-class InfoDiagnosticWriter;
-
-
 
 template<typename ModelView>
 class H5Writer
@@ -45,6 +40,7 @@ class H5Writer
 
 public:
     using This       = H5Writer<ModelView>;
+    using Model_t    = typename ModelView::Model_t;
     using GridLayout = typename ModelView::GridLayout;
     using Attributes = typename ModelView::PatchProperties;
 
@@ -57,10 +53,33 @@ public:
 
     template<typename Hierarchy, typename Model>
     H5Writer(Hierarchy& hier, Model& model, std::string const hifivePath, HiFile::AccessMode _flags)
-        : flags{_flags}
+        : modelView_{hier, model}
+        , flags{_flags}
         , filePath_{hifivePath}
-        , modelView_{hier, model}
     {
+        if constexpr (solver::is_hybrid_model_v<Model>)
+        {
+            typeWriters_ = {
+                {"info", make_writer<InfoDiagnosticWriter<This>>()},
+                {"meta", make_writer<MetaDiagnosticWriter<This>>()},
+                {"fluid", make_writer<FluidDiagnosticWriter<This>>()},
+                {"electromag", make_writer<ElectromagDiagnosticWriter<This>>()},
+                {"particle", make_writer<ParticlesDiagnosticWriter<This>>()} //
+            };
+        }
+        else if constexpr (solver::is_mhd_model_v<Model>)
+        {
+            typeWriters_ = {
+                {"meta", make_writer<MetaDiagnosticWriter<This>>()},
+                {"mhd", make_writer<MHDDiagnosticWriter<This>>()},
+                {"electromag", make_writer<ElectromagDiagnosticWriter<This>>()} //
+            };
+        }
+        else
+        {
+            // MacOS clang unhappy with static_assert(false), requires a dependency on Model
+            static_assert(!std::is_same_v<Model, Model>, "Unsupported model type in H5Writer");
+        }
     }
 
     ~H5Writer() {}
@@ -168,7 +187,11 @@ public:
     auto& modelView() { return modelView_; }
     auto timestamp() const { return timestamp_; }
 
-    std::size_t minLevel = 0, maxLevel = 10; // TODO hard-coded to be parametrized somehow
+private:
+    ModelView modelView_;
+
+public:
+    std::size_t minLevel = 0, maxLevel = modelView_.maxLevel();
     HiFile::AccessMode flags;
 
 
@@ -176,18 +199,11 @@ private:
     double timestamp_ = 0;
     std::string filePath_;
     std::string patchPath_; // is passed around as "virtual write()" has no parameters
-    ModelView modelView_;
     Attributes fileAttributes_;
 
     std::unordered_map<std::string, HiFile::AccessMode> file_flags;
 
-    std::unordered_map<std::string, std::shared_ptr<H5TypeWriter<This>>> typeWriters_{
-        {"info", make_writer<InfoDiagnosticWriter<This>>()},
-        {"meta", make_writer<MetaDiagnosticWriter<This>>()},
-        {"fluid", make_writer<FluidDiagnosticWriter<This>>()},
-        {"electromag", make_writer<ElectromagDiagnosticWriter<This>>()},
-        {"particle", make_writer<ParticlesDiagnosticWriter<This>>()} //
-    };
+    std::unordered_map<std::string, std::shared_ptr<H5TypeWriter<This>>> typeWriters_;
 
     template<typename Writer>
     std::shared_ptr<H5TypeWriter<This>> make_writer()
@@ -201,14 +217,15 @@ private:
 
     H5Writer(H5Writer const&)            = delete;
     H5Writer(H5Writer&&)                 = delete;
-    H5Writer& operator&(H5Writer const&) = delete;
-    H5Writer& operator&(H5Writer&&)      = delete;
+    H5Writer& operator=(H5Writer const&) = delete;
+    H5Writer& operator=(H5Writer&&)      = delete;
 
 
     //  State of this class is controlled via "dump()"
     //  block public access to internal state
     friend class FluidDiagnosticWriter<This>;
     friend class ElectromagDiagnosticWriter<This>;
+    friend class MHDDiagnosticWriter<This>;
     friend class ParticlesDiagnosticWriter<This>;
     friend class MetaDiagnosticWriter<This>;
     friend class InfoDiagnosticWriter<This>;
@@ -352,4 +369,4 @@ void H5Writer<ModelView>::writeDatasets_(std::vector<DiagnosticProperties*> cons
 
 } /* namespace PHARE::diagnostic::h5 */
 
-#endif /* PHARE_DETAIL_DIAGNOSTIC_HIGHFIVE_H */
+#endif /* PHARE_DETAIL_DIAGNOSTIC_HIGHFIVE_HPP */

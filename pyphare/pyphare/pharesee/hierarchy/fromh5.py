@@ -1,5 +1,6 @@
 import os
 import numpy as np
+from pathlib import Path
 
 from .patch import Patch
 from .patchlevel import PatchLevel
@@ -15,8 +16,6 @@ from ...core.phare_utilities import (
 )
 from ...core.gridlayout import GridLayout
 from .hierarchy_utils import field_qties
-
-from pathlib import Path
 from pyphare.core.phare_utilities import listify
 
 
@@ -111,7 +110,7 @@ def add_to_patchdata(patch_datas, h5_patch_grp, basename, layout):
             if is_pop_fluid_file(basename):
                 pdata_name = pop_name(basename) + "_" + pdata_name
 
-            if dataset_name in patch_datas:
+            if pdata_name in patch_datas:
                 raise ValueError("error - {} already in patchdata".format(dataset_name))
 
             patch_datas[pdata_name] = pdata
@@ -131,13 +130,11 @@ def h5_filename_from(diagInfo):
 def get_times_from_h5(filepath, as_float=True):
     import h5py  # see doc/conventions.md section 2.1.1
 
-    f = h5py.File(filepath, "r")
-    if as_float:
-        times = np.array(sorted([float(s) for s in list(f[h5_time_grp_key].keys())]))
-    else:
+    with h5py.File(filepath, "r") as f:
         times = list(f[h5_time_grp_key].keys())
-    f.close()
-    return times
+        if as_float:
+            times = np.array(sorted([float(s) for s in times]))
+        return times
 
 
 def create_from_all_times(time, hier):

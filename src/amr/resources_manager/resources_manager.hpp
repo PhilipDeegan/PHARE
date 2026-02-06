@@ -1,11 +1,12 @@
 #ifndef PHARE_AMR_TOOLS_RESOURCES_MANAGER_HPP
 #define PHARE_AMR_TOOLS_RESOURCES_MANAGER_HPP
 
-#include "core/def/phare_mpi.hpp" // IWYU pragma: keep
 
 #include "core/def.hpp"
-#include "core/logger.hpp"
+#include "core/def/phare_mpi.hpp" // IWYU pragma: keep
 #include "core/hybrid/hybrid_quantities.hpp"
+
+#include "amr/samrai.hpp"
 
 #include "field_resource.hpp"
 #include "resources_guards.hpp"
@@ -19,6 +20,7 @@
 
 #include <map>
 #include <optional>
+
 
 
 namespace PHARE
@@ -36,6 +38,34 @@ namespace amr
     };
 
 
+    struct ResourcesManagerGlobals
+    {
+        static ResourcesManagerGlobals& INSTANCE();
+
+
+        std::vector<std::map<std::string, ResourcesInfo>*> resources_;
+
+        static auto ALL_IDS()
+        {
+            std::vector<int> ids;
+            ids.reserve((core::sum_from(INSTANCE().resources_,
+                                        [](auto const& map) { return map->size(); })));
+
+            assert(INSTANCE().resources_.size());
+            for (auto const res_map_ptr : INSTANCE().resources_)
+                for (auto const& [_, info] : *res_map_ptr)
+                    ids.emplace_back(info.id);
+
+            return ids;
+        }
+
+        static void registerForRestarts()
+        {
+            auto pdrm = SAMRAI::hier::PatchDataRestartManager::getManager();
+            for (auto const& id : ALL_IDS()) // duplicates don't matter
+                pdrm->registerPatchDataForRestart(id);
+        }
+    };
 
 
     /** \brief ResourcesManager is an adapter between PHARE objects that manipulate
@@ -81,10 +111,13 @@ namespace amr
      *
      *
      */
+
     template<typename GridLayoutT, typename Grid_t>
     class ResourcesManager
     {
         using This = ResourcesManager<GridLayoutT, Grid_t>;
+        using QuantityType =
+            typename extract_quantity_type<typename Grid_t::physical_quantity_type>::type;
 
     public:
         static constexpr std::size_t dimension    = GridLayoutT::dimension;
@@ -96,15 +129,23 @@ namespace amr
         using UserParticle_t = UserParticleType<ResourcesView, interp_order>;
 
         template<std::size_t rank>
-        using UserTensorField_t
-            = UserTensorFieldType<rank, Grid_t, GridLayoutT, core::HybridQuantity>;
+        using UserTensorField_t = UserTensorFieldType<rank, Grid_t, GridLayoutT, QuantityType>;
 
 
         ResourcesManager()
-            : variableDatabase_{SAMRAI::hier::VariableDatabase::getDatabase()}
+            : variableDatabase_{SamraiLifeCycle::getDatabase()}
             , context_{variableDatabase_->getContext(contextName_)}
             , dimension_{SAMRAI::tbox::Dimension{dimension}}
         {
+            ResourcesManagerGlobals::INSTANCE().resources_.emplace_back(&nameToResourceInfo_);
+        }
+        ~ResourcesManager()
+        {
+            for (auto& [key, resourcesInfo] : nameToResourceInfo_)
+                variableDatabase_->removeVariable(key);
+
+            auto& vec = ResourcesManagerGlobals::INSTANCE().resources_;
+            vec.erase(std::remove(vec.begin(), vec.end(), &nameToResourceInfo_), vec.end());
         }
 
 
@@ -285,39 +326,35 @@ namespace amr
 
 
 
-        ~ResourcesManager()
-        {
-            for (auto& [key, resourcesInfo] : nameToResourceInfo_)
-            {
-                variableDatabase_->removeVariable(key);
-            }
-        }
-
 
         void registerForRestarts() const
         {
-            auto pdrm = SAMRAI::hier::PatchDataRestartManager::getManager();
+            auto pdrm = SamraiLifeCycle::getPatchDataRestartManager();
             for (auto const& id : restart_patch_data_ids())
                 pdrm->registerPatchDataForRestart(id);
         }
 
+        // needed as long as we have different resource managers dealing with different physical
+        // quantities
+        // template<typename ResourcesView>
+        // void registerForRestarts(ResourcesView const& view) const
+        // {
+        //     auto pdrm = SAMRAI::hier::PatchDataRestartManager::getManager();
+
+        //     for (auto const& id : restart_patch_data_ids(view))
+        //         pdrm->registerPatchDataForRestart(id);
+        // }
+
+
 
         NO_DISCARD auto restart_patch_data_ids() const
-        { // see https://github.com/PHAREHUB/PHARE/issues/664
+        {
+            // see https://github.com/PHAREHUB/PHARE/issues/664
             std::vector<int> ids;
             for (auto const& [key, info] : nameToResourceInfo_)
                 ids.emplace_back(info.id);
             return ids;
         }
-
-        template<typename ResourcesView> // this function is never called
-        NO_DISCARD auto restart_patch_data_ids(ResourcesView const& view) const
-        {
-            std::vector<int> ids;
-            getIDs_(view, ids);
-            return ids;
-        }
-
 
         auto getIDsList(auto&&... keys) const
         {
@@ -348,6 +385,8 @@ namespace amr
         template<typename Level_t, typename... Args>
         struct LevelLooper
         {
+            using value_type = std::shared_ptr<SAMRAI::hier::Patch>;
+
             LevelLooper(ResourcesManager& rm, Level_t& lvl, Args&... arrgs)
                 : rm{rm}
                 , level{lvl}
@@ -540,7 +579,7 @@ namespace amr
 
             auto const& resourceInfoIt = nameToResourceInfo_.find(obj.name());
             if (resourceInfoIt == nameToResourceInfo_.end())
-                throw std::runtime_error("Resources not found !");
+                throw std::runtime_error("Resources not found ! " + obj.name());
 
             obj.setBuffer(getResourcesPointer_<ResourcesType>(resourceInfoIt->second, patch));
         }
@@ -578,7 +617,7 @@ namespace amr
             }
             else
             {
-                throw std::runtime_error("Resources not found !");
+                throw std::runtime_error("Resources not found ! " + resourcesName);
             }
         }
 

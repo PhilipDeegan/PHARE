@@ -2,18 +2,17 @@
 #
 
 import copy
-import time
 import datetime
 import unittest
 import numpy as np
+from time import sleep
 from pathlib import Path
 
 from datetime import timedelta
 from ddt import ddt, data, unpack
 
+from pyphare import cpp
 import pyphare.pharein as ph
-
-from pyphare.cpp import cpp_lib
 from pyphare.pharesee.run import Run
 from pyphare.simulator.simulator import Simulator
 
@@ -21,8 +20,6 @@ from tests.simulator import SimulatorTest
 from tests.diagnostic import dump_all_diags
 from pyphare.pharesee.hierarchy.patchdata import ParticleData
 from pyphare.pharesee.hierarchy.fromh5 import get_all_available_quantities_from_h5
-
-cpp = cpp_lib()
 
 
 def permute(dic, expected_num_levels):
@@ -349,10 +346,12 @@ class RestartsTest(SimulatorTest):
         # autodump false to ignore possible init dump
         simulator = Simulator(ph.global_vars.sim, auto_dump=False).initialize()
 
-        time.sleep(5)
+        sleep(5)
         simulator.advance().dump()  # should trigger restart on "restart_idx" advance
         simulator.advance().dump()
+        print("First sim finishing...")
         simulator.reset()
+        print("First sim finished / restarting sim...")
         self.register_diag_dir_for_cleanup(diag_dir0)
 
         # second restarted simulation
@@ -431,13 +430,13 @@ class RestartsTest(SimulatorTest):
         Dim / interp / etc are not relevant here
         """
         ndim, interp = 1, 1
-        print(f"test_advanced_restarts_options")
+        print("test_advanced_restarts_options")
 
         simput = copy.deepcopy(
             dup(
                 dict(
                     cells=10,
-                    time_step_nbr=10,
+                    time_step_nbr=7,
                     max_nbr_levels=1,
                     refinement="tagging",
                 )
@@ -446,9 +445,8 @@ class RestartsTest(SimulatorTest):
 
         simput["interp_order"] = interp
         time_step = simput["time_step"]
-        time_step_nbr = simput["time_step_nbr"]
 
-        timestamps = time_step * np.arange(time_step_nbr + 1)
+        timestamps = time_step * np.arange(simput["time_step_nbr"] + 1)
         local_out = self.unique_diag_dir_for_test_case(f"{out}/test", ndim, interp)
         simput["restart_options"]["dir"] = local_out
         simput["restart_options"]["keep_last"] = 3
@@ -456,13 +454,20 @@ class RestartsTest(SimulatorTest):
 
         ph.global_vars.sim = None
         ph.global_vars.sim = ph.Simulation(**simput)
-        model = setup_model()
+        setup_model()
         Simulator(ph.global_vars.sim).run().reset()
         self.register_diag_dir_for_cleanup(local_out)
-        diag_dir0 = local_out
 
+        # restarted
+        timestamps = time_step * np.arange(7, 11)
+        simput["time_step_nbr"] = 3
         simput["restart_options"]["restart_time"] = "auto"
-        self.assertEqual(0.01, ph.restarts.restart_time(simput["restart_options"]))
+        simput["restart_options"]["timestamps"] = timestamps
+        self.assertEqual(0.007, ph.restarts.restart_time(simput["restart_options"]))
+        ph.global_vars.sim = None
+        ph.global_vars.sim = ph.Simulation(**simput)
+        setup_model()
+        Simulator(ph.global_vars.sim).run().reset()
 
         dirs = []
         for path_object in Path(local_out).iterdir():
@@ -475,6 +480,8 @@ class RestartsTest(SimulatorTest):
         dirs = sorted(dirs)
         for i, idx in enumerate(range(8, 11)):
             self.assertAlmostEqual(dirs[i], time_step * idx)
+
+        self.assertEqual(0.01, ph.restarts.restart_time(simput["restart_options"]))
 
 
 if __name__ == "__main__":

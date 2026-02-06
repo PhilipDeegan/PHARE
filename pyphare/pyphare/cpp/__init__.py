@@ -2,16 +2,39 @@
 #
 #
 
+import json
+import importlib
+from . import validate
 
-def cpp_lib(override=None):
-    import importlib
+__all__ = ["validate"]
 
-    return importlib.import_module("pybindlibs.cpp")
+_libs = {}
+
+
+def simulator_id(sim):
+    if not sim.mhd_timestepper:  # no MHD
+        return f"{sim.ndim}_{sim.interp_order}_{sim.refined_particle_nbr}"
+    else:
+        Hall = "true" if sim.hall else "false"
+        Res = "true" if sim.res else "false"
+        Hyper_Res = "true" if sim.hyper_res else "false"
+        return (
+            f"{sim.ndim}_{sim.interp_order}_{sim.refined_particle_nbr}_"
+            f"{sim.mhd_timestepper}_{sim.reconstruction}_{sim.limiter}_"
+            f"{sim.riemann}_{Hall}_{Res}_{Hyper_Res}"
+        )
+
+
+def cpp_lib(sim):
+    global _libs
+
+    mod_str = f"pybindlibs.cpp_{simulator_id(sim)}"
+    if mod_str not in _libs:
+        _libs[mod_str] = importlib.import_module(mod_str)
+    return _libs[mod_str]
 
 
 def cpp_etc_lib():
-    import importlib
-
     return importlib.import_module("pybindlibs.cpp_etc")
 
 
@@ -20,18 +43,24 @@ def build_config():
 
 
 def build_config_as_json():
-    import json
-
     return json.dumps(build_config())
 
 
-def splitter_type(dim, interp, n_particles):
-    return getattr(cpp_lib(), f"Splitter_{dim}_{interp}_{n_particles}")
+def splitter_type(sim):
+    return getattr(cpp_lib(sim), "Splitter")
 
 
-def create_splitter(dim, interp, n_particles):
-    return splitter_type(dim, interp, n_particles)()
+def split_pyarrays_fn(sim):
+    return getattr(cpp_lib(sim), "split_pyarray_particles")
 
 
-def split_pyarrays_fn(dim, interp, n_particles):
-    return getattr(cpp_lib(), f"split_pyarray_particles_{dim}_{interp}_{n_particles}")
+def mpi_rank():
+    return getattr(cpp_etc_lib(), "mpi_rank")()
+
+
+def mpi_size():
+    return getattr(cpp_etc_lib(), "mpi_size")()
+
+
+def mpi_barrier():
+    return getattr(cpp_etc_lib(), "mpi_barrier")()
