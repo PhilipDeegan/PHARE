@@ -136,15 +136,16 @@ public:
             core::BdryLoc::Type const bLoc
                 = static_cast<core::BdryLoc::Type>(bBox.getLocationIndex());
 
-            // Get ghost cells as a SAMRAI Box, and extend it in case of dual staggering.
             SAMRAI::hier::Box samraiBoxToFill
                 = patchGeom->getBoundaryFillBox(bBox, patch_box, ghost_width_to_fill);
             auto localBox = gridLayout.AMRToLocal(phare_box_from<dimension>(samraiBoxToFill));
+
             std::shared_ptr<boundary_condition_type> bc = boundaryManager_.getBoundaryCondition(
                 bLoc, scalarOrTensorField.physicalQuantity());
             if (!bc)
                 throw std::runtime_error("boundary condition not found.");
-            bc->apply(scalarOrTensorField, localBox, gridLayout, fill_time);
+
+            bc->apply(scalarOrTensorField, bLoc, localBox, gridLayout, fill_time);
         };
     }
 

@@ -59,16 +59,14 @@ public:
             {
                 // we will need a factory here
                 scalar_conditions_[_scalar_key_type({location, quantity})]
-                    = std::make_shared<FieldNeumannBoundaryCondition<FieldT, GridLayoutT>>(
-                        location, quantity);
+                    = std::make_shared<FieldNeumannBoundaryCondition<FieldT, GridLayoutT>>();
             };
 
             for (auto const quantity : vectorQuantities)
             {
                 // we will need a factory here
                 vector_conditions_[_vector_key_type({location, quantity})] = std::make_shared<
-                    FieldNeumannBoundaryCondition<vector_field_type, GridLayoutT>>(location,
-                                                                                   quantity);
+                    FieldNeumannBoundaryCondition<vector_field_type, GridLayoutT>>();
             };
         };
     }

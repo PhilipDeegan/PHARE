@@ -36,20 +36,7 @@ public:
     static constexpr size_t N         = Super::N;
     static constexpr bool is_scalar   = Super::is_scalar;
 
-    FieldNeumannBoundaryCondition() = delete;
-
-    /**
-     * @brief Construct the Neumann boundary condition.
-     *
-     * @param location Boundary location.
-     * @param physical_quantity Physical quantity identifier.
-     *
-     */
-    FieldNeumannBoundaryCondition(BdryLoc::Type const& location,
-                                  physical_quantity_type const& physicalQuantity)
-        : Super(location, physicalQuantity)
-    {
-    } //
+    FieldNeumannBoundaryCondition() = default;
 
     FieldNeumannBoundaryCondition(FieldNeumannBoundaryCondition const&)            = default;
     FieldNeumannBoundaryCondition& operator=(FieldNeumannBoundaryCondition const&) = default;
