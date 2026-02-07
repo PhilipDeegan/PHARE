@@ -3,7 +3,9 @@
 
 #include "core/def.hpp"
 #include "core/def/phare_mpi.hpp" // IWYU pragma: keep
+#include "core/mhd/mhd_quantities.hpp"
 #include "core/models/mhd_state.hpp"
+#include "core/boundary/boundary_manager.hpp"
 
 #include "amr/messengers/mhd_messenger_info.hpp"
 #include "amr/physical_models/physical_model.hpp"
@@ -11,6 +13,8 @@
 
 #include <SAMRAI/hier/PatchLevel.h>
 
+#include <initializer_list>
+#include <span>
 #include <string>
 #include <string_view>
 
@@ -28,28 +32,25 @@ public:
     using level_t   = amr_types::level_t;
     using Interface = IPhysicalModel<AMR_Types>;
 
-    using physical_quantity_type = core::MHDQuantity;
     using vecfield_type          = VecFieldT;
     using field_type             = vecfield_type::field_type;
     using state_type             = core::MHDState<vecfield_type>;
     using gridlayout_type        = GridLayoutT;
     using grid_type              = Grid_t;
     using resources_manager_type = amr::ResourcesManager<gridlayout_type, Grid_t>;
+    using boundary_manager_type
+        = core::BoundaryManager<core::MHDQuantity, field_type, gridlayout_type>;
 
     static constexpr std::string_view model_type_name = "MHDModel";
     static inline std::string const model_name{model_type_name};
 
     state_type state;
     std::shared_ptr<resources_manager_type> resourcesManager;
+    std::shared_ptr<boundary_manager_type> boundaryManager;
 
     // diagnostics buffers
     vecfield_type V_diag_{"diagnostics_V_", core::MHDQuantity::Vector::V};
     field_type P_diag_{"diagnostics_P_", core::MHDQuantity::Scalar::P};
-
-    // maybe these could have a single allocation shared for hybrid and mhd, as they are strictly
-    // temporaries. Right now the hybrid version is in the hybrid_hybrid_messenger_strategy.hpp
-    field_type tmpField_{"PHARE_sumField_MHD", core::MHDQuantity::Scalar::ScalarAllPrimal};
-    vecfield_type tmpVec_{"PHARE_sumVec_MHD", core::MHDQuantity::Vector::VecAllPrimal};
 
     void initialize(level_t& level) override;
 
@@ -59,8 +60,6 @@ public:
         resourcesManager->allocate(state, patch, allocateTime);
         resourcesManager->allocate(V_diag_, patch, allocateTime);
         resourcesManager->allocate(P_diag_, patch, allocateTime);
-        resourcesManager->allocate(tmpField_, patch, allocateTime);
-        resourcesManager->allocate(tmpVec_, patch, allocateTime);
     }
 
 
@@ -79,8 +78,35 @@ public:
     {
         resourcesManager->registerResources(V_diag_);
         resourcesManager->registerResources(P_diag_);
-        resourcesManager->registerResources(tmpField_);
-        resourcesManager->registerResources(tmpVec_);
+        // this is really ugly
+        std::vector<core::MHDQuantity::Scalar> scalarQuantities
+            = {core::MHDQuantity::Scalar::rho, core::MHDQuantity::Scalar::Etot};
+        auto vectorQuantities = [&]() {
+            if constexpr (dimension == 1)
+            {
+                return std::vector<core::MHDQuantity::Vector>{
+                    core::MHDQuantity::Vector::B, core::MHDQuantity::Vector::J,
+                    core::MHDQuantity::Vector::E, core::MHDQuantity::Vector::rhoV,
+                    core::MHDQuantity::Vector::VecFlux_x};
+            }
+            else if constexpr (dimension == 2)
+            {
+                return std::vector<core::MHDQuantity::Vector>{
+                    core::MHDQuantity::Vector::B,         core::MHDQuantity::Vector::J,
+                    core::MHDQuantity::Vector::E,         core::MHDQuantity::Vector::rhoV,
+                    core::MHDQuantity::Vector::VecFlux_x, core::MHDQuantity::Vector::VecFlux_y};
+            }
+            else
+            {
+                std::vector<core::MHDQuantity::Vector>{
+                    core::MHDQuantity::Vector::B,         core::MHDQuantity::Vector::J,
+                    core::MHDQuantity::Vector::E,         core::MHDQuantity::Vector::rhoV,
+                    core::MHDQuantity::Vector::VecFlux_x, core::MHDQuantity::Vector::VecFlux_y,
+                    core::MHDQuantity::Vector::VecFlux_z};
+            };
+        }();
+        boundaryManager
+            = std::make_shared<boundary_manager_type>(dict, scalarQuantities, vectorQuantities);
     }
 
     ~MHDModel() override = default;
