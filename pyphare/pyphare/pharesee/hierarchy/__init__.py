@@ -57,7 +57,7 @@ def hierarchy_from(
             return hierarchy_fromvtkhdf(h5_filename, times, hier, **kwargs)
         raise RuntimeError(f"Unknown h5 file type: {h5_filename}")
     if simulator is not None and qty is not None:
-        return hierarchy_from_sim(simulator, qty, pop=pop)
+        return hierarchy_from_sim(simulator, qty, pop=pop, hier=hier)
 
     if func is not None and hier is not None:
         return hierarchy_from_func(func, hier, **kwargs)

@@ -10,6 +10,8 @@ logging.basicConfig(level=logging.INFO)
 
 logger = getLogger(__name__)
 data_path = "/home/p/git/phare/master/phare_outputs/harris_3d/EM_B.vtkhdf"
+data_path = sys.argv[1] if len(sys.argv) > 1 else data_path
+
 # data_path = "phare_outputs/vtk_diagnostic_test/test_vtk/test_dump_diags_1/1/2/1/ions_pop_alpha_flux.vtkhdf"
 array_name = "data"
 fps = 5
@@ -146,9 +148,10 @@ if __name__ == "__main__":
     # -----------------------------
     # 8. Slice loop
     # -----------------------------
-    points = poly_all.GetPoints()
-    z_coords = [points.GetPoint(i)[2] for i in range(points.GetNumberOfPoints())]
-    z_values = sorted(set(z_coords))
+    # points = poly_all.GetPoints()
+    # z_coords = [points.GetPoint(i)[2] for i in range(points.GetNumberOfPoints())]
+    # print("z_coords", z_coords)
+    # z_values = sorted(set(z_coords))
 
     for i in range(n_slices):
         z = z_values[i]

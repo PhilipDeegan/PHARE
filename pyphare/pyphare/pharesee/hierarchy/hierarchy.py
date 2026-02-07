@@ -226,14 +226,15 @@ class PatchHierarchy(object):
             time = self._default_time()
         return list(self.levels(time).keys())
 
-    def add_time(self, time, patch_level, h5file, selection_box=None):
+    def add_time(self, time, patch_level, h5file=None, selection_box=None):
         formated_time = format_timestamp(time)
 
         self.time_hier[format_timestamp(time)] = patch_level
         if selection_box is not None:
             self.selection_box[formated_time] = selection_box
 
-        self.data_files[h5file.filename] = h5file
+        if h5file:
+            self.data_files[h5file.filename] = h5file
         self.update()
 
     def is_homogeneous(self):
@@ -456,6 +457,7 @@ class PatchHierarchy(object):
 
     def plot2d(self, **kwargs):
         from matplotlib.patches import Rectangle
+        from matplotlib.collections import QuadMesh
         from mpl_toolkits.axes_grid1 import make_axes_locatable
 
         time = kwargs.get("time", self._default_time())
@@ -465,6 +467,7 @@ class PatchHierarchy(object):
             default_qty = self.quantities()[0]
         qty = kwargs.get("qty", default_qty)
 
+        gidx = -1
         if "ax" not in kwargs:
             fig, ax = plt.subplots()
         else:
@@ -492,6 +495,7 @@ class PatchHierarchy(object):
             if lvl_nbr not in usr_lvls:
                 continue
             for patch in self.level(lvl_nbr, time).patches:
+                gidx += 1
                 pdat = patch[qty]
                 data = pdat.dataset[:]
                 nbrGhosts = pdat.ghosts_nbr
@@ -511,43 +515,57 @@ class PatchHierarchy(object):
                 y -= dy * 0.5
                 x = np.append(x, x[-1] + dx)
                 y = np.append(y, y[-1] + dy)
-                im = ax.pcolormesh(
-                    x,
-                    y,
-                    data.T,
-                    cmap=kwargs.get("cmap", "Spectral_r"),
-                    vmin=kwargs.get("vmin", glob_min - 1e-6),
-                    vmax=kwargs.get("vmax", glob_max + 1e-6),
+
+                update = len(ax.collections) > gidx and isinstance(
+                    ax.collections[gidx], QuadMesh
                 )
-
-                if kwargs.get("plot_patches", False) is True:
-                    r = Rectangle(
-                        (patch.box.lower[0] * dx, patch.box.lower[1] * dy),
-                        patch.box.shape[0] * dx,
-                        patch.box.shape[1] * dy,
-                        fc="none",
-                        ec=patchcolors[lvl_nbr],
-                        alpha=0.4,
-                        lw=linewidths[lvl_nbr],
-                        ls=linestyles[lvl_nbr],
+                if update:  # maybe not ideal
+                    im = ax.collections[gidx]
+                    im.set_array(data.T)
+                    im.set_clim(
+                        vmin=kwargs.get("vmin", glob_min - 1e-6),
+                        vmax=kwargs.get("vmax", glob_max + 1e-6),
                     )
-                    ax.add_patch(r)
+                    ax.draw_artist(im)
+                else:
+                    im = ax.pcolormesh(
+                        x,
+                        y,
+                        data.T,
+                        cmap=kwargs.get("cmap", "Spectral_r"),
+                        vmin=kwargs.get("vmin", glob_min - 1e-6),
+                        vmax=kwargs.get("vmax", glob_max + 1e-6),
+                    )
 
-        ax.set_aspect(kwargs.get("aspect", "equal"))
-        ax.set_title(kwargs.get("title", ""))
-        ax.set_xlabel(kwargs.get("xlabel", "x"))
-        ax.set_ylabel(kwargs.get("ylabel", "y"))
-        if "xlim" in kwargs:
-            ax.set_xlim(kwargs["xlim"])
-        if "ylim" in kwargs:
-            ax.set_ylim(kwargs["ylim"])
+                    if kwargs.get("plot_patches", False) is True:
+                        r = Rectangle(
+                            (patch.box.lower[0] * dx, patch.box.lower[1] * dy),
+                            patch.box.shape[0] * dx,
+                            patch.box.shape[1] * dy,
+                            fc="none",
+                            ec=patchcolors[lvl_nbr],
+                            alpha=0.4,
+                            lw=linewidths[lvl_nbr],
+                            ls=linestyles[lvl_nbr],
+                        )
+                        ax.add_patch(r)
 
-        divider = make_axes_locatable(ax)
-        cax = divider.append_axes("right", size="5%", pad=0.08)
-        plt.colorbar(im, ax=ax, cax=cax)
+                    ax.set_aspect(kwargs.get("aspect", "equal"))
+                    ax.set_title(kwargs.get("title", ""))
+                    ax.set_xlabel(kwargs.get("xlabel", "x"))
+                    ax.set_ylabel(kwargs.get("ylabel", "y"))
+                    if "xlim" in kwargs:
+                        ax.set_xlim(kwargs["xlim"])
+                    if "ylim" in kwargs:
+                        ax.set_ylim(kwargs["ylim"])
 
-        if kwargs.get("legend", None) is not None:
-            ax.legend()
+                    divider = make_axes_locatable(ax)
+                    cax = divider.append_axes("right", size="5%", pad=0.08)
+
+                    plt.colorbar(im, ax=ax, cax=cax)
+
+                    if kwargs.get("legend", None) is not None:
+                        ax.legend()
 
         if "filename" in kwargs:
             fig.savefig(kwargs["filename"], dpi=kwargs.get("dpi", 200))
@@ -614,70 +632,6 @@ class PatchHierarchy(object):
                 final[pop] = kwargs["select"](particles)
 
         return final, dp(final, **kwargs)
-
-    def zeros_like(self):
-        """only works for fields and vecfields with 1 time"""
-        from copy import deepcopy
-
-        assert len(self.time_hier) == 1
-        copy = deepcopy(self)
-
-        hier = (list(copy.time_hier.values()))[0]
-
-        for ilvl, lvl in hier.items():
-            for patch in lvl:
-                for key, pd in patch.patch_datas.items():
-                    patch.patch_datas[key] = pd.zeros_like()
-        assert not copy.has_non_zero()
-        return copy
-
-    def has_non_zero(self):
-        """only works for fields and vecfields with 1 time"""
-
-        assert len(self.time_hier) == 1
-
-        hier = (list(self.time_hier.values()))[0]
-
-        for ilvl, lvl in hier.items():
-            for patch in lvl:
-                for key, pd in patch.patch_datas.items():
-                    check = np.nonzero(pd.dataset[:])
-                    if len(check[0]):
-                        return True
-        return False
-
-    def max(self, qty=None):
-        """only works for fields and vecfields with 1 time"""
-
-        assert len(self.time_hier) == 1
-
-        hier = (list(self.time_hier.values()))[0]
-        val = [0 for ilvl, lvl in hier.items()]
-
-        for ilvl, lvl in hier.items():
-            for patch in lvl:
-                for key, pd in patch.patch_datas.items():
-                    if qty is None or key == qty:
-                        val[ilvl] = max(np.max(pd.dataset), val[ilvl])
-
-        return val
-
-    def min_max_patch_shape(self, qty=None):
-        """only works for fields and vecfields with 1 time"""
-
-        assert len(self.time_hier) == 1
-
-        hier = (list(self.time_hier.values()))[0]
-        val = [[10000, 0] for ilvl, lvl in hier.items()]
-
-        for ilvl, lvl in hier.items():
-            for patch in lvl:
-                for key, pd in patch.patch_datas.items():
-                    if qty is None or key == qty:
-                        val[ilvl][0] = min(np.min(pd.dataset.shape), val[ilvl][0])
-                        val[ilvl][1] = max(np.max(pd.dataset.shape), val[ilvl][1])
-
-        return val
 
 
 def finest_part_data(hierarchy, time=None):

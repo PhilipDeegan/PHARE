@@ -10,14 +10,14 @@ from ...core.box import Box
 import numpy as np
 
 
-def hierarchy_from_sim(simulator, qty, pop=""):
+def hierarchy_from_sim(simulator, qty, pop="", hier=None):
     dw = simulator.data_wrangler()
     nbr_levels = dw.getNumberOfLevels()
     patch_levels = {}
 
-    root_cell_width = simulator.cell_width()
+    root_cell_width = np.asarray(simulator.cell_width())
     domain_box = Box([0] * len(root_cell_width), simulator.domain_box())
-    assert len(domain_box.ndim) == len(simulator.domain_box().ndim)
+    assert domain_box.ndim == len(simulator.domain_box())
 
     for ilvl in range(nbr_levels):
         lvl_cell_width = root_cell_width / refinement_ratio**ilvl
@@ -26,21 +26,16 @@ def hierarchy_from_sim(simulator, qty, pop=""):
         getters = quantidic(ilvl, dw)
 
         if isFieldQty(qty):
-            wpatches = getters[qty]()
-            for patch in wpatches:
-                patch_datas = {}
-                lower = patch.lower
-                upper = patch.upper
-                origin = patch.origin
+            for patch in getters[qty]():
                 layout = GridLayout(
-                    Box(lower, upper),
-                    origin,
+                    Box(patch.lower, patch.upper),
+                    patch.origin,
                     lvl_cell_width,
-                    interp_order=simulator.interporder(),
+                    interp_order=simulator.interp_order(),
                 )
-                pdata = FieldData(layout, field_qties[qty], patch.data)
-                patch_datas[qty] = pdata
-                patches[ilvl].append(Patch(patch_datas))
+                patches[ilvl].append(
+                    Patch({qty[-1]: FieldData(layout, field_qties[qty], patch.data)})
+                )
 
         elif qty == "particles":
             if pop == "":
@@ -60,12 +55,9 @@ def hierarchy_from_sim(simulator, qty, pop=""):
             for patch in dom_dw_patches:
                 patch_datas = {}
 
-                lower = patch.lower
-                upper = patch.upper
-                origin = patch.origin
                 layout = GridLayout(
-                    Box(lower, upper),
-                    origin,
+                    Box(patch.lower, patch.upper),
+                    patch.origin,
                     lvl_cell_width,
                     interp_order=simulator.interp_order(),
                 )
@@ -120,4 +112,11 @@ def hierarchy_from_sim(simulator, qty, pop=""):
 
         patch_levels[ilvl] = PatchLevel(ilvl, patches[ilvl])
 
+    if hier:
+        for lvl_nbr, level in hier.levels(hier.times()[0]).items():
+            new_level = patch_levels[lvl_nbr]
+            for ip, patch in enumerate(level.patches):
+                patch.patch_datas = {**patch.patch_datas, **new_level[ip].patch_datas}
+
+        return hier
     return PatchHierarchy(patch_levels, domain_box, time=simulator.currentTime())

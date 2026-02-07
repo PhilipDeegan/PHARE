@@ -17,6 +17,9 @@
 
 namespace PHARE::core
 {
+class BorisException : public DictionaryException
+{
+};
 
 
 template<std::size_t dim, typename ParticleRange, typename Electromag, typename Interpolator,
@@ -34,7 +37,6 @@ class BorisPusher
 
         double delta, vel;
     };
-
 
 public:
     using Super
@@ -103,6 +105,7 @@ public:
         //   particles consistent. see: https://github.com/PHAREHUB/PHARE/issues/571
         prePushStep_(rangeIn, rangeOut);
 
+
         rangeOut = firstSelector(rangeOut);
 
         double const dto2m = 0.5 * dt_ / mass;
@@ -164,7 +167,8 @@ private:
             if (std::abs(delta) > 2)
                 throw MoveTwoCellException{delta, partIn.v[iDim]};
 
-            auto const iCell    = static_cast<int>(std::floor(delta));
+            auto const iCell = static_cast<int>(std::floor(delta));
+
             partOut.delta[iDim] = delta - iCell;
             newCell[iDim]       = iCell + partIn.iCell[iDim];
         }
