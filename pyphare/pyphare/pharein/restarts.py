@@ -59,7 +59,7 @@ def restart_time(restart_options):
         if restart_options["restart_time"] == "auto":
             return find_latest_time_from_restarts(restart_options)
         return restart_options["restart_time"]
-    return None
+    return 0
 
 
 def find_latest_time_from_restarts(restart_options):
@@ -73,7 +73,7 @@ def find_latest_time_from_restarts(restart_options):
             except ValueError:
                 ...  # skipped
 
-    return None if len(dirs) == 0 else sorted(dirs)[-1]
+    return 0 if len(dirs) == 0 else sorted(dirs)[-1]
 
 
 # ------------------------------------------------------------------------------
@@ -171,7 +171,7 @@ def is_restartable_compared_to(curr_sim, prev_sim):
         for key in keys:
             curr = getattr(curr_sim, key)
             prev = getattr(prev_sim, key)
-            if any([op(curr, prev)]):
+            if np.any([op(curr, prev)]):
                 failed.append((key, curr, prev, op))
 
     # use negative operator for printing
