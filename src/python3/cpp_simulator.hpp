@@ -60,32 +60,44 @@ void inline declare_etc(py::module& m)
         .def(py::init<std::shared_ptr<Sim> const&, std::shared_ptr<amr::Hierarchy> const&>())
         .def(py::init<std::shared_ptr<ISimulator> const&, std::shared_ptr<amr::Hierarchy> const&>())
         .def("sync_merge", &DW::sync_merge)
-        .def("getPatchLevel", &DW::getPatchLevel)
+        .def("getMHDPatchLevel", &DW::getMHDPatchLevel)
+        .def("getHybridPatchLevel", &DW::getHybridPatchLevel)
         .def("getNumberOfLevels", &DW::getNumberOfLevels);
 
-    using PL = PatchLevel<opts>;
-    name     = "PatchLevel";
-    py::class_<PL, py::smart_holder>(m, name.c_str())
-        .def("getEM", &PL::getEM)
-        .def("getE", &PL::getE)
-        .def("getB", &PL::getB)
-        .def("getBx", &PL::getBx)
-        .def("getBy", &PL::getBy)
-        .def("getBz", &PL::getBz)
-        .def("getEx", &PL::getEx)
-        .def("getEy", &PL::getEy)
-        .def("getEz", &PL::getEz)
-        .def("getVix", &PL::getVix)
-        .def("getViy", &PL::getViy)
-        .def("getViz", &PL::getViz)
-        .def("getDensity", &PL::getDensity)
-        .def("getBulkVelocity", &PL::getBulkVelocity)
-        .def("getPopDensities", &PL::getPopDensities)
-        .def("getPopFluxes", &PL::getPopFlux)
-        .def("getFx", &PL::getFx)
-        .def("getFy", &PL::getFy)
-        .def("getFz", &PL::getFz)
-        .def("getParticles", &PL::getParticles, py::arg("userPopName") = "all");
+
+    using HybPL = PatchLevel<typename Sim::HybridModel>;
+    name        = "HybridPatchLevel";
+    if constexpr (core::defaultNbrRefinedParts(opts.dimension, opts.interp_order)
+                  == opts.nbRefinedPart) // register once!
+        py::class_<HybPL, py::smart_holder>(m, name.c_str())
+            .def("getEM", &HybPL::getEM)
+            .def("getE", &HybPL::getE)
+            .def("getB", &HybPL::getB)
+            .def("getBx", &HybPL::getBx)
+            .def("getBy", &HybPL::getBy)
+            .def("getBz", &HybPL::getBz)
+            .def("getEx", &HybPL::getEx)
+            .def("getEy", &HybPL::getEy)
+            .def("getEz", &HybPL::getEz)
+            .def("getVi", &HybPL::getVi)
+            .def("getVix", &HybPL::getVix)
+            .def("getViy", &HybPL::getViy)
+            .def("getViz", &HybPL::getViz)
+            .def("getDensity", &HybPL::getDensity)
+            .def("getBulkVelocity", &HybPL::getBulkVelocity)
+            .def("getPopDensities", &HybPL::getPopDensities)
+            .def("getPopFluxes", &HybPL::getPopFlux)
+            .def("getFx", &HybPL::getFx)
+            .def("getFy", &HybPL::getFy)
+            .def("getFz", &HybPL::getFz)
+            .def("getParticles", &HybPL::getParticles, py::arg("userPopName") = "all");
+
+
+    using MHDPL = PatchLevel<typename Sim::MHDModel>;
+    name        = "MHDPatchLevel";
+    if constexpr (core::defaultNbrRefinedParts(opts.dimension, opts.interp_order)
+                  == opts.nbRefinedPart)
+        py::class_<MHDPL, py::smart_holder>(m, name.c_str());
 
     using _Splitter
         = PHARE::amr::Splitter<core::DimConst<Sim::dimension>, core::InterpConst<Sim::interp_order>,

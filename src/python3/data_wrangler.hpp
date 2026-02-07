@@ -1,6 +1,7 @@
 #ifndef PHARE_PYTHON_DATA_WRANGLER_HPP
 #define PHARE_PYTHON_DATA_WRANGLER_HPP
 
+
 #include "core/utilities/mpi_utils.hpp"
 #include "core/utilities/point/point.hpp"
 #include "core/utilities/meta/meta_utilities.hpp"
@@ -16,13 +17,16 @@
 
 #include "dict.hpp"
 
+
 #include <array>
 #include <memory>
 #include <vector>
 #include <cstddef>
 #include <iterator>
-#include <stdexcept>
 #include <algorithm>
+#include <stdexcept>
+
+
 
 namespace PHARE::pydata
 {
@@ -71,6 +75,8 @@ public:
 
     using Simulator   = PHARE::Simulator<opts>;
     using HybridModel = Simulator::HybridModel;
+    using MHDModel    = Simulator::MHDModel;
+
 
 
     DataWrangler(std::shared_ptr<Simulator> const& simulator,
@@ -90,17 +96,23 @@ public:
 
     auto getNumberOfLevels() const { return hierarchy_->getNumberOfLevels(); }
 
-    auto getPatchLevel(size_t lvl)
+    auto getMHDPatchLevel(size_t lvl)
     {
-        return PatchLevel<opts>{*hierarchy_, *simulator_.getHybridModel(), lvl};
+        return PatchLevel<MHDModel>{*hierarchy_, *simulator_.getMHDModel(), lvl};
     }
+
+    auto getHybridPatchLevel(size_t lvl)
+    {
+        return PatchLevel<HybridModel>{*hierarchy_, *simulator_.getHybridModel(), lvl};
+    }
+
 
     auto sort_merge_1d(std::vector<PatchData<std::vector<double>, dimension>> const&& input,
                        bool shared_patch_border = false)
     {
         std::vector<std::pair<double, PatchData<std::vector<double>, dimension> const*>> sorted;
         for (auto const& data : input)
-            sorted.emplace_back(core::Point<double, 1>::fromString(data.origin)[0], &data);
+            sorted.emplace_back(makeSpan(data.origin)[0], &data);
         std::sort(sorted.begin(), sorted.end(), [](auto& a, auto& b) { return a.first < b.first; });
         std::vector<double> ret;
         for (size_t i = 0; i < sorted.size(); i++)
@@ -130,7 +142,7 @@ public:
 
         auto const collect = [&](PatchData<std::vector<double>, dimension> const& patch_data) {
             auto patchIDs = core::mpi::collect(patch_data.patchID, mpi_size);
-            auto origins  = core::mpi::collect(patch_data.origin, mpi_size);
+            auto origins  = core::mpi::collect_raw(makeSpan(patch_data.origin), mpi_size);
             auto lower    = core::mpi::collect_raw(makeSpan(patch_data.lower), mpi_size);
             auto upper    = core::mpi::collect_raw(makeSpan(patch_data.upper), mpi_size);
             auto ghosts   = core::mpi::collect(patch_data.nGhosts, mpi_size);
