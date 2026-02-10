@@ -1,13 +1,10 @@
 #ifndef PHARE_CORE_NUMERICS_PUSHER_PUSHER_HPP
 #define PHARE_CORE_NUMERICS_PUSHER_PUSHER_HPP
 
-#include <cstddef>
-#include <type_traits>
-#include <utility>
-#include <functional>
 
-#include "core/utilities/range/range.hpp"
-#include "core/data/particles/particle.hpp"
+#include <array>
+#include <cstddef>
+#include <functional>
 
 namespace PHARE
 {

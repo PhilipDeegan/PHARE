@@ -14,7 +14,7 @@ struct SimOpts
     std::size_t dimension    = 1;
     std::size_t interp_order = 1;
 
-    std::size_t nbRefinedPart = core::defaultNbrRefinedParts(dimension, interp_order);
+    std::size_t nbRefinedPart = core::defaultNbrRefinedParts(dimension);
 };
 
 

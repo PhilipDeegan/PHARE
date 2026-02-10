@@ -2,18 +2,19 @@
 #define PHARE_CORE_DATA_PARTICLES_PARTICLE_ARRAY_HPP
 
 
+#include "core/def.hpp"
+#include "core/utilities/span.hpp"
+#include "core/utilities/box/box.hpp"
+#include "core/utilities/cellmap.hpp"
+#include "core/utilities/range/range.hpp"
+
+#include "particle.hpp"
+
+
+#include <vector>
 #include <cstddef>
 #include <utility>
-#include <vector>
 
-#include "core/utilities/indexer.hpp"
-#include "particle.hpp"
-#include "core/utilities/point/point.hpp"
-#include "core/utilities/cellmap.hpp"
-#include "core/logger.hpp"
-#include "core/utilities/box/box.hpp"
-#include "core/utilities/range/range.hpp"
-#include "core/def.hpp"
 
 namespace PHARE::core
 {
@@ -182,7 +183,7 @@ public:
     template<typename Cell>
     void change_icell(Cell const& newCell, std::size_t particleIndex)
     {
-        auto oldCell                    = particles_[particleIndex].iCell;
+        auto const oldCell              = particles_[particleIndex].iCell;
         particles_[particleIndex].iCell = newCell;
         if (!box_.isEmpty())
         {

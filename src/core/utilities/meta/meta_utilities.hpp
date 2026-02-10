@@ -1,10 +1,12 @@
 #ifndef PHARE_CORE_UTILITIES_META_META_UTILITIES_HPP
 #define PHARE_CORE_UTILITIES_META_META_UTILITIES_HPP
 
+
+#include "core/utilities/types.hpp"
+
 #include <iterator>
 #include <type_traits>
 
-#include "core/utilities/types.hpp"
 
 namespace PHARE
 {
@@ -69,46 +71,14 @@ namespace core
     using SimulatorOption = std::tuple<DimConstant, InterpConstant,
                                        std::integral_constant<std::size_t, ValidNbrParticles>...>;
 
-    constexpr decltype(auto) possibleSimulators()
+
+
+
+    constexpr std::size_t defaultNbrRefinedParts(std::size_t const dim)
     {
-        // inner tuple = dim, interp, list[possible nbrParticles for dim/interp]
-        return std::tuple<SimulatorOption<DimConst<1>, InterpConst<1>, 2, 3>,
-                          SimulatorOption<DimConst<1>, InterpConst<2>, 2, 3, 4>,
-                          SimulatorOption<DimConst<1>, InterpConst<3>, 2, 3, 4, 5>,
+        assert(0 < dim < 4);
 
-                          SimulatorOption<DimConst<2>, InterpConst<1>, 4, 5, 8, 9>,
-                          SimulatorOption<DimConst<2>, InterpConst<2>, 4, 5, 8, 9, 16>,
-                          SimulatorOption<DimConst<2>, InterpConst<3>, 4, 5, 8, 9, 25>,
-
-                          SimulatorOption<DimConst<3>, InterpConst<1>, 6, 12>,
-                          SimulatorOption<DimConst<3>, InterpConst<2>, 6, 12>,
-                          SimulatorOption<DimConst<3>, InterpConst<3>, 6, 12>
-
-                          >{};
-    }
-
-
-    constexpr std::size_t defaultNbrRefinedParts(std::size_t dim, std::size_t interp)
-    {
-        auto sims            = possibleSimulators();
-        using SimsTuple_t    = decltype(sims);
-        auto constexpr nsims = std::tuple_size_v<SimsTuple_t>;
-
-        std::size_t nbRefinedPart = 0;
-
-        for_N<nsims>([&](auto i) {
-            using SimOption = std::tuple_element_t<i, SimsTuple_t>;
-
-            if (std::tuple_element_t<0, SimOption>{}() == dim
-                and std::tuple_element_t<1, SimOption>{}() == interp)
-            {
-                nbRefinedPart = std::tuple_element_t<2, SimOption>{};
-            }
-        });
-
-        assert(nbRefinedPart != 0); // is static_assert in constexpr call
-
-        return nbRefinedPart;
+        return std::array<std::size_t, 3>{2, 4, 6}[dim - 1];
     }
 
 
@@ -142,9 +112,8 @@ namespace core
             using SimuType = std::decay_t<decltype(simType)>;
             using _dim     = typename std::tuple_element<0, SimuType>::type;
 
-            if constexpr (_dim{}() < 3) // TORM on 3D PR
-                if (!p)
-                    p = maker(dim, _dim{});
+            if (!p)
+                p = maker(dim, _dim{});
         });
 
         return p;
@@ -171,10 +140,7 @@ namespace core
         Ptr_t p     = nullptr;
 
         core::apply(phare_exe_default_simulators(), [&](auto const& simType) {
-            using SimuType = std::decay_t<decltype(simType)>;                // TORM on 3D PR
-            using _dim     = typename std::tuple_element<0, SimuType>::type; // TORM on 3D PR
-            if constexpr (_dim{}() < 3)                                      // TORM on 3D PR
-                _makeAtRuntime(maker, p, dim, interpOrder, nbRefinedPart, simType);
+            _makeAtRuntime(maker, p, dim, interpOrder, nbRefinedPart, simType);
         });
 
         return p;
