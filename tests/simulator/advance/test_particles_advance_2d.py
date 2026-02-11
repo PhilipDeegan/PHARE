@@ -23,10 +23,13 @@ def per_interp(dic):
 
 
 @ddt
-class AdvanceTest(AdvanceTestBase):
+class Advance2DTest(AdvanceTestBase):
     @data(*interp_orders)
     def test_L0_particle_number_conservation(self, interp):
-        self._test_L0_particle_number_conservation(ndim, interp, ppc=ppc)
+        print(f"{self._testMethodName}_{ndim}d")
+        self._test_L0_particle_number_conservation(
+            ndim, interp, refinement_boxes={}, ppc=ppc
+        )
 
     @data(
         *per_interp(({"L0": {"B0": Box2D(10, 14)}})),

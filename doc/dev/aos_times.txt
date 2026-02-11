@@ -1,0 +1,28 @@
+100% loss(99.99) Simulator::initialize                                 22,344.17ms
+ 0.01% loss(-) HybridHybridMessengerStrategy::fillIonMomentGhosts           2.90ms
+100% loss(0.05) Simulator::advance                                     18,046.22ms
+ 99.95% loss(0.0) SolverPPC::advanceLevel                              18,037.60ms
+  1.85% loss(0.01) SolverPPC::predictor1_                                 333.43ms
+   0.63% loss(-) SolverPPC::predictor1_.faraday                           114.15ms
+   0.54% loss(-) SolverPPC::predictor1_.ampere                             98.22ms
+   0.67% loss(-) SolverPPC::predictor1_.ohm                               121.02ms
+  0.06% loss(-) SolverPPC::average_                                        10.95ms
+  57.52% loss(57.13) SolverPPC::moveIons_                              10,380.86ms
+   24.65% loss(-) Boris::move_no_bc                                     4,447.71ms
+   0.00% loss(-) HybridHybridMessengerStrategy::fillIonPopMomentGhosts      0.02ms
+   0.02% loss(-) HybridHybridMessengerStrategy::fillIonMomentGhosts         2.85ms
+  1.82% loss(0.01) SolverPPC::predictor2_                                 327.90ms
+   0.63% loss(-) SolverPPC::predictor2_.faraday                           113.82ms
+   0.55% loss(-) SolverPPC::predictor2_.ampere                             98.36ms
+   0.64% loss(-) SolverPPC::predictor2_.ohm                               115.69ms
+  0.05% loss(-) SolverPPC::average_                                         9.04ms
+  36.83% loss(0.51) SolverPPC::moveIons_                                6,645.61ms
+   36.61% loss(32.8) IonUpdater::updateAndDepositAll_                   6,607.31ms
+    24.60% loss(-) Boris::move_no_bc                                    4,439.99ms
+   0.00% loss(-) HybridHybridMessengerStrategy::fillIonPopMomentGhosts      0.02ms
+   0.01% loss(-) HybridHybridMessengerStrategy::fillIonGhostParticles       1.28ms
+   0.02% loss(-) HybridHybridMessengerStrategy::fillIonMomentGhosts         2.90ms
+  1.83% loss(0.01) SolverPPC::corrector_                                  329.66ms
+   0.63% loss(-) SolverPPC::corrector_.faraday                            113.61ms
+   0.54% loss(-) SolverPPC::corrector_.ampere                              98.27ms
+   0.65% loss(-) SolverPPC::corrector_.ohm                                117.76ms

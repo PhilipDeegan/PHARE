@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
 
-
+import os
 import numpy as np
+import matplotlib as mpl
 from pathlib import Path
 
 import pyphare.pharein as ph
@@ -13,24 +14,33 @@ from pyphare.simulator.simulator import Simulator
 from pyphare.simulator.simulator import startMPI
 
 from tests.simulator import SimulatorTest
+from tests.diagnostic import dump_all_diags
 
 
 ph.NO_GUI()
 
-
-cells = (200, 100)
+ppc = 100
+cells = (400, 200)
 time_step = 0.005
-final_time = 50
-timestamps = np.arange(0, final_time + time_step, final_time / 5)
-diag_dir = "phare_outputs/harris"
+time_step_nbr = 2
+final_time = time_step * time_step_nbr
+# timestamps = np.arange(0, final_time + time_step, final_time / 5)
+timestamps = [final_time]
+# np.arange(0, final_time + time_step, final_time / (final_time / time_step))
+layout = 3
+diag_dir = f"phare_outputs/harris/{layout}"
 
 
 def config():
+    print("timestamps", timestamps)
+
     L = 0.5
 
     sim = ph.Simulation(
+        largest_patch_size=200,
         time_step=time_step,
-        final_time=final_time,
+        # final_time=final_time,
+        time_step_nbr=time_step_nbr,
         cells=cells,
         dl=(0.40, 0.40),
         refinement="tagging",
@@ -42,7 +52,6 @@ def config():
             "options": {"dir": diag_dir, "mode": "overwrite"},
         },
         strict=True,
-        nesting_buffer=1,
     )
 
     def density(x, y):
@@ -125,30 +134,19 @@ def config():
         "vthx": vthx,
         "vthy": vthy,
         "vthz": vthz,
-        "nbr_part_per_cell": 100,
+        "nbr_part_per_cell": ppc,
     }
 
-    ph.MaxwellianFluidModel(
+    model = ph.MaxwellianFluidModel(
         bx=bx,
         by=by,
         bz=bz,
         protons={"charge": 1, "density": density, **vvv, "init": {"seed": 12334}},
     )
     ph.ElectronModel(closure="isothermal", Te=0.0)
+    dump_all_diags(model.populations)
 
-    for quantity in ["E", "B"]:
-        ph.ElectromagDiagnostics(quantity=quantity, write_timestamps=timestamps)
-    for quantity in ["mass_density", "bulkVelocity"]:
-        ph.FluidDiagnostics(quantity=quantity, write_timestamps=timestamps)
-
-    for quantity in ["density", "pressure_tensor"]:
-        ph.FluidDiagnostics(
-            quantity=quantity, write_timestamps=timestamps, population_name="protons"
-        )
-
-    ph.InfoDiagnostics(quantity="particle_count")
-
-    ph.LoadBalancer(active=True, auto=True, mode="nppc", tol=0.05)
+    # ph.LoadBalancer(active=True, auto=True, mode="nppc", tol=0.05)
 
     return sim
 
@@ -159,7 +157,6 @@ def plot_file_for_qty(plot_dir, qty, time):
 
 def plot(diag_dir, plot_dir):
     run = Run(diag_dir)
-    pop_name = "protons"
     for time in timestamps:
         run.GetDivB(time).plot(
             filename=plot_file_for_qty(plot_dir, "divb", time),
@@ -170,12 +167,17 @@ def plot(diag_dir, plot_dir):
         run.GetRanks(time).plot(
             filename=plot_file_for_qty(plot_dir, "Ranks", time), plot_patches=True
         )
-        run.GetN(time, pop_name=pop_name).plot(
+        run.GetN(time, pop_name="protons").plot(
             filename=plot_file_for_qty(plot_dir, "N", time), plot_patches=True
         )
         for c in ["x", "y", "z"]:
             run.GetB(time).plot(
                 filename=plot_file_for_qty(plot_dir, f"b{c}", time),
+                plot_patches=True,
+                qty=f"{c}",
+            )
+            run.GetE(time).plot(
+                filename=plot_file_for_qty(plot_dir, f"e{c}", time),
                 plot_patches=True,
                 qty=f"{c}",
             )
@@ -185,20 +187,6 @@ def plot(diag_dir, plot_dir):
             plot_patches=True,
             vmin=-2,
             vmax=2,
-        )
-        run.GetPressure(time, pop_name=pop_name).plot(
-            filename=plot_file_for_qty(plot_dir, "Pxx", time),
-            qty=pop_name + "_Pxx",
-            plot_patches=True,
-            vmin=0,
-            vmax=2.7,
-        )
-        run.GetPressure(time, pop_name=pop_name).plot(
-            filename=plot_file_for_qty(plot_dir, "Pzz", time),
-            qty=pop_name + "_Pzz",
-            plot_patches=True,
-            vmin=0,
-            vmax=1.5,
         )
 
 
@@ -216,7 +204,8 @@ class HarrisTest(SimulatorTest):
 
     def test_run(self):
         self.register_diag_dir_for_cleanup(diag_dir)
-        Simulator(config()).run().reset()
+        Simulator(config()).setup(layout=layout).initialize().run()
+
         if cpp.mpi_rank() == 0:
             plot_dir = Path(f"{diag_dir}_plots") / str(cpp.mpi_size())
             plot_dir.mkdir(parents=True, exist_ok=True)
@@ -228,3 +217,4 @@ class HarrisTest(SimulatorTest):
 if __name__ == "__main__":
     startMPI()
     HarrisTest().test_run().tearDown()
+    # Simulator(config()).setup(layout=layout).initialize().run()

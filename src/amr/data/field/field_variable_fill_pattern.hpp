@@ -4,7 +4,7 @@
 #include "core/logger.hpp"
 #include "core/def/phare_mpi.hpp"
 #include "core/utilities/types.hpp"
-#include <core/hybrid/hybrid_quantities.hpp>
+// #include "core/hybrid/hybrid_quantities.hpp"
 #include "core/data/tensorfield/tensorfield.hpp"
 
 #include <amr/utilities/box/amr_box.hpp>
@@ -62,6 +62,7 @@ public:
 
                                              transformation);
     }
+
 
     /*
      *************************************************************************
@@ -258,6 +259,7 @@ class FieldGhostInterpOverlapFillPattern : public SAMRAI::xfer::VariableFillPatt
     std::size_t constexpr static dim = Gridlayout_t::dimension;
     using FieldGeometry_t            = FieldGeometryBase<dim>;
 
+
 public:
     FieldGhostInterpOverlapFillPattern() {}
     ~FieldGhostInterpOverlapFillPattern() override {}
@@ -265,6 +267,7 @@ public:
     std::shared_ptr<SAMRAI::hier::BoxOverlap>
     calculateOverlap(SAMRAI::hier::BoxGeometry const& _dst_geometry,
                      SAMRAI::hier::BoxGeometry const& _src_geometry,
+
                      SAMRAI::hier::Box const& dst_patch_box, SAMRAI::hier::Box const& src_mask,
                      SAMRAI::hier::Box const& fill_box, bool const overwrite_interior,
                      SAMRAI::hier::Transformation const& transformation) const override
@@ -335,6 +338,7 @@ private:
         throw std::runtime_error("no refinement supported or expected");
     }
 };
+
 
 template<typename Gridlayout_t, std::size_t rank_ = 1> // ASSUMED ALL PRIMAL!
 class TensorFieldGhostInterpOverlapFillPattern : public SAMRAI::xfer::VariableFillPattern

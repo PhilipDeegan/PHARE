@@ -1,0 +1,39 @@
+name: mkn
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+  schedule:
+    - cron: "0 12 1 * *"
+
+env:
+  MKN_GCC_PREFERRED: 1
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    container: ghcr.io/pharchive/phare_dep/ubuntu:24.04
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Install
+      run: apt-get update && apt-get install -y curl sudo
+
+    - name: "setup"
+      run: |
+        curl -Lo mkn https://github.com/mkn/mkn/releases/download/latest/mkn_nix
+        chmod +x mkn && mv mkn /.venv/bin/mkn
+        mkdir /mkn
+
+    - name: "Build/Test"
+
+      run: |
+        . /.venv/bin/activate
+        PROPS="samrai.ver=installed,HDF5_PTH=/usr/lib/x86_64-linux-gnu/hdf5/openmpi,HDF5_INC=/usr/include/hdf5/openmpi"
+        CARGS="-P ${PROPS} -w mkn.gpu" ./mkn.sh

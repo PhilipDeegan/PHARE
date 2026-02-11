@@ -13,9 +13,6 @@
 
 namespace PHARE::amr
 {
-using core::dirX;
-using core::dirY;
-using core::dirZ;
 /** @brief This class gives an operator() that performs the coarsening of N fine nodes onto a
  * given coarse node
  *
@@ -29,10 +26,16 @@ using core::dirZ;
  * This is done by assigning to a magnetic field component on a coarse face, the average
  * of the enclosed fine faces
  *
+ * WARNING:
+ * the following assumes where B is, i.e. Yee layout centering
+ * as it only does faces pirmal-dual, dual-primal and dual-dual
+ *
  */
 template<std::size_t dimension>
 class ElectricFieldCoarsener
 {
+    using Point_t = core::Point<int, dimension>;
+
 public:
     ElectricFieldCoarsener(std::array<core::QtyCentering, dimension> const centering,
                            SAMRAI::hier::Box const& sourceBox,
@@ -41,19 +44,22 @@ public:
         : centering_{centering}
         , sourceBox_{sourceBox}
         , destinationBox_{destinationBox}
-
     {
     }
+
 
     template<typename FieldT>
     void operator()(FieldT const& fineField, FieldT& coarseField,
                     core::Point<int, dimension> coarseIndex)
     {
+        using core::dirX;
+        using core::dirY;
+        using core::dirZ;
         // For the moment we only take the case of field with the same centering
         TBOX_ASSERT(fineField.physicalQuantity() == coarseField.physicalQuantity());
 
-        core::Point<int, dimension> fineStartIndex;
 
+        core::Point<int, dimension> fineStartIndex;
         for (auto i = std::size_t{0}; i < dimension; ++i)
         {
             fineStartIndex[i] = coarseIndex[i] * refinementRatio;
@@ -143,11 +149,28 @@ public:
         }
     }
 
-private:
+
+    // template<std::size_t D, typename FieldT>
+    // typename std::enable_if<D == 1, void>::type
+    // coarsen(Point_t const fineStartIndex, FieldT const& fineField, FieldT& coarseField,
+    //         Point_t const coarseIndex);
+
+    // template<std::size_t D, typename FieldT>
+    // typename std::enable_if<D == 2, void>::type
+    // coarsen(Point_t const fineStartIndex, FieldT const& fineField, FieldT& coarseField,
+    //         Point_t const coarseIndex);
+
+    // template<std::size_t D, typename FieldT>
+    // typename std::enable_if<D == 3, void>::type
+    // coarsen(Point_t const fineStartIndex, FieldT const& fineField, FieldT& coarseField,
+    //         Point_t const coarseIndex);
+
+
     std::array<core::QtyCentering, dimension> const centering_;
     SAMRAI::hier::Box const sourceBox_;
     SAMRAI::hier::Box const destinationBox_;
 };
+
 
 } // namespace PHARE::amr
 
