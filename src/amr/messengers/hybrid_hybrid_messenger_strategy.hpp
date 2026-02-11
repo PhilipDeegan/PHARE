@@ -319,12 +319,12 @@ namespace amr
             }
 
             {
-                auto border_max_factory = std::make_shared<FieldBorderMaxTransactionFactory_t>();
+                auto border_max_factory = std::make_shared<VecFieldBorderMaxTransactionFactory_t>();
                 for (auto& refiner : ionFluxBorderMaxRefiners_)
                     refiner.registerLevel(hierarchy, level, border_max_factory);
             }
             {
-                auto border_max_factory = std::make_shared<VecFieldBorderMaxTransactionFactory_t>();
+                auto border_max_factory = std::make_shared<FieldBorderMaxTransactionFactory_t>();
                 for (auto& refiner : ionDensityBorderMaxRefiners_)
                     refiner.registerLevel(hierarchy, level, border_max_factory);
             }
