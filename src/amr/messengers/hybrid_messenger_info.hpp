@@ -59,12 +59,17 @@ namespace amr
 
         // below are the descriptions of the vector fields that for which
         // ghosts need to be filled at some point.
+
         std::vector<std::string> ghostFlux;
         std::vector<std::string> sumBorderFields;
         std::vector<std::string> ghostMagnetic;
         std::vector<std::string> ghostElectric;
         std::vector<std::string> ghostCurrent;
         std::vector<std::string> ghostBulkVelocity;
+
+
+        std::vector<std::string> maxBorderFields;
+        std::vector<std::string> maxBorderVecFields;
 
         // below are the descriptions of the electric field that we use in the refluxing
         std::string refluxElectric;

@@ -6,7 +6,7 @@
 
 #include "amr/physical_models/mhd_model.hpp"
 #include "amr/physical_models/hybrid_model.hpp"
-#include "amr/messengers/field_sum_transaction.hpp"
+#include "amr/messengers/field_operate_transaction.hpp"
 #include "amr/data/field/field_variable_fill_pattern.hpp"
 
 #include "dict.hpp"
@@ -30,7 +30,6 @@ template<typename Hierarchy, typename Model>
 class BaseModelView : public IModelView
 {
 public:
-    using GridLayout        = Model::gridlayout_type;
     using VecField          = Model::vecfield_type;
     using TensorFieldT      = Model::ions_type::tensorfield_type;
     using GridLayoutT       = Model::gridlayout_type;
@@ -38,8 +37,8 @@ public:
     using TensorFieldData_t = ResMan::template UserTensorField_t</*rank=*/2>::patch_data_type;
     static constexpr auto dimension = Model::dimension;
 
-
 public:
+    using Model_t = Model;
     using PatchProperties
         = cppdict::Dict<float, double, std::size_t, std::vector<int>, std::vector<std::uint32_t>,
                         std::vector<double>, std::vector<std::size_t>, std::string,
@@ -93,9 +92,9 @@ public:
     template<typename Action>
     void visitHierarchy(Action&& action, int minLevel = 0, int maxLevel = 0)
     {
-        PHARE::amr::visitHierarchy<GridLayout>(hierarchy_, *model_.resourcesManager,
-                                               std::forward<Action>(action), minLevel, maxLevel,
-                                               model_);
+        PHARE::amr::visitHierarchy<GridLayoutT>(hierarchy_, *model_.resourcesManager,
+                                                std::forward<Action>(action), minLevel, maxLevel,
+                                                model_);
     }
 
     NO_DISCARD auto boundaryConditions() const { return hierarchy_.boundaryConditions(); }
@@ -105,10 +104,14 @@ public:
 
     NO_DISCARD std::string getLayoutTypeString() const
     {
-        return std::string{GridLayout::implT::type};
+        return std::string{GridLayoutT::implT::type};
     }
 
-    NO_DISCARD auto getPatchProperties(std::string patchID, GridLayout const& grid) const
+
+
+
+    NO_DISCARD auto getPatchProperties(std::string /*patchID*/, GridLayoutT const& grid) const
+
     {
         PatchProperties dict;
         dict["origin"]   = grid.origin().toVector();
@@ -141,6 +144,11 @@ public:
         return model_.tags.at(key);
     }
 
+
+    auto operator()() const { return model_.getCompileTimeResourcesViewList(); }
+
+
+
 protected:
     Model& model_;
     Hierarchy& hierarchy_;
@@ -170,12 +178,14 @@ protected:
     {
         auto& getOrCreateSchedule(auto& hierarchy, int const ilvl)
         {
+            using PlusEqualsOp = core::PlusEquals<typename VecField::value_type>;
             if (not MTschedules.count(ilvl))
                 MTschedules.try_emplace(
-                    ilvl, MTalgo->createSchedule(
-                              hierarchy.getPatchLevel(ilvl), 0,
-                              std::make_shared<
-                                  amr::FieldBorderSumTransactionFactory<TensorFieldData_t>>()));
+                    ilvl,
+                    MTalgo->createSchedule(
+                        hierarchy.getPatchLevel(ilvl), 0,
+                        std::make_shared<amr::FieldBorderOpTransactionFactory<TensorFieldData_t,
+                                                                              PlusEqualsOp>>()));
             return *MTschedules[ilvl];
         }
 
@@ -185,7 +195,7 @@ protected:
     };
 
     std::vector<MTAlgo> MTAlgos;
-    TensorFieldT sumTensor_{"PHARE_sumTensor", core::HybridQuantity::Tensor::M};
+    TensorFieldT sumTensor_{"phare_scratch_tensor_field", core::HybridQuantity::Tensor::M};
 };
 
 

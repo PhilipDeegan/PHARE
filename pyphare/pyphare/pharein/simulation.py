@@ -401,12 +401,16 @@ def check_patch_size(ndim, **kwargs):
             grid.nbrGhosts(kwargs["interp_order"], x) for x in ["primal", "dual"]
         )
 
+    interp = kwargs["interp_order"]
     max_ghosts = get_max_ghosts()
     small_invalid_patch_size = phare_utilities.np_array_ify(max_ghosts, ndim)
     largest_patch_size = kwargs.get("largest_patch_size", None)
 
-    # to prevent primal ghost overlaps of non adjacent patches, we need smallest_patch_size+=1
-    smallest_patch_size = phare_utilities.np_array_ify(max_ghosts, ndim) + 1
+    # to prevent primal ghost box overlaps of non adjacent patches, we need smallest_patch_size * 2 + 1
+    smallest_patch_size = phare_utilities.np_array_ify(max_ghosts, ndim) * 2 + 1
+    # TORM next lines after https://github.com/llnl/SAMRAI/issues/311
+    min_per_interp = [6, 9, 9]  # SAMRAI BORDER BUG
+    smallest_patch_size = phare_utilities.np_array_ify(min_per_interp[interp - 1], ndim)
     if "smallest_patch_size" in kwargs and kwargs["smallest_patch_size"] is not None:
         smallest_patch_size = phare_utilities.np_array_ify(
             kwargs["smallest_patch_size"], ndim
@@ -509,8 +513,6 @@ def check_diag_options(**kwargs):
 
 
 def check_restart_options(**kwargs):
-    import pyphare.pharein.restarts as restarts
-
     valid_keys = [
         "dir",
         "elapsed_timestamps",
@@ -522,6 +524,8 @@ def check_restart_options(**kwargs):
     restart_options = kwargs.get("restart_options", None)
 
     if restart_options is not None:
+        import pyphare.pharein.restarts as restarts
+
         for key in restart_options.keys():
             if key not in valid_keys:
                 raise ValueError(

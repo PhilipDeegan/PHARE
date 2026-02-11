@@ -6,7 +6,7 @@ import numpy as np
 from datetime import datetime
 
 import pyphare.pharein as ph
-from pyphare.pharein import ElectronModel
+from pyphare.core.phare_utilities import np_array_ify
 
 
 def parse_cli_args(pop_from_sys=True):
@@ -31,28 +31,28 @@ class NoOverwriteDict(dict):
             return super(NoOverwriteDict, self).__setitem__(k, v)
 
 
-def basicSimulatorArgs(dim: int, interp: int, **kwargs):
+def basicSimulatorArgs(ndim: int, interp: int, **kwargs):
     from pyphare.pharein.simulation import valid_refined_particle_nbr
     from pyphare.pharein.simulation import check_patch_size
+    from pyphare.core.phare_utilities import np_array_ify
 
-    cells = kwargs.get("cells", [20 for i in range(dim)])
-    if not isinstance(cells, (list, tuple)):
-        cells = [cells] * dim
+    cells = np_array_ify(kwargs.get("cells", 20), ndim)
 
-    _, smallest_patch_size = check_patch_size(dim, interp_order=interp, cells=cells)
+    _, smallest_patch_size = check_patch_size(ndim, interp_order=interp, cells=cells)
     dl = [1.0 / v for v in cells]
-    b0 = [[3] * dim, [8] * dim]
+    b0 = [[3] * ndim, [12] * ndim]
+
     args = {
         "interp_order": interp,
         "smallest_patch_size": smallest_patch_size,
-        "largest_patch_size": [20] * dim,
+        "largest_patch_size": [20] * ndim,
         "time_step_nbr": 1000,
         "final_time": 1.0,
-        "boundary_types": ["periodic"] * dim,
+        "boundary_types": ["periodic"] * ndim,
         "cells": cells,
         "dl": dl,
         "refinement_boxes": {"L0": {"B0": b0}},
-        "refined_particle_nbr": valid_refined_particle_nbr[dim][interp][0],
+        "refined_particle_nbr": valid_refined_particle_nbr[ndim][interp][0],
         "diag_options": {},
         "nesting_buffer": 0,
         "strict": True,
@@ -60,7 +60,6 @@ def basicSimulatorArgs(dim: int, interp: int, **kwargs):
     for k, v in kwargs.items():
         if k in args:
             args[k] = v
-
     return args
 
 
@@ -98,12 +97,17 @@ def density_2d_periodic(sim, x, y):
     )
 
 
-# def density_3d_periodic(sim, x, y, z):
-#     xmax, ymax, zmax = sim.simulation_domain()
-#     background_particles = 0.3  # avoids 0 density
-#     xx, yy, zz = meshify(x, y, z)
-#     r = np.exp(-(xx-0.5*xmax)**2)*np.exp(-(yy-ymax/2.)**2)*np.exp(-(zz-zmax/2.)**2) + background_particles
-#     return r
+def density_3d_periodic(sim, x, y, z):
+    xmax, ymax, zmax = sim.simulation_domain()
+    background_particles = 0.3  # avoids 0 density
+    xx, yy, zz = meshify(x, y, z)
+    r = (
+        np.exp(-((xx - 0.5 * xmax) ** 2))
+        * np.exp(-((yy - ymax / 2.0) ** 2))
+        * np.exp(-((zz - zmax / 2.0) ** 2))
+        + background_particles
+    )
+    return r
 
 
 def defaultPopulationSettings(sim, density_fn, vbulk_fn):
@@ -119,19 +123,19 @@ def defaultPopulationSettings(sim, density_fn, vbulk_fn):
     }
 
 
-def makeBasicModel(extra_pops={}):
+def makeBasicModel(extra_pops={}, ppc=100):
     sim = ph.global_vars.sim
     _density_fn_periodic = globals()["density_" + str(sim.ndim) + "d_periodic"]
 
     pops = {
         "protons": {
             **defaultPopulationSettings(sim, _density_fn_periodic, fn_periodic),
-            "nbr_part_per_cell": 100,
+            "nbr_part_per_cell": ppc,
             "init": {"seed": 1337},
         },
         "alpha": {
             **defaultPopulationSettings(sim, _density_fn_periodic, fn_periodic),
-            "nbr_part_per_cell": 100,
+            "nbr_part_per_cell": ppc,
             "init": {"seed": 13337},
         },
     }
@@ -157,7 +161,7 @@ def populate_simulation(dim, interp, **input):
     if "diags_fn" in input:
         input["diags_fn"](model)
 
-    ElectronModel(closure="isothermal", Te=0.12)
+    ph.ElectronModel(closure="isothermal", Te=0.12)
 
     return simulation
 
@@ -247,10 +251,13 @@ class SimulatorTest(unittest.TestCase):
         self._outcome = result
         super().run(result)
 
-    def unique_diag_dir_for_test_case(self, base_path, ndim, interp, post_path=""):
+    def unique_diag_dir_for_test_case(
+        self, base_path, ndim, interp, sim_setup_kwargs={}, post_path=""
+    ):
         from pyphare import cpp
 
-        return f"{base_path}/{self._testMethodName}/{cpp.mpi_size()}/{ndim}/{interp}/{post_path}"
+        layout = sim_setup_kwargs.get("layout", 1)
+        return f"{base_path}/{self._testMethodName}/{cpp.mpi_size()}/{ndim}/{interp}/{layout}/{post_path}"
 
     def clean_up_diags_dirs(self):
         from pyphare import cpp
@@ -264,3 +271,33 @@ class SimulatorTest(unittest.TestCase):
                 if os.path.exists(diag_dir):
                     shutil.rmtree(diag_dir)
         cpp.mpi_barrier()
+
+
+def debug_tracer():
+    """
+    print live stack trace during execution
+    """
+
+    import sys, os
+
+    def tracefunc(frame, event, arg, indent=[0]):
+        filename = os.path.basename(frame.f_code.co_filename)
+        line_number = frame.f_lineno
+        if event == "call":
+            indent[0] += 2
+            print(
+                "-" * indent[0] + "> enter function",
+                frame.f_code.co_name,
+                f"{filename} {line_number}",
+            )
+        elif event == "return":
+            print(
+                "<" + "-" * indent[0],
+                "exit function",
+                frame.f_code.co_name,
+                f"{filename} {line_number}",
+            )
+            indent[0] -= 2
+        return tracefunc
+
+    sys.setprofile(tracefunc)

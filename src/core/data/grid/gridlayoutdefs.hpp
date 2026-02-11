@@ -1,20 +1,20 @@
 #ifndef PHARE_CORE_GRID_GRIDLAYOUTDEFS_HPP
 #define PHARE_CORE_GRID_GRIDLAYOUTDEFS_HPP
 
-#include <cstddef>
 
-#include "core/hybrid/hybrid_quantities.hpp"
-#include "core/utilities/types.hpp"
 #include "core/utilities/point/point.hpp"
+#include "core/hybrid/hybrid_quantities.hpp"
+
+#include <cstddef>
+#include <cstdint>
+
 
 namespace PHARE
 {
 namespace core
 {
-    enum class Direction { X, Y, Z };
-
-
-    enum class QtyCentering { primal = 0, dual = 1 };
+    enum class Direction : std::uint8_t { X = 0, Y, Z };
+    enum class QtyCentering : std::uint8_t { primal = 0, dual = 1 };
 
 
     template<std::size_t dim>

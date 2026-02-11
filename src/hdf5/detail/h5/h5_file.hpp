@@ -2,20 +2,19 @@
 #define PHARE_HDF5_H5FILE_HPP
 
 #include "core/def.hpp"
-#include "core/def/phare_mpi.hpp" // IWYU pragma: keep
-#include "highfive/H5File.hpp"
-#include "highfive/H5Easy.hpp"
+#include "core/def/phare_mpi.hpp"
 
 #include "core/utilities/types.hpp"
 #include "core/utilities/mpi_utils.hpp"
 #include "core/utilities/meta/meta_utilities.hpp"
 
+#include "highfive/H5File.hpp"
+#include "highfive/H5Easy.hpp"
+
 namespace PHARE::hdf5::h5
 {
 using HiFile = HighFive::File;
 using FileOp = HighFive::File::AccessMode;
-
-
 
 template<std::size_t dim, typename Data>
 NO_DISCARD auto decay_to_pointer(Data& data)
