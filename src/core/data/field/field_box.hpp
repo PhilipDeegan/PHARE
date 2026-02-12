@@ -82,7 +82,6 @@ void max_of_fields(auto& dst, auto const& src)
     }
 }
 
-
 template<typename Field_t>
 template<typename Operator>
 void FieldBox<Field_t>::set_from(std::vector<value_type> const& vec, std::size_t seek)
