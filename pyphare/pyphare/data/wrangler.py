@@ -12,6 +12,11 @@ class DataWrangler:
         self.cpp = getattr(cpp.cpp_lib(sim), "DataWrangler")(
             simulator.cpp_sim, simulator.cpp_hier
         )
+        self.modelsPerLevel = {
+            lvl: simulator.cpp_hier.modelForLevel(lvl)
+            for lvl in range(sim.max_nbr_levels)
+        }
+        print("self.modelsPerLevel", self.modelsPerLevel)
 
     def kill(self):
         del self.cpp
@@ -19,8 +24,21 @@ class DataWrangler:
     def getNumberOfLevels(self):
         return self.cpp.getNumberOfLevels()
 
+    def getMHDPatchLevel(self, lvl):
+        return self.cpp.getMHDPatchLevel(lvl)
+
+    def getHybridPatchLevel(self, lvl):
+        return self.cpp.getHybridPatchLevel(lvl)
+
     def getPatchLevel(self, lvl):
-        return self.cpp.getPatchLevel(lvl)
+        assert lvl in self.modelsPerLevel, (
+            "lvl not in levels " + str(lvl) + f" {self.modelsPerLevel}"
+        )
+        lvlModel = self.modelsPerLevel[lvl]
+        assert lvlModel in ["Hybrid", "MHD"]
+        if lvlModel == "MHD":
+            return self.getMHDPatchLevel(lvl)
+        return self.getHybridPatchLevel(lvl)
 
     def _lvl0FullContiguous(self, input, is_primal=True):
         return self.cpp.sync_merge(input, is_primal)

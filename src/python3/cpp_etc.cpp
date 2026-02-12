@@ -88,7 +88,8 @@ PYBIND11_MODULE(cpp_etc, m)
         .def(py::init<>())
         .def("reset", &SamraiLifeCycle::reset);
 
-    py::class_<PHARE::amr::Hierarchy, std::shared_ptr<PHARE::amr::Hierarchy>>(m, "AMRHierarchy");
+    py::class_<PHARE::amr::Hierarchy, py::smart_holder>(m, "AMRHierarchy")
+        .def("modelForLevel", &PHARE::amr::Hierarchy::modelForLevel);
     m.def("make_hierarchy", []() { return PHARE::amr::Hierarchy::make(); });
 
     m.def("makePyArrayWrapper", makePyArrayWrapper<double>);
@@ -134,6 +135,9 @@ PYBIND11_MODULE(cpp_etc, m)
     declareDim<2>(m);
     declareDim<3>(m);
 
+    declarePatchData<py_array_t<double>, 1>(m, "PatchPyArrayDouble_1D");
+    declarePatchData<py_array_t<double>, 2>(m, "PatchPyArrayDouble_2D");
+    declarePatchData<py_array_t<double>, 3>(m, "PatchPyArrayDouble_3D");
     declarePatchData<std::vector<double>, 1>(m, "PatchDataVectorDouble_1D");
     declarePatchData<std::vector<double>, 2>(m, "PatchDataVectorDouble_2D");
     declarePatchData<std::vector<double>, 3>(m, "PatchDataVectorDouble_3D");
