@@ -37,8 +37,12 @@ namespace solver
         static constexpr auto dimension    = GridLayoutT::dimension;
         static constexpr auto interp_order = GridLayoutT::interp_order;
 
-        PHARE::core::Ohm<GridLayoutT> ohm_;
-        PHARE::core::Ampere<GridLayoutT> ampere_;
+        using ParticleArray_t = HybridModel::particle_array_type;
+        using Interpolating_t
+            = core::Interpolating<ParticleArray_t, interp_order, /*atomic_interp*/ false>;
+
+        PHARE::core::OhmSingleTransformer ohm_;
+        PHARE::core::AmpereSingleTransformer ampere_;
 
         inline bool isRootLevel(int const levelNumber) const { return levelNumber == 0; }
 
@@ -52,7 +56,8 @@ namespace solver
                                 amr::IMessenger<IPhysicalModelT>& messenger, double initDataTime,
                                 bool isRegridding) override
         {
-            core::Interpolator<dimension, interp_order> interpolate_;
+            Interpolating_t interpolate_;
+
             auto& hybridModel = static_cast<HybridModel&>(model);
             auto& level       = amr_types::getLevel(*hierarchy, levelNumber);
 
@@ -95,6 +100,7 @@ namespace solver
                 throw core::DictionaryException{}("ID", "HybridLevelInitializer::initialize");
 
             // now all particles are here, we must compute moments.
+
             auto& ions = hybridModel.state.ions;
             auto& rm   = *hybridModel.resourcesManager;
 
@@ -104,6 +110,7 @@ namespace solver
                 core::resetMoments(ions);
                 core::depositParticles(ions, layout, interpolate_, core::DomainDeposit{});
             }
+
 
             // at this point flux and density is computed for all pops
             // but nodes on ghost box overlaps are not complete because they lack
@@ -128,6 +135,7 @@ namespace solver
                 ions.computeChargeDensity();
                 ions.computeBulkVelocity();
             }
+            hybMessenger.fillIonBorders(ions, level, initDataTime);
 
             // on level i>0, this relies on 'prepareStep' having been called on when
             // level i-1 was initialized (at the end of this function)
@@ -145,38 +153,34 @@ namespace solver
             // this only needs to be done for the root level
             // since otherwise initLevel has done it already
             // TODO NICO comment! E is regridded, we only needed J for E
+
             if (!isRegriddingL0)
                 if (isRootLevel(levelNumber))
                 {
                     auto& B = hybridModel.state.electromag.B;
                     auto& J = hybridModel.state.J;
 
-                    for (auto& patch : level)
+                    for (auto& patch : rm.enumerate(level, B, J))
                     {
-                        auto _      = hybridModel.resourcesManager->setOnPatch(*patch, B, J);
                         auto layout = PHARE::amr::layoutFromPatch<GridLayoutT>(*patch);
-                        auto __     = core::SetLayout(&layout, ampere_);
-                        ampere_(B, J);
+                        ampere_(layout, B, J);
 
-                        hybridModel.resourcesManager->setTime(J, *patch, 0.);
+                        rm.setTime(J, *patch, 0.);
                     }
                     hybMessenger.fillCurrentGhosts(J, level, 0.);
 
                     auto& electrons = hybridModel.state.electrons;
                     auto& E         = hybridModel.state.electromag.E;
 
-                    for (auto& patch : level)
+                    for (auto& patch : rm.enumerate(level, B, E, J, electrons))
                     {
                         auto layout = PHARE::amr::layoutFromPatch<GridLayoutT>(*patch);
-                        auto _
-                            = hybridModel.resourcesManager->setOnPatch(*patch, B, E, J, electrons);
                         electrons.update(layout);
                         auto& Ve = electrons.velocity();
                         auto& Ne = electrons.density();
                         auto& Pe = electrons.pressure();
-                        auto __  = core::SetLayout(&layout, ohm_);
-                        ohm_(Ne, Ve, Pe, B, J, E);
-                        hybridModel.resourcesManager->setTime(E, *patch, 0.);
+                        ohm_(layout, Ne, Ve, Pe, B, J, E);
+                        rm.setTime(E, *patch, 0.);
                     }
 
                     hybMessenger.fillElectricGhosts(E, level, 0.);
@@ -191,7 +195,11 @@ namespace solver
             hybMessenger.prepareStep(hybridModel, level, initDataTime);
         }
     };
+
+
 } // namespace solver
+
 } // namespace PHARE
+
 
 #endif

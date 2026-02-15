@@ -6,7 +6,11 @@
 #define PHARE_SIM_STR 1, 1, 2 // mostly for clangformat - errors in cpp file if define is missing
 #endif
 
+
 #include "core/def/phare_mpi.hpp" // IWYU pragma: keep
+#include "core/def/phare_config.hpp"
+#include "core/utilities/types.hpp"
+#include "core/utilities/mpi_utils.hpp"
 
 #include "amr/samrai.hpp" // IWYU pragma: keep
 #include "amr/wrappers/hierarchy.hpp"
@@ -14,15 +18,24 @@
 #include "simulator/simulator.hpp" // IWYU pragma: keep
 
 #include "python3/pybind_def.hpp" // IWYU pragma: keep
-#include "pybind11/stl.h"         // IWYU pragma: keep
-#include "pybind11/numpy.h"       // IWYU pragma: keep
-#include "pybind11/chrono.h"      // IWYU pragma: keep
-#include "pybind11/complex.h"     // IWYU pragma: keep
-#include "pybind11/functional.h"  // IWYU pragma: keep
+#include "simulator/simulator.hpp"
+
+#include "pybind11/stl.h"        // IWYU pragma: keep
+#include "pybind11/numpy.h"      // IWYU pragma: keep
+#include "pybind11/chrono.h"     // IWYU pragma: keep
+#include "pybind11/complex.h"    // IWYU pragma: keep
+#include "pybind11/functional.h" // IWYU pragma: keep
 
 #include "python3/particles.hpp"     // IWYU pragma: keep
 #include "python3/patch_level.hpp"   // IWYU pragma: keep
 #include "python3/data_wrangler.hpp" // IWYU pragma: keep
+#include "python3/pybind_def.hpp"    // IWYU pragma: keep
+
+#include "python3/patch_data.hpp"
+
+#include "magic_enum/magic_enum_utility.hpp"
+
+#include <cstddef>
 
 
 namespace py = pybind11;
@@ -51,7 +64,8 @@ void declareSimulator(PyClass&& sim)
 template<typename Sim>
 void inline declare_etc(py::module& m)
 {
-    constexpr auto opts = SimOpts{PHARE_SIM_STR};
+    constexpr auto opts = SimOpts::make(PHARE_SIM_STR);
+
 
     using DW         = DataWrangler<opts>;
     std::string name = "DataWrangler";
@@ -104,9 +118,10 @@ void inline declare_etc(py::module& m)
 
 void inline declare_macro_sim(py::module& m)
 {
-    using Sim = Simulator<SimOpts{PHARE_SIM_STR}>;
+    using Sim = Simulator<SimOpts::make(PHARE_SIM_STR)>;
 
     std::string name = "Simulator";
+
     declareSimulator<Sim>(
         py::class_<Sim, py::smart_holder>(m, name.c_str())
             .def_property_readonly_static("dims", [](py::object) { return Sim::dimension; })
@@ -119,6 +134,7 @@ void inline declare_macro_sim(py::module& m)
     m.def(name.c_str(), [](std::shared_ptr<PHARE::amr::Hierarchy> const& hier) {
         return makeSimulator<Sim>(hier);
     });
+
 
 
     declare_etc<Sim>(m);

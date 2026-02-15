@@ -31,6 +31,7 @@ void updater_routine(benchmark::State& state)
         = std::vector<Particle_t>(n_parts, core::bench::particle<dim>());
     core::bench::disperse(patch_particles.domain_particles, 0, cells - 1);
     std::sort(patch_particles.domain_particles);
+
     auto particles_copy = patch_particles.domain_particles; // tmp storage between update modes
 
     initializer::PHAREDict dict;

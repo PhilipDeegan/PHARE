@@ -40,6 +40,9 @@ class Patch:
     def __getitem__(self, key):
         return self.patch_datas[key]
 
+    def __iter__(self):
+        return self.patch_datas.values().__iter__()
+
     def copy(self):
         """does not copy patchdatas.datasets (see class PatchData)"""
         from copy import deepcopy

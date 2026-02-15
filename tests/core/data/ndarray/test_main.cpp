@@ -1,12 +1,22 @@
-#include "gmock/gmock.h"
-#include "gtest/gtest.h"
-#include <random>
-#include <string>
 
+
+#include "phare_core.hpp"
 #include "core/data/ndarray/ndarray_vector.hpp"
+#include "phare_simulator_options.hpp"
+
+
+#include "gtest/gtest.h"
+
+#include <random>
+
 
 
 using namespace PHARE::core;
+
+#if PHARE_HAVE_RAJA and PHARE_HAVE_UMPIRE
+#include "raja_umpire_tests.h"
+#endif
+
 
 
 template<class NdArray>
@@ -57,9 +67,12 @@ protected:
 };
 
 
-using NdArray1D = ::testing::Types<NdArrayVector<1>>;
-using NdArray2D = ::testing::Types<NdArrayVector<2>>;
-using NdArray3D = ::testing::Types<NdArrayVector<3>>;
+template<std::size_t dim>
+using NdArray_t = typename PHARE_Types<PHARE::SimOpts{dim}>::Array_t;
+
+using NdArray1D = ::testing::Types<NdArray_t<1>>;
+using NdArray2D = ::testing::Types<NdArray_t<2>>;
+using NdArray3D = ::testing::Types<NdArray_t<3>>;
 
 
 TYPED_TEST_SUITE(GenericNdArray1D, NdArray1D);
@@ -85,8 +98,8 @@ TYPED_TEST(GenericNdArray1D, IsModifiable)
 TYPED_TEST(GenericNdArray1D, CanBeReadOnly)
 {
     std::uint32_t i{2};
-    this->a(i)                  = 12.;
-    NdArrayVector<1> const& ref = this->a;
+    this->a(i)              = 12.;
+    NdArray_t<1> const& ref = this->a;
     EXPECT_EQ(12., ref(i));
 }
 
@@ -109,12 +122,15 @@ TYPED_TEST(GenericNdArray1D, AccessWholeArray)
 }
 
 
-TYPED_TEST(GenericNdArray1D, HasCopyCtor)
+TYPED_TEST(GenericNdArray1D, HasCopyCtor) // this is operator= test
 {
     for (auto& e : this->a)
         e = 12.;
 
-    NdArrayVector<1> other{this->nx};
+    for (auto const& e : this->a)
+        EXPECT_DOUBLE_EQ(12., e);
+
+    NdArray_t<1> other{this->nx};
     other = this->a;
 
     for (auto const& e : other)
@@ -127,7 +143,10 @@ TYPED_TEST(GenericNdArray1D, HasMoveCtor)
     for (auto& e : this->a)
         e = 12.;
 
-    NdArrayVector<1> other = std::move(this->a);
+    for (auto const& e : this->a)
+        EXPECT_DOUBLE_EQ(12., e);
+
+    NdArray_t<1> other = std::move(this->a);
 
     for (auto const& e : other)
         EXPECT_DOUBLE_EQ(12., e);
@@ -152,8 +171,8 @@ TYPED_TEST(GenericNdArray2D, IsModifiable)
 TYPED_TEST(GenericNdArray2D, CanBeReadOnly)
 {
     std::uint32_t i{2}, j{3};
-    this->a(i, j)               = 12.;
-    NdArrayVector<2> const& ref = this->a;
+    this->a(i, j)           = 12.;
+    NdArray_t<2> const& ref = this->a;
     EXPECT_EQ(12., ref(i, j));
 }
 
@@ -185,7 +204,7 @@ TYPED_TEST(GenericNdArray2D, HasCopyCtor)
     for (auto& e : this->a)
         e = 12.;
 
-    NdArrayVector<2> other{this->nx, this->ny};
+    NdArray_t<2> other{this->nx, this->ny};
     other = this->a;
 
     for (auto const& e : other)
@@ -198,7 +217,7 @@ TYPED_TEST(GenericNdArray2D, HasMoveCtor)
     for (auto& e : this->a)
         e = 12.;
 
-    NdArrayVector<2> other = std::move(this->a);
+    NdArray_t<2> other = std::move(this->a);
 
     for (auto const& e : other)
         EXPECT_DOUBLE_EQ(12., e);
@@ -223,8 +242,8 @@ TYPED_TEST(GenericNdArray3D, IsModifiable)
 TYPED_TEST(GenericNdArray3D, CanBeReadOnly)
 {
     std::uint32_t i{2}, j{3}, k{4};
-    this->a(i, j, k)            = 12.;
-    NdArrayVector<3> const& ref = this->a;
+    this->a(i, j, k)        = 12.;
+    NdArray_t<3> const& ref = this->a;
     EXPECT_EQ(12., ref(i, j, k));
 }
 
@@ -260,7 +279,7 @@ TYPED_TEST(GenericNdArray3D, HasCopyCtor)
     for (auto& e : this->a)
         e = 12.;
 
-    NdArrayVector<3> other{this->nx, this->ny, this->nz};
+    NdArray_t<3> other{this->nx, this->ny, this->nz};
     other = this->a;
 
     for (auto const& e : other)
@@ -273,11 +292,12 @@ TYPED_TEST(GenericNdArray3D, HasMoveCtor)
     for (auto& e : this->a)
         e = 12.;
 
-    NdArrayVector<3> other = std::move(this->a);
+    NdArray_t<3> other = std::move(this->a);
 
     for (auto const& e : other)
         EXPECT_DOUBLE_EQ(12., e);
 }
+
 
 
 
@@ -286,7 +306,8 @@ TEST(MaskedView1d, maskOps)
     constexpr std::size_t dim    = 1;
     constexpr std::uint32_t size = 20;
     using Mask                   = NdArrayMask;
-    NdArrayVector<dim> array{{size}, 0.};
+
+    NdArray_t<dim> array{{size}, 0};
 
     EXPECT_EQ(std::accumulate(array.begin(), array.end(), 0), 0);
 
@@ -319,7 +340,8 @@ TEST(MaskedView2d, maskOps)
     constexpr std::uint32_t size   = 20;
     constexpr std::uint32_t sizeSq = 20 * 20;
     using Mask                     = NdArrayMask;
-    NdArrayVector<dim> array{{size, size}, 0.};
+
+    NdArray_t<dim> array{{size, size}, 0.};
 
     EXPECT_EQ(std::accumulate(array.begin(), array.end(), 0), 0);
 
@@ -358,7 +380,9 @@ TEST(MaskedView2d, maskOps2)
     constexpr std::uint32_t size0 = 20, size1 = 22;
     constexpr std::uint32_t sizeSq = size0 * size1;
     using Mask                     = NdArrayMask;
-    NdArrayVector<dim> array{{size0, size1}, 0.};
+
+    NdArray_t<dim> array{{size0, size1}, 0.};
+
 
     EXPECT_EQ(std::accumulate(array.begin(), array.end(), 0), 0);
 
@@ -390,6 +414,60 @@ TEST(MaskedView2d, maskOps2)
                                                                   + twoCellsOffset5.nCells(array)
                                                                   + Mask{0u}.nCells(array));
 }
+
+TEST(MaskedView3d, maskOps3)
+{
+    constexpr std::size_t dim      = 3;
+    constexpr std::uint32_t size0  = 10;
+    constexpr std::uint32_t sizeCu = size0 * size0 * size0;
+    using Mask                     = PHARE::core::NdArrayMask;
+
+    auto sum = [](auto const& array) { return std::accumulate(array.begin(), array.end(), 0); };
+
+    {
+        NdArrayVector<dim> array{{size0, size0, size0}, 0};
+        EXPECT_EQ(sum(array), 0);
+        std::fill(array.begin(), array.end(), 1);
+        EXPECT_EQ(sum(array), sizeCu);
+    }
+
+    {
+        NdArrayVector<dim> array{{size0, size0, size0}, 0};
+        EXPECT_EQ(std::accumulate(array.begin(), array.end(), 0), 0);
+        array[Mask{0}] = 1;
+        EXPECT_EQ(std::accumulate(array.begin(), array.end(), 0), 488);
+
+        // outter cells of a 10**3 cube =
+        // (10 * 10 * 2) + (10 * 8 * 2) + (8 * 8 * 2);
+        // or
+        // (8 * 8 * 6) + (10 * 4) + (8 * 8);
+        // = 488
+    }
+
+    std::uint32_t ten = 10;
+    NdArrayVector<3> array{{ten, ten, ten}, 0};
+
+    array[Mask{0}] = 1;
+    EXPECT_EQ(sum(array), 488);
+    array[Mask{1}] >> array[Mask{0}];
+    EXPECT_EQ(sum(array), 0);
+
+    array[Mask{2}] = 1;
+    EXPECT_EQ(sum(array), 152);
+    array[Mask{1}] = 1;
+    EXPECT_EQ(sum(array), 448);
+    array[Mask{1}] = 0;
+    EXPECT_EQ(sum(array), 152);
+
+    array[Mask{2}] >> array[Mask{1}];
+    EXPECT_EQ(sum(array), 448);
+    array[Mask{2}] = 0;
+    EXPECT_EQ(sum(array), 296);
+
+    EXPECT_EQ(Mask{1}.nCells(array), 296);
+    EXPECT_EQ(Mask{2}.nCells(array), 152);
+}
+
 
 int main(int argc, char** argv)
 {

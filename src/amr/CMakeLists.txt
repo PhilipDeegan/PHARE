@@ -21,6 +21,7 @@ set( SOURCES_INC
      data/field/refine/field_refiner.hpp
      data/field/refine/magnetic_field_init_refiner.hpp
      data/field/refine/magnetic_field_refiner.hpp
+     data/field/refine/magnetic_field_regrider.hpp
      data/field/refine/electric_field_refiner.hpp
      data/field/refine/linear_weighter.hpp
      data/field/refine/field_refine_operator.hpp
@@ -83,7 +84,7 @@ set( SOURCES_CPP
      samrai.cpp
    )
 
-# single source of entry for static SAMRAI things
+
 add_library(${PROJECT_NAME} SHARED ${SOURCES_INC} ${SOURCES_CPP})
 target_compile_options(${PROJECT_NAME} PRIVATE ${PHARE_WERROR_FLAGS})
 set_property(TARGET ${PROJECT_NAME} PROPERTY INTERPROCEDURAL_OPTIMIZATION ${PHARE_INTERPROCEDURAL_OPTIMIZATION})
@@ -104,6 +105,7 @@ target_link_libraries(${PROJECT_NAME} PUBLIC
   SAMRAI_xfer
   MPI::MPI_C
   cppdict
+  magic_enum
 )
 
 if (HighFive) # SAMRAI USES HDF5 so we need this here

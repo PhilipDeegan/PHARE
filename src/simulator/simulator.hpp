@@ -1,12 +1,12 @@
 #ifndef PHARE_SIMULATOR_SIMULATOR_HPP
 #define PHARE_SIMULATOR_SIMULATOR_HPP
 
+#include "core/def.hpp"
+#include "core/errors.hpp"
 
 #include "phare_core.hpp"
 #include "phare_types.hpp"
 
-#include "core/def.hpp"
-#include "core/errors.hpp"
 #include "core/logger.hpp"
 #include "core/utilities/types.hpp"
 #include "core/utilities/mpi_utils.hpp"
@@ -61,14 +61,17 @@ public:
 template<auto opts>
 class Simulator : public ISimulator
 {
+    using SimOpts = decltype(opts);
+
 public:
-    std::size_t static constexpr dimension     = opts.dimension;
-    std::size_t static constexpr interp_order  = opts.interp_order;
-    std::size_t static constexpr nbRefinedPart = opts.nbRefinedPart;
+    auto static constexpr dimension      = opts.dimension;
+    auto static constexpr interp_order   = opts.interp_order;
+    auto static constexpr nbRefinedPart  = opts.nbRefinedPart;
+    auto static constexpr layout_mode    = opts.layout_mode;
+    auto static constexpr allocator_mode = opts.alloc_mode;
 
     using SAMRAITypes            = PHARE::amr::SAMRAI_Types;
     using PHARETypes             = PHARE_Types<opts>;
-    using IPhysicalModel         = PHARE::solver::IPhysicalModel<SAMRAITypes>;
     using HybridModel            = PHARETypes::HybridModel_t;
     using MHDModel               = PHARETypes::MHDModel_t;
     using SolverMHD              = PHARETypes::SolverMHD_t;
@@ -80,7 +83,8 @@ public:
     using Integrator             = PHARE::amr::Integrator<dimension>;
 
     using ResourceManager_t = HybridModel::resources_manager_type;
-    static_assert(std::is_same_v<ResourceManager_t, typename MHDModel::resources_manager_type>);
+    // static_assert(std::is_same_v<ResourceManager_t, typename MHDModel::resources_manager_type>);
+
 
 
     Simulator(PHARE::initializer::PHAREDict const& dict,
@@ -123,6 +127,7 @@ public:
             return rMan->dump(timestamp, timestep);
         return false;
     }
+
 
 
 protected:
@@ -195,7 +200,7 @@ private:
 
     SimFunctors functors_;
 
-    SimFunctors functors_setup(PHARE::initializer::PHAREDict const& dict)
+    SimFunctors functors_setup(PHARE::initializer::PHAREDict const& /*dict*/)
     {
         return {{"pre_advance", {/*empty vector*/}}};
     }

@@ -147,9 +147,6 @@ class RestartsTest(SimulatorTest):
         self.simulator = None
         ph.global_vars.sim = None
 
-    def ddt_test_id(self):
-        return self._testMethodName.split("_")[-1]
-
     def check_diags(self, diag_dir0, diag_dir1, pops, timestamps, expected_num_levels):
         if cpp.mpi_rank() > 0:
             return
@@ -204,6 +201,7 @@ class RestartsTest(SimulatorTest):
                                     f"FAILED domain particles at time {time} {ilvl} {patch1.box} {patch0.box}"
                                 )
                         else:
+                            print(f"checking {pd_key}")
                             np.testing.assert_equal(pd0.dataset[:], pd1.dataset[:])
                         checks += 1
 
@@ -214,6 +212,7 @@ class RestartsTest(SimulatorTest):
             self.assertGreaterEqual(n_patches, n_levels)  # at least one patch per level
 
     @data(
+        *permute(dup(dict()), expected_num_levels=2),  # refinement boxes set later
         *permute(
             dup(
                 dict(
@@ -223,7 +222,6 @@ class RestartsTest(SimulatorTest):
             ),
             expected_num_levels=3,
         ),
-        *permute(dup(dict()), expected_num_levels=2),  # refinement boxes set later
     )
     @unpack
     def test_restarts(self, ndim, interp, simInput, expected_num_levels):

@@ -4,15 +4,16 @@
 
 import os
 import sys
-import datetime
 import atexit
-import time as timem
+import datetime
+import traceback
 import numpy as np
-import pyphare.pharein as ph
+import time as timem
 from pathlib import Path
-from . import monitoring as mon
 
 from pyphare import cpp
+import pyphare.pharein as ph
+from . import monitoring as mon
 import pyphare.pharein.restarts as restarts
 
 
@@ -33,7 +34,7 @@ def simulator_shutdown():
 
 def make_cpp_simulator(cpp_lib, hier):
     if SCOPE_TIMING:
-        mon.timing_setup(cpp_lib)
+        mon.timing_setup()
 
     make_sim = "make_simulator"
     assert hasattr(cpp_lib, make_sim)
@@ -75,7 +76,7 @@ class Simulator:
 
         These arguments have good default, change them at your own risk.
 
-        *  **print_one_line**: (``bool``), default True, will print simulator info per advance on one line (erasing the previous)
+        *  **print_one_line**: (``bool``), default False, will print simulator info per advance on one line (erasing the previous)
         *  **auto_dump**: (``bool``), if True (default), will dump diagnostics automatically at requested timestamps
         *  **post_advance**: (``Function``),  default None. A python function to execute after each advance()
         *  **log_to_file**: if True (default), will log prints made from C++ code per MPI rank to the .log directory
@@ -91,7 +92,7 @@ class Simulator:
         self.post_advance = kwargs.get("post_advance", None)
         self.initialized = False
         self.print_eol = "\n"
-        if kwargs.get("print_one_line", True):
+        if kwargs.get("print_one_line", False):
             self.print_eol = "\r"
         self.print_eol = kwargs.get("print_eol", self.print_eol)
         self.log_to_file = kwargs.get("log_to_file", True)
@@ -100,11 +101,12 @@ class Simulator:
         import pyphare.simulator._simulator as _simulator
 
         _simulator.obj = self
+        self.cpp_lib = None
 
     def __del__(self):
         self.reset()
 
-    def setup(self):
+    def setup(self, **kwargs):
         # mostly to detach C++ class construction/dict parsing from C++ Simulator::init
         try:
             startMPI()
@@ -118,14 +120,12 @@ class Simulator:
                 self._log_to_file()
             ph.populateDict()
 
-            self.cpp_lib = cpp.cpp_lib(self.simulation)
+            self.cpp_lib = cpp.cpp_lib(self.simulation, **kwargs)
             self.cpp_hier = cpp.cpp_etc_lib().make_hierarchy()
             self.cpp_sim = make_cpp_simulator(self.cpp_lib, self.cpp_hier)
 
             return self
         except Exception:
-            import traceback
-
             print('Exception caught in "Simulator.setup()": {}'.format(sys.exc_info()))
             print(traceback.format_exc())
             raise ValueError("Error in Simulator.setup(), see previous error")
@@ -151,6 +151,7 @@ class Simulator:
                     sys.exc_info()[0]
                 )
             )
+            print(traceback.format_exc())
             raise ValueError("Error in Simulator.initialize(), see previous error")
 
     def _throw(self, e):
@@ -199,7 +200,8 @@ class Simulator:
         if self.simulation.dry_run:
             return self
         if monitoring:
-            mon.setup_monitoring(self.cpp_lib)
+            interval = monitoring if isinstance(monitoring, int) else 100  # seconds
+            mon.setup_monitoring(interval)
         perf = []
         end_time = self.cpp_sim.endTime()
         t = self.cpp_sim.currentTime()
@@ -211,6 +213,7 @@ class Simulator:
             ticktock = tock - tick
             perf.append(ticktock)
             t = self.cpp_sim.currentTime()
+
             if cpp.mpi_rank() == 0:
                 out = f"t = {t:8.5f}  -  {ticktock:6.5f}sec  - total {np.sum(perf):7.4}sec"
                 print(out, end=self.print_eol)
@@ -221,7 +224,7 @@ class Simulator:
         if plot_times:
             plot_timestep_time(perf)
 
-        mon.monitoring_shutdown(self.cpp_lib)
+        mon.monitoring_shutdown()
         return self.reset()
 
     def _auto_dump(self):

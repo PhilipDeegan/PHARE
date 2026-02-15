@@ -50,9 +50,9 @@ public:
     make_unique(Hierarchy& hier, ResourceManager_t& resman, initializer::PHAREDict const& dict)
     {
         auto rMan = std::make_unique<RestartsManager>(Writer::make_unique(hier, resman, dict));
-        auto restarts_are_written = core::any(
-            core::generate([&](auto const& v) { return dict.contains(v); },
-                           std::vector<std::string>{"write_timestamps", "elapsed_timestamps"}));
+        auto restarts_are_written = core::any(core::generate_from(
+            [&](auto const& v) { return dict.contains(v); },
+            std::vector<std::string>{"write_timestamps", "elapsed_timestamps"}));
         if (restarts_are_written) // else is only loading not saving restarts
             rMan->addRestartDict(dict);
         return rMan;
@@ -88,12 +88,12 @@ private:
 
     bool needsWrite_(RestartsProperties const& rest, double const timeStamp, double const timeStep)
     {
-        auto simUnit
+        auto const simUnit
             = nextWriteSimUnit_ < rest.writeTimestamps.size()
               and needsCadenceAction_(rest.writeTimestamps[nextWriteSimUnit_], timeStamp, timeStep);
 
-        auto elapsed = nextWriteElapsed_ < rest.elapsedTimestamps.size()
-                       and needsElapsedAction_(rest.elapsedTimestamps[nextWriteElapsed_]);
+        auto const elapsed = nextWriteElapsed_ < rest.elapsedTimestamps.size()
+                             and needsElapsedAction_(rest.elapsedTimestamps[nextWriteElapsed_]);
 
         if (simUnit)
             ++nextWriteSimUnit_;
