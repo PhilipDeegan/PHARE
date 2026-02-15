@@ -8,17 +8,33 @@ from . import validate
 
 __all__ = ["validate"]
 
+# continue to use override if set
+_active_layouts = [
+    1,  # AoS Cellmap
+    # 3,  # AoS TileSet
+]  # see: src/core/data/particles/particle_array_def.hpp
+
+
 _libs = {}
 
 
-def simulator_id(sim):
-    return f"{sim.ndim}_{sim.interp_order}_{sim.refined_particle_nbr}"
+def simulator_id(sim, layout=1, allocator=0):
+    return "_".join(
+        str(s)
+        for s in [
+            sim.ndim,
+            sim.interp_order,
+            sim.refined_particle_nbr,
+            # layout,
+            # allocator,
+        ]
+    )
 
 
-def cpp_lib(sim):
+def cpp_lib(sim, layout=1, allocator=0):
     global _libs
 
-    mod_str = f"pybindlibs.cpp_{simulator_id(sim)}"
+    mod_str = f"pybindlibs.cpp_{simulator_id(sim, layout, allocator)}"
     if mod_str not in _libs:
         _libs[mod_str] = importlib.import_module(mod_str)
     return _libs[mod_str]
@@ -54,3 +70,8 @@ def mpi_size():
 
 def mpi_barrier():
     return getattr(cpp_etc_lib(), "mpi_barrier")()
+
+
+def supported_particle_layouts():
+    # see: src/core/data/particles/particle_array_def.hpp
+    return _active_layouts

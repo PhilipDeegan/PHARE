@@ -1,15 +1,19 @@
 #ifndef HIGHFIVEDIAGNOSTICWRITER_HPP
 #define HIGHFIVEDIAGNOSTICWRITER_HPP
 
-#include <string>
-#include <algorithm>
-#include <unordered_map>
 
+#include "core/data/tensorfield/tensorfield.hpp"
 #include "core/utilities/mpi_utils.hpp"
+#include "core/data/field/field_box.hpp"
+#include "core/data/grid/grid_tiles.hpp"
 
 #include "diagnostic/diagnostic_writer.hpp"
 
 #include "hdf5/detail/h5/h5_file.hpp"
+
+
+#include <string>
+#include <unordered_map>
 
 
 namespace PHARE::diagnostic::h5
@@ -77,6 +81,7 @@ protected:
     {
         for (std::size_t lvl = h5Writer_.minLevel; lvl <= maxLevel; lvl++)
         {
+            assert(patchIDs.count(lvl));
             auto& lvlPatches       = patchIDs.at(lvl);
             std::size_t patchNbr   = lvlPatches.size();
             std::size_t maxPatches = core::mpi::max(patchNbr);
@@ -96,6 +101,7 @@ protected:
     {
         for (std::size_t lvl = h5Writer_.minLevel; lvl <= maxLevel; lvl++)
         {
+            assert(patchAttributes.count(lvl));
             auto& lvlPatches       = patchAttributes.at(lvl);
             std::size_t patchNbr   = lvlPatches.size();
             std::size_t maxPatches = core::mpi::max(patchNbr);
@@ -142,12 +148,69 @@ protected:
     }
 
 
+
     auto& h5FileForQuantity(DiagnosticProperties& diagnostic)
     {
         if (!fileData_.count(diagnostic.quantity))
             throw std::runtime_error("Unknown Diagnostic Quantity: " + diagnostic.quantity);
 
         return *fileData_.at(diagnostic.quantity);
+    }
+
+    auto noop_reducer()
+    {
+        return [](auto& f) -> auto& { return f; };
+    }
+
+    template<typename Field_t>
+    auto& field_reducer(Field_t& f, bool const reduce = true)
+    {
+        if constexpr (core::is_field_tile_set_v<Field_t>)
+        {
+            f.check();
+            auto&& [a, field, c, d] = this->h5Writer_.modelView()();
+            if (reduce)
+                core::reduce_single(field, f);
+            return field;
+        }
+        else
+            return f;
+    }
+
+    template<typename TField_t>
+    auto& vec_field_reducer(TField_t& f, bool const reduce = true)
+    {
+        using Field_t = TField_t::field_type;
+
+        if constexpr (core::is_field_tile_set_v<Field_t>)
+        {
+            core::check_tensorfield(f);
+            auto&& [a, b, vf, d] = this->h5Writer_.modelView()();
+            if (reduce)
+                for (std::size_t i = 0; i < 3; ++i)
+                    core::reduce_single(vf[i], f[i]);
+            return vf;
+        }
+        else
+            return f;
+    }
+
+    template<typename TField_t>
+    auto& tensor_field_reducer(TField_t& f, bool const reduce = true)
+    {
+        using Field_t = TField_t::field_type;
+
+        if constexpr (core::is_field_tile_set_v<Field_t>)
+        {
+            core::check_tensorfield(f);
+            auto&& [a, b, c, tf] = this->h5Writer_.modelView()();
+            if (reduce)
+                for (std::size_t i = 0; i < 6; ++i)
+                    core::reduce_single(tf[i], f[i]);
+            return tf;
+        }
+        else
+            return f;
     }
 
 

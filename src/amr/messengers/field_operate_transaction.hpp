@@ -1,12 +1,19 @@
 #ifndef PHARE_AMR_MESSENGERS_FIELD_OP_TRANSACTION_HPP
 #define PHARE_AMR_MESSENGERS_FIELD_OP_TRANSACTION_HPP
 
+
+
 #include "core/logger.hpp"
 
 #include <SAMRAI/tbox/Dimension.h>
-#include <SAMRAI/hier/PatchLevel.h>
-#include <SAMRAI/hier/BoxOverlap.h>
+#include <SAMRAI/xfer/RefineSchedule.h>
 #include <SAMRAI/xfer/RefineAlgorithm.h>
+#include <SAMRAI/xfer/CoarsenSchedule.h>
+#include <SAMRAI/xfer/CoarsenAlgorithm.h>
+#include <SAMRAI/xfer/PatchLevelBorderFillPattern.h>
+#include <SAMRAI/xfer/PatchLevelInteriorFillPattern.h>
+
+
 
 #include <stdexcept>
 
@@ -29,7 +36,8 @@ namespace PHARE::amr
  * This transaction defines these override to these methods to call specific methods
  * of FieldData to perform arbitrary operations.
  */
-template<typename FieldData_t, typename Operation>
+
+template<typename SrcFieldData_t, typename Operation, typename DstFieldData_t = SrcFieldData_t>
 class FieldBorderOpTransaction : public SAMRAI::tbox::Transaction
 {
 public:
@@ -93,10 +101,13 @@ private:
 };
 
 
-template<typename FieldData_t, typename Operation>
-bool FieldBorderOpTransaction<FieldData_t, Operation>::canEstimateIncomingMessageSize()
+
+template<typename SrcFieldData_t, typename Operation, typename DstFieldData_t>
+bool FieldBorderOpTransaction<SrcFieldData_t, Operation,
+                              DstFieldData_t>::canEstimateIncomingMessageSize()
 {
-    PHARE_LOG_SCOPE(2, "FieldBorderOpTransaction::canEstimateIncomingMessageSize");
+    PHARE_LOG_SCOPE(3, "FieldBorderOpTransaction::canEstimateIncomingMessageSize");
+
     bool can_estimate = false;
     if (getSourceProcessor() == d_src_level->getBoxLevel()->getMPI().getRank())
     {
@@ -114,57 +125,66 @@ bool FieldBorderOpTransaction<FieldData_t, Operation>::canEstimateIncomingMessag
 }
 
 
-template<typename FieldData_t, typename Operation>
-size_t FieldBorderOpTransaction<FieldData_t, Operation>::computeIncomingMessageSize()
+
+
+template<typename SrcFieldData_t, typename Operation, typename DstFieldData_t>
+size_t
+FieldBorderOpTransaction<SrcFieldData_t, Operation, DstFieldData_t>::computeIncomingMessageSize()
 {
-    PHARE_LOG_SCOPE(2, "FieldBorderOpTransaction::computeIncomingMessageSize");
+    PHARE_LOG_SCOPE(3, "FieldBorderOpTransaction::computeIncomingMessageSize");
     d_incoming_bytes = d_dst_level->getPatch(d_dst_node.getGlobalId())
                            ->getPatchData(d_refine_data[d_item_id]->d_scratch)
                            ->getDataStreamSize(*d_overlap);
     return d_incoming_bytes;
 }
 
-template<typename FieldData_t, typename Operation>
-size_t FieldBorderOpTransaction<FieldData_t, Operation>::computeOutgoingMessageSize()
+
+
+template<typename SrcFieldData_t, typename Operation, typename DstFieldData_t>
+size_t
+FieldBorderOpTransaction<SrcFieldData_t, Operation, DstFieldData_t>::computeOutgoingMessageSize()
 {
-    PHARE_LOG_SCOPE(2, "FieldBorderOpTransaction::computeOutgoingMessageSize");
+    PHARE_LOG_SCOPE(3, "FieldBorderOpTransaction::computeOutgoingMessageSize");
     d_outgoing_bytes = d_src_level->getPatch(d_src_node.getGlobalId())
                            ->getPatchData(d_refine_data[d_item_id]->d_src)
                            ->getDataStreamSize(*d_overlap);
     return d_outgoing_bytes;
 }
 
-template<typename FieldData_t, typename Operation>
-int FieldBorderOpTransaction<FieldData_t, Operation>::getSourceProcessor()
+
+template<typename SrcFieldData_t, typename Operation, typename DstFieldData_t>
+int FieldBorderOpTransaction<SrcFieldData_t, Operation, DstFieldData_t>::getSourceProcessor()
 {
-    PHARE_LOG_SCOPE(2, "FieldBorderOpTransaction::getSourceProcessor");
+    PHARE_LOG_SCOPE(3, "FieldBorderOpTransaction::getSourceProcessor");
     return d_src_node.getOwnerRank();
 }
 
-template<typename FieldData_t, typename Operation>
-int FieldBorderOpTransaction<FieldData_t, Operation>::getDestinationProcessor()
+template<typename SrcFieldData_t, typename Operation, typename DstFieldData_t>
+int FieldBorderOpTransaction<SrcFieldData_t, Operation, DstFieldData_t>::getDestinationProcessor()
 {
-    PHARE_LOG_SCOPE(2, "FieldBorderOpTransaction::getDestinationProcessor");
+    PHARE_LOG_SCOPE(3, "FieldBorderOpTransaction::getDestinationProcessor");
     return d_dst_node.getOwnerRank();
 }
 
-template<typename FieldData_t, typename Operation>
-void FieldBorderOpTransaction<FieldData_t, Operation>::packStream(
+template<typename SrcFieldData_t, typename Operation, typename DstFieldData_t>
+void FieldBorderOpTransaction<SrcFieldData_t, Operation, DstFieldData_t>::packStream(
     SAMRAI::tbox::MessageStream& stream)
 {
-    PHARE_LOG_SCOPE(2, "FieldBorderOpTransaction::packStream");
+    PHARE_LOG_SCOPE(3, "FieldBorderOpTransaction::packStream");
     d_src_level->getPatch(d_src_node.getGlobalId())
         ->getPatchData(d_refine_data[d_item_id]->d_src)
         ->packStream(stream, *d_overlap);
 }
 
-template<typename FieldData_t, typename Operation>
-void FieldBorderOpTransaction<FieldData_t, Operation>::unpackStream(
+
+
+template<typename SrcFieldData_t, typename Operation, typename DstFieldData_t>
+void FieldBorderOpTransaction<SrcFieldData_t, Operation, DstFieldData_t>::unpackStream(
     SAMRAI::tbox::MessageStream& stream)
 {
-    PHARE_LOG_SCOPE(2, "FieldBorderOpTransaction::unpackStream");
-    std::shared_ptr<FieldData_t> onode_dst_data(
-        SAMRAI_SHARED_PTR_CAST<FieldData_t, SAMRAI::hier::PatchData>(
+    PHARE_LOG_SCOPE(3, "FieldBorderOpTransaction::unpackStream");
+    std::shared_ptr<DstFieldData_t> onode_dst_data(
+        SAMRAI_SHARED_PTR_CAST<DstFieldData_t, SAMRAI::hier::PatchData>(
             d_dst_level->getPatch(d_dst_node.getGlobalId())
                 ->getPatchData(d_refine_data[d_item_id]->d_scratch)));
     TBOX_ASSERT(onode_dst_data);
@@ -173,27 +193,31 @@ void FieldBorderOpTransaction<FieldData_t, Operation>::unpackStream(
 }
 
 
-template<typename FieldData_t, typename Operation>
-void FieldBorderOpTransaction<FieldData_t, Operation>::printClassData(std::ostream& stream) const
-{
-    PHARE_LOG_SCOPE(2, "FieldBorderOpTransaction::printClassData");
 
+
+template<typename SrcFieldData_t, typename Operation, typename DstFieldData_t>
+void FieldBorderOpTransaction<SrcFieldData_t, Operation, DstFieldData_t>::printClassData(
+    std::ostream& stream) const
+{
+    PHARE_LOG_SCOPE(3, "FieldBorderOpTransaction::printClassData");
     throw std::runtime_error("FieldBorderOpTransaction::printClassData!");
 }
 
-template<typename FieldData_t, typename Operation>
-void FieldBorderOpTransaction<FieldData_t, Operation>::copyLocalData()
+template<typename SrcFieldData_t, typename Operation, typename DstFieldData_t>
+void FieldBorderOpTransaction<SrcFieldData_t, Operation, DstFieldData_t>::copyLocalData()
 {
-    PHARE_LOG_SCOPE(2, "FieldBorderOpTransaction::copyLocalData");
+    PHARE_LOG_SCOPE(3, "FieldBorderOpTransaction::copyLocalData");
+    assert(this);
 
-    std::shared_ptr<FieldData_t> onode_dst_data(
-        SAMRAI_SHARED_PTR_CAST<FieldData_t, SAMRAI::hier::PatchData>(
-            d_dst_level->getPatch(d_dst_node.getGlobalId())
-                ->getPatchData(d_refine_data[d_item_id]->d_scratch)));
+    auto dst_data = d_dst_level->getPatch(d_dst_node.getGlobalId())
+                        ->getPatchData(d_refine_data[d_item_id]->d_scratch);
+    assert(dst_data);
+    std::shared_ptr<DstFieldData_t> onode_dst_data(
+        SAMRAI_SHARED_PTR_CAST<DstFieldData_t, SAMRAI::hier::PatchData>(dst_data));
     TBOX_ASSERT(onode_dst_data);
 
-    std::shared_ptr<FieldData_t> onode_src_data(
-        SAMRAI_SHARED_PTR_CAST<FieldData_t, SAMRAI::hier::PatchData>(
+    std::shared_ptr<SrcFieldData_t> onode_src_data(
+        SAMRAI_SHARED_PTR_CAST<SrcFieldData_t, SAMRAI::hier::PatchData>(
             d_src_level->getPatch(d_src_node.getGlobalId())
                 ->getPatchData(d_refine_data[d_item_id]->d_src)));
     TBOX_ASSERT(onode_src_data);
@@ -202,7 +226,7 @@ void FieldBorderOpTransaction<FieldData_t, Operation>::copyLocalData()
 }
 
 
-template<typename FieldData_t, typename Operation>
+template<typename SrcFieldData_t, typename Operation, typename DstFieldData_t = SrcFieldData_t>
 class FieldBorderOpTransactionFactory : public SAMRAI::xfer::RefineTransactionFactory
 {
 public:
@@ -225,9 +249,9 @@ public:
         TBOX_ASSERT(refine_data != 0);
         TBOX_ASSERT_OBJDIM_EQUALITY4(*dst_level, *src_level, dst_node, src_node);
 
-        PHARE_LOG_SCOPE(2, "FieldBorderOpTransactionFactory::allocate");
-
-        return std::make_shared<FieldBorderOpTransaction<FieldData_t, Operation>>(
+        PHARE_LOG_SCOPE(3, "FieldBorderOpTransactionFactory::allocate");
+        return std::make_shared<
+            FieldBorderOpTransaction<SrcFieldData_t, Operation, DstFieldData_t>>(
             dst_level, src_level, overlap, dst_node, src_node, refine_data, item_id);
     }
 
@@ -235,7 +259,7 @@ public:
     preprocessScratchSpace(std::shared_ptr<SAMRAI::hier::PatchLevel> const& level, double fill_time,
                            SAMRAI::hier::ComponentSelector const& preprocess_vector) const override
     {
-        PHARE_LOG_SCOPE(2, "FieldBorderOpTransactionFactory::preprocessScratchSpace");
+        PHARE_LOG_SCOPE(3, "FieldBorderOpTransactionFactory::preprocessScratchSpace");
 
         // noop
     }

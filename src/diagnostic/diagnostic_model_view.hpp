@@ -30,7 +30,6 @@ template<typename Hierarchy, typename Model>
 class BaseModelView : public IModelView
 {
 public:
-    using GridLayout        = Model::gridlayout_type;
     using VecField          = Model::vecfield_type;
     using TensorFieldT      = Model::ions_type::tensorfield_type;
     using GridLayoutT       = Model::gridlayout_type;
@@ -38,8 +37,8 @@ public:
     using TensorFieldData_t = ResMan::template UserTensorField_t</*rank=*/2>::patch_data_type;
     static constexpr auto dimension = Model::dimension;
 
-
 public:
+    using Model_t = Model;
     using PatchProperties
         = cppdict::Dict<float, double, std::size_t, std::vector<int>, std::vector<std::uint32_t>,
                         std::vector<double>, std::vector<std::size_t>, std::string,
@@ -93,9 +92,9 @@ public:
     template<typename Action>
     void visitHierarchy(Action&& action, int minLevel = 0, int maxLevel = 0)
     {
-        PHARE::amr::visitHierarchy<GridLayout>(hierarchy_, *model_.resourcesManager,
-                                               std::forward<Action>(action), minLevel, maxLevel,
-                                               model_);
+        PHARE::amr::visitHierarchy<GridLayoutT>(hierarchy_, *model_.resourcesManager,
+                                                std::forward<Action>(action), minLevel, maxLevel,
+                                                model_);
     }
 
     NO_DISCARD auto boundaryConditions() const { return hierarchy_.boundaryConditions(); }
@@ -105,10 +104,14 @@ public:
 
     NO_DISCARD std::string getLayoutTypeString() const
     {
-        return std::string{GridLayout::implT::type};
+        return std::string{GridLayoutT::implT::type};
     }
 
-    NO_DISCARD auto getPatchProperties(std::string patchID, GridLayout const& grid) const
+
+
+
+    NO_DISCARD auto getPatchProperties(std::string /*patchID*/, GridLayoutT const& grid) const
+
     {
         PatchProperties dict;
         dict["origin"]   = grid.origin().toVector();
@@ -140,6 +143,11 @@ public:
         auto key = std::to_string(ilevel) + "_" + patch_id;
         return model_.tags.at(key);
     }
+
+
+    auto operator()() const { return model_.getCompileTimeResourcesViewList(); }
+
+
 
 protected:
     Model& model_;
@@ -187,7 +195,7 @@ protected:
     };
 
     std::vector<MTAlgo> MTAlgos;
-    TensorFieldT sumTensor_{"PHARE_sumTensor", core::HybridQuantity::Tensor::M};
+    TensorFieldT sumTensor_{"phare_scratch_tensor_field", core::HybridQuantity::Tensor::M};
 };
 
 
