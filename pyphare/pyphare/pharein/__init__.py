@@ -59,9 +59,10 @@ if venv_path is not None:
 
 def NO_GUI():
     """prevents issues when command line only and no desktop etc"""
-    import matplotlib as mpl
+    if not os.environ.get("DISPLAY"):
+        import matplotlib as mpl
 
-    mpl.use("Agg")
+        mpl.use("Agg")
 
 
 def _patch_data_ids(restart_file_dir):
