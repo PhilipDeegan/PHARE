@@ -7,6 +7,7 @@
 #include "core/data/grid/gridlayout_utils.hpp"
 #include "core/data/vecfield/vecfield_component.hpp"
 
+#include "core/utilities/index/index.hpp"
 #include "initializer/data_provider.hpp"
 
 
