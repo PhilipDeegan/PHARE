@@ -10,7 +10,7 @@ class Box:
     def __init__(self, lower, upper):
         lower, upper = [np_array_ify(arr) for arr in [lower, upper]]
         assert lower.shape == upper.shape
-        assert (lower <= upper).all()
+        assert (lower <= upper).all(), f"{lower} > {upper}"
         self.lower = lower.astype(int)  # can't slice with floats
         self.upper = upper.astype(int)
         self.ndim = len(self.lower)
@@ -199,6 +199,7 @@ def remove_all(box, to_remove):
                 del remaining[rm]
             remaining += tmp
         return remaining
+
     return [box]
 
 

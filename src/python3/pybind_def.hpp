@@ -7,6 +7,7 @@
 #include <stdexcept>
 
 #include "core/utilities/span.hpp"
+#include "core/utilities/types.hpp"
 
 #include "pybind11/stl.h"
 #include "pybind11/numpy.h"
@@ -34,6 +35,34 @@ std::size_t ndSize(PyArrayInfo const& ar_info)
                            std::multiplies<std::size_t>());
 }
 
+
+template<std::size_t dim, typename T>
+auto shape(py_array_t<T> const& ar)
+{
+    auto const info = ar.request();
+    if (info.ndim != dim)
+        throw std::runtime_error("bad dim");
+    return core::for_N_make_array<dim>([&](auto i) -> std::size_t {
+        if (info.shape[i] == 0)
+            throw std::runtime_error("how can a shape be 0?");
+        return info.shape[i];
+    });
+}
+
+template<typename T, std::size_t dim>
+std::array<std::size_t, dim> strides(std::array<T, dim> const& shape)
+{
+    std::size_t constexpr data_size = sizeof(T);
+
+    if constexpr (dim == 1)
+        return {data_size};
+
+    if constexpr (dim == 2)
+        return {data_size * shape[1], data_size};
+
+    if constexpr (dim == 3)
+        return {data_size * shape[1] * shape[2], data_size * shape[1], data_size};
+}
 
 template<typename T>
 class __attribute__((visibility("hidden"))) PyArrayWrapper : public core::Span<T>
