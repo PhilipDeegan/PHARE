@@ -73,8 +73,8 @@ public:
     void reserve(std::size_t newSize) { return particles_.reserve(newSize); }
     void resize(std::size_t newSize) { return particles_.resize(newSize); }
 
-    NO_DISCARD auto const& operator[](std::size_t i) const { return particles_[i]; }
-    NO_DISCARD auto& operator[](std::size_t i) { return particles_[i]; }
+    NO_DISCARD auto const& operator[](std::size_t const i) const { return particles_[i]; }
+    NO_DISCARD auto& operator[](std::size_t const i) { return particles_[i]; }
 
     NO_DISCARD bool operator==(ParticleArray<dim> const& that) const
     {

@@ -17,7 +17,7 @@ os.environ["PHARE_SCOPE_TIMING"] = "0"  # turn on scope timing
 
 ph.NO_GUI()
 
-
+ppc = 100
 cells = (101, 101)
 # cells = (41, 41, 41)
 dl = (0.1, 0.1)
@@ -26,7 +26,7 @@ dx, dy = dl
 name = "bowler"
 diag_outputs = f"phare_outputs/test/{name}"
 
-final_time = 55
+final_time = 122
 time_step = 0.001
 timestamps = [final_time]
 
@@ -64,8 +64,8 @@ def b2(sim, x, y):
     U = A * Ux_dir
     V = A * Uy_dir
 
-    U *= 0.001
-    V *= 0.001
+    U *= 0.0001
+    V *= 0.0001
 
     return U, V
 
@@ -82,7 +82,26 @@ def update(postOp):
     _globals["ts"] += 1
     ts = _globals["ts"]
 
+    if ts % 100 != 0:
+        return
     # print("ts", ts)
+
+    hier = None
+    hier = hierarchy_from_sim(live, qty="particles", pop="protons")
+    L0 = hier.level(0, hier.times()[0])
+    vmax = 0
+    for ip, patch in enumerate(L0.patches):
+        for i, name in enumerate(patch.patch_datas.keys()):
+            pd = patch.patch_datas[name]
+            # print("v", pd.dataset[0].v)
+            for i in range(pd.dataset.size()):
+                p = pd.dataset[i]
+                # print("ptype", type(p))
+                vmax = max(vmax, max(p.v))
+
+    print("\nVmax: ", vmax)
+
+    return
     if ts % 1000 != 0:
         return
     # print("ts++", ts)
@@ -93,8 +112,7 @@ def update(postOp):
     # for lvl_nbr, level in hier.levels(hier.times()[0]).items():
     L0 = hier.level(0, hier.times()[0])
     for ip, patch in enumerate(L0.patches):
-        pdata_names = list(patch.patch_datas.keys())
-        for i, name in enumerate(pdata_names):
+        for i, name in enumerate(patch.patch_datas.keys()):
             pd = patch.patch_datas[name]
             nbrGhosts = pd.ghosts_nbr
             select = tuple([slice(nbrGhost, -(nbrGhost)) for nbrGhost in nbrGhosts])
@@ -119,7 +137,7 @@ def config():
             "dir": "checkpoints",
             "mode": "overwrite",
             # "elapsed_timestamps": [0],
-            "timestamps": [15, 20, 25, 30, 35, final_time],
+            "timestamps": [final_time],
             "restart_time": "auto",
             "keep_last": 5,
         },
@@ -151,7 +169,7 @@ def config():
     vvv = {
         **{f"vbulk{c}": vxyz for c in C},
         **{f"vth{c}": vthxyz for c in C},
-        "nbr_part_per_cell": 100,
+        "nbr_part_per_cell": ppc,
     }
     protons = {
         "charge": 1,

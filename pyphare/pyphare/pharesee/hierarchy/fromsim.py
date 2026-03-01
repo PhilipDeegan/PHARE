@@ -1,3 +1,4 @@
+from pyphare import cpp
 from .hierarchy_utils import isFieldQty, field_qties, quantidic, refinement_ratio
 from .patchdata import FieldData, ParticleData
 from .patch import Patch
@@ -10,7 +11,18 @@ from ...core.box import Box
 import numpy as np
 
 
-def hierarchy_from_sim(simulator, qty, pop="", hier=None):
+def patch_gridlayout(patch, dl, interp_order):
+    return GridLayout(
+        Box(patch.lower, patch.upper), patch.origin, dl, interp_order=interp_order
+    )
+
+
+def hierarchy_from_sim(simulator, qty, pop="", hier=None, sync=False):
+    """
+    sync==True will copy all data to rank 0!
+    leaving other ranks with an empty hierarch!
+    """
+
     dw = simulator.data_wrangler()
     nbr_levels = dw.getNumberOfLevels()
     patch_levels = {}
@@ -26,33 +38,28 @@ def hierarchy_from_sim(simulator, qty, pop="", hier=None):
         getters = quantidic(ilvl, dw)
 
         if isFieldQty(qty):
-            for patch in getters[qty]():
-                layout = GridLayout(
-                    Box(patch.lower, patch.upper),
-                    patch.origin,
-                    lvl_cell_width,
-                    interp_order=simulator.interp_order(),
+            patch_datas = getters[qty]()
+
+            if sync:
+                patch_datas = dw.sync(patch_datas)
+                if cpp.mpi_rank() > 0:
+                    continue
+
+            for patch_data in patch_datas:
+                layout = patch_gridlayout(
+                    patch_data, lvl_cell_width, simulator.interp_order()
                 )
                 patches[ilvl].append(
-                    Patch({qty[-1]: FieldData(layout, field_qties[qty], patch.data)})
+                    Patch({qty: FieldData(layout, field_qties[qty], patch_data.data)})
                 )
 
-        elif qty == "particles":
+        elif qty == "particles":  # domain only!
+            if sync:
+                raise ValueError("sync not supported for particles")
             if pop == "":
                 raise ValueError("must specify pop argument for particles")
-            # here the getter returns a dict like this
-            # {'protons': {'patchGhost': [<pybindlibs.cpp.PatchDataContiguousParticles_1 at 0x119f78970>,
-            # <pybindlibs.cpp.PatchDataContiguousParticles_1 at 0x119f78f70>],
-            # 'domain': [<pybindlibs.cpp.PatchDataContiguousParticles_1 at 0x119f78d70>,
-            # <pybindlibs.cpp.PatchDataContiguousParticles_1 at 0x119f78770>]}}
 
-            # domain particles are assumed to always be here
-            # but patchGhost and levelGhost may not be, depending on the level
-
-            populationdict = getters[qty](pop)[pop]
-
-            dom_dw_patches = populationdict["domain"]
-            for patch in dom_dw_patches:
+            for patch in getters[qty](pop):
                 patch_datas = {}
 
                 layout = GridLayout(
@@ -61,51 +68,10 @@ def hierarchy_from_sim(simulator, qty, pop="", hier=None):
                     lvl_cell_width,
                     interp_order=simulator.interp_order(),
                 )
-                v = np.asarray(patch.data.v).reshape(int(len(patch.data.v) / 3), 3)
 
-                domain_particles = Particles(
-                    icells=np.asarray(patch.data.iCell),
-                    deltas=np.asarray(patch.data.delta),
-                    v=v,
-                    weights=np.asarray(patch.data.weight),
-                    charges=np.asarray(patch.data.charge),
+                patches[ilvl].append(  # ParticleData is SoA!
+                    Patch({qty: FieldData(layout, "tags", patch.data)})
                 )
-
-                patch_datas[pop + "_particles"] = ParticleData(
-                    layout, domain_particles, pop
-                )
-                patches[ilvl].append(Patch(patch_datas))
-
-            # ok now let's add the patchGhost if present
-            # note that patchGhost patches may not be the same list as the
-            # domain patches... since not all patches may not have patchGhost while they do have
-            # domain... while looping on the patchGhost items, we need to search in
-            # the already created patches which one to which add the patchGhost particles
-
-            for ghostParticles in ["levelGhost"]:
-                if ghostParticles in populationdict:
-                    for dwpatch in populationdict[ghostParticles]:
-                        v = np.asarray(dwpatch.data.v)
-                        s = v.size
-                        v = v[:].reshape(int(s / 3), 3)
-
-                        patchGhost_part = Particles(
-                            icells=np.asarray(dwpatch.data.iCell),
-                            deltas=np.asarray(dwpatch.data.delta),
-                            v=v,
-                            weights=np.asarray(dwpatch.data.weight),
-                            charges=np.asarray(dwpatch.data.charge),
-                        )
-
-                        box = Box(dwpatch.lower, dwpatch.upper)
-
-                        # now search which of the already created patches has the same box
-                        # once found we add the new particles to the ones already present
-
-                        patch = [p for p in patches[ilvl] if p.box == box][0]
-                        patch.patch_datas[pop + "_particles"].dataset.add(
-                            patchGhost_part
-                        )
 
         else:
             raise ValueError("{} is not a valid quantity".format(qty))

@@ -45,6 +45,7 @@ class FieldData(PatchData):
     def x(self):
         if self._x is None:
             self._x = self.yeeCoordsFor(0)
+
         return self._x
 
     @property
@@ -105,6 +106,7 @@ class FieldData(PatchData):
             lower = self.layout.AMRToLocal(overlap.lower)
             upper = self.layout.AMRToLocal(overlap.upper)
             select = tuple(slice(lower[i], upper[i] + 1) for i in range(box.ndim))
+
             return self.dataset[select]
 
         return np.array([])

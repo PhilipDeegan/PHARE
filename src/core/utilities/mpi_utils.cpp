@@ -59,7 +59,7 @@ void debug_barrier()
 
 
 
-std::string date_time(std::string format)
+std::string date_time(std::string const& format)
 {
     std::time_t t = std::time(NULL);
     char buffer[80];

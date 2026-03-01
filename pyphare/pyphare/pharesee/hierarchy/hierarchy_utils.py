@@ -215,19 +215,15 @@ def quantidic(ilvl, wrangler):
     pl = wrangler.getPatchLevel(ilvl)
 
     return {
-        "density": pl.getDensity,
-        "bulkVelocity_x": pl.getVix,
-        "bulkVelocity_y": pl.getViy,
-        "bulkVelocity_z": pl.getViz,
-        "EM_B_x": pl.getBx,
-        "EM_B_y": pl.getBy,
-        "EM_B_z": pl.getBz,
-        "EM_E_x": pl.getEx,
-        "EM_E_y": pl.getEy,
-        "EM_E_z": pl.getEz,
-        "flux_x": pl.getFx,
-        "flux_y": pl.getFy,
-        "flux_z": pl.getFz,
+        "density": pl.getNi,
+        "Vi": pl.getVi,
+        "EM_B_x": lambda: pl.getB("x"),
+        "EM_B_y": lambda: pl.getB("y"),
+        "EM_B_z": lambda: pl.getB("z"),
+        # "EM_E_x": pl.getEx,
+        # "EM_E_y": pl.getEy,
+        # "EM_E_z": pl.getEz,
+        "flux": pl.getFlux,
         "particles": pl.getParticles,
     }
 
