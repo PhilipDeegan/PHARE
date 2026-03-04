@@ -74,9 +74,8 @@ protected:
 
 
 template<typename Model>
-class __attribute__((
-    visibility("hidden"))) PatchLevel<Model, std::enable_if_t<solver::is_hybrid_model_v<Model>>>
-    : AnyPatchLevel<Model>
+class __attribute__((visibility("hidden")))
+PatchLevel<Model, std::enable_if_t<solver::is_hybrid_model_v<Model>>> : AnyPatchLevel<Model>
 {
     using Super = AnyPatchLevel<Model>;
 
@@ -119,13 +118,14 @@ public:
 
     auto getVi(std::string const& component)
     {
-        return this->getField(
-            this->model.state.ions.velocity()(this->vecfield_component(component)));
+        return this->getVecFieldComponent(this->model.state.ions.velocity(),
+                                          this->vecfield_component(component));
     }
 
     auto getFlux(std::string const& component, std::string const& popName)
     {
-        return this->getField(getIonPop(popName).flux()(this->vecfield_component(component)));
+        return this->getVecFieldComponent(getIonPop(popName).flux(),
+                                          this->vecfield_component(component));
     }
 
     auto getParticles(std::string const& popName)
@@ -147,9 +147,8 @@ public:
 
 
 template<typename Model>
-class __attribute__((
-    visibility("hidden"))) PatchLevel<Model, std::enable_if_t<solver::is_mhd_model_v<Model>>>
-    : AnyPatchLevel<Model>
+class __attribute__((visibility("hidden")))
+PatchLevel<Model, std::enable_if_t<solver::is_mhd_model_v<Model>>> : AnyPatchLevel<Model>
 {
     using Super = AnyPatchLevel<Model>;
 

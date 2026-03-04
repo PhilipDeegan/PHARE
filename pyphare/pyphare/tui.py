@@ -4,16 +4,22 @@ from textual.app import App, ComposeResult
 from textual.widgets import Footer, Header, Log
 from textual.containers import Container, Horizontal, VerticalScroll
 from textual.widgets import Placeholder
+from textual.widgets import Input, Static
 
+from textual import work
 from textual.worker import Worker
+from threading import Thread
 
 
-class TextualApp(App):
+class TextualTUI(App):
     """An app with a simple log."""
 
-    def __init__(self):
+    def __init__(self, max_lines=30):
         super().__init__()
-        self.std_log = Log(id="std_log")
+        self.max_lines = max_lines
+
+        # self.simulator = simulator
+        self.std_log = Log(id="std_log", max_lines=max_lines * 2, auto_scroll=True)
 
     def compose(self) -> ComposeResult:
         yield Header()
@@ -41,11 +47,13 @@ class TextualApp(App):
             ),
             id="content",
         )
-        yield std_log
+        yield self.std_log
         yield Footer()
 
     def print(self, *a, **kw):
         """redirects to the UI's default std output log"""
+        if self.std_log.line_count > self.max_lines:
+            self.std_log.refresh_lines(self.max_lines, self.max_lines * 2)
         print(*a, file=self, **kw)
 
     def flush(self):
@@ -66,48 +74,20 @@ class TextualApp(App):
         except RuntimeError as e:
             return f(*a, **kw)
 
+    # def watch_data(self) -> None:
+    #     sleep(1)
+    #     # raise "watch_data"
+    #     # self.query_one(Label).update(f"Data: {self.data}")
 
-if __name__ == "__main__":
-    from contextlib import redirect_stdout
+    # def on_input_submitted(self, message):
+    #     sleep(1)
+    #     # raise "on_input_submitted"
+    #     # self.data = message.value
 
-    TextualApp().run()
+    # @work(exclusive=True, thread=True)
+    # def run(self) -> None:
+    #     self.simulator.run()
 
-# class MyTUI(App):
-#     def __init__(self):
-#         super().__init__()
-#         self.std_log = Log(id="std_log")
-
-#     def compose(self):
-#         yield Header()
-#         yield self.std_log
-#         yield Footer()
-
-#     def print(self, *a, **kw):
-#         """redirects to the UI's default std output log"""
-#         kw["file"] = self
-#         print(*a, **kw)
-
-#     def flush(self):
-#         pass
-
-#     def write(self, s):
-#         """for redirecting stdout to a file-like"""
-#         if self.is_running:
-#             return self.call_from_anywhere(
-#                 self.std_log.write, s
-#             )  # std_log is a TextLog
-#         else:
-#             return sys.__stdout__.write(s)
-
-#     def call_from_anywhere(self, f, *a, **kw):
-#         try:
-#             return self.call_from_thread(f, *a, **kw)
-#         except RuntimeError as e:
-#             return f(*a, **kw)
-
-
-# my_tui_instance = MyTUI()
-
-# # some_module.print = my_tui_instance.print
-
-# my_tui_instance.run()
+    # async def on_input_changed(self, message: Input.Changed) -> None:
+    #     """Called when the input changes"""
+    #     await self.run()

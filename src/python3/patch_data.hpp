@@ -6,6 +6,7 @@
 #include "core/utilities/point/point.hpp"
 
 
+#include <stdexcept>
 #include <string>
 #include <cstring>
 #include <utility>
@@ -59,13 +60,13 @@ template<typename PatchData, typename Field, typename GridLayout>
 void setPyPatchDataFromField(PatchData& pdata, Field const& field, GridLayout& grid,
                              std::string patchID)
 {
+    auto constexpr dimension = PatchData::dimension;
+    static_assert(dimension >= 1 and dimension <= 3);
+
     setPatchDataFromGrid(pdata, grid, patchID);
     pdata.nGhosts = static_cast<std::size_t>(
         GridLayout::nbrGhosts(GridLayout::centering(field.physicalQuantity())[0]));
-
-    static_assert(PatchData::dimension >= 1 and PatchData::dimension <= 3);
-
-    pdata.data = py::memoryview::from_buffer(field.data(), field.shape(), strides(field.shape()));
+    pdata.data = field_as_memory_view(field);
 }
 
 

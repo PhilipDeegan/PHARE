@@ -130,7 +130,7 @@ public:
                     if (datas[i].size() == 0) // missing patch on rank
                         continue;
 
-                    auto& data      = collected.emplace_back(shapes[i], strides(shapes[i]));
+                    auto& data = collected.emplace_back(shapes[i], strides_from<double>(shapes[i]));
                     auto const span = makeSpan(data.data);
                     std::memcpy(span.data(), datas[i].data(), span.size() * sizeof(double));
                     setPatchData(data, patchIDs[i], origins[i], lower[i], upper[i]);
