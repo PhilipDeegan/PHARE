@@ -99,7 +99,8 @@ public:
         Super::putToRestart(restart_db);
 
         for (std::uint16_t c = 0; c < N; ++c)
-            restart_db->putVector("field_" + grids[c].name(), grids[c].vector());
+            restart_db->putDoubleArray("field_" + grids[c].name(), grids[c].data(),
+                                       grids[c].size());
     };
 
 
@@ -112,7 +113,7 @@ public:
      */
     void copy(SAMRAI::hier::PatchData const& source) final
     {
-        PHARE_LOG_SCOPE(3, "TensorFieldData::copy");
+        PHARE_LOG_SCOPE(2, "TensorFieldData::copy");
 
         // After checking that source and *this have the same number of dimension
         // We will try to cast source as a TensorFieldData, if it succeed we can continue
@@ -178,7 +179,7 @@ public:
      */
     void copy(SAMRAI::hier::PatchData const& source, SAMRAI::hier::BoxOverlap const& overlap) final
     {
-        PHARE_LOG_SCOPE(3, "TensorFieldData::copy");
+        PHARE_LOG_SCOPE(2, "TensorFieldData::copy");
 
         // casts throw on failure
         auto& fieldSource  = dynamic_cast<TensorFieldData const&>(source);
@@ -228,7 +229,7 @@ public:
     void packStream(SAMRAI::tbox::MessageStream& stream,
                     SAMRAI::hier::BoxOverlap const& overlap) const final
     {
-        PHARE_LOG_SCOPE(3, "TensorFieldData::packStream");
+        PHARE_LOG_SCOPE(2, "TensorFieldData::packStream");
 
         std::size_t const expectedSize = getDataStreamSize_(overlap) / sizeof(value_type);
         std::vector<typename Grid_t::type> buffer;
@@ -283,7 +284,7 @@ public:
     void unpackStream(SAMRAI::tbox::MessageStream& stream, SAMRAI::hier::BoxOverlap const& overlap,
                       auto& dst_grids)
     {
-        PHARE_LOG_SCOPE(3, "TensorFieldData::unpackStream");
+        PHARE_LOG_SCOPE(2, "TensorFieldData::unpackStream");
 
         auto& tFieldOverlap = dynamic_cast<TensorFieldOverlap_t const&>(overlap);
 
