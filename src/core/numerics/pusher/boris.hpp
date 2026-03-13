@@ -143,10 +143,9 @@ public:
               Boxing_t const& boxing)
     {
         move_domain<copy_particle>(pop, em, interpolator, boxing);
-        move_level_ghost<copy_particle>(pop, em, interpolator, boxing);
+        move_level_ghost<copy_particle>(pop, em, interpolator, boxing); // adds to domain!
     }
 
-private:
     void move_particle(auto& particle, auto const& em, auto& interpolator, auto const& layout,
                        auto const& dto2m)
     {
@@ -185,6 +184,7 @@ private:
         }
     };
 
+private:
     template<bool copy_particle, typename Population, typename Boxing_t>
     void move_level_ghost(Population& pop, Electromag const& em, Interpolator& interpolator,
                           Boxing_t const& boxing)
@@ -206,18 +206,14 @@ private:
 
             move_particle(particle, em, interpolator, layout, dto2m);
 
-            if (oldCell == particle.iCell)
-                continue;
-
-            bool const isInDomainBox      = boxing.isInDomainBox(particle);
-            bool const should_interpolate = isInDomainBox;
-
-            if (should_interpolate)
+            auto const changed_cell = oldCell != particle.iCell;
+            if (not changed_cell || boxing.isInGhostBox(particle))
                 interpolator.particleToMesh( //
                     particle, pop.particleDensity(), pop.chargeDensity(), pop.flux(), layout);
 
             if constexpr (!copy_particle)
             {
+                bool const isInDomainBox = boxing.isInDomainBox(particle);
                 if (isInDomainBox)
                 {
                     domain.push_back(particle);
@@ -226,9 +222,8 @@ private:
                     continue;
                 }
 
-                bool const isInNonLevelGhostBox
-                    = isInDomainBox || boxing.isInNonLevelGhostBox(particle.iCell);
-                bool const isInLevelGhostBox = !isInNonLevelGhostBox;
+                bool const isInNonLevelGhostBox = boxing.isInNonLevelGhostBox(particle.iCell);
+                bool const isInLevelGhostBox    = !isInNonLevelGhostBox;
 
                 if (isInLevelGhostBox)
                     level_ghost.change_icell(particle, oldCell, i);
@@ -263,7 +258,9 @@ private:
 
             move_particle(particle, em, interpolator, layout, dto2m);
 
-            if (oldCell == particle.iCell)
+            auto const changed_cell = oldCell != particle.iCell;
+
+            if (not changed_cell)
             {
                 interpolator.particleToMesh( //
                     particle, pop.particleDensity(), pop.chargeDensity(), pop.flux(), layout);
@@ -271,10 +268,7 @@ private:
                 continue;
             }
 
-            bool const isInDomainBox = boxing.isInDomainBox(particle);
-            bool const isInNonLevelGhostBox
-                = isInDomainBox || boxing.isInNonLevelGhostBox(particle.iCell);
-            bool const should_interpolate = isInNonLevelGhostBox;
+            bool const should_interpolate = boxing.isInNonLevelGhostBox(particle.iCell);
 
             if (!should_interpolate)
             {

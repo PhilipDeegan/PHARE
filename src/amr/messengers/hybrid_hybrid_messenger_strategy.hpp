@@ -403,7 +403,7 @@ namespace amr
         void fillCurrentGhosts(VecFieldT& J, level_t const& level, double const fillTime) override
         {
             {
-                PHARE_LOG_SCOPE(3, "HybridHybridMessengerStrategy::fillCurrentGhosts::naning");
+                PHARE_LOG_SCOPE(2, "HybridHybridMessengerStrategy::fillCurrentGhosts::naning");
                 setNaNsOnVecfieldGhosts(J, level);
             }
 

@@ -53,7 +53,7 @@ def config():
         restart_options={
             "dir": "checkpoints",
             "mode": "overwrite",
-            "elapsed_timestamps": [0],
+            # "elapsed_timestamps": [0],
             "restart_time": "auto",
         },
         write_reports=False,
