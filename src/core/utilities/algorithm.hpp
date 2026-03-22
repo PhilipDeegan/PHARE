@@ -13,6 +13,11 @@
 #include "core/data/tensorfield/tensorfield.hpp"
 
 
+#include "core/data/grid/grid.hpp"
+#include "core/data/grid/grid_tiles.hpp"
+
+
+
 #include <string>
 #include <algorithm>
 #include <stdexcept>
@@ -58,6 +63,7 @@ namespace core
 } // namespace core
 } // namespace PHARE
 
+
 namespace PHARE::core
 {
 
@@ -100,11 +106,11 @@ auto convert_to_primal(        //
     throw std::runtime_error("Quantity not supported for conversion to primal.");
 }
 
-template<std::size_t dim, typename... Ts>
-auto& convert_to_fortran_primal(  // DOES NOT WORK ON GHOST BOX!
-    Field<dim, Ts...>& dst,       //
-    Field<dim, Ts...> const& src, //
-    auto const& layout            //
+template<std::size_t dim, typename PQ, typename T, auto am>
+auto& convert_to_fortran_primal(       // DOES NOT WORK ON GHOST BOX!
+    Field<dim, PQ, T, am>& dst,        //
+    Field<dim, PQ, T, am> const& src,  //
+    auto const& layout, auto const qty //
 )
 {
     bool static constexpr c_ordering = false;
@@ -113,7 +119,7 @@ auto& convert_to_fortran_primal(  // DOES NOT WORK ON GHOST BOX!
         throw std::runtime_error("Invalid operation, all directions must be primal");
 
     auto const all_primal
-        = all(layout.centering(src), [](auto const c) { return c == QtyCentering::primal; });
+        = all(layout.centering(qty), [](auto const c) { return c == QtyCentering::primal; });
 
     auto const lcl_box = layout.AMRToLocal(layout.AMRBoxFor(dst));
     auto dst_view      = make_array_view<c_ordering>(dst.data(), *lcl_box.shape());
@@ -131,7 +137,7 @@ auto& convert_to_fortran_primal(  // DOES NOT WORK ON GHOST BOX!
 
     else
         for (auto const [lix, lix0] : boxes_iterator(lcl_box, lcl_zero_box))
-            dst_view(lix0) = convert_to_primal(src, layout, lix, src.physicalQuantity());
+            dst_view(lix0) = convert_to_primal(src, layout, lix, qty);
 
     return dst;
 }
@@ -140,14 +146,118 @@ template<typename Field_t, typename PQ, std::size_t rank>
 auto& convert_to_fortran_primal(               //
     TensorField<Field_t, PQ, rank>& dst,       //
     TensorField<Field_t, PQ, rank> const& src, //
-    auto const& layout                         //
+    auto const& layout, auto const quantities  //
 )
 {
     for (std::size_t ci = 0; ci < src.size(); ++ci)
-        convert_to_fortran_primal(dst[ci], src[ci], layout);
+        convert_to_fortran_primal(dst[ci], src[ci], layout, quantities[ci]);
     return dst;
 }
 
+template<typename GL, typename ND, typename PQ>
+void transform(FieldTileSet<GL, ND, PQ> const& in, FieldTileSet<GL, ND, PQ>& out, auto const fn)
+{
+    std::size_t const size = in().size();
+    for (std::size_t i = 0; i < size; ++i)
+        std::transform(in[i]().begin(), in[i]().end(), out[i]().begin(), fn);
+}
+
+
+template<typename GL, typename ND, typename PQ>
+void transform(FieldTileSet<GL, ND, PQ> const& in0, FieldTileSet<GL, ND, PQ> const& in1,
+               FieldTileSet<GL, ND, PQ>& out, auto const fn)
+{
+    assert(in0.isUsable());
+    assert(in1.isUsable());
+    assert(out.isUsable());
+    auto const size = in0().size();
+
+    for (std::size_t i = 0; i < size; ++i)
+    {
+        auto& i0 = in0[i]();
+        auto& i1 = in1[i]();
+        auto& o0 = out[i]();
+        std::transform(in0[i]().begin(), in0[i]().end(), in1[i]().begin(), out[i]().begin(), fn);
+    }
+}
+
+
+template<typename GL, typename ND, typename PQ>
+void average(FieldTileSet<GL, ND, PQ> const& f1, FieldTileSet<GL, ND, PQ> const& f2,
+             FieldTileSet<GL, ND, PQ>& avg)
+{
+    core::transform(f1, f2, avg, std::plus<double>());
+    core::transform(avg, avg, [](double x) { return x * 0.5; });
+}
+
+
+template<auto opts>
+void transform(basic::Field<opts> const& in, basic::Field<opts>& out, auto const fn)
+{
+    std::transform(in.begin(), in.end(), out.begin(), fn);
+}
+
+template<auto opts>
+void transform(basic::Field<opts> const& in0, basic::Field<opts> const& in1,
+               basic::Field<opts>& out, auto const fn)
+{
+    std::transform(in0.begin(), in0.end(), in1.begin(), out.begin(), fn);
+}
+
+
+template<auto opts>
+void average(basic::Field<opts> const& f1, basic::Field<opts> const& f2, basic::Field<opts>& avg)
+{
+    core::transform(f1, f2, avg, std::plus<double>());
+    core::transform(avg, avg, [](double x) { return x * 0.5; });
+}
+
+template<typename Field_t, std::size_t rank>
+void average(basic::TensorField<Field_t, rank> const& vf1,
+             basic::TensorField<Field_t, rank> const& vf2, basic::TensorField<Field_t, rank>& Vavg)
+{
+    auto constexpr static N = detail::tensor_field_dim_from_rank<rank>();
+
+    for (std::size_t i = 0; i < N; ++i)
+        average(vf1[i], vf2[i], Vavg[i]);
+}
+
+
+template<typename Field_t>
+void accumulate_field(Field_t& dst, Field_t const& src, auto const coef)
+    requires(not is_field_tile_set_v<Field_t>)
+{
+    if (dst.size() != src.size())
+        throw std::runtime_error("Cannot accumulate fields with different sizes");
+
+    for (std::size_t i = 0; i < dst.size(); ++i)
+        dst.data()[i] = src.data()[i] * coef;
+}
+
+
+template<typename Field_t>
+void accumulate_field(Field_t& dst, Field_t const& src, auto const coef)
+    requires(is_field_tile_set_v<Field_t>)
+{
+    auto& dst_tiles = dst();
+    auto& src_tiles = src();
+
+    if (dst_tiles.size() != src_tiles.size())
+        throw std::runtime_error("Cannot accumulate fields with different number of tiles");
+
+    for (std::size_t i = 0; i < dst_tiles.size(); ++i)
+        accumulate_field(dst_tiles[i](), src_tiles[i](), coef);
+}
+
+
+
+template<typename Field_t>
+void accumulate(basic::TensorField<Field_t, 1>& dst, basic::TensorField<Field_t, 1> const& src,
+                auto const coeff)
+{
+    for (std::size_t c = 0; c < dst.size(); ++c)
+        accumulate_field(dst[c], src[c], coeff);
+}
 
 
 } // namespace PHARE::core

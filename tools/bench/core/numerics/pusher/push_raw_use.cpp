@@ -13,7 +13,7 @@ void push()
     using GridLayout_t      = TestGridLayout<typename PHARE_Types::GridLayout_t>;
     using Interpolator      = PHARE::core::Interpolator<dim, interp>;
     using BoundaryCondition = PHARE::core::BoundaryCondition<dim, interp>;
-    using Electromag_t      = PHARE::core::UsableElectromag<dim>;
+    using Electromag_t      = PHARE::core::UsableElectromag<GridLayout_t>;
     using Ions_t            = PHARE_Types::Ions_t;
     using ParticleArray     = Ions_t::particle_array_type;
     using ParticleRange     = PHARE::core::IndexRange<ParticleArray>;
@@ -27,7 +27,7 @@ void push()
 
     std::stringstream ss;
     ss << "unsorted_particles_" << dim << ".raw";
-    PHARE::core::bench::read_raw_from_file(domainParticles, ss.str());
+    PHARE::core::read_raw_from_file(domainParticles, ss.str());
 
     // std::sort(domainParticles);
 

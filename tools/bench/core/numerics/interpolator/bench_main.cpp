@@ -3,6 +3,8 @@
 #include "core/numerics/interpolator/interpolator.hpp"
 #include "tests/core/data/gridlayout/test_gridlayout.hpp"
 
+#include "benchmark/benchmark.h"
+
 template<std::size_t dim, std::size_t interp>
 void interpolate(benchmark::State& state)
 {
@@ -18,21 +20,23 @@ void interpolate(benchmark::State& state)
     GridLayout_t layout{cells};
     PHARE::core::Interpolator<dim, interp> interpolator;
     ParticleArray particles{layout.AMRBox()};
-    particles.vector().resize(n_parts, PHARE::core::bench::particle<dim>());
-    PHARE::core::UsableElectromag<dim> em{layout};
-    PHARE::core::UsableVecField<dim> flux{"F", layout, PHARE::core::HybridQuantity::Vector::V};
+    add_particles_in(particles, layout.AMRBox(), n_parts);
+
+    PHARE::core::UsableElectromag<GridLayout_t> em{layout};
+    PHARE::core::UsableVecField<GridLayout_t> flux{"F", layout,
+                                                   PHARE::core::HybridQuantity::Vector::V};
     Grid_t particleDensity{"particleDensity", PHARE::core::HybridQuantity::Scalar::rho,
                            layout.allocSize(PHARE::core::HybridQuantity::Scalar::rho)};
     Grid_t chargeDensity{"chargeDensity", PHARE::core::HybridQuantity::Scalar::rho,
                          layout.allocSize(PHARE::core::HybridQuantity::Scalar::rho)};
 
-    PHARE::core::bench::disperse(particles, 0, cells - 1);
+    delta_disperse(particles);
 
     while (state.KeepRunning())
     {
         // meshToParticle
-        for (auto& particle : particles)
-            interpolator(particle, em, layout);
+        for (std::size_t i = 0; i < particles.size(); ++i)
+            interpolator(particles, em, layout, i);
 
         // particleToMesh
         interpolator(particles, particleDensity, chargeDensity, flux, layout);
