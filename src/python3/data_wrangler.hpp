@@ -1,6 +1,7 @@
 #ifndef PHARE_PYTHON_DATA_WRANGLER_HPP
 #define PHARE_PYTHON_DATA_WRANGLER_HPP
 
+
 #include "core/utilities/mpi_utils.hpp"
 #include "core/utilities/point/point.hpp"
 #include "core/utilities/meta/meta_utilities.hpp"
@@ -21,13 +22,14 @@
 #include <vector>
 #include <cstddef>
 #include <iterator>
-#include <stdexcept>
 #include <algorithm>
+#include <stdexcept>
+
 
 namespace PHARE::pydata
 {
 template<auto opts>
-class SimulatorCaster
+class __attribute__((visibility("hidden"))) SimulatorCaster
 {
 public:
     using Simulator_t = Simulator<opts>;
@@ -123,10 +125,10 @@ public:
         int mpi_size = core::mpi::size();
         std::vector<PatchData<std::vector<double>, dimension>> collected;
 
-        auto reinterpret_array = [&](auto& py_array) {
-            return reinterpret_cast<std::array<std::size_t, dimension>&>(
-                *static_cast<std::size_t*>(py_array.request().ptr));
-        };
+        // auto reinterpret_array = [&](auto& py_array) {
+        //     return reinterpret_cast<std::array<std::size_t, dimension>&>(
+        //         *static_cast<std::size_t*>(py_array.request().ptr));
+        // };
 
         auto collect = [&](PatchData<std::vector<double>, dimension> const& patch_data) {
             auto patchIDs = core::mpi::collect(patch_data.patchID, mpi_size);

@@ -521,8 +521,6 @@ def check_diag_options(**kwargs):
 
 
 def check_restart_options(**kwargs):
-    import pyphare.pharein.restarts as restarts
-
     valid_keys = [
         "dir",
         "elapsed_timestamps",
@@ -534,6 +532,8 @@ def check_restart_options(**kwargs):
     restart_options = kwargs.get("restart_options", None)
 
     if restart_options is not None:
+        import pyphare.pharein.restarts as restarts
+
         for key in restart_options.keys():
             if key not in valid_keys:
                 raise ValueError(

@@ -31,16 +31,16 @@ template<typename Hierarchy, typename Model>
 class BaseModelView : public IModelView
 {
 public:
-    using GridLayout        = Model::gridlayout_type;
     using VecField          = Model::vecfield_type;
     using TensorFieldT      = Model::ions_type::tensorfield_type;
+    using GridLayout        = Model::gridlayout_type;
     using ResMan            = Model::resources_manager_type;
     using Field             = Model::field_type;
     using TensorFieldData_t = ResMan::template UserTensorField_t</*rank=*/2>::patch_data_type;
     static constexpr auto dimension = Model::dimension;
 
-
 public:
+    using Model_t = Model;
     using PatchProperties
         = cppdict::Dict<float, double, std::size_t, std::vector<int>, std::vector<std::uint32_t>,
                         std::vector<double>, std::vector<std::size_t>, std::string,
@@ -118,7 +118,7 @@ public:
         return std::string{GridLayout::implT::type};
     }
 
-    NO_DISCARD auto getPatchProperties(std::string patchID, GridLayout const& grid) const
+    NO_DISCARD auto getPatchProperties(std::string /*patchID*/, GridLayout const& grid) const
     {
         PatchProperties dict;
         dict["origin"]   = grid.origin().toVector();
@@ -169,6 +169,59 @@ public:
     {
         return std::forward_as_tuple(tmpField_, tmpVec_, tmpTensor_);
     }
+    auto operator()() const { return model_.getCompileTimeResourcesViewList(); }
+
+
+    template<typename Field_t>
+    auto& field_reducer(Field_t& f, bool const reduce = true)
+    {
+        if constexpr (core::is_field_tile_set_v<Field_t>)
+        {
+            f.check();
+            auto&& [a, field, c, d] = (*this)();
+            if (reduce)
+                core::reduce_single(field, f);
+            return field;
+        }
+        else
+            return f;
+    }
+
+    template<typename TField_t>
+    auto& vec_field_reducer(TField_t& f, bool const reduce = true)
+    {
+        using Field_t = TField_t::field_type;
+
+        if constexpr (core::is_field_tile_set_v<Field_t>)
+        {
+            core::check_tensorfield(f);
+            auto&& [a, b, vf, d] = (*this)();
+            if (reduce)
+                for (std::size_t i = 0; i < 3; ++i)
+                    core::reduce_single(vf[i], f[i]);
+            return vf;
+        }
+        else
+            return f;
+    }
+
+    template<typename TField_t>
+    auto& tensor_field_reducer(TField_t& f, bool const reduce = true)
+    {
+        using Field_t = TField_t::field_type;
+
+        if constexpr (core::is_field_tile_set_v<Field_t>)
+        {
+            core::check_tensorfield(f);
+            auto&& [a, b, c, tf] = (*this)();
+            if (reduce)
+                for (std::size_t i = 0; i < 6; ++i)
+                    core::reduce_single(tf[i], f[i]);
+            return tf;
+        }
+        else
+            return f;
+    }
 
 
 protected:
@@ -217,9 +270,9 @@ protected:
     };
 
     std::vector<MTAlgo> MTAlgos;
-    Field tmpField_{"PHARE_sumField", core::HybridQuantity::Scalar::rho};
-    VecField tmpVec_{"PHARE_sumVec", core::HybridQuantity::Vector::V};
-    TensorFieldT tmpTensor_{"PHARE_sumTensor", core::HybridQuantity::Tensor::M};
+    Field tmpField_{"phare_scratch_field", core::HybridQuantity::Scalar::Vx};
+    VecField tmpVec_{"phare_scratch_vec_field", core::HybridQuantity::Vector::V};
+    TensorFieldT tmpTensor_{"phare_scratch_tensor_field", core::HybridQuantity::Tensor::M};
 };
 
 

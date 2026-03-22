@@ -37,8 +37,12 @@ namespace solver
         static constexpr auto dimension    = GridLayoutT::dimension;
         static constexpr auto interp_order = GridLayoutT::interp_order;
 
-        PHARE::core::Ohm<GridLayoutT> ohm_;
-        PHARE::core::Ampere<GridLayoutT> ampere_;
+        using ParticleArray_t = HybridModel::particle_array_type;
+        using Interpolating_t
+            = core::Interpolating<ParticleArray_t, interp_order, /*atomic_interp*/ false>;
+
+        PHARE::core::OhmSingleTransformer ohm_;
+        PHARE::core::AmpereSingleTransformer ampere_;
 
         inline bool isRootLevel(int const levelNumber) const { return levelNumber == 0; }
 
@@ -52,7 +56,8 @@ namespace solver
                                 amr::IMessenger<IPhysicalModelT>& messenger, double initDataTime,
                                 bool isRegridding) override
         {
-            core::Interpolator<dimension, interp_order> interpolate_;
+            Interpolating_t interpolate_;
+
             auto& hybridModel = static_cast<HybridModel&>(model);
             auto& level       = amr_types::getLevel(*hierarchy, levelNumber);
 
@@ -95,6 +100,7 @@ namespace solver
                 throw core::DictionaryException{}("ID", "HybridLevelInitializer::initialize");
 
             // now all particles are here, we must compute moments.
+
             auto& ions = hybridModel.state.ions;
             auto& rm   = *hybridModel.resourcesManager;
 
@@ -104,6 +110,7 @@ namespace solver
                 core::resetMoments(ions);
                 core::depositParticles(ions, layout, interpolate_, core::DomainDeposit{});
             }
+
 
             // at this point flux and density is computed for all pops
             // but nodes on ghost box overlaps are not complete because they lack
@@ -156,8 +163,7 @@ namespace solver
                     for (auto& patch : rm.enumerate(level, B, J))
                     {
                         auto layout = PHARE::amr::layoutFromPatch<GridLayoutT>(*patch);
-                        auto __     = core::SetLayout(&layout, ampere_);
-                        ampere_(B, J);
+                        ampere_(layout, B, J);
 
                         rm.setTime(J, *patch, 0.);
                     }
@@ -173,8 +179,7 @@ namespace solver
                         auto& Ve = electrons.velocity();
                         auto& Ne = electrons.density();
                         auto& Pe = electrons.pressure();
-                        auto __  = core::SetLayout(&layout, ohm_);
-                        ohm_(Ne, Ve, Pe, B, J, E);
+                        ohm_(layout, Ne, Ve, Pe, B, J, E);
                         rm.setTime(E, *patch, 0.);
                     }
 
@@ -190,7 +195,11 @@ namespace solver
             hybMessenger.prepareStep(hybridModel, level, initDataTime);
         }
     };
+
+
 } // namespace solver
+
 } // namespace PHARE
+
 
 #endif
