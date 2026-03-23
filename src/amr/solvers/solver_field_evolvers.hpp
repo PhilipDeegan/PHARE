@@ -132,7 +132,6 @@ OhmLevelTransformer(core::OhmInfo, typename Model::amr_types::level_t&, Model&)
 
 
 
-
 template<typename level_t, typename Model>
 struct TimeSetter
 {

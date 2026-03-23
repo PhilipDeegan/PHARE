@@ -6,6 +6,7 @@
 #include "core/numerics/ohm/ohm.hpp"
 #include "core/utilities/mpi_utils.hpp"
 #include "core/data/vecfield/vecfield.hpp"
+#include "core/data/electrons/electrons.hpp"
 #include "core/numerics/ion_updater/ion_updater.hpp"
 
 #include "amr/solvers/solver.hpp"
@@ -112,10 +113,14 @@ public:
 
 
     NO_DISCARD auto getCompileTimeResourcesViewList()
-    { return std::forward_as_tuple(Bold_, fluxSumE_); }
+    {
+        return std::forward_as_tuple(Bold_, fluxSumE_);
+    }
 
     NO_DISCARD auto getCompileTimeResourcesViewList() const
-    { return std::forward_as_tuple(Bold_, fluxSumE_); }
+    {
+        return std::forward_as_tuple(Bold_, fluxSumE_);
+    }
 
 
 private:
