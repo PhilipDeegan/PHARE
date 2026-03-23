@@ -322,9 +322,6 @@ def _compute_to_primal(patchdatas, patch_id, **kwargs):
 
     reference_name = next(iter(kwargs.values()))
     reference_pd = patchdatas[reference_name]
-    nb_ghosts = reference_pd.layout.nbrGhosts(
-        reference_pd.layout.interp_order, "primal"
-    )
     ndim = reference_pd.box.ndim
 
     centerings = ["primal"] * ndim
@@ -332,6 +329,7 @@ def _compute_to_primal(patchdatas, patch_id, **kwargs):
     pd_attrs = []
     for name, pd_name in kwargs.items():
         pd = patchdatas[pd_name]
+        nb_ghosts = int(pd.ghosts_nbr[0])
 
         ds = pd.dataset
 
@@ -378,10 +376,9 @@ def _get_rank(patchdatas, patch_id, **kwargs):
     reference_pd = patchdatas["Bx"]  # Bx as a ref, but could be any other
     ndim = reference_pd.box.ndim
 
-    layout = reference_pd.layout
-    centering = "dual"
-    nbrGhosts = layout.nbrGhosts(layout.interp_order, centering)
-    shape = grow(reference_pd.box, [nbrGhosts] * 2).shape
+    centering = ["dual"] * ndim
+    nbrGhosts = int(reference_pd.ghosts_nbr[0])
+    shape = grow(reference_pd.box, [nbrGhosts] * ndim).shape
 
     if ndim == 1:
         pass
