@@ -16,11 +16,11 @@
 namespace PHARE::core
 {
 
-
-template<auto opts, typename internals /* defaulted in details header */>
-class ParticleArray : public internals::value_type
+template<auto opts /* defaulted in details header */>
+class ParticleArray : public ResolvedParticleArray_t<opts>
 {
-    using This = ParticleArray<opts, internals>;
+    using This      = ParticleArray<opts>;
+    using internals = ParticleArrayResolver<opts>;
 
 
     template<typename... Args>
@@ -41,7 +41,7 @@ class ParticleArray : public internals::value_type
     }
 
 public:
-    using Super      = internals::value_type;
+    using Super      = ResolvedParticleArray_t<opts>;
     using value_type = ParticleDefaults<opts.dim>::Particle_t;
     using view_t     = ParticleArray<opts.with_storage(StorageMode::SPAN)>;
 
@@ -51,16 +51,10 @@ public:
     auto static constexpr layout_mode  = opts.layout_mode;
     auto static constexpr storage_mode = opts.storage_mode;
     auto static constexpr type_id      = internals::type_id;
-    auto static constexpr is_mapped    = internals::is_mapped; // torm
-    auto static inline mon             = MemoryMonitor{std::string{type_id}};
+    // auto static constexpr is_mapped    = internals::is_mapped; // torm
+    auto static inline mon = MemoryMonitor{std::string{type_id}};
 
-    std::string static id()
-    {
-        std::stringstream ss;
-        ss << magic_enum::enum_name(layout_mode) << "," << magic_enum::enum_name(alloc_mode) << ","
-           << magic_enum::enum_name(storage_mode);
-        return ss.str();
-    }
+    std::string static id() { return std::string{type_id}; }
 
     ParticleArray(ParticleArray&& that)
         : Super{std::forward<Super>(that)}
@@ -117,8 +111,8 @@ public:
     Super& super() _PHARE_ALL_FN_ { return *this; }
     Super const& super() const { return *this; }
 
-    template<auto _opts, typename _internals>
-    friend std::ostream& operator<<(std::ostream& out, ParticleArray<_opts, _internals> const&);
+    template<auto _opts>
+    friend std::ostream& operator<<(std::ostream& out, ParticleArray<_opts> const&);
 };
 
 template<std::size_t dim>
@@ -132,10 +126,10 @@ template<std::size_t dim>
 using SoAParticleArray = ParticleArray<ParticleArrayOptions{dim, LayoutMode::SoA}>;
 
 
-template<auto opts, typename internals>
-std::ostream& operator<<(std::ostream& out, ParticleArray<opts, internals> const& arr)
+template<auto opts>
+std::ostream& operator<<(std::ostream& out, ParticleArray<opts> const& arr)
 {
-    if constexpr (ParticleArray<opts, internals>::layout_mode == LayoutMode::SoAPC) {}
+    if constexpr (ParticleArray<opts>::layout_mode == LayoutMode::SoAPC) {}
     else
         for (auto const& p : arr)
             out << p.copy();
@@ -145,15 +139,15 @@ std::ostream& operator<<(std::ostream& out, ParticleArray<opts, internals> const
 
 
 
-template<auto opts, typename internals>
-void empty(ParticleArray<opts, internals>& array)
+template<auto opts>
+void empty(ParticleArray<opts>& array)
 {
     array.clear();
 }
 
 
-template<auto opts, typename internals>
-void swap(ParticleArray<opts, internals>& array1, ParticleArray<opts, internals>& array2)
+template<auto opts>
+void swap(ParticleArray<opts>& array1, ParticleArray<opts>& array2)
 {
     array1.swap(array2);
 }
@@ -194,8 +188,8 @@ EqualityReport particles_equals(P0 const& ref, P1 const& cmp, double const atol 
     return EqualityReport{true};
 }
 
-template<auto O, typename I0, typename I1>
-EqualityReport operator==(ParticleArray<O, I0> const& p0, ParticleArray<O, I1> const& p1)
+template<auto O>
+EqualityReport operator==(ParticleArray<O> const& p0, ParticleArray<O> const& p1)
 {
     auto report = particles_equals(p0, p1);
     if (!report)
@@ -206,8 +200,8 @@ EqualityReport operator==(ParticleArray<O, I0> const& p0, ParticleArray<O, I1> c
     return report;
 }
 
-template<auto O, typename I0>
-EqualityReport operator==(ParticleArray<O, I0> const& p0, std::vector<Particle<O>> const& p1)
+template<auto O>
+EqualityReport operator==(ParticleArray<O> const& p0, std::vector<Particle<O>> const& p1)
 {
     return particles_equals(p0, p1);
 }
@@ -218,7 +212,7 @@ template<typename ParticleArray_t>
 auto constexpr base_layout_type()
 {
     using enum LayoutMode;
-    if constexpr (any_in(ParticleArray_t::layout_mode, AoS, AoSMapped, AoSPC, AoSTS))
+    if constexpr (any_in(ParticleArray_t::layout_mode, AoS, AoSMapped, AoSPC, AoSTS, AoSCMTS))
         return AoS;
     return SoA;
 }
@@ -257,11 +251,11 @@ auto print_particles_per_cell(ParticleArray_t const& ps)
 }
 
 
-template<auto O, typename I0>
-void per_particle(ParticleArray<O, I0> const& particles, auto const fn)
+template<auto O>
+void per_particle(ParticleArray<O> const& particles, auto const fn)
 {
     using enum LayoutMode;
-    if constexpr (any_in(O.layout_mode, AoSTS))
+    if constexpr (is_tiled(O.layout_mode))
         for (auto& tile : particles())
             for (auto& p : tile())
                 fn(p);
@@ -270,32 +264,32 @@ void per_particle(ParticleArray<O, I0> const& particles, auto const fn)
             fn(p);
 }
 
-template<auto O, typename I0>
-void check_particles(ParticleArray<O, I0> const& particles, bool const print = false)
+template<auto O>
+void check_particles(ParticleArray<O> const& particles, bool const print = false)
 {
     using enum LayoutMode;
 
     PHARE_DEBUG_DO({
-        if constexpr (any_in(O.layout_mode, AoSTS))
+        if constexpr (is_tiled(O.layout_mode))
             particles.check();
     })
 }
 
 
-template<auto O, typename I0>
-void check_particles_views(ParticleArray<O, I0>& particles, bool const print = false)
+template<auto O>
+void check_particles_views(ParticleArray<O>& particles, bool const print = false)
 {
     using enum LayoutMode;
 
     PHARE_DEBUG_DO({ check_particles(*particles); })
 }
 
-template<auto O, typename I0>
-void particle_array_domain_is_valid(ParticleArray<O, I0> const& particles, auto const& domain_box)
+template<auto O>
+void particle_array_domain_is_valid(ParticleArray<O> const& particles, auto const& domain_box)
 {
     std::size_t in_domain_box = 0, not_in_domain_box = 0;
 
-    if constexpr (any_in(O.layout_mode, AoSTS))
+    if constexpr (is_tiled(O.layout_mode))
     {
         for (std::size_t tidx = 0; tidx < particles().size(); ++tidx)
         {
@@ -317,8 +311,8 @@ void particle_array_domain_is_valid(ParticleArray<O, I0> const& particles, auto 
         throw std::runtime_error("Invalid particles");
 }
 
-template<auto O, typename I0>
-void particle_array_ghost_is_valid(ParticleArray<O, I0> const& particles, auto const& domain_box,
+template<auto O>
+void particle_array_ghost_is_valid(ParticleArray<O> const& particles, auto const& domain_box,
                                    auto const& ghost_box)
 {
     std::size_t in_ghost_layer = 0, not_in_ghost_layer = 0, outside_gb = 0;
@@ -335,7 +329,7 @@ void particle_array_ghost_is_valid(ParticleArray<O, I0> const& particles, auto c
             ++not_in_ghost_layer;
     });
 
-    if constexpr (any_in(O.layout_mode, AoSTS))
+    if constexpr (is_tiled(O.layout_mode))
     {
         for (std::size_t tidx = 0; tidx < particles().size(); ++tidx)
         {

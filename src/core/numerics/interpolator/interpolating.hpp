@@ -47,7 +47,7 @@ public:
         PHARE_LOG_SCOPE(3, "Interpolating::particleToMesh");
 
         using enum LayoutMode;
-        if constexpr (any_in(Particles::layout_mode, AoSTS))
+        if constexpr (any_in(Particles::layout_mode, AoSTS, AoSCMTS))
         {
             // using GridTile_t  = Field::value_type;
             using Field_vt    = Field::value_type; // GridTile_t::value_type::field_type;

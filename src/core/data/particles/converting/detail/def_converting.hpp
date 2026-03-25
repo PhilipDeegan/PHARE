@@ -5,7 +5,6 @@
 
 #include "core/data/particles/particle_array_def.hpp"
 
-#include <cstddef>
 
 namespace PHARE::core
 {
@@ -25,9 +24,6 @@ struct ParticlesConverter
 
     template<typename Dst, typename Src, typename GridLayout>
     Dst operator()(Src const& src, GridLayout const& layout);
-
-    std::size_t const start;
-    std::size_t const end;
 };
 
 

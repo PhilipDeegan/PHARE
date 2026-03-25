@@ -12,9 +12,9 @@ using namespace PHARE;
 template<std::size_t dim, std::size_t interp>
 void updater_routine(benchmark::State& state)
 {
-    constexpr std::uint32_t cells   = 30;
-    constexpr std::uint32_t n_parts = 1e7;
-    auto static constexpr opts      = PHARE::SimOpts{dim, interp};
+    constexpr std::uint32_t cells = 15;
+    constexpr std::uint32_t ppc   = 100;
+    auto static constexpr opts    = PHARE::SimOpts{dim, interp};
 
     using PHARE_Types   = core::PHARE_Types<opts>;
     using GridLayout_t  = TestGridLayout<typename PHARE_Types::GridLayout_t>;
@@ -31,7 +31,7 @@ void updater_routine(benchmark::State& state)
     Boxing_t const boxing{layout, {grow(layout.AMRBox(), GridLayout_t::nbrParticleGhosts())}};
 
     auto& patch_particles = ions.populations[0].particles;
-    add_particles_in(patch_particles.domain_particles, layout.AMRBox(), n_parts);
+    add_particles_in(patch_particles.domain_particles, layout.AMRBox(), ppc);
 
     delta_disperse(patch_particles.domain_particles);
     // std::sort(patch_particles.domain_particles);

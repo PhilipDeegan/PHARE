@@ -27,6 +27,36 @@ void ParticlesAppender<LM::AoSMapped, AM::CPU, LM::AoS, AM::CPU>::operator()( //
 
 
 
+
+template<>
+template<auto type, typename Src, typename Dst>
+void ParticlesAppender<LM::AoSMapped, AM::CPU, LM::AoSTS, AM::CPU>::operator()( //
+    Src const& src, Dst& dst)
+{
+    PHARE_LOG_SCOPE(3, "ParticlesAppender<AoSMapped, CPU, AoSTS, CPU>::operator()");
+
+    for (auto const& p : src)
+        dst.emplace_back(p);
+
+    dst.template sync<2, type>();
+}
+
+template<>
+template<auto type, typename Src, typename Dst>
+void ParticlesAppender<LM::AoSMapped, AM::CPU, LM::AoSCMTS, AM::CPU>::operator()( //
+    Src const& src, Dst& dst)
+{
+    PHARE_LOG_SCOPE(3, "ParticlesAppender<AoSMapped, CPU, AoSCMTS, CPU>::operator()");
+
+    for (auto const& p : src)
+        dst.emplace_back(p);
+
+    dst.template sync<2, type>();
+}
+
+
+
+
 template<>
 template<auto type, typename Src, typename Dst>
 void ParticlesAppender<LM::AoSMapped, AM::CPU, LM::AoSPC, AM::GPU_UNIFIED>::operator()( //
@@ -87,20 +117,6 @@ void ParticlesAppender<LM::AoSMapped, AM::CPU, LM::AoSTS, AM::GPU_UNIFIED>::oper
 
     dst.template sync<2, type>();
 }
-
-template<>
-template<auto type, typename Src, typename Dst>
-void ParticlesAppender<LM::AoSMapped, AM::CPU, LM::AoSTS, AM::CPU>::operator()( //
-    Src const& src, Dst& dst)
-{
-    PHARE_LOG_SCOPE(3, "ParticlesAppender<AoSMapped, CPU, AoSTS, CPU>::operator()");
-
-    for (auto const& p : src)
-        dst.emplace_back(p);
-
-    dst.template sync<2, type>();
-}
-
 
 
 

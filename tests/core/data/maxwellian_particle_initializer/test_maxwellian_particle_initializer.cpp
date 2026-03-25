@@ -3,6 +3,7 @@
 #include "core/data/grid/gridlayout_impl.hpp"
 #include "core/data/ions/particle_initializers/maxwellian_particle_initializer.hpp"
 #include "core/data/particles/particle_array.hpp"
+#include "core/data/particles/particle_array_def.hpp"
 #include "core/data/particles/particle_utilities.hpp"
 #include "core/utilities/box/box.hpp"
 #include "core/utilities/point/point.hpp"
@@ -26,7 +27,7 @@ private:
 
     auto static init_particles(GridLayoutT const& layout)
     {
-        if constexpr (ParticleArrayT::is_mapped)
+        if constexpr (any_in(ParticleArrayT::layout_mode, LayoutMode::AoSMapped))
             return ParticleArrayT{layout.AMRBox()};
         else
             return ParticleArrayT{};

@@ -22,6 +22,13 @@ if(PHARE_COMPILER_WORKAROUNDS)
   endif() # compiler is GNU
 endif(PHARE_COMPILER_WORKAROUNDS)
 
+if(devMode) # set defaults
+  set (useExceptionsInsteadOfMPIAbort ON CACHE BOOL "YES!" FORCE)
+endif(devMode)
+
+if(useExceptionsInsteadOfMPIAbort)
+  set (PHARE_FLAGS ${PHARE_FLAGS} -DPHARE_ERRORS_USE_MPI_ABORT=0 ) # defaults in C++ to true if not set!
+endif(useExceptionsInsteadOfMPIAbort)
 
 set (PHARE_LINK_FLAGS )
 set (PHARE_BASE_LIBS )

@@ -22,11 +22,11 @@ struct IonUpdaterImplResolverFns
         if constexpr (any_in(ParticleArray_t::layout_mode, AoSMapped))
             return _as_nullptr_<core::IonUpdater<Ions, Electromag, GridLayout>*>();
 #if PHARE_HAVE_MKN_GPU
-        else if constexpr (any_in(ParticleArray_t::layout_mode, AoSTS))
+        else if constexpr (is_tiled(ParticleArray_t::layout_mode))
             return _as_nullptr_<core::mkn::IonUpdaterMultiTS<Ions, Electromag, GridLayout>*>();
 #endif // PHARE_HAVE_MKN_GPU
         else
-            throw std::runtime_error("no");
+            static_assert(dependent_false_v<Ions>);
     }
 
     template<typename T>

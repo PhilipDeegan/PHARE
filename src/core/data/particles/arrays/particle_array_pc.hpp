@@ -21,7 +21,7 @@ template<typename Particles, std::uint8_t impl_ = 0>
 class PerCellSpan
 {
 protected:
-    using SIZE_T = unsigned long long int;
+    using SIZE_T = default_span_size_t;
 
 public:
     auto static constexpr alloc_mode = Particles::alloc_mode;
@@ -151,7 +151,7 @@ template<typename Particles, std::uint8_t impl_ = 0>
 class PerCellVector
 {
     using This   = PerCellVector<Particles, impl_>;
-    using SIZE_T = unsigned long long int; // cuda issues
+    using SIZE_T = default_span_size_t;
 
     template<typename P, std::uint8_t i>
     friend class PerCellSpan;

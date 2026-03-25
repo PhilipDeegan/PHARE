@@ -12,10 +12,9 @@
 
 #include "core/utilities/span.hpp"
 #include "core/utilities/box/box.hpp"
-// #include "core/data/particles/particle.hpp"
 #include "core/data/ndarray/ndarray_vector.hpp"
 #include "core/data/particles/particle_array_def.hpp"
-#include "core/data/particles/particle_array_partitioner.hpp"
+// #include "core/data/particles/particle_array_partitioner.hpp"
 
 
 
@@ -41,29 +40,23 @@ class ParticlesTile : public Box<std::int32_t, Particles::dimension>
 
 
 public:
-    ParticlesTile(ParticlesTile const&)            = default;
-    ParticlesTile(ParticlesTile&&)                 = default;
-    ParticlesTile& operator=(ParticlesTile const&) = default;
-    ParticlesTile& operator=(ParticlesTile&&)      = default;
-
-
     ParticlesTile(Super const& box, std::size_t const ghost_cells)
         : Super{box}
         , particles{make_particles<Particles>(box, ghost_cells)}
     {
     }
 
-    template<typename Ps
-    /*, auto S0 = Particles::storage_mode,
-             auto S1  = Ps::storage_mode,
-             typename = std::enable_if_t<S0 == StorageMode::SPAN and S0 != S1>*/>
+    ParticlesTile(ParticlesTile const&)            = default;
+    ParticlesTile(ParticlesTile&&)                 = default;
+    ParticlesTile& operator=(ParticlesTile const&) = default;
+    ParticlesTile& operator=(ParticlesTile&&)      = default;
+
+    template<typename Ps>
     ParticlesTile(ParticlesTile<Ps>& tile)
         : Super{tile}
-        , particles{tile() /*, tile().size()*/}
+        , particles{tile()}
     {
     }
-
-
 
 
     Super& operator*() _PHARE_ALL_FN_ { return *this; }
@@ -97,24 +90,23 @@ struct CrossTileCopyDAO;
 
 
 
-template<typename Particles, std::uint8_t impl_ = 0>
+template<typename Particles>
 class TileSetSpan
 {
     friend struct TileSetParticlesService;
     template<typename>
     friend struct CrossTileCopyDAO;
 
-
 protected:
-    using SIZE_T = unsigned long long int;
+    using SIZE_T = default_span_size_t;
 
 public:
     auto static constexpr alloc_mode = Particles::alloc_mode;
     auto static constexpr dim        = Particles::dimension;
-    auto static constexpr impl_v     = impl_;
-    using This                       = TileSetSpan<Particles, impl_v>;
-    using lobox_t                    = Box<std::uint32_t, dim>;
-    using per_tile_particles         = Particles;
+
+    using This               = TileSetSpan<Particles>;
+    using lobox_t            = Box<std::uint32_t, dim>;
+    using per_tile_particles = Particles;
 
 private:
     using locell_t = std::array<std::uint32_t, dim>;
@@ -246,14 +238,14 @@ protected:
 }; // TileSetSpan
 
 
-template<typename Particles, std::uint8_t impl_ = 0>
+template<typename Particles>
 class TileSetVector
 {
-    using This                    = TileSetVector<Particles, impl_>;
-    using SIZE_T                  = unsigned long long int; // cuda issues
+    using This                    = TileSetVector<Particles>;
+    using SIZE_T                  = default_span_size_t;
     bool static constexpr c_order = true;
 
-    template<typename P, std::uint8_t i>
+    template<typename P>
     friend class TileSetSpan;
 
     friend struct TileSetParticlesService;
@@ -267,7 +259,6 @@ class TileSetVector
 
 public:
     auto static constexpr dim          = Particles::dimension;
-    auto static constexpr impl_v       = impl_;
     auto static constexpr alloc_mode   = Particles::alloc_mode;
     auto static constexpr layout_mode  = Particles::layout_mode;
     auto static constexpr storage_mode = StorageMode::VECTOR;
@@ -540,9 +531,9 @@ protected:
 
 
 
-template<typename Particles, std::uint8_t impl>
+template<typename Particles>
 template<auto type>
-auto& TileSetVector<Particles, impl>::reserve_ppc(std::size_t const& ppc)
+auto& TileSetVector<Particles>::reserve_ppc(std::size_t const& ppc)
 {
     static_assert(std::is_same_v<decltype(type), ParticleType>);
 
@@ -570,18 +561,18 @@ auto& TileSetVector<Particles, impl>::reserve_ppc(std::size_t const& ppc)
 
 
 
-template<typename Particles, std::uint8_t impl>
+template<typename Particles>
 template<auto type>
-void TileSetVector<Particles, impl>::trim() // change to erase(box)
+void TileSetVector<Particles>::trim() // change to erase(box)
 {
     static_assert(std::is_same_v<decltype(type), ParticleType>);
 }
 
 
 
-template<typename Particles, std::uint8_t impl>
+template<typename Particles>
 template<auto type>
-void TileSetVector<Particles, impl>::sync_check_realloc()
+void TileSetVector<Particles>::sync_check_realloc()
 {
     PHARE_LOG_SCOPE(3, "TileSetVector::sync_check_realloc");
 
@@ -606,9 +597,9 @@ void TileSetVector<Particles, impl>::sync_check_realloc()
 }
 
 
-template<typename Particles, std::uint8_t impl>
+template<typename Particles>
 template<auto type>
-void TileSetVector<Particles, impl>::sync_moved()
+void TileSetVector<Particles>::sync_moved()
 {
     sync_check_realloc<type>();
     reset_views();
@@ -620,9 +611,9 @@ void TileSetVector<Particles, impl>::sync_moved()
     };
 }
 
-template<typename Particles, std::uint8_t impl>
+template<typename Particles>
 template<std::uint8_t PHASE, auto type>
-void TileSetVector<Particles, impl>::sync()
+void TileSetVector<Particles>::sync()
 {
     static constexpr auto layout_mode = Particles::layout_mode;
 
@@ -653,6 +644,8 @@ void TileSetVector<Particles, impl>::sync()
             resize(gaps, cs, false);
         }
         cap_(lix) = cap;
+        if constexpr (Particles::layout_mode == LayoutMode::AoSMapped)
+            tile().sortMapping();
     });
 
     PHARE_LOG_SCOPE(3, "TileSetVector::sync::reset_views");
@@ -668,10 +661,9 @@ struct TileSetParticles : public Super_
     using Particle_t         = typename Super::Particle_t;
     using per_tile_particles = typename Super::per_tile_particles;
 
-    template<std::size_t size>
-    using array_type = per_tile_particles::template array_type<size>;
+    // template<std::size_t size>
+    //  using array_type = per_tile_particles::template array_type<size>;
 
-    auto static constexpr impl_v       = Super::impl_v;
     auto static constexpr alloc_mode   = Super::alloc_mode;
     auto static constexpr dimension    = Super::dimension;
     auto static constexpr storage_mode = Super::storage_mode;
@@ -1022,9 +1014,9 @@ struct TileSetParticles<OuterSuper>::iterator_impl : public tile_set_iterator_su
 
 
 
-template<typename Particles, std::uint8_t impl>
+template<typename Particles>
 template<auto type, typename... Args>
-void TileSetSpan<Particles, impl>::sync(Args&&... args) _PHARE_ALL_FN_
+void TileSetSpan<Particles>::sync(Args&&... args) _PHARE_ALL_FN_
 {
     PHARE_LOG_SCOPE(3, "TileSetSpan::sync(stream)");
     static constexpr auto alloc_mode  = Particles::alloc_mode;
@@ -1069,7 +1061,7 @@ struct CrossTileCopyDAO
 {
     bool constexpr static ATOMIC = true;
     bool constexpr static GPU    = Particles::alloc_mode == AllocatorMode::GPU_UNIFIED;
-    using Op                     = Operators<span_size_default_t, ATOMIC, GPU>;
+    using Op                     = Operators<default_span_size_t, ATOMIC, GPU>;
     using Tile                   = ParticlesTile<typename Particles::per_tile_particles>;
 
     Particles& ps;
@@ -1146,15 +1138,15 @@ struct CrossTileCopyDAO
 
 
 
-template<typename Particles, std::uint8_t impl>
-void TileSetSpan<Particles, impl>::sync_tile_add_new(std::size_t const tidx) _PHARE_ALL_FN_
+template<typename Particles>
+void TileSetSpan<Particles>::sync_tile_add_new(std::size_t const tidx) _PHARE_ALL_FN_
 {
     CrossTileCopyDAO<std::decay_t<decltype(*this)>>{*this, tidx}.copy_in();
 }
 
 
-template<typename Particles, std::uint8_t impl>
-void TileSetSpan<Particles, impl>::sync_tile_rm_left(std::size_t const tidx) _PHARE_ALL_FN_
+template<typename Particles>
+void TileSetSpan<Particles>::sync_tile_rm_left(std::size_t const tidx) _PHARE_ALL_FN_
 {
     CrossTileCopyDAO<std::decay_t<decltype(*this)>>{*this, tidx}.rm_left();
 }

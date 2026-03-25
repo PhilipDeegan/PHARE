@@ -8,9 +8,9 @@
 template<std::size_t dim, std::size_t interp>
 void interpolate(benchmark::State& state)
 {
-    constexpr std::uint32_t cells   = 30;
-    constexpr std::uint32_t n_parts = 1e7;
-    auto static constexpr opts      = PHARE::SimOpts{dim, interp};
+    constexpr std::uint32_t cells = 30;
+    constexpr std::uint32_t ppc   = 100;
+    auto static constexpr opts    = PHARE::SimOpts{dim, interp};
 
     using PHARE_Types   = PHARE::core::PHARE_Types<opts>;
     using GridLayout_t  = TestGridLayout<typename PHARE_Types::GridLayout_t>;
@@ -20,7 +20,7 @@ void interpolate(benchmark::State& state)
     GridLayout_t layout{cells};
     PHARE::core::Interpolator<dim, interp> interpolator;
     ParticleArray particles{layout.AMRBox()};
-    add_particles_in(particles, layout.AMRBox(), n_parts);
+    add_particles_in(particles, layout.AMRBox(), ppc);
 
     PHARE::core::UsableElectromag<GridLayout_t> em{layout};
     PHARE::core::UsableVecField<GridLayout_t> flux{"F", layout,

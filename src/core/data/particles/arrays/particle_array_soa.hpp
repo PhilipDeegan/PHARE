@@ -88,7 +88,7 @@ struct SoASpan
     auto static constexpr dimension    = dim;
     template<typename T>
     using container_t = std::conditional_t<_const_, T const*, T*>;
-    using SIZE_T      = unsigned long long int; // cuda issues
+    using SIZE_T      = default_span_size_t;
 
     SoASpan() = default;
 
@@ -280,15 +280,15 @@ public:
     auto static constexpr layout_mode  = LayoutMode::SoA;
     auto static constexpr storage_mode = Super::storage_mode;
 
-    using SIZE_T     = unsigned long long int; // cuda issues
+    using SIZE_T     = default_span_size_t;
     using Particle_t = SoAParticle_crt<dimension>;
     using Super::size;
 
     using Span_t = SoAParticles<SoASpan<dimension, alloc_mode>>;
     friend class SoAParticles<SoASpan<dimension, alloc_mode>>;
 
-    template<std::size_t size>
-    using array_type = SoAParticles<SoAArray<dimension, size>>;
+    // template<std::size_t size>
+    //  using array_type = SoAParticles<SoAArray<dimension, size>>;
 
     using iterator       = iterator_impl<This>;
     using const_iterator = iterator_impl<This const>;

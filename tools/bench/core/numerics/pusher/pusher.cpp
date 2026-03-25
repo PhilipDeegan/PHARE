@@ -13,10 +13,10 @@ void push(benchmark::State& state)
 {
     auto static constexpr opts = PHARE::SimOpts{dim, interp};
     using namespace PHARE::core;
-    constexpr double mass           = 1;
-    constexpr std::uint32_t cells   = 65;
-    constexpr std::uint32_t n_parts = 1e7;
-    auto constexpr no_op            = [](auto& particleRange) { return particleRange; };
+    constexpr double mass         = 1;
+    constexpr std::uint32_t cells = 10;
+    constexpr std::uint32_t ppc   = 100;
+    auto constexpr no_op          = [](auto& particleRange) { return particleRange; };
 
     using PHARE_Types       = PHARE::core::PHARE_Types<opts>;
     using GridLayout_t      = TestGridLayout<typename PHARE_Types::GridLayout_t>;
@@ -34,7 +34,7 @@ void push(benchmark::State& state)
     GridLayout_t layout{cells};
     Electromag_t em{layout};
     ParticleArray_t domainParticles{layout.AMRBox()};
-    add_particles_in(domainParticles, layout.AMRBox(), n_parts);
+    add_particles_in(domainParticles, layout.AMRBox(), ppc);
     delta_disperse(domainParticles, 13337);
 
     ParticleArray_t tmpDomain = domainParticles;
@@ -43,8 +43,8 @@ void push(benchmark::State& state)
     BorisPusher_t pusher{layout.meshSize(), .001};
     Interpolator interpolator;
 
-    while (state.KeepRunningBatch(1))
-        pusher.move(rangeIn, rangeOut, em, mass, interpolator, layout, no_op, no_op);
+    // while (state.KeepRunningBatch(1))
+    pusher.move(rangeIn, rangeOut, em, mass, interpolator, layout, no_op, no_op);
 }
 
 BENCHMARK_TEMPLATE(push, /*dim=*/1, /*interp=*/1)->Unit(benchmark::kMicrosecond);

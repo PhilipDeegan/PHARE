@@ -82,7 +82,7 @@ template<typename Ions, typename EM, typename GridLayout_t>
 auto get_updater_for(Ions& ions, EM const& em, GridLayout_t const& layout)
 {
     using Particles = typename Ions::particle_array_type;
-    if constexpr (Particles::is_mapped)
+    if constexpr (any_in(Particles::layout_mode, LayoutMode::AoSMapped))
         return construct_<IonUpdater<Ions, EM, GridLayout_t>>(ions, em, layout);
     else if constexpr (Particles::layout_mode == LayoutMode::AoSPC)
         return construct_<IonUpdaterPC<Ions, EM, GridLayout_t>>(ions, em, layout);

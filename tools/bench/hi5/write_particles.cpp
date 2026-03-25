@@ -4,6 +4,7 @@
 #define PHARE_DIAG_DOUBLES 0
 #endif
 
+#include "core/data/particles/particle.hpp"
 #include "core/data/particles/particle_array.hpp"
 #include "core/data/particles/particle_packer.hpp"
 
@@ -14,10 +15,6 @@
 
 #include "hdf5/detail/hdf5_utils.hpp"
 #include "hdf5/detail/h5/h5_file.hpp"
-
-#include "core/data/particles/particle.hpp"
-#include "core/data/particles/particle_array.hpp"
-#include "core/data/particles/particle_packer.hpp"
 
 // #include "phare/phare.hpp"
 
@@ -37,21 +34,15 @@ void do_bench(benchmark::State& state)
     using ParticleArray_SOA
         = core::ParticleArray<core::ParticleArrayOptions{dim, core::LayoutMode::SoA}>;
 
-    auto getSize = [](auto const& value) -> std::size_t {
-        using ValueType = std::decay_t<decltype(value)>;
-        if constexpr (hdf5::is_array_dataset<ValueType, dim>)
-            return value.size();
-        else
-            return 1u; /* not an array so value one of type ValueType*/
-    };
+
 
     auto createDataSet_ = [&](auto& hi5, auto const& path, auto const size, auto const& value) {
-        using ValueType = std::decay_t<decltype(value)>;
+        using ValueType  = std::decay_t<decltype(value)>;
+        auto const shape = hdf5::ParticleWriter::size_for<dim>(value, size);
         if constexpr (hdf5::is_array_dataset<ValueType, dim>)
-            return hi5.template create_data_set<typename ValueType::value_type>(
-                path, HighFive::DataSpace(size));
+            return hi5.template create_data_set<typename ValueType::value_type>(path, shape);
         else
-            return hi5.template create_data_set<ValueType>(path, HighFive::DataSpace(size));
+            return hi5.template create_data_set<ValueType>(path, shape);
     };
 
 
@@ -79,10 +70,11 @@ void do_bench(benchmark::State& state)
         std::size_t part_idx = 0;
         core::apply(Packer::empty(), [&](auto const& arg) {
             datasets.emplace_back(
-                createDataSet_(hi5, path + keys[part_idx], getSize(arg) * particles.size(), arg));
+                createDataSet_(hi5, path + keys[part_idx], particles.size(), arg));
             part_idx++;
         });
-        writeParticles(datasets, particles);
+
+        hdf5::ParticleWriter::write(hi5, particles, path);
     }
 }
 

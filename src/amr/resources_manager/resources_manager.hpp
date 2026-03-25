@@ -358,15 +358,21 @@ namespace amr
         // iterate per patch and set args on patch
         template<typename... Args>
         auto inline enumerate(SAMRAI::hier::PatchLevel const& level, Args&&... args)
-        { return LevelLooper<SAMRAI::hier::PatchLevel const, Args...>{*this, level, args...}; }
+        {
+            return LevelLooper<SAMRAI::hier::PatchLevel const, Args...>{*this, level, args...};
+        }
         template<typename... Args>
         auto inline enumerate(SAMRAI::hier::PatchLevel& level, Args&&... args)
-        { return LevelLooper<SAMRAI::hier::PatchLevel, Args...>{*this, level, args...}; }
+        {
+            return LevelLooper<SAMRAI::hier::PatchLevel, Args...>{*this, level, args...};
+        }
 
     private:
         template<typename Level_t, typename... Args>
         struct LevelLooper
         {
+            using value_type = std::shared_ptr<SAMRAI::hier::Patch>;
+
             LevelLooper(ResourcesManager& rm, Level_t& lvl, Args&... arrgs)
                 : rm{rm}
                 , level{lvl}
@@ -474,7 +480,9 @@ namespace amr
         template<typename ResourceType>
         auto getResourcesPointer_(ResourcesInfo const& resourcesVariableInfo,
                                   SAMRAI::hier::Patch const& patch) const
-        { return getPatchData_<ResourceType>(resourcesVariableInfo, patch); }
+        {
+            return getPatchData_<ResourceType>(resourcesVariableInfo, patch);
+        }
 
 
 

@@ -13,6 +13,7 @@
 // #include "core/utilities/range/range.hpp"
 // #include "core/data/particles/particle.hpp"
 #include "core/data/particles/particle_array_def.hpp"
+#include "core/data/particles/particle_array_type_options.hpp"
 
 
 #include <vector>
@@ -23,21 +24,22 @@
 namespace PHARE::core
 {
 
-template<std::size_t dim, std::size_t size_>
+
+template<auto opts>
 class AoSArray
 {
 public:
+    auto static constexpr dimension    = opts.dim;
     auto static constexpr alloc_mode   = AllocatorMode::CPU;
     auto static constexpr storage_mode = StorageMode::ARRAY;
-    auto static constexpr dimension    = dim;
-    using Particle_t                   = typename ParticleDefaults<dim>::Particle_t;
-    using container_type               = std::array<Particle_t, size_>;
+    using Particle_t                   = ParticleDefaults<opts.dim>::Particle_t;
+    using container_type               = std::array<Particle_t, opts.size>;
 
     auto begin() const { return particles_.begin(); }
     auto begin() { return particles_.begin(); }
     auto end() const { return particles_.end(); }
     auto end() { return particles_.end(); }
-    auto constexpr static size() { return size_; }
+    auto constexpr static size() { return opts.size; }
     auto& operator[](std::size_t i) const { return particles_.data()[i]; }
     auto& operator[](std::size_t i) { return particles_.data()[i]; }
 
@@ -47,16 +49,16 @@ protected:
 
 
 
-template<std::size_t dim, auto alloc_mode_>
+template<auto opts>
 class AoSSpan
 {
-    static_assert(std::is_same_v<decltype(alloc_mode_), PHARE::AllocatorMode>);
+    using This = AoSSpan<opts>;
 
 public:
-    auto static constexpr alloc_mode   = alloc_mode_;
+    auto static constexpr dimension    = opts.dim;
+    auto static constexpr alloc_mode   = opts.alloc_mode;
     auto static constexpr storage_mode = StorageMode::SPAN;
-    auto static constexpr dimension    = dim;
-    using Particle_t                   = typename ParticleDefaults<dim>::Particle_t;
+    using Particle_t                   = ParticleDefaults<opts.dim>::Particle_t;
 
     AoSSpan() = default;
 
@@ -64,7 +66,6 @@ public:
     AoSSpan(Container& container)
         : particles_{container.data(), container.size()}
     {
-        static_assert(std::is_trivially_move_constructible_v<AoSSpan<dim, alloc_mode>>);
     }
 
     template<typename Container>
@@ -77,6 +78,7 @@ public:
         : AoSSpan{array, 0, siz}
     {
     }
+
 
     auto size() _PHARE_ALL_FN_ { return particles_.size(); }
     void clear() _PHARE_ALL_FN_ { particles_.s = 0; }
@@ -110,15 +112,14 @@ public:
 };
 
 
-
-template<std::size_t dim, auto alloc_mode_>
-class AoSMappedSpan : public AoSSpan<dim, alloc_mode_>
+template<auto opts>
+class AoSMappedSpan : public AoSSpan<opts>
 {
-    using box_t     = Box<int, dim>;
-    using CellMap_t = CellMap<dim, int, /*is_span=*/true>;
+    using box_t     = Box<int, opts.dim>;
+    using CellMap_t = CellMap<opts.dim, int, /*is_span=*/true>;
 
 public:
-    using Super = AoSSpan<dim, alloc_mode_>;
+    using Super = AoSSpan<opts>;
 
 
     template<typename Particles_t>
@@ -138,11 +139,11 @@ public:
 
 
 
-template<std::size_t dim, auto alloc_mode_>
+template<auto opts>
 class AoSVector
 {
-    static_assert(std::is_same_v<decltype(alloc_mode_), PHARE::AllocatorMode>);
-    using This = AoSVector<dim, alloc_mode_>;
+    using This = AoSVector<opts>;
+
 
     template<typename Iterator>
     auto check_distance_size_t(Iterator const& start, Iterator const& end)
@@ -155,17 +156,17 @@ class AoSVector
 
     std::uint8_t constexpr static alloc_impl()
     {
-        if (alloc_mode_ == AllocatorMode::GPU_UNIFIED)
+        if (opts.alloc_mode == AllocatorMode::GPU_UNIFIED)
             return 1;
         return 0;
     }
 
 public:
     auto static constexpr storage_mode = StorageMode::VECTOR;
-    auto static constexpr alloc_mode   = alloc_mode_;
-    auto static constexpr dimension    = dim;
+    auto static constexpr alloc_mode   = opts.alloc_mode;
+    auto static constexpr dimension    = opts.dim;
 
-    using Particle_t     = typename ParticleDefaults<dim>::Particle_t;
+    using Particle_t     = ParticleDefaults<opts.dim>::Particle_t;
     using value_type     = Particle_t;
     using vec_helper     = PHARE::Vector<Particle_t, alloc_mode, alloc_impl()>;
     using container_type = typename vec_helper::vector_t;
@@ -174,7 +175,6 @@ public:
     AoSVector(AoSVector&& that)
         : particles_(std::move(that.particles_))
     {
-        // static_assert(std::is_trivially_move_constructible_v<AoSVector<dim, alloc_mode>>);
     }
 
     AoSVector(AoSVector const& from)            = default;
@@ -303,14 +303,14 @@ protected:
 };
 
 
-template<std::size_t dim, auto alloc_mode_>
-class AoSMappedVector : public AoSVector<dim, alloc_mode_>
+template<auto opts>
+class AoSMappedVector : public AoSVector<opts>
 {
-    using box_t     = Box<int, dim>;
-    using CellMap_t = CellMap<dim, int>;
+    using box_t     = Box<int, opts.dim>;
+    using CellMap_t = CellMap<opts.dim, int>;
 
 public:
-    using Super = AoSVector<dim, alloc_mode_>;
+    using Super = AoSVector<opts>;
     using Super::erase;
 
 protected:
@@ -325,7 +325,7 @@ public:
     {
     }
 
-    // void erase(box_t const& box) { cellMap_.erase(this->particles_, box); }
+    void erase(box_t const& box) { cellMap_.erase(this->particles_, box); }
 
     auto& map() { return cellMap_; }
 
@@ -335,11 +335,11 @@ protected:
 };
 
 
-template<typename Super_>
-struct AoSParticles : public Super_
+template<template<auto> typename Super_, auto opts>
+struct AoSParticles : public Super_<opts>
 {
-    using Super      = Super_;
-    using This       = AoSParticles<Super>;
+    using Super      = Super_<opts>;
+    using This       = AoSParticles;
     using Particle_t = typename Super::Particle_t;
 
     auto static constexpr dimension    = Super::dimension;
@@ -348,12 +348,13 @@ struct AoSParticles : public Super_
     auto static constexpr storage_mode = Super::storage_mode;
     auto static constexpr size_of_particle() { return sizeof(Particle_t); }
 
-    using Span_t = AoSParticles<AoSSpan<dimension, alloc_mode>>;
-    friend struct AoSParticles<AoSSpan<dimension, alloc_mode>>;
+    using Span_t = AoSParticles<AoSSpan, opts>;
 
+    // template<auto>
+    // friend struct AoSParticles; //<AoSSpan<dimension, alloc_mode>>;
 
-    template<std::size_t size>
-    using array_type = AoSParticles<AoSArray<dimension, size>>;
+    // template<std::size_t size>
+    // using array_type = AoSParticles<AoSArray<dimension, size>>;
 
     using Super::particles_;
 
@@ -497,15 +498,15 @@ struct AoSParticles : public Super_
 
 
 
-template<typename Super_>
-class AoSMappedParticles : public Super_
+template<template<auto> typename Super_, auto opts>
+class AoSMappedParticles : public AoSParticles<Super_, opts>
 {
-    using Super = Super_;
-    using This  = AoSMappedParticles<Super>;
+    using Super = AoSParticles<Super_, opts>;
+    using This  = AoSMappedParticles; //<Super>;
 
     using Super2 = Super::Super;
 
-    template<typename _Super>
+    template<template<auto> typename, auto>
     friend class AoSMappedParticles;
 
 
@@ -516,8 +517,8 @@ public:
     using Particle_t = Super::Particle_t;
     using box_t      = Box<int, dimension>;
 
-    template<std::size_t size>
-    using array_type = typename Super::template array_type<size>;
+    // template<std::size_t size>
+    //  using array_type = typename Super::template array_type<size>;
 
     using Super::particles_;
     using Super2::box_;
@@ -540,13 +541,13 @@ public:
     // }
 
     AoSMappedParticles(box_t box = {}, std::size_t size = 0)
-        : Super_(box, size)
+        : Super(box, size)
     {
     }
 
     template<typename Particle_t>
     AoSMappedParticles(box_t box, std::size_t size, Particle_t const& from)
-        : Super_(box, size, from)
+        : Super(box, size, from)
     // , cellMap_{box_}
     {
         PHARE_ASSERT(box_.size() > 0);
@@ -789,16 +790,16 @@ public:
 
 
 
-template<typename OuterSuper>
+template<template<auto> typename Super, auto opts>
 template<typename T>
-struct AoSParticles<OuterSuper>::iterator_impl
+struct AoSParticles<Super, opts>::iterator_impl
 {
-    auto static constexpr dimension = OuterSuper::dimension;
+    auto static constexpr dimension = opts.dim;
 
     using outer_type        = std::decay_t<T>;
     using difference_type   = std::size_t;
     using iterator_category = std::forward_iterator_tag;
-    using Particle_t        = typename OuterSuper::Particle_t;
+    using Particle_t        = Super::Particle_t;
     using value_type        = Particle_t;
     using pointer           = Particle_t*;
     using reference         = Particle_t&;

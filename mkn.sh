@@ -18,7 +18,7 @@ set -x
         mkn clean build -Kqp test_core -d google.test,+ -a "-fPIC" ${CARGS}
         mkn clean build -Kqp core -a "-fPIC" ${CARGS} "$@"
     )
-    mkn clean build -p test_core -M "${FILE}" ${CARGS} "$@" dbg
+    mkn clean build -p test_core -M "${FILE}" ${CARGS} "$@" run
   ) || true
 
   [[ $FILE != tests/core/* ]] && (

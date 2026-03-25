@@ -8,9 +8,8 @@
 namespace PHARE::core
 {
 
-struct Sortings
-{ // to be used in contexpr fashion
-
+struct Sortings // to be used in constexpr fashion
+{
     bool by_delta = true;
 };
 

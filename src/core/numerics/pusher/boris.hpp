@@ -7,6 +7,7 @@
 #include "core/utilities/range/range.hpp"
 #include "core/numerics/pusher/pusher.hpp"
 #include "core/data/particles/particle.hpp"
+#include "core/data/particles/particle_array_def.hpp"
 
 
 #include <array>
@@ -190,7 +191,7 @@ private:
             auto out     = outParticles.begin() + outIdx;
             auto newCell = advancePosition_(in, out, halfDtOverDl_);
 
-            if constexpr (ParticleArray::is_mapped)
+            if constexpr (any_in(ParticleArray::layout_mode, LayoutMode::AoSMapped))
             {
                 if (newCell != inParticles.iCell(inIdx))
                     outParticles.change_icell(newCell, outIdx);
@@ -206,7 +207,8 @@ private:
     {
         auto particle = particles.begin() + idx;
         auto newCell  = advancePosition_(deref(particle), deref(particle), halfDtOverDl);
-        if constexpr (Particles::is_mapped)
+
+        if constexpr (any_in(Particles::layout_mode, LayoutMode::AoSMapped))
         {
             if (newCell != particles.iCell(idx))
                 particles.change_icell(newCell, idx);

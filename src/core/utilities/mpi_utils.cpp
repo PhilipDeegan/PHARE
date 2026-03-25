@@ -1,6 +1,13 @@
 #if !defined(PHARE_SKIP_MPI_IN_CORE)
 
+#include "core/errors.hpp"
+
 #include "mpi_utils.hpp"
+
+
+#ifndef PHARE_ERRORS_USE_MPI_ABORT
+#define PHARE_ERRORS_USE_MPI_ABORT 1
+#endif
 
 namespace PHARE::core::mpi
 {
@@ -34,6 +41,26 @@ bool any(bool b)
     int global_sum, local_sum = static_cast<int>(b);
     MPI_Allreduce(&local_sum, &global_sum, 1, MPI_INT, MPI_SUM, MPI_COMM_WORLD);
     return global_sum > 0;
+}
+
+bool any_errors()
+{
+#if PHARE_ERRORS_USE_MPI_ABORT == 0
+    return any(core::Errors::instance().any()); // ALLREDUCE!
+#else
+    return false;
+#endif
+}
+
+
+void log_error(std::string const key, std::string const val)
+{
+#if PHARE_ERRORS_USE_MPI_ABORT
+    std::cout << "MPI ABORT: PHARE ERROR: " << key << " " << val << std::endl;
+    MPI_Abort(MPI_COMM_WORLD, -1);
+#else
+    core::Errors::instance().log(key, val);
+#endif
 }
 
 

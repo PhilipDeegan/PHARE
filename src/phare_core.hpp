@@ -61,6 +61,11 @@ struct UsingResolver<GridLayout_t, LayoutMode::AoSTS, A_>
     using Field_t = FieldTileSet<GridLayout_t, Grid_base_type, Field_base_type>;
 };
 
+template<typename GridLayout_t, auto A_>
+struct UsingResolver<GridLayout_t, LayoutMode::AoSCMTS, A_>
+    : UsingResolver<GridLayout_t, LayoutMode::AoSTS, A_>
+{
+};
 
 
 

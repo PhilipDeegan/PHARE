@@ -9,8 +9,8 @@ namespace PHARE::core
 {
 
 
-template<typename Dst, typename Src, typename... Args>
-auto static convert_particles(Src const& src, Args&&... args)
+template<typename Dst, typename Src, typename GridLayout>
+auto static convert_particles_from(Src const& src, GridLayout const& layout)
 {
     using Converter
         = ParticlesConverter<Src::layout_mode, Src::alloc_mode, Dst::layout_mode, Dst::alloc_mode>;
@@ -19,8 +19,7 @@ auto static convert_particles(Src const& src, Args&&... args)
     auto constexpr function_id              = join_string_views_v<FN_ID, Dst::type_id>;
     PHARE_LOG_SCOPE(1, function_id);
 
-    auto const& [layout, start, end] = std::forward_as_tuple(args...);
-    return Converter{start, end}.template operator()<Dst>(src, layout);
+    return Converter{}.template operator()<Dst>(src, layout);
 }
 
 template<typename Dst, typename Src, typename GridLayout>
@@ -29,7 +28,7 @@ auto static convert_particles(Src const& src, GridLayout const& layout)
     if constexpr (std::is_same_v<Dst, Src>)
         return src;
     else
-        return convert_particles<Dst>(src, layout, 0ull, src.size());
+        return convert_particles_from<Dst>(src, layout);
 }
 
 template<typename Dst, typename Src, typename GridLayout>
@@ -44,8 +43,8 @@ auto static convert_particles_and_sort(Src const& src, GridLayout const& layout)
     return out;
 }
 
-template<auto layout_mode, auto O, typename I0, typename GridLayout>
-auto convert_to(ParticleArray<O, I0> const& src, GridLayout const& layout)
+template<auto layout_mode, auto O, typename GridLayout>
+auto convert_to(ParticleArray<O> const& src, GridLayout const& layout)
 {
     using Parts = ParticleArray<O.with_layout(layout_mode).with_storage(StorageMode::VECTOR)>;
 

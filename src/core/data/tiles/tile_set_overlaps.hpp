@@ -30,7 +30,7 @@ struct NdSpanSet
 
     Box<std::uint32_t, dim> box_;
     std::vector<T> vec;
-    std::vector<span_size_default_t> displs;
+    std::vector<default_span_size_t> displs;
     NdArrayVector<dim, Span<T>> cells{box_.shape()};
 };
 
@@ -58,7 +58,7 @@ struct TileBoxSpanSet
     Box<std::uint32_t, dim> ghost_box_;
     TileSet<Box<int, dim>> tiles{box_};
     std::vector<Tile_t*> vec;
-    std::vector<span_size_default_t> displs;
+    std::vector<default_span_size_t> displs;
     NdArrayVector<dim, Span<Tile_t*>> cells{ghost_box_.shape()};
 };
 

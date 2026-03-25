@@ -52,16 +52,9 @@ struct IndexerStorage<StorageMode::SPAN> : public IndexerBase<Span<std::size_t>>
     using Super::indexes_;
 
     IndexerStorage() = default;
-    // IndexerStorage(auto const& span)
-    //     : Super{span}
-    // {
-    // }
 
-    void set_from(auto& indexer)
-    {
-        indexes_.ptr = indexer.data(); // = Span<std::size_t>{indexer.data(), indexer.size()};
-        indexes_.s   = indexer.size();
-    }
+    void set_from(auto& indexer) { indexes_ = {indexer.data(), indexer.size()}; }
+    void clear() { /*noop*/ }
 };
 
 template<>

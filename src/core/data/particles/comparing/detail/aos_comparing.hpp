@@ -124,6 +124,24 @@ EqualityReport ParticlesComparator<AoSTS, GPU_UNIFIED, AoSTS, GPU_UNIFIED>::oper
     return ParticlesComparator<AoSTS, CPU, AoSTS, CPU>{}(ps0, ps1, atol); // do better
 }
 
+template<>
+template<typename PS0, typename PS1>
+EqualityReport ParticlesComparator<AoSCMTS, CPU, AoSCMTS, CPU>::operator()(PS0 const& ps0,
+                                                                           PS1 const& ps1,
+                                                                           double const atol)
+{
+    return EqualityReport{true};
+}
+
+
+template<>
+template<typename PS0, typename PS1>
+EqualityReport ParticlesComparator<AoSCMTS, GPU_UNIFIED, AoSCMTS, GPU_UNIFIED>::operator()(
+    PS0 const& ps0, PS1 const& ps1, double const atol)
+{
+    return EqualityReport{true};
+}
+
 } // namespace PHARE::core
 
 

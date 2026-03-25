@@ -60,7 +60,7 @@ void shuffle(Particles& particles, std::optional<int> seed = std::nullopt)
 
     std::shuffle(particles.begin(), particles.end(), gen);
 
-    if constexpr (Particles::is_mapped)
+    if constexpr (any_in(Particles::layout_mode, LayoutMode::AoSMapped))
     {
         particles.empty_map();
         particles.map_particles();
@@ -93,7 +93,7 @@ void add_ghost_particles(Particles& particles, GridLayout const& layout, Box con
     auto constexpr nghosts = GridLayout::nbrParticleGhosts();
 
     // PHARE_LOG_LINE_SS(box);
-    if constexpr (any_in(Particles::layout_mode, AoSTS))
+    if constexpr (is_tiled(Particles::layout_mode))
     {
         auto const amr_ghost_box = grow(layout.AMRBox(), nghosts);
         auto const lcl_box       = as_unsigned(shift(box, amr_ghost_box.lower * -1));

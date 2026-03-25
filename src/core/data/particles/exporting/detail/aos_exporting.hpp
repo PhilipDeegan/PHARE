@@ -117,37 +117,38 @@ void ParticlesExporter<AoSTS, GPU_UNIFIED>::move_particles(Src& src, Dst& dst, B
 
 
 template<>
-template<bool in, typename Src, std::size_t dim>
-void ParticlesExporter<AoS, CPU>::delete_particles(Src& src, Box<int, dim> const& box)
+template<typename Src, std::size_t dim>
+void ParticlesExporter<AoS, CPU>::delete_particles_not_in(Src& src, Box<int, dim> const& box)
+{
+    src.erase(box);
+    src.sortMapping();
+}
+template<>
+template<typename Src, typename Boxes>
+void ParticlesExporter<AoSMapped, CPU>::delete_particles_not_in(Src& src, Boxes const& boxes)
+{
+    for (auto const& box : boxes)
+        src.erase(box);
+}
+
+template<>
+template<typename Src, std::size_t dim>
+void ParticlesExporter<AoSMapped, CPU>::delete_particles_not_in(Src& src, Box<int, dim> const& box)
 {
     throw std::runtime_error("todo");
 }
 template<>
-template<bool in, typename Src, typename Boxes>
-void ParticlesExporter<AoSMapped, CPU>::delete_particles(Src& src, Boxes const& boxes)
+template<typename Src, typename Boxes>
+void ParticlesExporter<AoSMapped, GPU_UNIFIED>::delete_particles_not_in(Src& src,
+                                                                        Boxes const& boxes)
 {
     throw std::runtime_error("todo");
 }
 
 template<>
-template<bool in, typename Src, std::size_t dim>
-void ParticlesExporter<AoSMapped, CPU>::delete_particles(Src& src, Box<int, dim> const& box)
+template<typename Src, std::size_t dim>
+void ParticlesExporter<AoSTS, CPU>::delete_particles_not_in(Src& src, Box<int, dim> const& box)
 {
-    throw std::runtime_error("todo");
-}
-template<>
-template<bool in, typename Src, typename Boxes>
-void ParticlesExporter<AoSMapped, GPU_UNIFIED>::delete_particles(Src& src, Boxes const& boxes)
-{
-    throw std::runtime_error("todo");
-}
-
-template<>
-template<bool in, typename Src, std::size_t dim>
-void ParticlesExporter<AoSTS, CPU>::delete_particles(Src& src, Box<int, dim> const& box)
-{
-    static_assert(in == false); // for now
-
     auto const ghost_nbr = (src.ghost_box().shape()[0] - src.box().shape()[0]) / 2;
 
     for (auto& tile : src())
@@ -169,11 +170,9 @@ void ParticlesExporter<AoSTS, CPU>::delete_particles(Src& src, Box<int, dim> con
 }
 
 template<>
-template<bool in, typename Src, typename Boxes>
-void ParticlesExporter<AoSTS, CPU>::delete_particles(Src& src, Boxes const& boxes)
+template<typename Src, typename Boxes>
+void ParticlesExporter<AoSTS, CPU>::delete_particles_not_in(Src& src, Boxes const& boxes)
 {
-    static_assert(in == false); // for now
-
     auto const ghost_nbr = (src.ghost_box().shape()[0] - src.box().shape()[0]) / 2;
 
     for (auto& tile : src())
@@ -196,19 +195,61 @@ void ParticlesExporter<AoSTS, CPU>::delete_particles(Src& src, Boxes const& boxe
 
 
 
+template<>
+template<typename Src, std::size_t dim>
+void ParticlesExporter<AoSCMTS, CPU>::delete_particles_not_in(Src& src, Box<int, dim> const& box)
+{
+    for (auto& tile : src())
+    {
+        if (tile().size() == 0)
+            continue;
+
+        if (box * tile)
+        {
+            tile().erase(box);
+            tile().sortMapping();
+        }
+    }
+
+    src.sync();
+}
+
+
 
 template<>
-template<bool in, typename Src, std::size_t dim>
-void ParticlesExporter<AoSTS, GPU_UNIFIED>::delete_particles(Src& src, Box<int, dim> const& box)
+template<typename Src, typename Boxes>
+void ParticlesExporter<AoSCMTS, CPU>::delete_particles_not_in(Src& src, Boxes const& boxes)
 {
-    ParticlesExporter<AoSTS, CPU>{}.delete_particles<in>(src, box);
+    for (auto& tile : src())
+    {
+        if (tile().size() == 0)
+            continue;
+
+        for (auto const& box : boxes)
+            if (box * tile)
+            {
+                tile().erase(box);
+                tile().sortMapping();
+            }
+    }
+
+    src.sync();
+}
+
+
+template<>
+template<typename Src, std::size_t dim>
+void ParticlesExporter<AoSTS, GPU_UNIFIED>::delete_particles_not_in(Src& src,
+                                                                    Box<int, dim> const& box)
+{
+    ParticlesExporter<AoSTS, CPU>{}.delete_particles_not_in(src, box);
 }
 
 template<>
-template<bool in, typename Src, typename Boxes>
-void ParticlesExporter<AoSTS, GPU_UNIFIED>::delete_particles(Src& src, Boxes const& boxes)
+template<typename Src, typename Boxes>
+void ParticlesExporter<AoSTS, GPU_UNIFIED>::delete_particles_not_in(Src& src, Boxes const& boxes)
 {
-    ParticlesExporter<AoSTS, CPU>{}.delete_particles<in>(src, boxes);
+    ParticlesExporter<AoSTS, CPU>{}.delete_particles_not_in(src, boxes);
 }
 
 

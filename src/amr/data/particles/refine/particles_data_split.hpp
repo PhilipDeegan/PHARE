@@ -4,11 +4,14 @@
 
 #include "core/def.hpp"
 #include "core/def/phare_mpi.hpp" // IWYU pragma: keep
-
 #include "core/data/grid/gridlayout.hpp"
+
+
 #include "core/data/particles/particle_array_def.hpp"
+#include "core/data/particles/particle_array_detail.hpp"
 #include "core/data/particles/particle_array_service.hpp"
 #include "core/data/particles/particle_array_partitioner.hpp"
+#include "core/data/particles/particle_array_type_options.hpp"
 
 
 #include "amr/amr_constants.hpp"
@@ -24,6 +27,7 @@
 #include <SAMRAI/geom/CartesianPatchGeometry.h>
 
 #include <tuple>
+#include <utility>
 
 
 namespace PHARE
@@ -69,6 +73,7 @@ NO_DISCARD auto toFineGrid(Iterator iterator)
 template<typename ParticleArray, ParticlesDataSplitType splitType, typename Splitter>
 struct ParticlesRefining
 {
+    static constexpr auto opts           = ParticleArray::options;
     static constexpr auto dim            = Splitter::dimension;
     static constexpr auto interpOrder    = Splitter::interp_order;
     static constexpr auto nbRefinedPart  = Splitter::nbRefinedPart;
@@ -76,6 +81,14 @@ struct ParticlesRefining
     static constexpr auto ParticleType_v = splitType == ParticlesDataSplitType::interior
                                                ? core::ParticleType::Domain
                                                : core::ParticleType::Ghost;
+
+    static constexpr auto base_layout_type = core::base_layout_type<ParticleArray>();
+    static constexpr auto array_opts
+        = opts.with_storage(StorageMode::ARRAY).with_layout(base_layout_type);
+    static constexpr auto array_type_opts
+        = ParticleArrayTypeOptions<array_opts, base_layout_type, StorageMode::ARRAY>::FROM(
+            opts, nbRefinedPart);
+    using array_type_t = ParticleArrayResolver<array_opts, array_type_opts>::value_type;
 
     ParticlesData<ParticleArray>& srcParticlesData;
     ParticlesData<ParticleArray>& destParticlesData;
@@ -124,7 +137,7 @@ struct ParticlesRefining
 
     void _forBox(core::Box<int, dim> const& destinationBox)
     {
-        using ArrayParticleArray = typename ParticleArray::template array_type<nbRefinedPart>;
+        using ArrayParticleArray = array_type_t;
 
         auto const final_size = [&]() {
             if constexpr (ParticleType_v == ParticleType::Domain)

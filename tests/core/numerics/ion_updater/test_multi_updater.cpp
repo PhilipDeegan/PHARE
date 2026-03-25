@@ -81,11 +81,11 @@ auto get_updater_for(Ions& /*ions*/, EM const& /*em*/, GridLayout_t const& /*lay
 {
     using enum LayoutMode;
     using Particles = typename Ions::particle_array_type;
-    if constexpr (Particles::is_mapped)
+    if constexpr (any_in(Particles::layout_mode, LayoutMode::AoSMapped))
         return construct_<IonUpdater<Ions, EM, GridLayout_t>>();
     // else if constexpr (any_in(Particles::layout_mode, AoSPC, SoAPC))
     //     return construct_<IonUpdaterMultiPC<Ions, EM, GridLayout_t>>();
-    else if constexpr (any_in(Particles::layout_mode, AoSTS, SoATS, SoAVXTS))
+    else if constexpr (is_tiled(Particles::layout_mode))
         return construct_<mkn::IonUpdaterMultiTS<Ions, EM, GridLayout_t>>();
     else
         return construct_<IonUpdaterPP<Ions, EM, GridLayout_t>>();
@@ -379,6 +379,8 @@ using Permutations_t = testing::Types< // ! notice commas !
      TestParam<1, LayoutMode::AoSTS, AllocatorMode::CPU, UpdaterMode::domain_only>
     ,TestParam<1, LayoutMode::AoSTS, AllocatorMode::CPU, UpdaterMode::all>
 
+    // ,TestParam<1, LayoutMode::AoSCMTS, AllocatorMode::CPU, UpdaterMode::all>
+
 PHARE_WITH_GPU(
 
     ,TestParam<1, LayoutMode::AoSTS, AllocatorMode::GPU_UNIFIED, UpdaterMode::domain_only>
@@ -402,8 +404,8 @@ TYPED_TEST(MultiPatchIonUpdaterTest, updater_domain_only)
     this->run();
 }
 
-template<auto opts, typename internals> // used by gtest
-void PrintTo(ParticleArray<opts, internals> const& arr, std::ostream* os)
+template<auto opts> // used by gtest
+void PrintTo(ParticleArray<opts> const& arr, std::ostream* os)
 {
     *os << arr;
 }

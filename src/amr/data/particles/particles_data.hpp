@@ -84,7 +84,7 @@ namespace amr
 
         auto construct_particles(auto const& ghosts) const
         {
-            if constexpr (ParticleArray::is_mapped)
+            if constexpr (any_in(ParticleArray::layout_mode, core::LayoutMode::AoSMapped))
                 return ParticleArray{grow(phare_box_from<dim>(getGhostBox()), ghostSafeMapLayer)};
 
             else
@@ -93,16 +93,24 @@ namespace amr
 
         template<typename T, std::size_t S, typename A>
         static auto _put_vec_size(std::vector<std::array<T, S>, A> const& vec)
-        { return vec.size() * S; }
+        {
+            return vec.size() * S;
+        }
         template<typename T, typename A>
         static auto _put_vec_size(std::vector<T, A> const& vec)
-        { return vec.size(); }
+        {
+            return vec.size();
+        }
         template<typename T, std::size_t S, typename A>
         static auto _put_vec_data(std::vector<std::array<T, S>, A> const& vec)
-        { return vec[0].data(); }
+        {
+            return vec[0].data();
+        }
         template<typename T, typename A>
         static auto _put_vec_data(std::vector<T, A> const& vec)
-        { return vec.data(); }
+        {
+            return vec.data();
+        }
 
         template<typename DB, typename T, typename A>
         void static putVecArrayToDB(DB const& db, std::vector<T, A> const& vec,
@@ -123,16 +131,24 @@ namespace amr
 
         template<typename T, std::size_t S, typename A>
         static auto _get_vec_size(std::size_t size, std::vector<std::array<T, S>, A> const&)
-        { return size / S; }
+        {
+            return size / S;
+        }
         template<typename T, typename A>
         static auto _get_vec_size(std::size_t size, std::vector<T, A> const&)
-        { return size; }
+        {
+            return size;
+        }
         template<typename T, std::size_t S, typename A>
         static auto _get_vec_data(std::vector<std::array<T, S>, A>& vec)
-        { return vec[0].data(); }
+        {
+            return vec[0].data();
+        }
         template<typename T, typename A>
         static auto _get_vec_data(std::vector<T, A>& vec)
-        { return vec.data(); }
+        {
+            return vec.data();
+        }
 
         template<typename DB, typename T, typename A>
         void static getVecArrayFromDB(DB const& db, std::vector<T, A>& vec, std::string const& key)
@@ -180,7 +196,9 @@ namespace amr
                    &levelGhostParticlesNew}
             , interiorLocalBox_{AMRToLocal(box, this->getGhostBox())}
             , name_{name}
-        { validate_ghosts(ghost); }
+        {
+            validate_ghosts(ghost);
+        }
 
 
         auto& name() const { return name_; }
@@ -205,7 +223,7 @@ namespace amr
                 if (particles.size() == 0)
                     return;
 
-                if constexpr (ParticleArray::is_mapped)
+                if constexpr (any_in(ParticleArray::layout_mode, core::LayoutMode::AoSMapped))
                     particles.sortMapping();
 
                 Packer packer{particles};
@@ -354,7 +372,9 @@ namespace amr
          * copy2 throws unconditiionnally.
          */
         void copy2([[maybe_unused]] SAMRAI::hier::PatchData& destination) const override
-        { throw std::runtime_error("Cannot cast"); }
+        {
+            throw std::runtime_error("Cannot cast");
+        }
 
 
 
@@ -401,7 +421,9 @@ namespace amr
 
         void copy2([[maybe_unused]] SAMRAI::hier::PatchData& destination,
                    [[maybe_unused]] SAMRAI::hier::BoxOverlap const& overlap) const override
-        { throw std::runtime_error("Cannot cast"); }
+        {
+            throw std::runtime_error("Cannot cast");
+        }
 
 
 
@@ -525,7 +547,7 @@ namespace amr
             if (pOverlap.isOverlapEmpty())
                 return;
 
-            if constexpr (ParticleArray::is_mapped)
+            if constexpr (any_in(ParticleArray::layout_mode, core::LayoutMode::AoSMapped))
                 unpackMappedParticles(stream, pOverlap);
             else
                 unpackAnyParticles(stream, pOverlap);
@@ -626,7 +648,7 @@ namespace amr
 
         void copy_(SamBox const& overlapBox, ParticlesData const& sourceData)
         {
-            if constexpr (ParticleArray::is_mapped)
+            if constexpr (any_in(ParticleArray::layout_mode, core::LayoutMode::AoSMapped))
                 copyMappedParticles(overlapBox, sourceData);
             else
                 copyPartitionedParticles(overlapBox, sourceData);
@@ -643,7 +665,7 @@ namespace amr
         void copy_(SamBox const& overlapBox, ParticlesData const& sourceData,
                    SAMRAI::hier::Transformation const& transformation)
         {
-            if constexpr (ParticleArray::is_mapped)
+            if constexpr (any_in(ParticleArray::layout_mode, core::LayoutMode::AoSMapped))
                 copyMappedParticles(overlapBox, sourceData, transformation);
             else
                 copyPartitionedParticles(overlapBox, sourceData, transformation);
@@ -679,7 +701,7 @@ namespace amr
                 SAMRAI::hier::Transformation const& transformation = overlap.getTransformation();
                 transformation.inverseTransform(shiftedOverlapBox);
                 auto shiftedOverlapBox_p = phare_box_from<dim>(shiftedOverlapBox);
-                if constexpr (ParticleArray::is_mapped)
+                if constexpr (any_in(ParticleArray::layout_mode, core::LayoutMode::AoSMapped))
                     numberParticles += domainParticles.nbr_particles_in(shiftedOverlapBox_p);
                 else
                 {
@@ -714,7 +736,7 @@ namespace amr
             // overlap box into our index space, intersect each of them with
             // our ghost box and put export them with the transformation offset
 
-            if constexpr (ParticleArray::is_mapped)
+            if constexpr (any_in(ParticleArray::layout_mode, core::LayoutMode::AoSMapped))
                 packMappedParticles(overlap, transformation, outBuffer);
             else
                 packPartitionedParticles(overlap, transformation, outBuffer);

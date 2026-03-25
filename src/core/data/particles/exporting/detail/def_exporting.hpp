@@ -22,11 +22,17 @@ struct ParticlesExporter
     void move_particles(Src& src, Dst& dst, Box_t const& box, std::size_t const growby = 0);
 
 
-    template<bool in = true, typename Src, std::size_t dim>
-    void delete_particles(Src& src, Box<int, dim> const& box);
+    template<typename Src, std::size_t dim>
+    void delete_particles_in(Src& src, Box<int, dim> const& box);
 
-    template<bool in = true, typename Src, typename Boxes>
-    void delete_particles(Src& src, Boxes const& boxes);
+    template<typename Src, typename Boxes>
+    void delete_particles_in(Src& src, Boxes const& boxes);
+
+    template<typename Src, std::size_t dim>
+    void delete_particles_not_in(Src& src, Box<int, dim> const& box);
+
+    template<typename Src, typename Boxes>
+    void delete_particles_not_in(Src& src, Boxes const& boxes);
 
     // template<typename Src, typename Dst, typename Box_t, typename Refiner, typename Transformer>
     // void operator()(Src const&, Dst&, Box_t const&, Refiner, Transformer);

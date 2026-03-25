@@ -65,7 +65,7 @@ auto default_em_init(EM& em, GridLayout const& patch_layout)
     };
 
     using enum LayoutMode;
-    if constexpr (any_in(layout_mde, AoSTS))
+    if constexpr (is_tiled(layout_mde))
     {
         for (auto& xyz : em.E)
             for (auto& tile : xyz())

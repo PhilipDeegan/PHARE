@@ -31,7 +31,16 @@ Dst ParticlesConverter<AoSTS, CPU, AoS, CPU>::operator()(Src const& src, GridLay
 
     return out;
 }
-
+template<>
+template<typename Dst, typename Src, typename GridLayout>
+Dst ParticlesConverter<AoSCMTS, CPU, AoS, CPU>::operator()(Src const& src, GridLayout const& layout)
+{
+    auto out = make_particles<Dst>(layout);
+    out.reserve(src.size());
+    for (auto const& tile : src())
+        std::copy(tile().begin(), tile().end(), std::back_inserter(out));
+    return out;
+}
 
 template<>
 template<typename Dst, typename Src, typename GridLayout>

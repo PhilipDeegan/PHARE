@@ -25,10 +25,10 @@ concept Spannable = requires(T t) {
 };
 
 
-using span_size_default_t = unsigned long long int; // CUDA doesn't like std::size_t
+using default_span_size_t = unsigned long long int; // CUDA doesn't like std::size_t
 
 
-template<typename T, typename SIZE = span_size_default_t>
+template<typename T, typename SIZE = default_span_size_t>
 struct Span
 {
     using value_type = std::decay_t<T>;
@@ -98,7 +98,7 @@ auto make_span(Data* data, std::size_t const& size)
     return Span<Data>{data, size};
 }
 
-template<typename T, typename SIZE = span_size_default_t>
+template<typename T, typename SIZE = default_span_size_t>
 class VectorSpan : private StackVar<std::vector<T>>, public core::Span<T, SIZE>
 {
     using Vector = StackVar<std::vector<T>>;
@@ -124,7 +124,7 @@ public:
 
 
 
-template<typename T, typename SIZE = span_size_default_t>
+template<typename T, typename SIZE = default_span_size_t>
 struct SpanSet
 {
     using value_type = T;
@@ -212,7 +212,7 @@ auto flatten(std::vector<std::array<T, size>>& data)
 }
 
 
-template<typename V, typename T, typename SIZE = span_size_default_t>
+template<typename V, typename T, typename SIZE = default_span_size_t>
 struct ViewSpan // represent vector of T as Span of V
 {
     auto constexpr static real_size = sizeof(T);

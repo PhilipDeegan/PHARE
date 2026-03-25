@@ -3,7 +3,7 @@
 
 #include "core/logger.hpp"
 #include "core/vector.hpp"
-// #include "core/utilities/span.hpp"
+#include "core/utilities/span.hpp"
 #include "core/utilities/types.hpp"
 
 #include "core/data/particles/particle.hpp"
@@ -107,7 +107,7 @@ struct SoAVXSpan
     auto static constexpr storage_mode = StorageMode::SPAN;
     auto static constexpr dimension    = dim;
 
-    using SIZE_T = unsigned long long int; // cuda issues
+    using SIZE_T = default_span_size_t;
 
     template<typename T>
     using container_t = T*;
@@ -265,15 +265,15 @@ public:
     auto static constexpr layout_mode  = LayoutMode::SoAVX;
     auto static constexpr storage_mode = Super::storage_mode;
 
-    using SIZE_T = unsigned long long int; // cuda issues
+    using SIZE_T = default_span_size_t;
     // using Particle_t = SoAVXParticle_crt<dimension>;
     using Super::size;
 
     using Span_t = SoAVXParticles<SoAVXSpan<dimension, alloc_mode>>;
     friend class SoAVXParticles<SoAVXSpan<dimension, alloc_mode>>;
 
-    template<std::size_t size>
-    using array_type = SoAVXParticles<SoAVXArray<dimension, size>>;
+    // template<std::size_t size>
+    //  using array_type = SoAVXParticles<SoAVXArray<dimension, size>>;
 
     using iterator       = iterator_impl<This>;
     using const_iterator = iterator_impl<This const>;

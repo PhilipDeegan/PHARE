@@ -14,21 +14,59 @@
 namespace PHARE::core
 {
 
+
 enum class LayoutMode : std::uint16_t {
     AoS = 0,
     AoSMapped, // 1
     AoSPC,     // 2
     AoSTS,     // 3
-    SoA,       // 4
-    SoAVX,     // 5
-    SoATS,     // 6
-    SoAVXTS,   // 7
-    SoAPC,     // 8
+    AoSCMTS,   // 4
+    SoA,       // 5
+    SoAVX,     // 6
+    SoATS,     // 7
+    SoAVXTS,   // 8
+    SoAPC,     // 9
 };
+
+bool constexpr is_tiled(LayoutMode lm)
+{
+    using enum LayoutMode;
+    return any_in(lm, AoSTS, AoSCMTS, SoATS, SoAVXTS);
+}
 
 enum class StorageMode : std::uint16_t { ARRAY = 0, VECTOR, SPAN };
 
 enum class ParticleType : std::uint16_t { Domain = 0, Ghost, PatchGhost, LevelGhost, All };
+
+
+struct ParticleArrayOptions
+{
+    std::size_t dim          = 1;
+    LayoutMode layout_mode   = LayoutMode::AoSMapped;
+    StorageMode storage_mode = StorageMode::VECTOR;
+    AllocatorMode alloc_mode = AllocatorMode::CPU;
+    bool _const_             = 0; // sometimes needed
+
+    auto constexpr with_layout(LayoutMode const lm) const
+    {
+        auto copy        = *this;
+        copy.layout_mode = lm;
+        return copy;
+    }
+    auto constexpr with_storage(StorageMode const sm) const
+    {
+        auto copy         = *this;
+        copy.storage_mode = sm;
+        return copy;
+    }
+    auto constexpr with_alloc(AllocatorMode const am) const
+    {
+        auto copy       = *this;
+        copy.alloc_mode = am;
+        return copy;
+    }
+};
+
 
 
 template<std::size_t dim>
@@ -36,8 +74,6 @@ struct ParticleDefaults
 {
     using Particle_t = Particle<dim>;
 };
-
-
 
 
 template<typename R = std::uint32_t, std::size_t dim>
@@ -115,9 +151,9 @@ Particles_t make_particles(Box<T, D> const& box, std::size_t const ghost_cells)
     using enum LayoutMode;
     if constexpr (any_in(Particles_t::layout_mode, AoSPC, SoAPC))
         return Particles_t{box, ghost_cells};
-    else if constexpr (any_in(Particles_t::layout_mode, AoSTS, SoATS, SoAVXTS))
+    else if constexpr (is_tiled(Particles_t::layout_mode))
         return Particles_t{box, ghost_cells};
-    else if constexpr (Particles_t::is_mapped)
+    else if constexpr (any_in(Particles_t::layout_mode, AoSMapped))
         return Particles_t{grow(box, ghost_cells)};
 
     else
@@ -129,7 +165,6 @@ Particles_t make_particles(GridLayout_t const& layout)
 {
     return make_particles<Particles_t>(layout.AMRBox(), GridLayout_t::nbrParticleGhosts());
 }
-
 
 
 

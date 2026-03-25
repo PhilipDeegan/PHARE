@@ -24,13 +24,13 @@ def do(dim):
     env.update({"PHARE_LOG": "NONE", "KLOG": "0"})
 
     P = f"""
-    mkn_r {profile} -M tests/diagnostic/test_diagnostics_{dim}d_ref.cpp
+    mkn {profile} -M tests/diagnostic/test_diagnostics_{dim}d_ref.cpp
     """
     print(P.strip())
     run(P.strip(), env)
 
     P = f"""
-    mkn_r {profile} -M tests/diagnostic/test_diagnostics_{dim}d_cmp.cpp
+    mkn {profile} -M tests/diagnostic/test_diagnostics_{dim}d_cmp.cpp
     """
     print(P.strip())
     run(P.strip(), env)

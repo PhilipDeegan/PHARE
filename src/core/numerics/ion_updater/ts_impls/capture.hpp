@@ -119,7 +119,7 @@ void IonUpdaterMultiTS<Ions, Electromag, GridLayout>::updateAndDepositDomain_(
             for (std::size_t j = 0; j < view.ions.size(); ++j)
             {
                 auto const popidx = view.ions.size() * i + j;
-                delete_particles<false>(*MultiBoris_t::domains[popidx],
+                delete_particles_not_in(*MultiBoris_t::domains[popidx],
                                         patch_boxings.nonLevelGhostBox);
 
                 move_in_domain(*MultiBoris_t::domains[popidx], *MultiBoris_t::levelGhosts[popidx],
@@ -201,15 +201,15 @@ void IonUpdaterMultiTS<Ions, Electromag, GridLayout>::updateAndDepositAll_(Model
         auto const per_pop = [&](auto& pop) {
             auto& domain = pop.domainParticles();
 
-            delete_particles<false>(domain, patch_boxings.nonLevelGhostBox);
+            delete_particles_not_in(domain, patch_boxings.nonLevelGhostBox);
 
             move_in_ghost_layer(pop.patchGhostParticles(), domain, patch_boxings.domainBox,
                                 patch_boxings.nonLevelGhostBox);
 
             move_in_domain(domain, pop.levelGhostParticles(), patch_boxings.domainBox);
 
-            delete_particles<false>(pop.levelGhostParticles(), patch_boxings.ghostBox);
-            delete_particles<false>(domain, patch_boxings.domainBox);
+            delete_particles_not_in(pop.levelGhostParticles(), patch_boxings.ghostBox);
+            delete_particles_not_in(domain, patch_boxings.domainBox);
         };
 
         for (auto& pop : view.ions)

@@ -16,9 +16,9 @@ namespace PHARE::core::bench
 
 
 template<std::size_t dim>
-void write_raw_unsorted_particles_to_file(std::size_t const n_parts = 1e7)
+void write_raw_unsorted_particles_to_file(std::size_t const n_parts = 1e6)
 {
-    constexpr std::uint32_t cells = 65;
+    constexpr std::uint32_t cells = 15;
 
     using PHARE_Types     = core::PHARE_Types<SimOpts{dim, /*interp =*/1 /*not important here*/}>;
     using GridLayout_t    = TestGridLayout<typename PHARE_Types::GridLayout_t>;

@@ -11,6 +11,10 @@
 // #include "core/data/particles/particle_array_partitioner.hpp"
 
 
+
+#include "core/data/particles/particle_array.hpp"
+
+
 #include "amr/utilities/box/amr_box.hpp"
 #include "amr/data/particles/refining/detail/def_refining.hpp"
 
@@ -29,14 +33,21 @@ template<auto type, typename Src, typename Dst, typename Box_t, typename Fn0, ty
 void ParticlesRefiner<AoS, CPU>::operator()(Src const& src, Dst& dst, Box_t const& box, Fn0 fn0,
                                             Fn1 fn1)
 {
-    // PHARE_LOG_LINE_SS(box);
-    std::uint16_t constexpr static N = 256;
+    std::uint16_t constexpr static N       = 256;
+    static constexpr auto base_layout_type = core::base_layout_type<Src>();
+    static constexpr auto array_opts
+        = Src::options.with_storage(core::StorageMode::ARRAY).with_layout(base_layout_type);
+    static constexpr auto array_type_opts
+        = core::ParticleArrayTypeOptions<array_opts, base_layout_type,
+                                         core::StorageMode::ARRAY>::FROM(Src::options, N);
+    using ArrayParticleArray = core::ParticleArrayResolver<array_opts, array_type_opts>::value_type;
+
 
     auto const splitBox     = grow(box, 2); // Splitter::maxCellDistanceFromSplit() ?
     auto const coarseDstBox = coarsen_box(splitBox);
 
-    using ArrayParticleArray = typename Src::template array_type<N>;
-    using SpanParticleArray  = Src::Span_t;
+    // using ArrayParticleArray = typename Src::template array_type<N>;
+    using SpanParticleArray = Src::Span_t;
 
     std::uint16_t big_buffer_cnt = 0;
     ArrayParticleArray big_buffer;
