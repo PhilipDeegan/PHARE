@@ -88,10 +88,4 @@ private:
 } // namespace PHARE::core
 
 
-#if !defined(PHARE_LOG_ERROR)
-#define PHARE_LOG_ERROR(x)                                                                         \
-    PHARE::core::Errors::instance().log(std::string{__FILE__} + ":" + std::to_string(__LINE__), x);
-#endif
-
-
 #endif /* PHARE_CORE_ERRORS_H */

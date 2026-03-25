@@ -75,6 +75,9 @@ class Particles:
     def size(self):
         return len(self.weights)
 
+    def __repr__(self):
+        return f"Particles(size: {self.size()}, id: {id(self)})"
+
     def __eq__(self, that):
         if isinstance(that, Particles):
             if self.size() != that.size():
@@ -91,7 +94,7 @@ class Particles:
                 return True
             except AssertionError as ex:
                 print(f"particles.py:Particles::eq failed with: {ex}")
-                print_trace()
+                # print_trace()
                 return False
         print(f"particles.py:Particles::eq bad type: {type(that)}")
         return False
@@ -204,12 +207,13 @@ def all_assert_sorted(part1, part2):
         else 1e-12
     )
 
-    np.testing.assert_array_equal(part1.iCells[idx1], part2.iCells[idx2])
-    np.testing.assert_allclose(part1.deltas[idx1], part2.deltas[idx2], atol=deltol)
+    np.testing.assert_array_equal(part1.iCells[idx1], part2.iCells[idx2], verbose=True)
 
     np.testing.assert_allclose(part1.v[idx1, 0], part2.v[idx2, 0], atol=1e-12)
     np.testing.assert_allclose(part1.v[idx1, 1], part2.v[idx2, 1], atol=1e-12)
     np.testing.assert_allclose(part1.v[idx1, 2], part2.v[idx2, 2], atol=1e-12)
+
+    np.testing.assert_allclose(part1.deltas[idx1], part2.deltas[idx2], atol=deltol)
 
 
 def any_assert(part1, part2):

@@ -1,10 +1,15 @@
 #ifndef PHARE_CORE_UTILITIES_META_META_UTILITIES_HPP
 #define PHARE_CORE_UTILITIES_META_META_UTILITIES_HPP
 
+#include "core/utilities/types.hpp"
+
+
+#include <tuple>
+#include <cassert>
 #include <iterator>
 #include <type_traits>
 
-#include "core/utilities/types.hpp"
+
 
 namespace PHARE
 {
@@ -60,9 +65,7 @@ namespace core
     template<typename T, typename T2, typename... Ts,
              typename = std::enable_if_t<std::is_same<T, T2>::value>>
     constexpr void allsame([[maybe_unused]] T arg, T2 arg2, Ts... args)
-    {
-        allsame(arg2, args...);
-    }
+    { allsame(arg2, args...); }
 
 
     template<typename DimConstant, typename InterpConstant, std::size_t... ValidNbrParticles>
@@ -80,7 +83,7 @@ namespace core
                           SimulatorOption<DimConst<2>, InterpConst<2>, 4, 5, 8, 9, 16>,
                           SimulatorOption<DimConst<2>, InterpConst<3>, 4, 5, 8, 9, 25>,
 
-                          SimulatorOption<DimConst<3>, InterpConst<1>, 6, 12>,
+                          SimulatorOption<DimConst<3>, InterpConst<1>, 6, 12 /*, 27*/>,
                           SimulatorOption<DimConst<3>, InterpConst<2>, 6, 12>,
                           SimulatorOption<DimConst<3>, InterpConst<3>, 6, 12>
 
@@ -110,6 +113,7 @@ namespace core
 
         return nbRefinedPart;
     }
+
 
 
 

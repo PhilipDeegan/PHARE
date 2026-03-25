@@ -20,6 +20,7 @@
 
 #include <map>
 #include <optional>
+#include <stdexcept>
 
 
 
@@ -81,16 +82,21 @@ namespace amr
      *
      * obj1 and obj2 become unusable again at the end of the scope of dataOnPatch
      *
-     *
+     *  struct ResourcesUserTypes{
+     *     using patch_data_type = SAMRAI::hier::PatchData;  // subclass thereof
+     *     using variable_type   = SAMRAI::hier::Variable;   // subclass thereof
+     *  };
      */
-    template<typename GridLayoutT, typename Grid_t>
+    template<typename GridLayoutT, typename Grid_t, typename... ResourcesUserTypes>
     class ResourcesManager
     {
-        using This = ResourcesManager<GridLayoutT, Grid_t>;
+        using This = ResourcesManager<GridLayoutT, Grid_t, ResourcesUserTypes...>;
 
     public:
         static constexpr std::size_t dimension    = GridLayoutT::dimension;
         static constexpr std::size_t interp_order = GridLayoutT::interp_order;
+
+        using ResourceUserTypes = std::tuple<ResourcesUserTypes...>;
 
         using UserField_t = UserFieldType<Grid_t, GridLayoutT>;
 
@@ -286,6 +292,27 @@ namespace amr
         }
 
 
+        auto getIDsList(auto&&... keys)
+        {
+            auto const Fn = [&](auto& key) {
+                if (key.size() == 0)
+                    throw std::runtime_error("Resource Manager key cannot be empty");
+                if (auto const id = getID(key))
+                    return *id;
+                throw std::runtime_error("Resource Manager has no key: " + key);
+            };
+            return std::array{Fn(keys)...};
+        }
+
+        void print_resources() const
+        {
+            for (auto& [key, _] : nameToResourceInfo_)
+            {
+                PHARE_LOG_LINE_SS(key);
+            }
+        }
+
+
 
         ~ResourcesManager()
         {
@@ -313,6 +340,7 @@ namespace amr
                 ids.emplace_back(info.id);
             return ids;
         }
+
 
         auto getIDsList(auto&&... keys) const
         {
@@ -343,6 +371,8 @@ namespace amr
         template<typename Level_t, typename... Args>
         struct LevelLooper
         {
+            using value_type = std::shared_ptr<SAMRAI::hier::Patch>;
+
             LevelLooper(ResourcesManager& rm, Level_t& lvl, Args&... arrgs)
                 : rm{rm}
                 , level{lvl}
@@ -385,6 +415,7 @@ namespace amr
             Level_t& level;
             std::tuple<Args&...> args;
         };
+
 
 
 
@@ -433,9 +464,11 @@ namespace amr
         auto getPatchData_(ResourcesInfo const& resourcesVariableInfo,
                            SAMRAI::hier::Patch const& patch) const
         {
-            auto patchData = patch.getPatchData(resourcesVariableInfo.variable, context_);
-            return (std::dynamic_pointer_cast<typename ResourceType::patch_data_type>(patchData))
-                ->getPointer();
+            using PatchData_t = ResourceType::patch_data_type;
+            auto patchData    = patch.getPatchData(resourcesVariableInfo.variable, context_);
+            if (auto casted = std::dynamic_pointer_cast<PatchData_t>(patchData))
+                return casted->getPointer();
+            throw std::runtime_error("Resource Manager bad cast");
         }
 
 
