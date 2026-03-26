@@ -73,8 +73,11 @@ class PatchHierarchy(object):
         no_copy_keys = ["data_files"]  # do not copy these things
         return deep_copy(self, memo, no_copy_keys)
 
-    def __getitem__(self, qty):
-        return self.__dict__[qty]
+    def __getitem__(self, input):
+        cls = type(input)
+        if cls is Box or cls is slice:
+            return interpolate(self, input)
+        return self.__dict__[input]
 
     def update(self):
         if len(self.quantities()) > 1:
@@ -619,14 +622,18 @@ class PatchHierarchy(object):
         from pyphare.pharesee.hierarchy.hierarchy_utils import flat_finest_field
         from pyphare.pharesee.run.utils import build_interpolator
 
-        nbrGhosts = list(self.level(0, time).patches[0].patch_datas.values())[0].ghosts_nbr
+        nbrGhosts = list(self.level(0, time).patches[0].patch_datas.values())[
+            0
+        ].ghosts_nbr
 
         interp_ = {}
         for qty in self.quantities():
             box = self.level(0, time).patches[0].patch_datas[qty].box
             dl = self.level(0, time).patches[0].patch_datas[qty].dl
             data, coords = flat_finest_field(self, qty, time=time)
-            interp_[qty] = build_interpolator(data, coords, interp, box, dl, qty, nbrGhosts)
+            interp_[qty] = build_interpolator(
+                data, coords, interp, box, dl, qty, nbrGhosts
+            )
         return interp_
 
     def __array_ufunc__(self, ufunc, method, *inputs, **kwargs):
@@ -640,7 +647,7 @@ class PatchHierarchy(object):
 
         times = inputs[0].times()
         for x in inputs:
-            assert(times == x.times())
+            assert times == x.times()
             if not isinstance(x, PatchHierarchy):
                 raise TypeError("this arg should be a PatchHierarchy")
         ils = [key for d in inputs[0].patch_levels for key in d]
@@ -659,7 +666,7 @@ class PatchHierarchy(object):
                     pls_.append(plvl)
                 pls.append(pls_)
 
-            out = [getattr(ufunc, method)(*pl, **kwargs)  for pl in zip(*pls)]
+            out = [getattr(ufunc, method)(*pl, **kwargs) for pl in zip(*pls)]
 
             # print("   ->  ", type(out), type(out[0]))
 
@@ -673,12 +680,14 @@ class PatchHierarchy(object):
 
             all_.append(final)
 
-        h_ = PatchHierarchy(all_,
-                           domain_box=self.domain_box,
-                           refinement_box=self.refinement_ratio,
-                           times=self.times(),
-                           data_files=self.data_files,
-                           selection_box=self.selection_box)
+        h_ = PatchHierarchy(
+            all_,
+            domain_box=self.domain_box,
+            refinement_box=self.refinement_ratio,
+            times=self.times(),
+            data_files=self.data_files,
+            selection_box=self.selection_box,
+        )
 
         from .scalarfield import ScalarField
         from .vectorfield import VectorField
@@ -690,7 +699,9 @@ class PatchHierarchy(object):
 
     def __array_function__(self, func, types, args, kwargs):
         # TODO this has to be tested w. np.mean for example
-        print(f"__array_function__ of Patch {func.__name__} called for {[getattr(a, 'name', a) for a in args]}")
+        print(
+            f"__array_function__ of Patch {func.__name__} called for {[getattr(a, 'name', a) for a in args]}"
+        )
         return func(*args, **kwargs)
 
 
@@ -824,3 +835,8 @@ def amr_grid(hierarchy, time):
             x = np.concatenate((x, xx))
 
     return np.sort(x)
+
+
+def interpolate(hier, box):
+    # should this return a new hierarchy with 1 level and 1 patch per quantity per time?
+    return hier.interpol(hier._default_time())

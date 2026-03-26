@@ -74,13 +74,15 @@ def validate_timestamps(clazz, key, **kwargs):
         )
     if not np.all(np.diff(timestamps) >= 0):
         raise RuntimeError(f"Error: {clazz}.{key} not in ascending order)")
-    if not np.all(
-        np.abs(timestamps / sim.time_step - np.rint(timestamps / sim.time_step) < 1e-9)
-    ):
+
+    tmp = timestamps[timestamps > 0]  # ignore zero!
+    what = np.abs(tmp / sim.time_step - np.rint(tmp / sim.time_step))
+    if not np.all(what < 1e-9):
         raise RuntimeError(
-            f"Error: {clazz}.{key} is inconsistent with simulation.time_step"
+            f"Error: {clazz}.{key} is inconsistent with simulation.time_step", what
         )
 
+    print("timestamps", timestamps)
     return timestamps
 
 
