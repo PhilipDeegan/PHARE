@@ -75,8 +75,8 @@ public:
         if (p)
             ::operator delete(p);
     }
-    void deallocate(T* const p, std::size_t /*n*/) noexcept
-    { // needed from std::
+    void deallocate(T* const p, std::size_t /*n*/) noexcept // needed from std::
+    {
         deallocate(p);
     }
 

@@ -11,9 +11,25 @@
 
 namespace PHARE::core
 {
+template<typename T>
+auto constexpr default_allocator()
+{
+    if constexpr (std::is_same_v<double, T>)
+        return NonConstructingHugePageAllocator<T>{};
+    else
+        return std::allocator<T>{};
+};
 
+template<typename T>
+struct DefaultAllocator
+{
+    using value_type = decltype(default_allocator<T>());
+};
 
-template<typename T, typename Allocator = NonConstructingAllocator<T>>
+template<typename T>
+using DefaultAllocator_t = DefaultAllocator<T>::value_type;
+
+template<typename T, typename Allocator = DefaultAllocator_t<T>>
 struct MinimizingVector
 {
     using vector_t = std::vector<T, Allocator>;

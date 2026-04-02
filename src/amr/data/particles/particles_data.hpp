@@ -769,7 +769,7 @@ void ParticlesData<ParticleArray_t>::unpack_from_ghost(SAMRAI::tbox::MessageStre
 
     std::size_t numberParticles = 0;
     stream >> numberParticles;
-    std::vector<Particle_t> particleArray(numberParticles);
+    auto& particleArray = *tmp.get(numberParticles);
     stream.unpack(particleArray.data(), numberParticles);
 
     domainParticles.reserve(domainParticles.size() + numberParticles);
