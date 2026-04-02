@@ -12,6 +12,7 @@
 #include <vector>
 #include <cassert>
 #include <cstdint>
+#include <cassert>
 #include <iomanip>
 #include <numeric>
 #include <sstream>
@@ -29,17 +30,9 @@ namespace core
 {
     enum class Basis { Magnetic, Cartesian };
 
-
-
-
     template<typename T>
-    NO_DISCARD std::vector<T> arange(T start, T stop, T step = 1)
-    {
-        std::vector<T> values;
-        for (T value = start; value < stop; value += step)
-            values.push_back(value);
-        return values;
-    }
+    static constexpr auto dependent_false_v = false;
+
 
     template<typename T>
     NO_DISCARD T norm(std::array<T, 3> vec)
@@ -48,9 +41,6 @@ namespace core
         return std::sqrt(squarreSum);
     }
 
-
-
-    enum class Edge { Xmin, Xmax, Ymin, Ymax, Zmin, Zmax };
 
 
     template<typename T> // this is so we can use struct {} initialization with
@@ -249,6 +239,7 @@ namespace core
         return _default;
     }
 
+
     template<typename T>
     NO_DISCARD inline T get_env_as(std::string const& key, T const& t)
     {
@@ -278,9 +269,9 @@ NO_DISCARD Return sum(Container const& container, Return r = 0)
 }
 
 template<typename Container, typename F>
-NO_DISCARD auto sum_from(Container const& container, F fn)
+NO_DISCARD auto sum_from(Container&& container, F fn)
 {
-    using value_type  = typename Container::value_type;
+    using value_type  = std::decay_t<Container>::value_type;
     using return_type = std::decay_t<std::invoke_result_t<F const&, value_type const&>>;
     return_type sum   = 0;
     for (auto const& el : container)
@@ -313,9 +304,9 @@ NO_DISCARD auto generate(F&& f, std::size_t count)
 
 
 template<typename F, typename Container>
-NO_DISCARD auto generate(F&& f, Container const& container)
+NO_DISCARD auto generate(F&& f, Container&& container)
 {
-    using T          = typename Container::value_type;
+    using T          = typename std::decay_t<Container>::value_type;
     using value_type = std::decay_t<std::invoke_result_t<F&, T&>>;
     std::vector<value_type> v1;
     if (container.size() > 0)
