@@ -39,6 +39,7 @@ namespace solver
         using Ohm_t    = OhmLevelTransformer<HybridModel>;
         core::OhmInfo ohm_info;
 
+
         inline bool isRootLevel(int const levelNumber) const { return levelNumber == 0; }
 
     public:
