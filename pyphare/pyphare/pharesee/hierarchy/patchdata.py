@@ -160,7 +160,7 @@ class FieldData(PatchData):
             gridlayout.directions[idx],
             withGhosts=any(self.ghosts_nbr) and self.field_name != "tags",
             centering=self.centerings[idx],
-            nbrGhosts=self.ghosts_nbr[idx],
+            ghosts_nbr=self.ghosts_nbr[idx],
         )
 
     def _resolve_ghost_nbr(self, **kwargs):
