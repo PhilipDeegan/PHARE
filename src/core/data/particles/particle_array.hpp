@@ -16,6 +16,7 @@
 #include <utility>
 
 
+
 namespace PHARE::core
 {
 template<std::size_t dim>
@@ -189,8 +190,8 @@ public:
         cellMap_.export_to(box, particles_.data(), dest, std::forward<Fn>(fn));
     }
 
-    template<typename Fn>
-    void export_particles(box_t const& box, std::vector<Particle_t>& dest, Fn&& fn) const
+    template<typename Fn, typename Dst>
+    void export_particles(box_t const& box, Dst& dest, Fn&& fn) const
     {
         PHARE_LOG_SCOPE(3, "ParticleArray::export_particles (box, vector, Fn)");
         cellMap_.export_to(box, particles_.data(), dest, std::forward<Fn>(fn));
@@ -218,7 +219,6 @@ public:
     {
         auto const oldCell              = particles_[particleIndex].iCell;
         particles_[particleIndex].iCell = newCell;
-
         if (auto const box_is_valid = box_.size() > 1)
             cellMap_.update(particles_, particleIndex, oldCell);
     }

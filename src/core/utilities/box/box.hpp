@@ -137,6 +137,13 @@ struct Box
     }
 
 
+    NO_DISCARD static Box fromString(std::string const& s)
+    {
+        auto const sep = s.find('_');
+        return Box{Point<Type, dim>::fromString(s.substr(0, sep)),
+                   Point<Type, dim>::fromString(s.substr(sep + 1))};
+    }
+
     NO_DISCARD constexpr static std::size_t nbrRemainBoxes()
     {
         if constexpr (dim == 1)
@@ -265,12 +272,14 @@ NO_DISCARD bool isIn(Point<Type, SIZE> const& point, Box<Type, SIZE> const& box)
 }
 
 
-template<typename Particle>
-NO_DISCARD auto isIn(Particle const& particle, Box<int, Particle::dimension> const& box)
+template<typename Particle, typename Type>
+NO_DISCARD auto isIn(Particle const& particle, Box<Type, Particle::dimension> const& box)
     -> decltype(isIn(particle.iCell, box), bool())
 {
     return isIn(particle.iCell, box);
 }
+
+
 
 /** this overload of isIn takes a Point and a Container of boxes
  * and returns true if the Point is at least in one of the boxes.

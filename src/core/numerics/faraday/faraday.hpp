@@ -63,6 +63,7 @@ private:
             Bxnew(ijk) = Bx(ijk);
 
         if constexpr (dimension == 2)
+
             Bxnew(ijk) = Bx(ijk) - dt * layout.template deriv<Direction::Y>(Ez, ijk);
 
         if constexpr (dimension == 3)

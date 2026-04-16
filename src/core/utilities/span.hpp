@@ -3,6 +3,7 @@
 #ifndef PHARE_CORE_UTILITIES_SPAN_HPP
 #define PHARE_CORE_UTILITIES_SPAN_HPP
 
+
 #include "core/def.hpp"
 #include "core/utilities/types.hpp"
 
@@ -36,8 +37,8 @@ struct Span
     Span& operator=(Span&&)      = default;
     Span& operator=(Span const&) = default;
 
-    NO_DISCARD auto& operator[](SIZE i) { return ptr[i]; }
-    NO_DISCARD value_type const& operator[](SIZE i) const { return ptr[i]; }
+    NO_DISCARD auto& operator[](SIZE const i) { return ptr[i]; }
+    NO_DISCARD value_type const& operator[](SIZE const i) const { return ptr[i]; }
     NO_DISCARD value_type const* data() const { return ptr; }
     NO_DISCARD auto data() { return ptr; }
     NO_DISCARD auto begin() { return ptr; }
@@ -45,6 +46,7 @@ struct Span
     NO_DISCARD auto end() { return ptr + s; }
     NO_DISCARD auto end() const { return ptr + s; }
     NO_DISCARD SIZE const& size() const { return s; }
+    NO_DISCARD auto size_address() { return &s; }
 
     T* ptr = nullptr;
     SIZE s = 0;

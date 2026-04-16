@@ -1,5 +1,6 @@
 #ifndef PHARE_CELLMAP_H
 #define PHARE_CELLMAP_H
+
 #include <cstddef>
 #include <string>
 #include <iterator>

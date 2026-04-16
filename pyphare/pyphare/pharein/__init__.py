@@ -10,6 +10,12 @@ from .diagnostics import (
     MetaDiagnostics,
     MHDDiagnostics,
     ParticleDiagnostics,
+    FieldDiagnosticSlice,
+)
+from .simulation import (
+    Simulation,
+    serialize as serialize_sim,
+    deserialize as deserialize_sim,
 )
 from .load_balancer import LoadBalancer
 from .electron_model import ElectronModel
@@ -31,6 +37,7 @@ __all__ = [
     "InfoDiagnostics",
     "Simulation",
     "LoadBalancer",
+    "FieldDiagnosticSlice",
 ]
 
 # This exists to allow a condition variable for when we are running PHARE from C++ via phare-exe
@@ -79,13 +86,37 @@ def clearDict():
     pp.stop()
 
 
-def populateDict(simulation=None):
-    from . import initialize
+def dict_populator():
+    import pybindlibs.dictator as pp
 
+    def add_size_t(path, val):
+        casted = int(val)
+        if casted < 0:
+            raise RuntimeError("pyphare.__init__::add_size_t received negative value")
+        pp.add_size_t(path, casted)
+
+    def add_vector_int(path, val):
+        pp.add_vector_int(path, list(val))
+
+    class DictPopulator:
+        def __init__(self):
+            self.add_int = add_int
+            self.add_bool = add_bool
+            self.add_double = add_double
+            self.add_size_t = add_size_t
+            self.add_vector_int = add_vector_int
+            self.add_string = pp.add_string
+
+    return DictPopulator()
+
+
+def populateDict(simulation=None):
     if simulation is None:
         from .global_vars import sim
 
         simulation = sim
+
+    # dp = dict_populator()
 
     initialize.general.populateDict(simulation)
     add_vector_string("simulation/models", simulation.model_options)
@@ -94,3 +125,10 @@ def populateDict(simulation=None):
         initialize.hybrid.populateDict(simulation)
     if "MHDModel" in simulation.model_options:
         initialize.mhd.populateDict(simulation)
+
+    # add_int = dp.add_int
+    # add_bool = dp.add_bool
+    # add_double = dp.add_double
+    # add_size_t = dp.add_size_t
+    # add_vector_int = dp.add_vector_int
+    # add_string = dp.add_string

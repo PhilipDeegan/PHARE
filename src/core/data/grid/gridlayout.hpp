@@ -111,7 +111,7 @@ namespace core
         GridLayout(std::array<double, dimension> const& meshSize,
                    std::array<std::uint32_t, dimension> const& nbrCells,
                    Point<double, dimension> const& origin,
-                   std::optional<AMRBox_t> const AMRBox = std::nullopt, int level_number = 0)
+                   std::optional<AMRBox_t> const AMRBox = std::nullopt, int const level_number = 0)
             : meshSize_{meshSize}
             , origin_{origin}
             , nbrPhysicalCells_{nbrCells}
@@ -1104,6 +1104,7 @@ namespace core
             return boxFor(field, [&](auto&&... args) { return this->physicalStartToEnd(args...); });
         }
 
+
         auto FieldBoxFor(auto const& field, Box<int, dimension> box) const
         {
             auto const centerings = centering(field);
@@ -1113,84 +1114,15 @@ namespace core
             return box;
         }
 
+
         auto AMRBoxFor(auto const& field) const { return FieldBoxFor(field, AMRBox_); }
+
 
         auto AMRGhostBoxFor(auto const& field) const
         {
             auto const centerings = centering(field);
             return grow(AMRBoxFor(field), for_N_make_array<dimension>(
                                               [&](auto i) { return nbrGhosts(centerings[i]); }));
-        }
-
-
-        template<auto direction>
-        static MeshIndex<dimension> next(MeshIndex<dimension> index)
-        {
-            if constexpr (dimension == 1)
-            {
-                return make_index(index[0] + 1);
-            }
-            else if constexpr (dimension == 2)
-            {
-                if constexpr (direction == Direction::X)
-                {
-                    return make_index(index[0] + 1, index[1]);
-                }
-                else if constexpr (direction == Direction::Y)
-                {
-                    return make_index(index[0], index[1] + 1);
-                }
-            }
-            else if constexpr (dimension == 3)
-            {
-                if constexpr (direction == Direction::X)
-                {
-                    return make_index(index[0] + 1, index[1], index[2]);
-                }
-                else if constexpr (direction == Direction::Y)
-                {
-                    return make_index(index[0], index[1] + 1, index[2]);
-                }
-                else if constexpr (direction == Direction::Z)
-                {
-                    return make_index(index[0], index[1], index[2] + 1);
-                }
-            }
-        }
-
-        template<auto direction>
-        static MeshIndex<dimension> previous(MeshIndex<dimension> index)
-        {
-            if constexpr (dimension == 1)
-            {
-                return make_index(index[0] - 1);
-            }
-            else if constexpr (dimension == 2)
-            {
-                if constexpr (direction == Direction::X)
-                {
-                    return make_index(index[0] - 1, index[1]);
-                }
-                else if constexpr (direction == Direction::Y)
-                {
-                    return make_index(index[0], index[1] - 1);
-                }
-            }
-            else if constexpr (dimension == 3)
-            {
-                if constexpr (direction == Direction::X)
-                {
-                    return make_index(index[0] - 1, index[1], index[2]);
-                }
-                else if constexpr (direction == Direction::Y)
-                {
-                    return make_index(index[0], index[1] - 1, index[2]);
-                }
-                else if constexpr (direction == Direction::Z)
-                {
-                    return make_index(index[0], index[1], index[2] - 1);
-                }
-            }
         }
 
 
@@ -1201,17 +1133,31 @@ namespace core
         }
 
         template<typename... Args>
-        void evalOnBiggerBox(auto const& field, auto const& grow, auto&& fn, Args&&... args) const
+        void evalOnBiggerBox(auto const& field, Point<uint32_t, dimension> const& grow,
+                             auto&& fn, Args&&... args) const
         {
-            evalOnAnyBox(core::grow(domainBoxFor(field), grow), fn, std::forward<Args>(args)...);
+            auto box = domainBoxFor(field);
+            for (std::size_t i = 0; i < dimension; ++i)
+            {
+                box.lower[i] -= grow[i];
+                box.upper[i] += grow[i];
+            }
+            evalOnAnyBox(box, fn, std::forward<Args>(args)...);
         }
 
         template<typename... Args>
-        void evalOnShrinkedGhostBox(auto const& field, auto const& shrink, auto&& fn,
-                                    Args&&... args) const
+        void evalOnShrinkedGhostBox(auto const& field, Point<uint32_t, dimension> const& shrink,
+                                    auto&& fn, Args&&... args) const
         {
-            evalOnAnyBox(core::shrink(ghostBoxFor(field), shrink), fn, std::forward<Args>(args)...);
+            auto box = ghostBoxFor(field);
+            for (std::size_t i = 0; i < dimension; ++i)
+            {
+                box.lower[i] += shrink[i];
+                box.upper[i] -= shrink[i];
+            }
+            evalOnAnyBox(box, fn, std::forward<Args>(args)...);
         }
+
 
         template<typename... Args>
         void evalOnGhostBox(auto const& field, auto&& fn, Args&&... args) const
@@ -1220,6 +1166,7 @@ namespace core
         }
 
         auto levelNumber() const { return levelNumber_; }
+
 
         auto amr_lcl_idx(auto const& box) const { return boxes_iterator{box, AMRToLocal(box)}; }
         auto amr_lcl_idx() const { return amr_lcl_idx(AMRBox()); }

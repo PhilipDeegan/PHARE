@@ -20,7 +20,6 @@ public:
 
     TestGridLayout() = default;
 
-
     TestGridLayout(double const dl, std::uint32_t const cells)
         : GridLayout{PHARE::core::ConstArray<double, dim>(dl),
                      PHARE::core::ConstArray<std::uint32_t, dim>(cells),

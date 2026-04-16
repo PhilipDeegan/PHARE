@@ -3,10 +3,12 @@
 
 #include "core/data/grid/gridlayoutdefs.hpp"
 #include "core/data/vecfield/vecfield_component.hpp"
-#include <core/utilities/types.hpp>
+#include "core/utilities/types.hpp"
+
 
 namespace PHARE::core
 {
+
 
 template<typename GridLayout>
 class Ampere
@@ -29,7 +31,7 @@ public:
         auto& Jy = J(Component::Y);
         auto& Jz = J(Component::Z);
 
-        auto const shrink = ConstArray<std::size_t, dimension>(1);
+        auto const shrink = ConstArray<std::uint32_t, dimension>(1);
 
         layout_.evalOnShrinkedGhostBox(
             Jx, shrink, [](auto&&... args) { JxEq_(args...); }, Jx, B, layout_);

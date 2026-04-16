@@ -7,6 +7,7 @@
 
 #include "amr/utilities/box/amr_box.hpp"
 #include "amr/data/field/field_geometry.hpp"
+#include "core/data/field/field_box_span.hpp"
 #include "amr/resources_manager/amr_utils.hpp"
 
 
@@ -21,8 +22,6 @@ namespace PHARE::amr
 using core::dirX;
 using core::dirY;
 using core::dirZ;
-
-
 
 
 template<typename ResMan, typename TensorFieldDataT>

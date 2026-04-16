@@ -159,7 +159,10 @@ void IonUpdater1<Ions>::update_ref(auto& ions, auto const& em, auto const& boxin
 template<typename Ions>
 void IonUpdater1<Ions>::Pusher::advance(auto& particle) const
 {
-    try { particle.iCell = boris::advance(particle, halfDtOverDl); }
+    try
+    {
+        particle.iCell = boris::advance(particle, halfDtOverDl);
+    }
     catch (boris::MoveTwoCellException const& e)
     {
         std::stringstream ss;
@@ -310,9 +313,8 @@ void IonUpdater1<Ions>::Pusher::move_domain_ref(auto& pop, auto const& em, auto 
 // ---------------------------------------------------------------------------
 
 template<typename Ions>
-void IonUpdater1<Ions>::Pusher::move_level_ghost_copy(auto& pop, auto const& em,
-                                                       auto const& boxing,
-                                                       auto& interpolator) const
+void IonUpdater1<Ions>::Pusher::move_level_ghost_copy(auto& pop, auto const& em, auto const& boxing,
+                                                      auto& interpolator) const
 {
     using Particle_t  = std::decay_t<decltype(pop.levelGhostParticles()[0])>;
     auto& level_ghost = pop.levelGhostParticles();
