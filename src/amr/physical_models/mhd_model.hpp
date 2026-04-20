@@ -15,6 +15,7 @@
 #include <string_view>
 
 
+
 namespace PHARE
 {
 namespace solver
@@ -23,9 +24,10 @@ namespace solver
     class MHDModel : public IPhysicalModel<AMR_Types>
     {
     public:
-        using patch_t   = typename AMR_Types::patch_t;
-        using level_t   = typename AMR_Types::level_t;
-        using Interface = IPhysicalModel<AMR_Types>;
+        using patch_t         = typename AMR_Types::patch_t;
+        using level_t         = typename AMR_Types::level_t;
+        using Interface       = IPhysicalModel<AMR_Types>;
+        using gridlayout_type = GridLayoutT;
 
         static constexpr std::string_view model_type_name = "MHDModel";
         static inline std::string const model_name{model_type_name};
