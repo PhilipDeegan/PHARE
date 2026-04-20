@@ -365,14 +365,14 @@ struct IonUpdaterTest : public ::testing::Test
     static constexpr auto interp_order = DimInterpT::interp_order;
     constexpr static PHARE::SimOpts opts{dim, interp_order};
     using PHARETypes    = PHARE::core::PHARE_Types<opts>;
-    using Ions          = typename PHARETypes::Ions_t;
-    using Electromag    = typename PHARETypes::Electromag_t;
-    using GridLayout    = typename PHARE::core::GridLayout<GridLayoutImplYee<dim, interp_order>>;
-    using ParticleArray = typename PHARETypes::ParticleArray_t;
-    using ParticleInitializerFactory = typename PHARETypes::ParticleInitializerFactory_t;
+    using Ions          = PHARETypes::Ions_t;
+    using Electromag    = PHARETypes::Electromag_t;
+    using GridLayout    = PHARE::core::GridLayout<GridLayoutImplYee<dim, interp_order>>;
+    using ParticleArray = PHARETypes::ParticleArray_t;
+    using ParticleInitializerFactory = PHARETypes::ParticleInitializerFactory_t;
 
-    using IonUpdater = typename PHARE::core::IonUpdater<Ions, Electromag, GridLayout>;
-    using Boxing_t   = PHARE::core::UpdaterSelectionBoxing<IonUpdater, GridLayout>;
+    using IonUpdater = PHARE::core::IonUpdater<Ions>;
+    using Boxing_t   = PHARE::core::UpdaterSelectionBoxing<GridLayout, ParticleArray>;
 
 
     double dt{0.01};
@@ -529,7 +529,7 @@ struct IonUpdaterTest : public ::testing::Test
 
     void fillIonsMomentsGhosts()
     {
-        using Interpolator = typename IonUpdater::Interpolator;
+        using Interpolator = IonUpdater::Interpolator_t;
         Interpolator interpolate;
 
         for (auto& pop : this->ions)
@@ -664,13 +664,6 @@ TYPED_TEST_SUITE(IonUpdaterTest, DimInterps, );
 
 
 
-TYPED_TEST(IonUpdaterTest, ionUpdaterTakesPusherParamsFromPHAREDictAtConstruction)
-{
-    typename IonUpdaterTest<TypeParam>::IonUpdater ionUpdater{
-        init_dict["simulation"]["algo"]["ion_updater"]};
-}
-
-
 // the following 3 tests are testing the fixture is well configured.
 
 
@@ -748,8 +741,8 @@ TYPED_TEST(IonUpdaterTest, particlesUntouchedInMomentOnlyMode)
 
     IonsBuffers ionsBufferCpy{this->ionsBuffers, this->layout};
 
-    ionUpdater.updatePopulations(this->ions, this->EM, this->boxing, this->dt,
-                                 UpdaterMode::domain_only);
+    ionUpdater.updatePopulations(UpdaterMode::domain_only, this->ions, this->EM, this->boxing,
+                                 this->dt);
 
     this->fillIonsMomentsGhosts();
 
@@ -819,7 +812,7 @@ TYPED_TEST(IonUpdaterTest, momentsAreChangedInParticlesAndMomentsMode)
 
     IonsBuffers ionsBufferCpy{this->ionsBuffers, this->layout};
 
-    ionUpdater.updatePopulations(this->ions, this->EM, this->boxing, this->dt, UpdaterMode::all);
+    ionUpdater.updatePopulations(UpdaterMode::all, this->ions, this->EM, this->boxing, this->dt);
 
     this->fillIonsMomentsGhosts();
 
@@ -839,8 +832,8 @@ TYPED_TEST(IonUpdaterTest, momentsAreChangedInMomentsOnlyMode)
 
     IonsBuffers ionsBufferCpy{this->ionsBuffers, this->layout};
 
-    ionUpdater.updatePopulations(this->ions, this->EM, this->boxing, this->dt,
-                                 UpdaterMode::domain_only);
+    ionUpdater.updatePopulations(UpdaterMode::domain_only, this->ions, this->EM, this->boxing,
+                                 this->dt);
 
     this->fillIonsMomentsGhosts();
 
@@ -857,8 +850,8 @@ TYPED_TEST(IonUpdaterTest, thatNoNaNsExistOnPhysicalNodesMoments)
     typename IonUpdaterTest<TypeParam>::IonUpdater ionUpdater{
         init_dict["simulation"]["algo"]["ion_updater"]};
 
-    ionUpdater.updatePopulations(this->ions, this->EM, this->boxing, this->dt,
-                                 UpdaterMode::domain_only);
+    ionUpdater.updatePopulations(UpdaterMode::domain_only, this->ions, this->EM, this->boxing,
+                                 this->dt);
 
     this->fillIonsMomentsGhosts();
 
