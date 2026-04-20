@@ -2,9 +2,6 @@
 #define PHARE_CORE_UTILITIES_BOX_BOX_SPAN_HPP
 
 
-// #include "core/def.hpp"
-// #include "core/logger.hpp"
-// #include "core/utilities/span.hpp"
 #include "core/utilities/box/box.hpp"
 
 #include <cstddef>
@@ -101,6 +98,7 @@ public:
     BoxSpans_t begin() const { return {box, slab_idx, span_begin()}; }
     BoxSpans_t end() { return {box, slab_idx, span_end()}; }
     BoxSpans_t end() const { return {box, slab_idx, span_end()}; }
+
 
     auto& operator*() { return *this; }
     auto& operator*() const { return *this; }
