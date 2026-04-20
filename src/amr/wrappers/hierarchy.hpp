@@ -8,11 +8,10 @@
 #include "core/utilities/mpi_utils.hpp"
 #include "core/utilities/meta/meta_utilities.hpp"
 
-#include "initializer/data_provider.hpp"
-
 #include "amr/samrai.hpp"
 #include "amr/amr_constants.hpp"
 
+#include "initializer/data_provider.hpp"
 
 #include <SAMRAI/algs/TimeRefinementIntegrator.h>
 #include <SAMRAI/geom/CartesianGridGeometry.h>
@@ -131,6 +130,12 @@ public:
         return path + "/" + core::to_string_fixed_width(timestamp, precision, width);
     }
 
+    std::string modelForLevel(int const level) const
+    {
+        assert(level < static_cast<int>(modelPerLevel_.size()));
+        return modelPerLevel_[level];
+    }
+
 protected:
     template<std::size_t dimension>
     Hierarchy(initializer::PHAREDict const& dict,
@@ -144,6 +149,7 @@ private:
     std::vector<double> const cellWidth_;
     std::vector<int> const domainBox_;
     std::vector<std::string> boundaryConditions_;
+    std::vector<std::string> modelPerLevel_;
     std::size_t maxLevel_ = 0;
 };
 
@@ -252,6 +258,9 @@ Hierarchy::Hierarchy(initializer::PHAREDict const& dict,
     if (maxLevel_ > MAX_LEVEL_IDX)
         throw std::runtime_error("Invalid max_nbr_levels, must be <= "
                                  + std::to_string(MAX_LEVEL_IDX + 1));
+
+    for (int i = 0; i < getMaxNumberOfLevels(); ++i)
+        modelPerLevel_.emplace_back("Hybrid");
 }
 
 

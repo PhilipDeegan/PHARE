@@ -50,7 +50,7 @@ private:
     using Faraday_t    = ModelViews_t::Faraday_t;
     using Ampere_t     = ModelViews_t::Ampere_t;
     using Ohm_t        = ModelViews_t::Ohm_t;
-    using IonUpdater_t = PHARE::core::IonUpdater<Ions, Electromag, GridLayout>;
+    using IonUpdater_t = PHARE::core::IonUpdater<Ions>;
 
     Electromag electromagPred_{"EMPred"};
     Electromag electromagAvg_{"EMAvg"};
@@ -198,7 +198,7 @@ private:
     }
 
 
-    using Boxing_t = core::UpdaterSelectionBoxing<IonUpdater_t, GridLayout>;
+    using Boxing_t = core::UpdaterSelectionBoxing<GridLayout, ParticleArray>;
     std::unordered_map<int /*level*/, std::unordered_map<std::string /*patchid*/, Boxing_t>> boxing;
 
 
@@ -286,24 +286,22 @@ void SolverPPC<HybridModel, AMR_Types>::accumulateFluxSum(IPhysicalModel_t& mode
     PHARE_LOG_SCOPE(1, "SolverPPC::accumulateFluxSum");
 
     auto& hybridModel = dynamic_cast<HybridModel&>(model);
+    auto& Eavg        = electromagAvg_.E;
+    auto& rm          = *hybridModel.resourcesManager;
 
-    for (auto& patch : level)
+    for (auto& patch : rm.enumerate(level, fluxSumE_, Eavg))
     {
-        auto& Eavg         = electromagAvg_.E;
-        auto const& layout = amr::layoutFromPatch<GridLayout>(*patch);
-        auto _             = hybridModel.resourcesManager->setOnPatch(*patch, fluxSumE_, Eavg);
+        auto const&& [Fx, Fy, Fz] = fluxSumE_();
+        auto const&& [Ex, Ey, Ez] = Eavg();
 
-        layout.evalOnGhostBox(fluxSumE_(core::Component::X), [&](auto const&... args) mutable {
-            fluxSumE_(core::Component::X)(args...) += Eavg(core::Component::X)(args...) * coef;
-        });
+        for (std::size_t i = 0; i < Fx.size(); ++i)
+            Fx.data()[i] += Ex.data()[i] * coef;
 
-        layout.evalOnGhostBox(fluxSumE_(core::Component::Y), [&](auto const&... args) mutable {
-            fluxSumE_(core::Component::Y)(args...) += Eavg(core::Component::Y)(args...) * coef;
-        });
+        for (std::size_t i = 0; i < Fy.size(); ++i)
+            Fy.data()[i] += Ey.data()[i] * coef;
 
-        layout.evalOnGhostBox(fluxSumE_(core::Component::Z), [&](auto const&... args) mutable {
-            fluxSumE_(core::Component::Z)(args...) += Eavg(core::Component::Z)(args...) * coef;
-        });
+        for (std::size_t i = 0; i < Fz.size(); ++i)
+            Fz.data()[i] += Ez.data()[i] * coef;
     }
 }
 
@@ -396,6 +394,9 @@ void SolverPPC<HybridModel, AMR_Types>::predictor1_(level_t& level, ModelViews_t
         auto dt = newTime - currentTime;
         faraday_(views.layouts, views.electromag_B, views.electromag_E, views.electromagPred_B, dt);
         setTime([](auto& state) -> auto& { return state.electromagPred.B; });
+    }
+    {
+        PHARE_LOG_SCOPE(1, "SolverPPC::predictor1_.faraday::schedules");
         fromCoarser.fillMagneticGhosts(electromagPred_.B, level, newTime);
     }
 
@@ -403,6 +404,9 @@ void SolverPPC<HybridModel, AMR_Types>::predictor1_(level_t& level, ModelViews_t
         PHARE_LOG_SCOPE(1, "SolverPPC::predictor1_.ampere");
         ampere_(views.layouts, views.electromagPred_B, views.J);
         setTime([](auto& state) -> auto& { return state.J; });
+    }
+    {
+        PHARE_LOG_SCOPE(1, "SolverPPC::predictor1_.ampere::schedules");
         fromCoarser.fillCurrentGhosts(views.model().state.J, level, newTime);
     }
 
@@ -466,7 +470,7 @@ void SolverPPC<HybridModel, AMR_Types>::corrector_(level_t& level, ModelViews_t&
     TimeSetter setTime{views, newTime};
 
     {
-        PHARE_LOG_SCOPE(1, "SolverPPC::corrector_.faraday");
+        PHARE_LOG_SCOPE(3, "SolverPPC::corrector_.faraday");
         auto dt = newTime - currentTime;
         faraday_(views.layouts, views.electromag_B, views.electromagAvg_E, views.electromag_B, dt);
         setTime([](auto& state) -> auto& { return state.electromag.B; });
@@ -474,14 +478,14 @@ void SolverPPC<HybridModel, AMR_Types>::corrector_(level_t& level, ModelViews_t&
     }
 
     {
-        PHARE_LOG_SCOPE(1, "SolverPPC::corrector_.ampere");
+        PHARE_LOG_SCOPE(3, "SolverPPC::corrector_.ampere");
         ampere_(views.layouts, views.electromag_B, views.J);
         setTime([](auto& state) -> auto& { return state.J; });
         fromCoarser.fillCurrentGhosts(views.model().state.J, level, newTime);
     }
 
     {
-        PHARE_LOG_SCOPE(1, "SolverPPC::corrector_.ohm");
+        PHARE_LOG_SCOPE(3, "SolverPPC::corrector_.ohm");
         for (auto& state : views)
             state.electrons.update(state.layout);
         ohm_(views.layouts, views.N, views.Ve, views.Pe, views.electromag_B, views.J,
@@ -498,22 +502,26 @@ template<typename HybridModel, typename AMR_Types>
 void SolverPPC<HybridModel, AMR_Types>::average_(level_t& level, ModelViews_t& views,
                                                  Messenger& fromCoarser, double const newTime)
 {
-    PHARE_LOG_SCOPE(1, "SolverPPC::average_");
-
-    TimeSetter setTime{views, newTime};
-
-    for (auto& state : views)
     {
-        PHARE::core::average(state.electromag.B, state.electromagPred.B, state.electromagAvg.B);
-        PHARE::core::average(state.electromag.E, state.electromagPred.E, state.electromagAvg.E);
-    }
+        PHARE_LOG_SCOPE(1, "SolverPPC::average");
 
-    setTime([](auto& state) -> auto& { return state.electromagAvg.B; });
-    setTime([](auto& state) -> auto& { return state.electromagAvg.E; });
+        TimeSetter setTime{views, newTime};
+
+        for (auto& state : views)
+        {
+            PHARE::core::average(state.electromag.B, state.electromagPred.B, state.electromagAvg.B);
+            PHARE::core::average(state.electromag.E, state.electromagPred.E, state.electromagAvg.E);
+        }
+
+        setTime([](auto& state) -> auto& { return state.electromagAvg.B; });
+        setTime([](auto& state) -> auto& { return state.electromagAvg.E; });
+    }
 
     // the following will fill E on all edges of all ghost cells, including those
     // on domain border. For level ghosts, electric field will be obtained from
     // next coarser level E average
+
+    PHARE_LOG_SCOPE(1, "SolverPPC::average::schedules");
     fromCoarser.fillElectricGhosts(electromagAvg_.E, level, newTime);
 }
 
@@ -548,7 +556,6 @@ void SolverPPC<HybridModel, AMR_Types>::moveIons_(level_t& level, ModelViews_t& 
                                                   Messenger& fromCoarser, double const currentTime,
                                                   double const newTime, core::UpdaterMode mode)
 {
-    PHARE_LOG_SCOPE(1, "SolverPPC::moveIons_");
     PHARE_DEBUG_DO(_debug_log_move_ions(views);)
 
     TimeSetter setTime{views, newTime};
@@ -556,11 +563,12 @@ void SolverPPC<HybridModel, AMR_Types>::moveIons_(level_t& level, ModelViews_t& 
 
     try
     {
+        PHARE_LOG_SCOPE(1, "SolverPPC::moveIons");
         auto dt = newTime - currentTime;
         for (auto& state : views)
             ionUpdater_.updatePopulations(
-                state.ions, state.electromagAvg,
-                levelBoxing.at(amr::to_string(state.patch->getGlobalId())), dt, mode);
+                mode, state.ions, state.electromagAvg,
+                levelBoxing.at(amr::to_string(state.patch->getGlobalId())), dt);
     }
     catch (core::DictionaryException const& ex)
     {
@@ -572,16 +580,31 @@ void SolverPPC<HybridModel, AMR_Types>::moveIons_(level_t& level, ModelViews_t& 
     // this needs to be done before calling the messenger
     setTime([](auto& state) -> auto& { return state.ions; });
 
-    fromCoarser.fillFluxBorders(views.model().state.ions, level, newTime);
-    fromCoarser.fillDensityBorders(views.model().state.ions, level, newTime);
-    fromCoarser.fillIonPopMomentGhosts(views.model().state.ions, level, newTime);
-    fromCoarser.fillIonGhostParticles(views.model().state.ions, level, newTime);
 
+    {
+        PHARE_LOG_SCOPE(1, "SolverPPC::moveIons::fillFluxBorders");
+        fromCoarser.fillFluxBorders(views.model().state.ions, level, newTime);
+    }
+    {
+        PHARE_LOG_SCOPE(1, "SolverPPC::moveIons::fillDensityBorders");
+        fromCoarser.fillDensityBorders(views.model().state.ions, level, newTime);
+    }
+    {
+        PHARE_LOG_SCOPE(1, "SolverPPC::moveIons::fillIonPopMomentGhosts");
+        fromCoarser.fillIonPopMomentGhosts(views.model().state.ions, level, newTime);
+    }
+    if (mode != core::UpdaterMode::domain_only)
+    {
+        PHARE_LOG_SCOPE(1, "SolverPPC::moveIons::fillIonGhostParticles");
+        fromCoarser.fillIonGhostParticles(views.model().state.ions, level, newTime);
+    }
     for (auto& state : views)
         ionUpdater_.updateIons(state.ions);
 
-    fromCoarser.fillIonBorders(views.model().state.ions, level, newTime);
-
+    {
+        PHARE_LOG_SCOPE(1, "SolverPPC::moveIons::fillIonBorders");
+        fromCoarser.fillIonBorders(views.model().state.ions, level, newTime);
+    }
     // no need to update time, since it has been done before
     // now Ni and Vi are calculated we can fill pure ghost nodes
     // these were not completed by the deposition of patch and levelghost particles

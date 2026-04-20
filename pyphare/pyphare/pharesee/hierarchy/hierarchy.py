@@ -34,14 +34,19 @@ class PatchHierarchy(object):
         if not isinstance(patch_levels, (tuple, list)):
             patch_levels = listify(patch_levels)
 
+        self.slice_box = kwargs.get("slice_box", None)
         self.selection_box = kwargs.get("selection_box", None)
-        if self.selection_box is not None:
+        if type(self.selection_box) is dict:
+            ...  # ?
+        elif self.selection_box is not None:
             if not isinstance(self.selection_box, (tuple, list)):
                 self.selection_box = listify(self.selection_box)
             self.selection_box = {
                 format_timestamp(t): box for t, box in zip(times, self.selection_box)
             }
             assert len(times) == len(self.selection_box)
+        if self.selection_box and all(v is None for v in self.selection_box.values()):
+            self.selection_box = None  # weird
 
         assert len(times) == len(patch_levels)
 
@@ -73,9 +78,6 @@ class PatchHierarchy(object):
         no_copy_keys = ["data_files"]  # do not copy these things
         return deep_copy(self, memo, no_copy_keys)
 
-    def __getitem__(self, qty):
-        return self.__dict__[qty]
-
     def update(self):
         if len(self.quantities()) > 1:
             for qty in self.quantities():
@@ -91,6 +93,7 @@ class PatchHierarchy(object):
                             new_lvls,
                             self.domain_box,
                             selection_box=self.domain_box,
+                            slice_box=self.slice_box,
                             times=time,
                             data_files=self.data_files,
                         )
@@ -229,14 +232,15 @@ class PatchHierarchy(object):
             time = self._default_time()
         return list(self.levels(time).keys())
 
-    def add_time(self, time, patch_level, h5file, selection_box=None):
+    def add_time(self, time, patch_level, h5file=None, selection_box=None):
         formated_time = format_timestamp(time)
 
         self.time_hier[format_timestamp(time)] = patch_level
         if selection_box is not None:
             self.selection_box[formated_time] = selection_box
 
-        self.data_files[h5file.filename] = h5file
+        if h5file:
+            self.data_files[h5file.filename] = h5file
         self.update()
 
     def is_homogeneous(self):
@@ -273,7 +277,7 @@ class PatchHierarchy(object):
         first = True
         for ilvl, lvl in self.levels(time).items():
             for patch in lvl.patches:
-                pd = patch.patch_datas[qty]
+                pd = patch[qty]
                 if first:
                     m = np.nanmin(pd.dataset[:])
                     first = False
@@ -288,7 +292,7 @@ class PatchHierarchy(object):
         first = True
         for _, lvl in self.levels(time).items():
             for patch in lvl.patches:
-                pd = patch.patch_datas[qty]
+                pd = patch[qty]
                 if first:
                     m = np.nanmax(pd.dataset[:])
                     first = False
@@ -432,9 +436,11 @@ class PatchHierarchy(object):
                 if qty is None:
                     qty = pdata_names[0]
 
-                nbrGhosts = patch.patch_datas[qty].ghosts_nbr
-                val = patch.patch_datas[qty][patch.box]
-                x = patch.patch_datas[qty].x[nbrGhosts[0] : -nbrGhosts[0]]
+                pd = patch[qty]
+                nbrGhosts = pd.ghosts_nbr
+                any_ghosts = any(nbrGhosts)
+                val = pd[patch.box] if any_ghosts else pd[:]
+                x = pd.x[nbrGhosts[0] : -nbrGhosts[0]] if nbrGhosts[0] > 0 else pd.x
                 label = "L{level}P{patch}".format(level=lvl_nbr, patch=ip)
                 marker = kwargs.get("marker", "")
                 ls = kwargs.get("ls", "--")
@@ -457,6 +463,7 @@ class PatchHierarchy(object):
 
     def plot2d(self, **kwargs):
         from matplotlib.patches import Rectangle
+        from matplotlib.collections import QuadMesh
         from mpl_toolkits.axes_grid1 import make_axes_locatable
 
         time = kwargs.get("time", self._default_time())
@@ -466,6 +473,7 @@ class PatchHierarchy(object):
             default_qty = self.quantities()[0]
         qty = kwargs.get("qty", default_qty)
 
+        gidx = -1
         if "ax" not in kwargs:
             fig, ax = plt.subplots()
         else:
@@ -493,7 +501,8 @@ class PatchHierarchy(object):
             if lvl_nbr not in usr_lvls:
                 continue
             for patch in self.level(lvl_nbr, time).patches:
-                pdat = patch.patch_datas[qty]
+                gidx += 1
+                pdat = patch[qty]
                 data = pdat.dataset[:]
                 nbrGhosts = pdat.ghosts_nbr
                 x = pdat.x
@@ -512,43 +521,133 @@ class PatchHierarchy(object):
                 y -= dy * 0.5
                 x = np.append(x, x[-1] + dx)
                 y = np.append(y, y[-1] + dy)
+
+                update = len(ax.collections) > gidx and isinstance(
+                    ax.collections[gidx], QuadMesh
+                )
+                if update:  # maybe not ideal
+                    im = ax.collections[gidx]
+                    im.set_array(data.T)
+                    im.set_clim(
+                        vmin=kwargs.get("vmin", glob_min - 1e-6),
+                        vmax=kwargs.get("vmax", glob_max + 1e-6),
+                    )
+                    ax.draw_artist(im)
+                else:
+                    im = ax.pcolormesh(
+                        x,
+                        y,
+                        data.T,
+                        cmap=kwargs.get("cmap", "Spectral_r"),
+                        vmin=kwargs.get("vmin", glob_min - 1e-6),
+                        vmax=kwargs.get("vmax", glob_max + 1e-6),
+                    )
+
+                    if kwargs.get("plot_patches", False) is True:
+                        r = Rectangle(
+                            (patch.box.lower[0] * dx, patch.box.lower[1] * dy),
+                            patch.box.shape[0] * dx,
+                            patch.box.shape[1] * dy,
+                            fc="none",
+                            ec=patchcolors[lvl_nbr],
+                            alpha=0.4,
+                            lw=linewidths[lvl_nbr],
+                            ls=linestyles[lvl_nbr],
+                        )
+                        ax.add_patch(r)
+
+                    ax.set_aspect(kwargs.get("aspect", "equal"))
+                    ax.set_title(kwargs.get("title", ""))
+                    ax.set_xlabel(kwargs.get("xlabel", "x"))
+                    ax.set_ylabel(kwargs.get("ylabel", "y"))
+                    if "xlim" in kwargs:
+                        ax.set_xlim(kwargs["xlim"])
+                    if "ylim" in kwargs:
+                        ax.set_ylim(kwargs["ylim"])
+
+                    divider = make_axes_locatable(ax)
+                    cax = divider.append_axes("right", size="5%", pad=0.08)
+
+                    plt.colorbar(im, ax=ax, cax=cax)
+
+                    if kwargs.get("legend", None) is not None:
+                        ax.legend()
+
+        if "filename" in kwargs:
+            fig.savefig(kwargs["filename"], dpi=kwargs.get("dpi", 200))
+
+        return fig, ax
+
+    def plot2d_slice(self, **kwargs):
+        from mpl_toolkits.axes_grid1 import make_axes_locatable
+
+        slice_lo, slice_up = self.slice_box
+        # find the dimension that is "thin" (lo == hi in primal coords)
+        slice_dim = next(
+            i for i, (lo, hi) in enumerate(zip(slice_lo, slice_up)) if lo == hi
+        )
+        plot_dims = [i for i in range(3) if i != slice_dim]
+
+        time = kwargs.get("time", self._default_time())
+        usr_lvls = kwargs.get("levels", self.levelNbrs(time))
+        default_qty = None
+        if len(self.quantities()) == 1:
+            default_qty = self.quantities()[0]
+        qty = kwargs.get("qty", default_qty)
+
+        if "ax" not in kwargs:
+            fig, ax = plt.subplots()
+        else:
+            ax = kwargs["ax"]
+            fig = ax.figure
+
+        glob_min = self.global_min(qty)
+        glob_max = self.global_max(qty)
+        dim_names = ["x", "y", "z"]
+        im = None
+
+        for lvl_nbr in usr_lvls:
+            if lvl_nbr not in self.levels(time):
+                continue
+            for patch in self.level(lvl_nbr, time).patches:
+                pdat = patch[qty]
+                data_3d = pdat.dataset[:]  # shape (nx, ny, nz) in Fortran order
+                # take index 0 along the thin dimension to get a 2D array
+                data_2d = np.take(data_3d, 0, axis=slice_dim)
+
+                dl = pdat.layout.dl
+                origin = pdat.layout.origin
+                d0 = dl[plot_dims[0]]
+                d1 = dl[plot_dims[1]]
+                o0 = origin[plot_dims[0]]
+                o1 = origin[plot_dims[1]]
+                n0, n1 = data_2d.shape
+                # shift by -0.5*dl so primal nodes become pixel centres in pcolormesh
+                coords0 = o0 - 0.5 * d0 + d0 * np.arange(n0 + 1)
+                coords1 = o1 - 0.5 * d1 + d1 * np.arange(n1 + 1)
+
                 im = ax.pcolormesh(
-                    x,
-                    y,
-                    data.T,
+                    coords0,
+                    coords1,
+                    data_2d.T,
                     cmap=kwargs.get("cmap", "Spectral_r"),
                     vmin=kwargs.get("vmin", glob_min - 1e-6),
                     vmax=kwargs.get("vmax", glob_max + 1e-6),
                 )
 
-                if kwargs.get("plot_patches", False) is True:
-                    r = Rectangle(
-                        (patch.box.lower[0] * dx, patch.box.lower[1] * dy),
-                        patch.box.shape[0] * dx,
-                        patch.box.shape[1] * dy,
-                        fc="none",
-                        ec=patchcolors[lvl_nbr],
-                        alpha=0.4,
-                        lw=linewidths[lvl_nbr],
-                        ls=linestyles[lvl_nbr],
-                    )
-                    ax.add_patch(r)
-
         ax.set_aspect(kwargs.get("aspect", "equal"))
         ax.set_title(kwargs.get("title", ""))
-        ax.set_xlabel(kwargs.get("xlabel", "x"))
-        ax.set_ylabel(kwargs.get("ylabel", "y"))
+        ax.set_xlabel(kwargs.get("xlabel", dim_names[plot_dims[0]]))
+        ax.set_ylabel(kwargs.get("ylabel", dim_names[plot_dims[1]]))
         if "xlim" in kwargs:
             ax.set_xlim(kwargs["xlim"])
         if "ylim" in kwargs:
             ax.set_ylim(kwargs["ylim"])
 
-        divider = make_axes_locatable(ax)
-        cax = divider.append_axes("right", size="5%", pad=0.08)
-        plt.colorbar(im, ax=ax, cax=cax)
-
-        if kwargs.get("legend", None) is not None:
-            ax.legend()
+        if im is not None:
+            divider = make_axes_locatable(ax)
+            cax = divider.append_axes("right", size="5%", pad=0.08)
+            plt.colorbar(im, ax=ax, cax=cax)
 
         if "filename" in kwargs:
             fig.savefig(kwargs["filename"], dpi=kwargs.get("dpi", 200))
@@ -560,6 +659,10 @@ class PatchHierarchy(object):
             return self.plot1d(**kwargs)
         elif self.ndim == 2:
             return self.plot2d(**kwargs)
+        elif self.ndim == 3:
+            if self.slice_box is not None:
+                return self.plot2d_slice(**kwargs)
+            raise RuntimeError("There is no 3d plot available, consider using paraview")
 
     def dist_plot(self, **kwargs):
         """

@@ -12,6 +12,7 @@
 #include <vector>
 #include <cassert>
 #include <cstdint>
+#include <cassert>
 #include <iomanip>
 #include <numeric>
 #include <sstream>
@@ -29,7 +30,8 @@ namespace core
 {
     enum class Basis { Magnetic, Cartesian };
 
-
+    template<typename T>
+    static constexpr auto dependent_false_v = false;
 
 
     template<typename T>
@@ -278,6 +280,31 @@ NO_DISCARD auto sum_from(Container&& container, F fn)
 
 
 
+template<std::size_t Idx, typename F>
+NO_DISCARD auto constexpr generate_array__(F& f, auto const& arr)
+{
+    return f(arr[Idx]);
+}
+
+template<typename F, std::size_t... Is>
+NO_DISCARD auto constexpr generate_array_(F& f, auto const& arr,
+                                          std::integer_sequence<std::size_t, Is...>)
+{
+    return std::array{generate_array__<Is>(f, arr)...};
+}
+
+template<typename F, typename Type, std::size_t Size>
+NO_DISCARD auto constexpr generate(F&& f, std::array<Type, Size> const& arr)
+{
+    return generate_array_(f, arr, std::make_integer_sequence<std::size_t, Size>{});
+}
+template<typename F, typename Type, std::size_t Size>
+NO_DISCARD auto constexpr generate(F&& f, std::array<Type, Size>& arr)
+{
+    return generate_array_(f, arr, std::make_integer_sequence<std::size_t, Size>{});
+}
+
+
 template<typename F>
 NO_DISCARD auto generate(F&& f, std::size_t from, std::size_t to)
 {
@@ -300,9 +327,9 @@ NO_DISCARD auto generate(F&& f, std::size_t count)
 
 
 template<typename F, typename Container>
-NO_DISCARD auto generate(F&& f, Container const& container)
+NO_DISCARD auto generate(F&& f, Container&& container)
 {
-    using T          = typename Container::value_type;
+    using T          = typename std::decay_t<Container>::value_type;
     using value_type = std::decay_t<std::invoke_result_t<F&, T&>>;
     std::vector<value_type> v1;
     if (container.size() > 0)
@@ -318,24 +345,6 @@ NO_DISCARD auto generate(F&& f, std::vector<T>&& v)
     return generate(std::forward<F>(f), v);
 }
 
-template<std::size_t Idx, typename F, typename Type, std::size_t Size>
-NO_DISCARD auto constexpr generate_array__(F& f, std::array<Type, Size> const& arr)
-{
-    return f(arr[Idx]);
-}
-
-template<typename Type, std::size_t Size, typename F, std::size_t... Is>
-NO_DISCARD auto constexpr generate_array_(F& f, std::array<Type, Size> const& arr,
-                                          std::integer_sequence<std::size_t, Is...>)
-{
-    return std::array{generate_array__<Is>(f, arr)...};
-}
-
-template<typename F, typename Type, std::size_t Size>
-NO_DISCARD auto constexpr generate(F&& f, std::array<Type, Size> const& arr)
-{
-    return generate_array_(f, arr, std::make_integer_sequence<std::size_t, Size>{});
-}
 
 template<typename T>
 auto constexpr all_are(auto&&... ts)
@@ -567,6 +576,21 @@ struct SetMax
     void operator()(auto& d0) { d = std::max(d, d0); }
     D& d;
 };
+
+
+
+template<typename T0, typename T1, std::size_t... Is>
+bool _array_equals(T0 const& a, T1 const& b, std::index_sequence<Is...> const&&)
+{
+    return (... && (a[Is] == b[Is]));
+}
+
+template<typename T, std::size_t S>
+bool array_equals(std::array<T, S> const& a, std::array<T, S> const& b)
+{
+    return _array_equals(a, b, std::make_index_sequence<S>{});
+}
+
 
 } // namespace PHARE::core
 
