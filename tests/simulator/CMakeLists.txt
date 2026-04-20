@@ -37,7 +37,9 @@ if(HighFive)
     phare_python3_exec(11 test_diagnostic_timestamps test_diagnostic_timestamps.py ${CMAKE_CURRENT_BINARY_DIR})
   endif(testMPI)
 
-
+  if(withMkn)
+    phare_python3_exec(9   layouts     test_layouts.py     ${CMAKE_CURRENT_BINARY_DIR}) # serial or n = 2
+  endif(withMkn)
 endif()
 
 configure_file(${CMAKE_CURRENT_SOURCE_DIR}/config.py ${CMAKE_CURRENT_BINARY_DIR}/config.py @ONLY)

@@ -2,11 +2,15 @@
 
 
 #include "core/def.hpp"
-#include "core/def/phare_config.hpp"
+#include "core/def/phare_config.hpp" // IWYU pragma: keep
 #include "core/data/particles/particle_array.hpp"
+#include "core/data/particles/particle_array_def.hpp"
 
 #include "amr/samrai.hpp"             // SamraiLifeCycle without simulators
 #include "amr/wrappers/hierarchy.hpp" // for HierarchyRestarter::getRestartFileFullPath
+
+
+#include "cpp_simulator.hpp"
 
 #include "python3/pybind_def.hpp"
 #include "python3/patch_data.hpp"
@@ -19,56 +23,35 @@
 
 
 #include <pybind11/stl_bind.h>
+#include <pybind11/native_enum.h>
+
 
 namespace py = pybind11;
 
 namespace PHARE::pydata
 {
 
-template<std::size_t dim>
-void declareParticles(py::module& m)
-{
-    using Particle   = core::Particle<dim>;
-    std::string name = "Particle_" + std::to_string(dim) + "D";
-    py::class_<Particle, std::shared_ptr<Particle>>(m, name.c_str())
-        .def_readonly("iCell", &Particle::iCell)
-        .def_readonly("delta", &Particle::delta)
-        .def_readonly("v", &Particle::v);
 
-    using ParticleArray = core::ParticleArray<dim>;
-    name                = "ParticleArray_" + std::to_string(dim) + "D";
-    py::class_<ParticleArray, std::shared_ptr<ParticleArray>>(m, name.c_str())
-        .def("size", &ParticleArray::size)
-        .def("__getitem__",
-             [](ParticleArray& self, std::size_t const idx) -> auto& { return self[idx]; });
-}
-
-
-template<typename Type, std::size_t dimension>
-void declarePatchData(py::module& m, std::string key)
-{
-    using PatchDataType = PatchData<Type, dimension>;
-    py::class_<PatchDataType>(m, key.c_str())
-        .def_readonly("patchID", &PatchDataType::patchID)
-        .def_readonly("origin", &PatchDataType::origin)
-        .def_readonly("lower", &PatchDataType::lower)
-        .def_readonly("upper", &PatchDataType::upper)
-        .def_readonly("nGhosts", &PatchDataType::nGhosts)
-        .def_readonly("data", &PatchDataType::data);
-}
 
 template<std::size_t dim>
 void declareDim(py::module& m)
 {
-    using CP         = core::ContiguousParticles<dim>;
-    std::string name = "ContiguousParticles_" + std::to_string(dim);
-    py::class_<CP, std::shared_ptr<CP>>(m, name.c_str())
+    using Particle   = core::Particle<dim>;
+    std::string name = "Particle_" + std::to_string(dim);
+    py::class_<Particle, std::shared_ptr<Particle>>(m, name.c_str())
+        .def_readonly("iCell", &Particle::iCell_)
+        .def_readonly("delta", &Particle::delta_)
+        .def_readonly("v", &Particle::v_);
+
+    using CP = core::SoAParticleArray<dim>;
+    name     = "ParticleArray_SOA_" + std::to_string(dim);
+    py::class_<CP, py::smart_holder>(m, name.c_str())
         .def(py::init<std::size_t>())
-        .def_readwrite("iCell", &CP::iCell)
-        .def_readwrite("delta", &CP::delta)
-        .def_readwrite("weight", &CP::weight)
-        .def_readwrite("charge", &CP::charge)
-        .def_readwrite("v", &CP::v)
+        .def_readwrite("iCell", &CP::iCell_)
+        .def_readwrite("delta", &CP::delta_)
+        .def_readwrite("weight", &CP::weight_)
+        .def_readwrite("charge", &CP::charge_)
+        .def_readwrite("v", &CP::v_)
         .def("size", &CP::size);
 
     name = "PatchData" + name;
@@ -93,12 +76,22 @@ auto samrai_version()
     return ss.str();
 }
 
-PYBIND11_MODULE(cpp_etc, m)
+auto constexpr supported_layouts()
+{
+    using enum core::LayoutMode;
+    std::vector layouts{AoSMapped};
+    PHARE_WITH_MKN_GPU(layouts.emplace_back(AoSTS));
+    return layouts;
+}
+
+PYBIND11_MODULE(cpp_etc, m, py::mod_gil_not_used())
 {
     auto samrai_restart_file = [](std::string path) {
         return PHARE::amr::HierarchyRestarter::getRestartFileFullPath(path);
     };
+
     py::class_<core::Span<double>, py::smart_holder>(m, "Span");
+    m.def("makeSpan", makePySpan<double>);
     py::class_<PyArrayWrapper<double>, py::smart_holder, core::Span<double>>(m, "PyWrapper");
 
 
@@ -151,26 +144,23 @@ PYBIND11_MODULE(cpp_etc, m)
         throw std::runtime_error("PHARE not built with highfive support");
     });
 
+    using enum core::LayoutMode;
+    py::native_enum<core::LayoutMode>(m, "LayoutMode", "enum.Enum")
+        .value("AoSMapped", AoSMapped)
+        .value("AoSTS", AoSTS)
+        .export_values()
+        .finalize();
+
+
+    m.def("supported_layouts", supported_layouts);
 
     declareDim<1>(m);
     declareDim<2>(m);
     declareDim<3>(m);
 
-    declarePatchData<py_array_t<double>, 1>(m, "PatchPyArrayDouble_1D");
-    declarePatchData<py_array_t<double>, 2>(m, "PatchPyArrayDouble_2D");
-    declarePatchData<py_array_t<double>, 3>(m, "PatchPyArrayDouble_3D");
-
-    declareParticles<1>(m);
-    declareParticles<2>(m);
-    declareParticles<3>(m);
-
-    declarePatchData<core::ParticleArray<1>, 1>(m, "PatchDataParticleArray_1D");
-    declarePatchData<core::ParticleArray<2>, 2>(m, "PatchDataParticleArray_2D");
-    declarePatchData<core::ParticleArray<3>, 3>(m, "PatchDataParticleArray_3D");
-
-    declarePatchData<core::ParticleArray<1>*, 1>(m, "PatchDataParticleArrayPtr_1D");
-    declarePatchData<core::ParticleArray<2>*, 2>(m, "PatchDataParticleArrayPtr_2D");
-    declarePatchData<core::ParticleArray<3>*, 3>(m, "PatchDataParticleArrayPtr_3D");
+    // declarePatchData<py_array_t<double>, 1>(m, "PatchPyArrayDouble_1D");
+    // declarePatchData<py_array_t<double>, 2>(m, "PatchPyArrayDouble_2D");
+    // declarePatchData<py_array_t<double>, 3>(m, "PatchPyArrayDouble_3D");
 }
 
 } // namespace PHARE::pydata

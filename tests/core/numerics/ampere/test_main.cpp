@@ -23,8 +23,6 @@
 
 using namespace PHARE::core;
 
-
-
 struct GridLayoutMock1D
 {
     static auto const dimension = 1u;
@@ -125,9 +123,10 @@ class Ampere1DTest : public ::testing::Test
 protected:
     static constexpr std::size_t dim          = 1;
     static constexpr std::size_t interp_order = 1;
-    using UsableVecFieldND                    = UsableVecField<dim>;
     using GridLayoutImpl                      = GridLayoutImplYee<dim, interp_order>;
-    GridLayout<GridLayoutImpl> layout;
+    using GridLayout_t                        = GridLayout<GridLayoutImpl>;
+    using UsableVecFieldND                    = UsableVecField<GridLayout_t>;
+    GridLayout_t layout;
 
     UsableVecFieldND B, J;
 
@@ -148,9 +147,10 @@ class Ampere2DTest : public ::testing::Test
 protected:
     static constexpr std::size_t dim          = 2;
     static constexpr std::size_t interp_order = 1;
-    using UsableVecFieldND                    = UsableVecField<dim>;
     using GridLayoutImpl                      = GridLayoutImplYee<dim, interp_order>;
-    GridLayout<GridLayoutImpl> layout;
+    using GridLayout_t                        = GridLayout<GridLayoutImpl>;
+    using UsableVecFieldND                    = UsableVecField<GridLayout_t>;
+    GridLayout_t layout;
 
     UsableVecFieldND B, J;
 
@@ -171,9 +171,10 @@ class Ampere3DTest : public ::testing::Test
 protected:
     static constexpr std::size_t dim          = 3;
     static constexpr std::size_t interp_order = 1;
-    using UsableVecFieldND                    = UsableVecField<dim>;
     using GridLayoutImpl                      = GridLayoutImplYee<dim, interp_order>;
-    GridLayout<GridLayoutImpl> layout;
+    using GridLayout_t                        = GridLayout<GridLayoutImpl>;
+    using UsableVecFieldND                    = UsableVecField<GridLayout_t>;
+    GridLayout_t layout;
 
     UsableVecFieldND B, J;
 
@@ -200,7 +201,7 @@ TEST_F(Ampere1DTest, ampere1DCalculatedOk)
     std::uint32_t gsi_d_X = this->layout.ghostStartIndex(QtyCentering::dual, Direction::X);
     std::uint32_t gei_d_X = this->layout.ghostEndIndex(QtyCentering::dual, Direction::X);
 
-    auto const& [Bx, By, Bz] = B();
+    auto& [Bx, By, Bz]       = B();
     auto const& [Jx, Jy, Jz] = J();
 
     for (std::uint32_t ix = gsi_d_X; ix <= gei_d_X; ++ix)
@@ -243,7 +244,7 @@ TEST_F(Ampere2DTest, ampere2DCalculatedOk)
     std::uint32_t gsi_d_Y = this->layout.ghostStartIndex(QtyCentering::dual, Direction::Y);
     std::uint32_t gei_d_Y = this->layout.ghostEndIndex(QtyCentering::dual, Direction::Y);
 
-    auto const& [Bx, By, Bz] = B();
+    auto& [Bx, By, Bz]       = B();
     auto const& [Jx, Jy, Jz] = J();
 
     for (std::uint32_t ix = gsi_p_X; ix <= gei_p_X; ++ix)
@@ -346,7 +347,7 @@ TEST_F(Ampere3DTest, ampere3DCalculatedOk)
     std::uint32_t gsi_d_Z = this->layout.ghostStartIndex(QtyCentering::dual, Direction::Z);
     std::uint32_t gei_d_Z = this->layout.ghostEndIndex(QtyCentering::dual, Direction::Z);
 
-    auto const& [Bx, By, Bz] = B();
+    auto& [Bx, By, Bz]       = B();
     auto const& [Jx, Jy, Jz] = J();
 
     for (std::uint32_t ix = gsi_p_X; ix <= gei_p_X; ++ix)
