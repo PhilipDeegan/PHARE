@@ -117,12 +117,30 @@ void ParticlesRefiner<AoSTS, CPU>::operator()(Src const& src, Dst& dst, Box_t co
         }
         else if constexpr (type == core::ParticleType::Ghost)
         {
-            for (auto& dst_tile : dst()) // only on dst patch borders
-                if (auto const growbox = grow(dst_tile, ghost_nbr);
-                    *(dst.box() * growbox) != growbox)
-                    if (auto const overlap = box * growbox)
+            // old
+            // for (auto& dst_tile : dst()) // only on dst patch borders
+            //    if (auto const growbox = grow(dst_tile, ghost_nbr);
+            //        *(dst.box() * growbox) != growbox)
+            //        if (auto const overlap = box * growbox)
+
+
+            for (auto& dst_tile : dst())
+            {
+                // Only grow in patch-boundary directions to avoid double-counting ghost
+                // cells near tile boundaries in 2D/3D (adjacent tiles share grow overlap).
+                auto excl_box = grow(dst_tile, ghost_nbr);
+                for (std::size_t d = 0; d < Src::dimension; ++d)
+                {
+                    if (dst_tile.lower[d] != dstBox.lower[d])
+                        excl_box.lower[d] = dst_tile.lower[d];
+                    if (dst_tile.upper[d] != dstBox.upper[d])
+                        excl_box.upper[d] = dst_tile.upper[d];
+                }
+                if (*(dst.box() * excl_box) != excl_box)
+                    if (auto const overlap = box * excl_box)
                         ParticlesRefiner<AoS, CPU>{}.template operator()<type>(
                             src_tile(), dst_tile(), *overlap, fn0, fn1);
+            }
         }
         else
         {

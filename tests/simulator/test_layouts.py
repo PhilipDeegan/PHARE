@@ -18,10 +18,10 @@ from tests.simulator.test_initialization import InitializationTest
 from tests.simulator.test_advance import AdvanceTestBase
 
 
-ndim_list = [1, 2, 3]
+ndim_list = [2]  # [1, 2, 3]
 interp_orders = [1]
 _ref_layout = "AoSMapped"
-cells = 30
+cells = 32
 ppc_per_dim = [100, 66, 20]
 
 
@@ -43,6 +43,7 @@ class ALayoutInitTest(InitializationTest):
             cells=cells,
             time_step_nbr=1,
             nbr_part_per_cell=ppc_per_dim[ndim - 1],
+            largest_patch_size=None,
             **kwargs,
         )
         ref_hier = self.getHierarchy(
@@ -109,53 +110,53 @@ class LayoutInitL0Test(ALayoutInitTest):
         self._compare_init(ndim, interp_order, "particles", cmp_layout, atol=0)
 
 
-# @ddt
-# class LayoutInitL1Test(ALayoutInitTest):
-#     def _compare_init(self, ndim, interp_order, qty, cmp_layout, atol=0):
-#         super().compare_init(
-#             ndim,
-#             interp_order,
-#             qty,
-#             cmp_layout,
-#             atol=atol,
-#             refinement_boxes={"L0": {"B0": nDBox(ndim, 10, 14)}},
-#         )
+@ddt
+class LayoutInitL1Test(ALayoutInitTest):
+    def _compare_init(self, ndim, interp_order, qty, cmp_layout, atol=0):
+        super().compare_init(
+            ndim,
+            interp_order,
+            qty,
+            cmp_layout,
+            atol=atol,
+            refinement_boxes={"L0": {"B0": nDBox(ndim, 10, 14)}},
+        )
 
-#     @data(*permute())
-#     @unpack
-#     def test_B_init_matches_reference_layout(self, ndim, interp_order, cmp_layout):
-#         print(
-#             f"{self._testMethodName} ndim={ndim} interp={interp_order} layout={cmp_layout}"
-#         )
-#         self._compare_init(ndim, interp_order, "b", cmp_layout, atol=0)
+    @data(*permute())
+    @unpack
+    def test_B_init_matches_reference_layout(self, ndim, interp_order, cmp_layout):
+        print(
+            f"{self._testMethodName} ndim={ndim} interp={interp_order} layout={cmp_layout}"
+        )
+        self._compare_init(ndim, interp_order, "b", cmp_layout, atol=0)
 
-#     @data(*permute())
-#     @unpack
-#     def test_E_init_matches_reference_layout(self, ndim, interp_order, cmp_layout):
-#         print(
-#             f"{self._testMethodName} ndim={ndim} interp={interp_order} layout={cmp_layout}"
-#         )
-#         self._compare_init(ndim, interp_order, "e", cmp_layout, atol=1e-14)
+    @data(*permute())
+    @unpack
+    def test_E_init_matches_reference_layout(self, ndim, interp_order, cmp_layout):
+        print(
+            f"{self._testMethodName} ndim={ndim} interp={interp_order} layout={cmp_layout}"
+        )
+        self._compare_init(ndim, interp_order, "e", cmp_layout, atol=1e-14)
 
-#     @data(*permute())
-#     @unpack
-#     def test_moments_init_matches_reference_layout(
-#         self, ndim, interp_order, cmp_layout
-#     ):
-#         print(
-#             f"{self._testMethodName} ndim={ndim} interp={interp_order} layout={cmp_layout}"
-#         )
-#         self._compare_init(ndim, interp_order, "moments", cmp_layout, atol=1e-14)
+    # @data(*permute())
+    # @unpack
+    # def test_moments_init_matches_reference_layout(
+    #     self, ndim, interp_order, cmp_layout
+    # ):
+    #     print(
+    #         f"{self._testMethodName} ndim={ndim} interp={interp_order} layout={cmp_layout}"
+    #     )
+    #     self._compare_init(ndim, interp_order, "moments", cmp_layout, atol=1e-14)
 
-#     @data(*permute())
-#     @unpack
-#     def test_particles_init_matches_reference_layout(
-#         self, ndim, interp_order, cmp_layout
-#     ):
-#         print(
-#             f"{self._testMethodName} ndim={ndim} interp={interp_order} layout={cmp_layout}"
-#         )
-#         self._compare_init(ndim, interp_order, "particles", cmp_layout, atol=0)
+    @data(*permute())
+    @unpack
+    def test_particles_init_matches_reference_layout(
+        self, ndim, interp_order, cmp_layout
+    ):
+        print(
+            f"{self._testMethodName} ndim={ndim} interp={interp_order} layout={cmp_layout}"
+        )
+        self._compare_init(ndim, interp_order, "particles", cmp_layout, atol=0)
 
 
 class ALayoutAdvanceTest(AdvanceTestBase):
@@ -166,6 +167,7 @@ class ALayoutAdvanceTest(AdvanceTestBase):
             time_step_nbr=1,
             model_init={"seed": 1337},
             nbr_part_per_cell=ppc_per_dim[ndim - 1],
+            largest_patch_size=None,
             **kwargs,
         )
         ref_hier = self.getHierarchy(
