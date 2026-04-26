@@ -43,21 +43,12 @@ public:
 protected:
     auto getField(auto& field)
     {
-        std::vector<PatchData<py_array_t<double>, dimension>> patchDatas;
-        auto visit = [&](auto& grid, auto patchID, auto /*ilvl*/) {
-            setPyPatchDataFromField(patchDatas.emplace_back(), field, grid, patchID);
-        };
-        amr::visitLevel<GridLayout>(*hierarchy.getPatchLevel(lvl), rm, visit, field);
-        return patchDatas;
+        return getPatchDatasForLevel<GridLayout>(hierarchy, model, lvl, field);
     }
     auto getVecFieldComponent(auto& vecfield, auto const component)
     {
-        std::vector<PatchData<py_array_t<double>, dimension>> patchDatas;
-        auto visit = [&](auto& grid, auto patchID, auto /*ilvl*/) {
-            setPyPatchDataFromField(patchDatas.emplace_back(), vecfield(component), grid, patchID);
-        };
-        amr::visitLevel<GridLayout>(*hierarchy.getPatchLevel(lvl), rm, visit, vecfield);
-        return patchDatas;
+        return getPatchDatasForLevel<GridLayout>(hierarchy, model, lvl, vecfield,
+                                                 [=](auto& vf) -> auto& { return vf(component); });
     }
 
     auto static vecfield_component(std::string const& component)
@@ -74,8 +65,9 @@ protected:
 
 
 template<typename Model>
-class __attribute__((visibility("hidden")))
-PatchLevel<Model, std::enable_if_t<solver::is_hybrid_model_v<Model>>> : AnyPatchLevel<Model>
+class __attribute__((
+    visibility("hidden"))) PatchLevel<Model, std::enable_if_t<solver::is_hybrid_model_v<Model>>>
+    : AnyPatchLevel<Model>
 {
     using Super = AnyPatchLevel<Model>;
 
@@ -130,7 +122,8 @@ public:
 
     auto getParticles(std::string const& popName)
     {
-        std::vector<PatchData<core::ParticleArray<dimension>*, dimension>> patchDatas;
+        using ParticleArray_t = Model_t::particle_array_type;
+        std::vector<PatchData<ParticleArray_t*, dimension>> patchDatas;
 
         auto& pop = getIonPop(popName);
 
@@ -147,8 +140,9 @@ public:
 
 
 template<typename Model>
-class __attribute__((visibility("hidden")))
-PatchLevel<Model, std::enable_if_t<solver::is_mhd_model_v<Model>>> : AnyPatchLevel<Model>
+class __attribute__((
+    visibility("hidden"))) PatchLevel<Model, std::enable_if_t<solver::is_mhd_model_v<Model>>>
+    : AnyPatchLevel<Model>
 {
     using Super = AnyPatchLevel<Model>;
 

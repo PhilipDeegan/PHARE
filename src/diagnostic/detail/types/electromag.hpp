@@ -50,6 +50,9 @@ public:
         DiagnosticProperties&, Attributes&,
         std::unordered_map<std::size_t, std::vector<std::pair<std::string, Attributes>>>&,
         std::size_t maxLevel) override;
+
+private:
+    // using Super::vec_field_reducer;
 };
 
 
@@ -68,10 +71,12 @@ void ElectromagDiagnosticWriter<H5Writer>::getDataSetInfo(DiagnosticProperties& 
                                                           Attributes& patchAttributes)
 {
     auto& h5Writer         = this->h5Writer_;
+    auto& modelView        = h5Writer.modelView();
     auto vecFields         = h5Writer.modelView().getElectromagFields();
     std::string lvlPatchID = std::to_string(iLevel) + "_" + patchID;
 
-    auto const infoVF = [&](auto& vecF, std::string name, auto& attr) {
+    auto const infoVF = [&](auto& vecF_in, std::string name, auto& attr) {
+        auto& vecF = modelView.vec_field_reducer(vecF_in);
         for (auto& [id, type] : core::Components::componentMap())
         {
             // highfive doesn't accept uint32 which ndarray.shape() is
@@ -87,11 +92,8 @@ void ElectromagDiagnosticWriter<H5Writer>::getDataSetInfo(DiagnosticProperties& 
     };
 
     for (auto* vecField : vecFields)
-    {
-        auto& name = vecField->name();
-        if (diagnostic.quantity == "/" + name)
-            infoVF(*vecField, name, patchAttributes[lvlPatchID]);
-    }
+        if (diagnostic.quantity == "/" + vecField->name())
+            infoVF(*vecField, vecField->name(), patchAttributes[lvlPatchID]);
 }
 
 
@@ -139,13 +141,14 @@ void ElectromagDiagnosticWriter<H5Writer>::initDataSets(
 template<typename H5Writer>
 void ElectromagDiagnosticWriter<H5Writer>::write(DiagnosticProperties& diagnostic)
 {
-    auto& h5Writer = this->h5Writer_;
+    auto& h5Writer  = this->h5Writer_;
+    auto& modelView = h5Writer.modelView();
 
     for (auto* vecField : h5Writer.modelView().getElectromagFields())
         if (diagnostic.quantity == "/" + vecField->name())
             h5Writer.writeTensorFieldAsDataset(Super::h5FileForQuantity(diagnostic),
                                                h5Writer.patchPath() + "/" + vecField->name(),
-                                               *vecField);
+                                               modelView.vec_field_reduced(*vecField));
 }
 
 

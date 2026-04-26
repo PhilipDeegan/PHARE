@@ -2,14 +2,20 @@
 #define PHARE_PYTHON_PATCH_DATA_HPP
 
 
-#include "pybind_def.hpp"
+#include "core/utilities/types.hpp"
+#include "core/data/grid/grid_tiles.hpp"
 #include "core/utilities/point/point.hpp"
 
+#include "amr/resources_manager/amr_utils.hpp"
 
-#include <stdexcept>
+#include "pybind_def.hpp"
+
+
 #include <string>
 #include <cstring>
 #include <utility>
+#include <stdexcept>
+
 
 
 namespace PHARE::pydata
@@ -67,6 +73,54 @@ void setPyPatchDataFromField(PatchData& pdata, Field const& field, GridLayout& g
     pdata.nGhosts = static_cast<std::size_t>(
         GridLayout::nbrGhosts(GridLayout::centering(field.physicalQuantity())[0]));
     pdata.data = field_as_memory_view(field);
+}
+
+template<typename Field>
+void populatePatchDataFromField(auto& patch_datas, Field const& field, auto const& gridlayout,
+                                auto const& patch_id)
+{
+}
+
+namespace detail
+{
+    auto static inline accessor = [](auto& el) { return el; };
+
+} // namespace detail
+
+template<typename GridLayout, typename Accessor = decltype(detail::accessor)>
+auto getPatchDatasForLevel(auto& hierarchy, auto& model, auto const ilvl, auto& qty,
+                           Accessor accessor = detail::accessor)
+{
+    static constexpr std::size_t dimension = GridLayout::dimension;
+
+    auto& rm = *model.resourcesManager;
+
+    std::vector<PatchData<py_array_t<double>, dimension>> patchDatas;
+
+    auto visit = [&](auto& grid, auto patchID, auto /*ilvl*/) {
+        auto&& field = accessor(qty);
+        using Field  = std::decay_t<decltype(field)>;
+
+        if constexpr (core::is_field_v<Field>)
+            setPyPatchDataFromField(patchDatas.emplace_back(), field, grid, patchID);
+        else if constexpr (core::is_field_tile_set_v<Field>)
+        {
+            std::size_t tidx = 0;
+            for (auto const& tile : field())
+            {
+                auto const tile_id = patchID + "_t" + std::to_string(tidx);
+                auto& tile_field   = tile();
+                setPyPatchDataFromField(patchDatas.emplace_back(), tile_field, tile.layout(),
+                                        tile_id);
+                ++tidx;
+            }
+        }
+        else
+            static_assert(core::dependent_false_v<GridLayout>);
+    };
+    amr::visitLevel<GridLayout>(*hierarchy.getPatchLevel(ilvl), rm, visit, qty);
+
+    return patchDatas;
 }
 
 
