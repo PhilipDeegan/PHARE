@@ -82,7 +82,7 @@ class FieldData(PatchData):
 
     def compare(self, that, atol=1e-16):
         return self.field_name == that.field_name and phut.fp_any_all_close(
-            self.dataset[:], that.dataset[:], atol=atol
+            self[self.box], that[that.box], atol=atol
         )
 
     def __eq__(self, that):
@@ -228,9 +228,9 @@ class ParticleData(PatchData):
     def size(self):
         return self.dataset.size()
 
-    def compare(self, that, *args, **kwargs):
+    def compare(self, that, atol=1e-12):
         """args/kwargs may include atol for consistency with field::compare"""
-        return self.name == that.name and self.dataset == that.dataset
+        return self.name == that.name and self.dataset.compare(that.dataset, atol)
 
     def __eq__(self, that):
         return self.compare(that)

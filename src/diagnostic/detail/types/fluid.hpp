@@ -2,7 +2,7 @@
 #define PHARE_DIAGNOSTIC_DETAIL_TYPES_FLUID_HPP
 
 #include "core/data/vecfield/vecfield_component.hpp"
-#include "core/numerics/interpolator/interpolator.hpp"
+#include "core/numerics/interpolator/interpolating.hpp"
 
 #include "diagnostic/detail/h5typewriter.hpp"
 
@@ -76,7 +76,8 @@ private:
 template<typename H5Writer>
 void FluidDiagnosticWriter<H5Writer>::compute(DiagnosticProperties& diagnostic)
 {
-    core::MomentumTensorInterpolator<dimension, interp_order> interpolator;
+    // core::MomentumTensorInterpolator<dimension, interp_order> interpolator;
+    core::MomentumTensorInterpolating<dimension, interp_order> interpolator;
 
     auto& h5Writer    = this->h5Writer_;
     auto& modelView   = h5Writer.modelView();
@@ -158,8 +159,9 @@ void FluidDiagnosticWriter<H5Writer>::getDataSetInfo(DiagnosticProperties& diagn
                                                      std::size_t iLevel, std::string const& patchID,
                                                      Attributes& patchAttributes)
 {
-    auto& h5Writer = this->h5Writer_;
-    auto& ions     = h5Writer.modelView().getIons();
+    auto& h5Writer  = this->h5Writer_;
+    auto& modelView = h5Writer.modelView();
+    auto& ions      = modelView.getIons();
     std::string lvlPatchID{std::to_string(iLevel) + "_" + patchID};
 
 
@@ -171,19 +173,22 @@ void FluidDiagnosticWriter<H5Writer>::getDataSetInfo(DiagnosticProperties& diagn
         attr[name + "_ghosts"] = static_cast<std::size_t>(ghosts[0]);
     };
 
-    auto const infoDS = [&](auto& field, std::string name, auto& attr) {
+    auto const infoDS = [&](auto& fieldIn, std::string name, auto& attr) {
         // highfive doesn't accept uint32 which ndarray.shape() is
+        auto& field       = modelView.field_reducer(fieldIn);
         auto const& shape = field.shape();
         attr[name]        = std::vector<std::size_t>(shape.data(), shape.data() + shape.size());
         setGhostNbr(field, attr, name);
     };
 
-    auto const infoVF = [&](auto& vecF, std::string name, auto& attr) {
+    auto const infoVF = [&](auto& vecFIn, std::string name, auto& attr) {
+        auto& vecF = modelView.vec_field_reducer(vecFIn);
         for (auto const& [id, type] : core::VectorComponents::map())
             infoDS(vecF.getComponent(type), name + "_" + id, attr);
     };
 
-    auto const infoTF = [&](auto& tensorF, std::string name, auto& attr) {
+    auto const infoTF = [&](auto& tensorFIn, std::string name, auto& attr) {
+        auto& tensorF = modelView.tensor_field_reducer(tensorFIn);
         for (auto const& [id, type] : core::TensorComponents::map())
             infoDS(tensorF.getComponent(type), name + "_" + id, attr);
     };
@@ -285,15 +290,21 @@ void FluidDiagnosticWriter<H5Writer>::initDataSets(
 template<typename H5Writer>
 void FluidDiagnosticWriter<H5Writer>::write(DiagnosticProperties& diagnostic)
 {
-    auto& h5Writer = this->h5Writer_;
-    auto& ions     = h5Writer.modelView().getIons();
-    auto& h5file   = Super::h5FileForQuantity(diagnostic);
+    auto& h5Writer  = this->h5Writer_;
+    auto& modelView = h5Writer.modelView();
+    auto& ions      = modelView.getIons();
+    auto& h5file    = Super::h5FileForQuantity(diagnostic);
 
-    auto writeDS = [&](auto path, auto& field) {
-        h5file.template write_data_set_flat<GridLayout::dimension>(path, field.data());
+    auto const writeDS = [&](auto path, auto& field) {
+        h5file.template write_data_set_flat<GridLayout::dimension>(
+            path, modelView.field_reduced(field).data());
     };
-    auto writeTF
-        = [&](auto path, auto& vecF) { h5Writer.writeTensorFieldAsDataset(h5file, path, vecF); };
+    auto const writeVF = [&](auto path, auto& vecF) {
+        h5Writer.writeTensorFieldAsDataset(h5file, path, modelView.vec_field_reduced(vecF));
+    };
+    auto const writeTF = [&](auto path, auto& tF) {
+        h5Writer.writeTensorFieldAsDataset(h5file, path, modelView.tensor_field_reduced(tF));
+    };
 
     std::string path = h5Writer.patchPath() + "/";
     for (auto& pop : ions)
@@ -304,7 +315,7 @@ void FluidDiagnosticWriter<H5Writer>::write(DiagnosticProperties& diagnostic)
         if (isActiveDiag(diagnostic, tree, "charge_density"))
             writeDS(path + "charge_density", pop.chargeDensity());
         if (isActiveDiag(diagnostic, tree, "flux"))
-            writeTF(path + "flux", pop.flux());
+            writeVF(path + "flux", pop.flux());
         if (isActiveDiag(diagnostic, tree, "momentum_tensor"))
             writeTF(path + "momentum_tensor", pop.momentumTensor());
     }
@@ -315,7 +326,7 @@ void FluidDiagnosticWriter<H5Writer>::write(DiagnosticProperties& diagnostic)
     if (isActiveDiag(diagnostic, tree, "mass_density"))
         writeDS(path + "mass_density", ions.massDensity());
     if (isActiveDiag(diagnostic, tree, "bulkVelocity"))
-        writeTF(path + "bulkVelocity", ions.velocity());
+        writeVF(path + "bulkVelocity", ions.velocity());
     if (isActiveDiag(diagnostic, tree, "momentum_tensor"))
         writeTF(path + "momentum_tensor", ions.momentumTensor());
 }

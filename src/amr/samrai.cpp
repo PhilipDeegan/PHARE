@@ -1,5 +1,12 @@
+
+#include "core/def/phlop.hpp" // IWYU pragma: keep // scope timing
+#include "core/utilities/mpi_utils.hpp"
+
+#include "initializer/data_provider.hpp"
+
 #include "samrai.hpp"
 
+#include <SAMRAI/tbox/SAMRAIManager.h>
 
 namespace PHARE
 {
@@ -16,15 +23,17 @@ SamraiLifeCycle::SamraiLifeCycle(int argc, char** argv)
     SAMRAI::tbox::Logger::getInstance()->setWarningAppender(appender);
     PHARE_WITH_PHLOP( //
         if (auto e = core::get_env("PHARE_SCOPE_TIMING", "false"); e == "1" || e == "true")
-            phlop::ScopeTimerMan::INSTANCE()
+            phlop::threaded::ScopeTimerMan::INSTANCE()
                 .file_name(".phare/timings/rank." + std::to_string(core::mpi::rank()) + ".txt")
                 .init(); //
     )
+    PHARE_WITH_KOKKOS(Kokkos::initialize(argc, argv); Kokkos::print_configuration(std::cout);)
 }
 
 SamraiLifeCycle::~SamraiLifeCycle()
 {
-    PHARE_WITH_PHLOP(phlop::ScopeTimerMan::reset());
+    PHARE_WITH_KOKKOS(Kokkos::finalize();)
+    PHARE_WITH_PHLOP(phlop::threaded::ScopeTimerMan::reset());
     SAMRAI::tbox::SAMRAIManager::shutdown();
     SAMRAI::tbox::SAMRAIManager::finalize();
     SAMRAI::tbox::SAMRAI_MPI::finalize();
