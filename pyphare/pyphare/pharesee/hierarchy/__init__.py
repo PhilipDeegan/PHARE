@@ -2,16 +2,20 @@ from .scalarfield import ScalarField
 from .vectorfield import VectorField
 from .hierarchy import PatchHierarchy
 from pyphare.core.phare_utilities import listify
+from . import func
 
-__all__ = [
-    "ScalarField",
-    "VectorField",
-    "PatchHierarchy",
-]
+__all__ = ["ScalarField", "VectorField", "PatchHierarchy", "func"]
 
 
 def hierarchy_from(
-    simulator=None, qty=None, pop="", h5_filename=None, times=None, hier=None, func=None, **kwargs
+    simulator=None,
+    qty=None,
+    pop="",
+    h5_filename=None,
+    times=None,
+    hier=None,
+    func=None,
+    **kwargs
 ):
     from .fromh5 import hierarchy_fromh5
     from .fromsim import hierarchy_from_sim
