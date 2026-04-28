@@ -58,6 +58,84 @@ def plot_patches(hier, save=False):
         fig.savefig("hierarchy.png")
 
 
+def plot2d_slice(hier, **kwargs):
+    import matplotlib.pyplot as plt
+    from mpl_toolkits.axes_grid1 import make_axes_locatable
+
+    slice_lo, slice_up = hier.slice_box
+    # find the dimension that is "thin" (lo == hi in primal coords)
+    slice_dim = next(
+        i for i, (lo, hi) in enumerate(zip(slice_lo, slice_up)) if lo == hi
+    )
+    plot_dims = [i for i in range(3) if i != slice_dim]
+
+    time = kwargs.get("time", hier._default_time())
+    usr_lvls = kwargs.get("levels", hier.levelNbrs(time))
+    default_qty = None
+    if len(hier.quantities()) == 1:
+        default_qty = hier.quantities()[0]
+    qty = kwargs.get("qty", default_qty)
+
+    if "ax" not in kwargs:
+        fig, ax = plt.subplots()
+    else:
+        ax = kwargs["ax"]
+        fig = ax.figure
+
+    glob_min = hier.global_min(qty)
+    glob_max = hier.global_max(qty)
+    dim_names = ["x", "y", "z"]
+    im = None
+
+    for lvl_nbr in usr_lvls:
+        if lvl_nbr not in hier.levels(time):
+            continue
+        for patch in hier.level(lvl_nbr, time).patches:
+            pdat = patch[qty]
+            data_3d = pdat.dataset[:]  # shape (nx, ny, nz) in Fortran order
+            # take index 0 along the thin dimension to get a 2D array
+            data_2d = np.take(data_3d, 0, axis=slice_dim)
+
+            dl = pdat.layout.dl
+            origin = pdat.layout.origin
+            d0 = dl[plot_dims[0]]
+            d1 = dl[plot_dims[1]]
+            o0 = origin[plot_dims[0]]
+            o1 = origin[plot_dims[1]]
+            n0, n1 = data_2d.shape
+            # shift by -0.5*dl so primal nodes become pixel centres in pcolormesh
+            coords0 = o0 - 0.5 * d0 + d0 * np.arange(n0 + 1)
+            coords1 = o1 - 0.5 * d1 + d1 * np.arange(n1 + 1)
+
+            im = ax.pcolormesh(
+                coords0,
+                coords1,
+                data_2d.T,
+                cmap=kwargs.get("cmap", "Spectral_r"),
+                vmin=kwargs.get("vmin", glob_min - 1e-6),
+                vmax=kwargs.get("vmax", glob_max + 1e-6),
+            )
+
+    ax.set_aspect(kwargs.get("aspect", "equal"))
+    ax.set_title(kwargs.get("title", ""))
+    ax.set_xlabel(kwargs.get("xlabel", dim_names[plot_dims[0]]))
+    ax.set_ylabel(kwargs.get("ylabel", dim_names[plot_dims[1]]))
+    if "xlim" in kwargs:
+        ax.set_xlim(kwargs["xlim"])
+    if "ylim" in kwargs:
+        ax.set_ylim(kwargs["ylim"])
+
+    if im is not None:
+        divider = make_axes_locatable(ax)
+        cax = divider.append_axes("right", size="5%", pad=0.08)
+        plt.colorbar(im, ax=ax, cax=cax)
+
+    if "filename" in kwargs:
+        fig.savefig(kwargs["filename"], dpi=kwargs.get("dpi", 200))
+
+    return fig, ax
+
+
 def plot_2d_patches(hier, ilvl, collections, **kwargs):
     import matplotlib.pyplot as plt
     from matplotlib.collections import PatchCollection
@@ -212,6 +290,8 @@ def plot(hier, **kwargs):
         return plot1d(hier, **kwargs)
     elif hier.ndim == 2:
         return plot2d(hier, **kwargs)
+    if hier.slice_box:
+        return plot2d_slice(hier, **kwargs)
     raise ValueError("3d not supported for plotting")
 
 

@@ -26,8 +26,13 @@
 #include <string>
 
 
+
+
 namespace PHARE
 {
+
+static inline auto const SIM_REPORT_N = core::get_env_as("PHARE_REPORT_SUMMARY", std::size_t{0});
+
 class ISimulator
 {
 public:
@@ -36,14 +41,14 @@ public:
     virtual double currentTime() = 0;
     virtual double timeStep()    = 0;
 
-    virtual void initialize()         = 0;
-    virtual double advance(double dt) = 0;
+    virtual void initialize()              = 0;
+    virtual std::string advance(double dt) = 0;
 
     virtual std::vector<int> const& domainBox() const    = 0;
     virtual std::vector<double> const& cellWidth() const = 0;
     virtual std::size_t interporder() const              = 0;
 
-    virtual std::string to_str() = 0;
+    virtual std::string to_str() const = 0;
 
     virtual ~ISimulator() {}
 
@@ -99,7 +104,7 @@ public:
     NO_DISCARD double currentTime() override { return currentTime_; }
 
     void initialize() override;
-    double advance(double dt) override;
+    std::string advance(double dt) override;
 
     std::vector<int> const& domainBox() const override { return hierarchy_->domainBox(); }
     std::vector<double> const& cellWidth() const override { return hierarchy_->cellWidth(); }
@@ -109,7 +114,7 @@ public:
     NO_DISCARD auto& getMHDModel() { return mhdModel_; }
     NO_DISCARD auto& getMultiPhysicsIntegrator() { return multiphysInteg_; }
 
-    NO_DISCARD std::string to_str() override;
+    NO_DISCARD std::string to_str() const override;
 
     bool dump_diagnostics(double timestamp, double timestep) override
     {
@@ -124,6 +129,8 @@ public:
         return false;
     }
 
+    std::string summary() const;
+
 
 protected:
     // provided to force flush for diags
@@ -132,35 +139,7 @@ protected:
 private:
     auto find_model(std::string name);
 
-    std::unique_ptr<std::ofstream> static log_file()
-    {
-        // ".log" directory is not created here, but in simulator.py
-        if (auto log = core::get_env("PHARE_LOG"))
-        {
-            if (log == "RANK_FILES")
-                return std::make_unique<std::ofstream>(".log/" + std::to_string(core::mpi::rank())
-                                                       + ".out");
-
-
-            if (log == "DATETIME_FILES")
-            {
-                auto date_time = core::mpi::date_time();
-                auto rank      = std::to_string(core::mpi::rank());
-                auto size      = std::to_string(core::mpi::size());
-                return std::make_unique<std::ofstream>(".log/" + date_time + "_" + rank + "_of_"
-                                                       + size + ".out");
-            }
-
-            if (log == "NULL")
-                return std::make_unique<std::ofstream>("/dev/null");
-
-            if (log != "CLI")
-                throw std::runtime_error(
-                    "PHARE_LOG invalid type, valid keys are RANK_FILES/DATETIME_FILES/CLI/NULL");
-        }
-
-        return nullptr;
-    }
+    std::unique_ptr<std::ofstream> static log_file();
 
     std::unique_ptr<std::ofstream> log_out{log_file()};
     std::streambuf* coutbuf = nullptr;
@@ -171,17 +150,18 @@ private:
     std::vector<PHARE::amr::MessengerDescriptor> descriptors_;
     MessengerFactory messengerFactory_;
 
-    float x_lo_[dimension];
-    float x_up_[dimension];
+
     int maxLevelNumber_;
     double dt_;
-    int timeStepNbr_           = 0;
-    double startTime_          = 0;
-    double finalTime_          = 0;
-    double currentTime_        = 0;
-    bool isInitialized         = false;
-    std::size_t fineDumpLvlMax = 0;
-    bool allowEmergencyDumps   = false;
+    int timeStepNbr_               = 0;
+    double startTime_              = 0;
+    double finalTime_              = 0;
+    double currentTime_            = 0;
+    std::size_t fineDumpLvlMax     = 0;
+    std::size_t summaryCadenceIdx_ = 0;
+    bool isInitialized             = false;
+
+    bool allowEmergencyDumps = false;
 
     std::shared_ptr<ResourceManager_t> resman_ptr;
 
@@ -210,7 +190,39 @@ private:
     void handle_dictionary_exception(core::DictionaryException const& e);
 };
 
+template<auto opts>
+std::unique_ptr<std::ofstream> Simulator<opts>::log_file()
+{
+    using namespace PHARE::core;
 
+    std::string const base = ".log/";
+    std::string const ext  = ".out";
+
+    // ".log" directory is not created here, but in simulator.py
+    if (auto log = get_env("PHARE_LOG"))
+    {
+        if (log == "RANK_FILES")
+            return std::make_unique<std::ofstream>(base + std::to_string(mpi::rank()) + ext);
+
+        if (log == "DATETIME_FILES")
+        {
+            auto date_time = mpi::date_time();
+            auto rank      = std::to_string(mpi::rank());
+            auto size      = std::to_string(mpi::size());
+            return std::make_unique<std::ofstream>(base + date_time + "_" + rank + "_of_" + size
+                                                   + ext);
+        }
+
+        if (log == "NULL")
+            return std::make_unique<std::ofstream>("/dev/null");
+
+        if (log != "CLI")
+            throw std::runtime_error(
+                "PHARE_LOG invalid type, valid keys are RANK_FILES/DATETIME_FILES/CLI/NULL");
+    }
+
+    return nullptr;
+}
 
 namespace
 {
@@ -357,6 +369,9 @@ Simulator<opts>::Simulator(PHARE::initializer::PHAREDict const& dict,
     , functors_{functors_setup(dict)}
     , multiphysInteg_{std::make_shared<MultiPhysicsIntegrator>(dict["simulation"], functors_)}
 {
+    if (!hierarchy_)
+        throw std::runtime_error("NO HIERARCHY!");
+
     resman_ptr   = std::make_shared<ResourceManager_t>();
     currentTime_ = restart_time(dict);
     finalTime_ += currentTime_; // final time is from timestep * timestep_nbr!
@@ -376,7 +391,7 @@ Simulator<opts>::Simulator(PHARE::initializer::PHAREDict const& dict,
 
 
 template<auto opts>
-std::string Simulator<opts>::to_str()
+std::string Simulator<opts>::to_str() const
 {
     std::stringstream ss;
     ss << "PHARE SIMULATOR\n";
@@ -390,7 +405,19 @@ std::string Simulator<opts>::to_str()
 }
 
 
+template<auto opts>
+std::string Simulator<opts>::summary() const
+{
+    std::stringstream ss;
 
+    // if (mhdModel_)
+    //     ss << mhdModel_->summarize(*hierarchy_);
+
+    if (hybridModel_)
+        ss << hybridModel_->summarize(*hierarchy_);
+
+    return ss.str();
+}
 
 template<auto opts>
 void Simulator<opts>::initialize()
@@ -445,11 +472,10 @@ void Simulator<opts>::initialize()
 
 
 template<auto opts>
-double Simulator<opts>::advance(double dt)
+std::string Simulator<opts>::advance(double dt)
 {
     PHARE_LOG_SCOPE(1, "Simulator::advance");
 
-    double dt_new                    = 0;
     std::optional<std::string> error = std::nullopt;
 
     try
@@ -457,7 +483,7 @@ double Simulator<opts>::advance(double dt)
         if (!integrator_)
             throw std::runtime_error("Error - no valid integrator in the simulator");
 
-        dt_new       = integrator_->advance(dt);
+        integrator_->advance(dt);
         currentTime_ = startTime_ + ((*timeStamper) += dt);
     }
     catch (core::DictionaryException const& ex)
@@ -485,7 +511,14 @@ double Simulator<opts>::advance(double dt)
         throw std::runtime_error("forcing error");
     }
 
-    return dt_new;
+    ++summaryCadenceIdx_;
+    if (SIM_REPORT_N > 0 and SIM_REPORT_N == summaryCadenceIdx_)
+    {
+        summaryCadenceIdx_ = 0;
+        return summary();
+    }
+
+    return "";
 }
 
 template<auto opts>

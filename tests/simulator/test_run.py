@@ -10,9 +10,7 @@ from pyphare.pharesee.run import Run
 from pyphare.simulator.simulator import Simulator, startMPI
 
 from tests.simulator import SimulatorTest
-from pyphare.simulator.simulator import Simulator, startMPI
 
-from pyphare.pharesee.hierarchy import hierarchy_utils as hootils
 
 ph.NO_GUI()
 
@@ -20,6 +18,7 @@ ph.NO_GUI()
 time_step = 0.005
 final_time = 0.01
 timestamps = [0, time_step, final_time]
+diag_base = "phare_outputs/test_run"
 
 
 def config_2d(diag_dir, diag_format):
@@ -167,6 +166,7 @@ def plot_file_for_qty(plot_dir, qty, time):
 
 def plot(test, diag_dir):
     """common across phareh5 and vtk"""
+
     run = Run(diag_dir)
     plot_dir = Path(f"{diag_dir}_plots")
     plot_dir.mkdir(parents=True, exist_ok=True)

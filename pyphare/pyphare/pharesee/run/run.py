@@ -44,6 +44,16 @@ class Run:
     def GetB(self, time, all_primal=True, **kwargs):
         return RunMan(self).GetB(time, all_primal=all_primal, **kwargs)
 
+    def GetBSlice(
+        self, time, merged=False, interp="nearest", all_primal=True, **kwargs
+    ):
+        if merged:
+            all_primal = False
+        hier = self._get_hier_for(time, "EM_B_x_slice_0", **kwargs)
+        if not all_primal:
+            return self._get(hier, time, merged, interp)
+        return VectorField.FROM(compute_hier_from(_compute_to_primal, hier))
+
     def GetE(self, time, all_primal=True, **kwargs):
         hier = self._get_hier_for(time, "EM_E", **kwargs)
         if not all_primal:

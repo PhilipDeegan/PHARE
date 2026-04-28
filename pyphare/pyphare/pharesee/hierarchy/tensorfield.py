@@ -20,6 +20,7 @@ class AnyTensorField(PatchHierarchy):
             hier.refinement_ratio,
             hier.times(),
             hier.data_files,
+            slice_box=hier.slice_box,
         )
 
     def __getitem__(self, input):

@@ -29,7 +29,9 @@ class PatchHierarchy(object):
         data_files=None,
         selection_box=None,
         ephemerals=None,
+        slice_box=None,
     ):
+        self.slice_box = slice_box
         if not isinstance(times, (tuple, list)):
             times = phut.listify(times)
 
@@ -44,6 +46,8 @@ class PatchHierarchy(object):
                 format_timestamp(t): box for t, box in zip(times, self.selection_box)
             }
             assert len(times) == len(self.selection_box)
+        if self.selection_box and all(v is None for v in self.selection_box.values()):
+            self.selection_box = None  # weird
 
         assert len(times) == len(patch_levels)
 
@@ -78,9 +82,6 @@ class PatchHierarchy(object):
         no_copy_keys = ["data_files"]  # do not copy these things
         return phut.deep_copy(self, memo, no_copy_keys)
 
-    def __getitem__(self, qty):
-        return self.__dict__[qty]
-
     def update(self):
         if len(self.quantities()) > 1:
             for qty in self.quantities():
@@ -96,6 +97,7 @@ class PatchHierarchy(object):
                             new_lvls,
                             self.domain_box,
                             selection_box=self.domain_box,
+                            slice_box=self.slice_box,
                             times=time,
                             data_files=self.data_files,
                         )
@@ -379,6 +381,11 @@ class PatchHierarchy(object):
         from .plotting.plot_fields import plot2d
 
         return plot2d(self, **kwargs)
+
+    def plot2d_slice(self, **kwargs):
+        from .plotting.plot_fields import plot2d_slice
+
+        return plot2d_slice(self, **kwargs)
 
     def plot(self, **kwargs):
         from .plotting.plot_fields import plot

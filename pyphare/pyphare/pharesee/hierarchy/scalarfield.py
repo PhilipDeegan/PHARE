@@ -54,16 +54,6 @@ class ScalarField(tensorfield.AnyTensorField):
     def __neg__(self):
         return self * -1
 
-    def gaussian(self, sigma=2):
-        return ScalarField.FROM(
-            hootils.compute_hier_from(
-                hc._compute_gaussian_filter_on_scalarfield,
-                self,
-                sigma=sigma,
-                qty=next(iter(self.quantities())),
-            )
-        )
-
 
 def copy_kwargs(scalar_field, other=None):
     if other:

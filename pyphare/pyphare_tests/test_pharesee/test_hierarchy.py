@@ -13,8 +13,6 @@ diag_outputs = "phare_outputs/"
 time_step_nbr = 2
 time_step = 0.005
 final_time = time_step * time_step_nbr
-dt = time_step
-nt = int(final_time / dt) + 1
 timestamps = [0, final_time]
 
 
