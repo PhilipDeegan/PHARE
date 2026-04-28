@@ -52,6 +52,9 @@ class VectorField(tensorfield.AnyTensorField):
             )
         )
 
+    def magnitude(self):
+        return hc.modulus(self)
+
 
 def copy_kwargs(vector_field, other=None):
     if other:

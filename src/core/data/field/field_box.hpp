@@ -55,10 +55,11 @@ public:
     }
 
 
-    template<typename Operator>
-    void set_from(std::vector<value_type> const& vec, std::size_t seek = 0);
+    template<typename Operator, typename Allocator>
+    void set_from(std::vector<value_type, Allocator> const& vec, std::size_t seek = 0);
 
-    void append_to(std::vector<value_type>& vec);
+    template<typename Allocator>
+    void append_to(std::vector<value_type, Allocator>& vec);
 };
 
 
@@ -101,8 +102,8 @@ void operate_on_fields(auto& dst, auto const& src)
 
 
 template<typename Field_t>
-template<typename Operator>
-void FieldBox<Field_t>::set_from(std::vector<value_type> const& vec, std::size_t seek)
+template<typename Operator, typename Allocator>
+void FieldBox<Field_t>::set_from(std::vector<value_type, Allocator> const& vec, std::size_t seek)
 {
     for (auto& slab : make_field_box_span(lcl_box, field))
         for (auto& span : slab)
@@ -114,7 +115,8 @@ void FieldBox<Field_t>::set_from(std::vector<value_type> const& vec, std::size_t
 
 
 template<typename Field_t>
-void FieldBox<Field_t>::append_to(std::vector<value_type>& vec)
+template<typename Allocator>
+void FieldBox<Field_t>::append_to(std::vector<value_type, Allocator>& vec)
 {
     // reserve vec before use!
     std::size_t seek = vec.size();

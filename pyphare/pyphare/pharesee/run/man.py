@@ -60,7 +60,7 @@ def lazy_patch_from_base(patch, calculators):
 
 
 def resolve_selected_level_patches(time, hier, level, ilvl):
-    if not hier.selection_box[time]:
+    if not hier.selection_box or not hier.selection_box[time]:
         return level.patches
 
     overlapped = []

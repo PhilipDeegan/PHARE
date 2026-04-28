@@ -110,7 +110,8 @@ class FieldBoxSpan : public BoxSpan<std::uint32_t, Array_t::dimension>
 {
     constexpr auto static dim = Array_t::dimension;
     using FieldBoxSlab_t      = FieldBoxSlab<Array_t, Spans_t>;
-    using Super               = BoxSpan<std::uint32_t, dim>;
+
+    using Super = BoxSpan<std::uint32_t, dim>;
     using Super::box;
     using Super::slab_begin;
     using Super::slab_end;
@@ -146,6 +147,7 @@ private:
 
 
 
+
 template<typename Array_t, std::size_t dim>
 auto make_field_box_span(Box<std::uint32_t, dim> const box, Array_t& arr)
 {
@@ -163,6 +165,7 @@ template<typename Array_t, std::size_t dim>
 auto make_field_box_point_span(Box<std::uint32_t, dim> const box, Array_t& arr)
 {
     using Row_t = FieldBoxPointSpans<Array_t>;
+
     return FieldBoxSpan<Array_t, Row_t>{arr, box};
 }
 
@@ -170,6 +173,7 @@ template<typename Array_t, std::size_t dim>
 auto make_field_box_point_span(Box<std::uint32_t, dim> const box, Array_t const& arr)
 {
     using Row_t = FieldBoxPointSpans<Array_t const>;
+
     return FieldBoxSpan<Array_t const, Row_t>{arr, box};
 }
 

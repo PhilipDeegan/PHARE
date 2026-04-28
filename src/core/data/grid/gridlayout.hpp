@@ -112,7 +112,7 @@ namespace core
         GridLayout(std::array<double, dimension> const& meshSize,
                    std::array<std::uint32_t, dimension> const& nbrCells,
                    Point<double, dimension> const& origin,
-                   std::optional<AMRBox_t> const AMRBox = std::nullopt, int level_number = 0)
+                   std::optional<AMRBox_t> const AMRBox = std::nullopt, int const level_number = 0)
             : meshSize_{meshSize}
             , origin_{origin}
             , nbrPhysicalCells_{nbrCells}
