@@ -231,19 +231,18 @@ def quantidic(ilvl, wrangler):
     pl = wrangler.getPatchLevel(ilvl)
 
     return {
-        "density": pl.getDensity,
-        "bulkVelocity_x": pl.getVix,
-        "bulkVelocity_y": pl.getViy,
-        "bulkVelocity_z": pl.getViz,
-        "EM_B_x": pl.getBx,
-        "EM_B_y": pl.getBy,
-        "EM_B_z": pl.getBz,
-        "EM_E_x": pl.getEx,
-        "EM_E_y": pl.getEy,
-        "EM_E_z": pl.getEz,
-        "flux_x": pl.getFx,
-        "flux_y": pl.getFy,
-        "flux_z": pl.getFz,
+        "density": pl.getNi,
+        "Vi": pl.getVi,
+        "EM_B_x": lambda: pl.getB("x"),
+        "EM_B_y": lambda: pl.getB("y"),
+        "EM_B_z": lambda: pl.getB("z"),
+        "EM_E_x": lambda: pl.getE("x"),
+        "EM_E_y": lambda: pl.getE("y"),
+        "EM_E_z": lambda: pl.getE("z"),
+        "bulkVelocity_x": lambda: pl.getVi("x"),
+        "bulkVelocity_y": lambda: pl.getVi("y"),
+        "bulkVelocity_z": lambda: pl.getVi("z"),
+        "flux": pl.getFlux,
         "particles": pl.getParticles,
     }
 
@@ -566,3 +565,56 @@ def min_max_patch_shape(hier, time, qty=None):
                     val[ilvl][1] = max(np.max(pd.dataset.shape), val[ilvl][1])
 
     return val
+
+
+def to_2d_from_slice(hier):
+    lo, up = hier.slice_box
+    invariant_dim = next(i for i in range(len(lo)) if lo[i] == up[i])
+    kept = [i for i in range(len(lo)) if i != invariant_dim]
+
+    def drop(arr):
+        return [arr[i] for i in kept]
+
+    domain_box_2d = Box(drop(hier.domain_box.lower), drop(hier.domain_box.upper))
+
+    new_time_levels = {}
+    for t, levels in hier.time_hier.items():
+        new_levels = {}
+        for ilvl, level in levels.items():
+            new_patches = []
+            for patch in level.patches:
+                new_patch_datas = {}
+                for qty_name, pdata in patch.patch_datas.items():
+                    data_2d = np.take(pdata.dataset[:], 0, axis=invariant_dim)
+
+                    box_2d = Box(
+                        drop(pdata.layout.box.lower),
+                        drop(pdata.layout.box.upper),
+                    )
+                    layout_2d = GridLayout(
+                        box_2d,
+                        np.array(drop(pdata.layout.origin)),
+                        np.array(drop(pdata.layout.dl)),
+                        interp_order=pdata.layout.interp_order,
+                    )
+                    pdata_2d = FieldData(
+                        layout_2d,
+                        qty_name,
+                        data_2d,
+                        centering=drop(pdata.centerings),
+                        ghosts_nbr=drop(list(pdata.ghosts_nbr)),
+                    )
+                    new_patch_datas[qty_name] = pdata_2d
+
+                new_patches.append(Patch(new_patch_datas, patch.id))
+            new_levels[ilvl] = PatchLevel(ilvl, new_patches)
+        new_time_levels[t] = new_levels
+
+    times = list(new_time_levels.keys())
+    return PatchHierarchy(
+        [new_time_levels[t] for t in times],
+        domain_box_2d,
+        hier.refinement_ratio,
+        times,
+        data_files=hier.data_files,
+    )

@@ -30,6 +30,8 @@ def GetFinest(hier, time, qty=None, interp="nearest"):
 
     if not hier.ephemerals:
         hier.ephemerals = {}
+
+    time = time or GetTime(hier)
     if time not in hier.ephemerals:
         hier.ephemerals[time] = {}
 
@@ -51,6 +53,10 @@ def GetFinest(hier, time, qty=None, interp="nearest"):
 
 def get_interpolated_selection_from(hier, selection, quantity=None, interp="nearest"):
     """selection to become selection box or slice etc"""
+    from ..hierarchy_utils import to_2d_from_slice
+
+    if hier.ndim == 3 and hier.slice_box:
+        hier = to_2d_from_slice(hier)
 
     times = hier.times()
     if len(times) > 1:

@@ -32,6 +32,7 @@ class PatchHierarchy(object):
         slice_box=None,
     ):
         self.slice_box = slice_box
+
         if not isinstance(times, (tuple, list)):
             times = phut.listify(times)
 
@@ -75,8 +76,11 @@ class PatchHierarchy(object):
         self.ephemerals = ephemerals
         self.update()
 
-    def finest(self, time, qty=None):
-        return func.GetFinest(self, time, qty)
+    def finest(self, time=None, qty=None):
+        from . import func
+
+        finest = func.GetFinest(self, time, qty)
+        return next(iter(finest.values())) if len(finest) == 1 else finest
 
     def __deepcopy__(self, memo):
         no_copy_keys = ["data_files"]  # do not copy these things
@@ -244,14 +248,15 @@ class PatchHierarchy(object):
             time = self._default_time()
         return list(self.levels(time).keys())
 
-    def add_time(self, time, patch_level, h5file, selection_box=None):
+    def add_time(self, time, patch_level, h5file=None, selection_box=None):
         formated_time = format_timestamp(time)
 
         self.time_hier[format_timestamp(time)] = patch_level
         if selection_box is not None:
             self.selection_box[formated_time] = selection_box
 
-        self.data_files[h5file.filename] = h5file
+        if h5file:
+            self.data_files[h5file.filename] = h5file
         self.update()
 
     def is_homogeneous(self):
