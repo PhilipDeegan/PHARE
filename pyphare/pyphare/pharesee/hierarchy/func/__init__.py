@@ -56,9 +56,8 @@ def get_interpolated_selection_from(hier, selection, quantity=None, interp="near
     if len(times) > 1:
         raise ValueError("TensorField interpolation does not support multiple times")
 
-    from pyphare.pharesee.run import utils as rutils
     from pyphare.pharesee.hierarchy import uniformgrid as uniform
-    from pyphare.pharesee.hierarchy import hierarchy_utils as hootils
+    from ..interpolation import make_interpolator, flat_finest_field
 
     time = times[0]
     dl = GetDl(hier, time)
@@ -76,11 +75,8 @@ def get_interpolated_selection_from(hier, selection, quantity=None, interp="near
     datas = {}
 
     for qty in [quantity] if quantity else hier.quantities():
-        data, coords = hootils.flat_finest_field(hier, qty, time=time)
-
-        interpolator, finest_coords = rutils.make_interpolator(
-            data, coords, interp, domain, dl, qty, nbrGhosts
-        )
+        flat = flat_finest_field(hier, qty, time=time)
+        interpolator, finest_coords = make_interpolator(flat, interp, domain, dl)
 
         mesh = np.meshgrid(*finest_coords, indexing="ij")
 
