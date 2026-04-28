@@ -10,7 +10,7 @@ from pyphare.core import phare_utilities as phut
 from . import func
 
 
-__all__ = ["ScalarField", "VectorField", "TensorField", "PatchHierarchy", "func"]
+__all__ = ["PatchHierarchy", "ScalarField", "VectorField", "TensorField", "func"]
 
 
 def hierarchy_from(
