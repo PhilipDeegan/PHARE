@@ -205,8 +205,8 @@ class AdvanceTestBase(SimulatorTest):
         datahier = self.getHierarchy(
             dim,
             interp_order,
-            cells=60,
             qty="fields",
+            cells=60,
             time_step=0.001,
             extra_diag_options={"fine_dump_lvl_max": 10},
             time_step_nbr=time_step_nbr,
@@ -214,8 +214,14 @@ class AdvanceTestBase(SimulatorTest):
             **kwargs,
         )
 
-        qties = ["rho"]
-        qties += [f"{qty}{xyz}" for qty in ["E", "V"] for xyz in ["x", "y", "z"]]
+        test_type = type(self).__name__
+        if test_type.endswith("MHDAdvanceTest"):
+            qties = ["mhdRho"]
+
+        else:  # hybrid
+            qties = ["rho"]
+            qties += [f"{qty}{xyz}" for qty in ["E", "V"] for xyz in ["x", "y", "z"]]
+
         lvl_steps = global_vars.sim.level_time_steps
         print("LEVELSTEPS === ", lvl_steps)
         assert len(lvl_steps) > 1, "this test makes no sense with only 1 level"
@@ -260,8 +266,8 @@ class AdvanceTestBase(SimulatorTest):
                         lvlOverlap = boxm.refine(coarsePatch.box, 2) * finePatch.box
                         if lvlOverlap is not None:
                             for qty in qties:
-                                coarse_pd = coarsePatch.patch_datas[qty]
-                                fine_pd = finePatch.patch_datas[qty]
+                                coarse_pd = coarsePatch[qty]
+                                fine_pd = finePatch[qty]
                                 coarseBox = boxm.coarsen(lvlOverlap, 2)
 
                                 coarse_pdDataset = coarse_pd.dataset[:]

@@ -77,6 +77,7 @@ class MHDInitializationTest(InitializationTest):
             res=res,
             hyper_res=hyper_res,
             model_options=["MHDModel"],
+            max_mhd_level=3,
         )
         diag_outputs = sim.diag_options["options"]["dir"]
         L = sim.simulation_domain()

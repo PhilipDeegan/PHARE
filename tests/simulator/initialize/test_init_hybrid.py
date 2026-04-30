@@ -21,8 +21,8 @@ class HybridInitializationTest(InitializationTest):
         self,
         ndim,
         interp_order,
-        refinement_boxes,
         qty,
+        refinement_boxes,
         nbr_part_per_cell=100,
         density=None,
         extra_diag_options=None,
@@ -238,8 +238,8 @@ class HybridInitializationTest(InitializationTest):
         datahier = self.getHierarchy(
             dim,
             interp_order,
-            {"L0": {"B0": nDBox(dim, 10, 20)}},
             "particles",
+            {"L0": {"B0": nDBox(dim, 10, 20)}},
             nbr_part_per_cell=default_ppc,
             **kwargs,
         )
@@ -277,8 +277,8 @@ class HybridInitializationTest(InitializationTest):
         datahier = self.getHierarchy(
             ndim,
             interp_order,
-            refinement_boxes,
             "particles",
+            refinement_boxes,
             cells=30,
             **kwargs,
         )

@@ -241,21 +241,21 @@ class DiagnosticsTest(SimulatorTest):
 
         self._check_diags(sim, ["0.0000000000", "0.0010000000"])
 
-    def test_dump_elapsed_time_diags(self, dim=1, interp=1):
-        print("test_dump_elapsed_time_diags dim/interp:{}/{}".format(dim, interp))
+    def test_dump_elapsed_time_diags(self, ndim=1, interp=1):
+        print("test_dump_elapsed_time_diags dim/interp:{}/{}".format(ndim, interp))
 
         simInput = copy.deepcopy(simArgs)
-        # configure simulation dim sized values
+        # configure simulation ndim sized values
         for key in ["cells", "dl", "boundary_types"]:
-            simInput[key] = [simInput[key] for d in range(dim)]
+            simInput[key] = [simInput[key] for d in range(ndim)]
 
-        b0 = [[10 for i in range(dim)], [19 for i in range(dim)]]
+        b0 = [[10 for i in range(ndim)], [19 for i in range(ndim)]]
         simInput["refinement_boxes"] = {"L0": {"B0": b0}}
 
         del simInput["diag_options"]["options"]["fine_dump_lvl_max"]  # don't want
 
         sim = config(self.simulation(interp_order=interp, **simInput))
-        self.assertTrue(len(sim.cells) == dim)
+        self.assertTrue(len(sim.cells) == ndim)
 
         dump_all_diags(sim.model.populations)
         for diagname, diagInfo in sim.diagnostics.items():
