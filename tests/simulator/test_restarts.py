@@ -262,7 +262,6 @@ class RestartsTest(SimulatorTest):
         Simulator(sim).run().reset()
         diag_dir0 = sim.diag_options["options"]["dir"]
         diag_dir1 = diag_dir0 + "_n2"
-        print("diag_dir0", diag_dir0)
 
         # second restarted simulation
         simput["restart_options"]["dir"] = diag_dir0
@@ -324,6 +323,7 @@ class RestartsTest(SimulatorTest):
         sim = self.simulation(**simput)
         diag_dir0 = sim.diag_options["options"]["dir"]
         diag_dir1 = f"{diag_dir0}_n2"
+
         self.assertEqual([seconds], sim.restart_options["elapsed_timestamps"])
 
         assert "restart_time" not in sim.restart_options
@@ -341,6 +341,7 @@ class RestartsTest(SimulatorTest):
         # second restarted simulation
         simput["restart_options"]["dir"] = diag_dir0
         simput["diag_options"]["options"]["dir"] = diag_dir1
+        simput["restart_options"]["dir"] = diag_dir0
         simput["restart_options"]["restart_time"] = time_step
 
         del simput["restart_options"]["elapsed_timestamps"]
@@ -374,6 +375,7 @@ class RestartsTest(SimulatorTest):
         # second simulation (not restarted)
         simput["restart_options"]["dir"] = diag_dir0
         simput["restart_options"]["mode"] = "conserve"
+
         sim = self.simulation(**simput)
         diag_dir1 = sim.diag_options["options"]["dir"]
         self.assertEqual(diag_dir0, diag_dir1)
@@ -417,7 +419,6 @@ class RestartsTest(SimulatorTest):
          and assert the only files remaining are for 8,9 and 10th timestep
          and the next restart time is from the last/10th timestep
         """
-        ndim, interp = 1, 1
         print("test_advanced_restarts_options")
 
         simput = copy.deepcopy(

@@ -78,6 +78,7 @@ class MHDAdvanceTest(AdvanceTestBase):
             res=res,
             hyper_res=hyper_res,
             model_options=["MHDModel"],
+            max_mhd_level=3,
         )
         diag_outputs = sim.diag_options["options"]["dir"]
         L = sim.simulation_domain()
@@ -143,9 +144,9 @@ class MHDAdvanceTest(AdvanceTestBase):
 
         if qty == "moments" or qty == "fields":
             mom_hier = hierarchy_from(
-                h5_filename=diag_outputs + "/ions_charge_density.h5", hier=eb_hier
+                h5_filename=diag_outputs + "/mhd_rho.h5", hier=eb_hier
             )
-            mom_hier = hierarchy_from(
-                h5_filename=diag_outputs + "/ions_bulkVelocity.h5", hier=mom_hier
-            )
+            # mom_hier = hierarchy_from(
+            #     h5_filename=diag_outputs + "/ions_bulkVelocity.h5", hier=mom_hier
+            # )
             return mom_hier

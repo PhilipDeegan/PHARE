@@ -259,7 +259,7 @@ class SimulatorTest(unittest.TestCase):
 
         return f"{self._testMethodName}/{cpp.mpi_size()}/{cpp.simulator_id(sim)}"
 
-    def simulation(self, ndim=1, interp_order=1, **kwargs):
+    def simulation(self, interp_order=1, **kwargs):
         """
         Override diagnostics and restarts directories to prevent resuse across tests
         This happens because we do not know the C++ simulation identifier (pybind module name)
