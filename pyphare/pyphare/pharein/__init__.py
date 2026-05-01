@@ -13,6 +13,7 @@ from .diagnostics import (
     ParticleDiagnostics,
     MetaDiagnostics,
     InfoDiagnostics,
+    FieldDiagnosticSlice,
 )
 from .simulation import (
     Simulation,
@@ -31,6 +32,7 @@ __all__ = [
     "MetaDiagnostics",
     "InfoDiagnostics",
     "Simulation",
+    "FieldDiagnosticSlice",
 ]
 
 # This exists to allow a condition variable for when we are running PHARE from C++ via phare-exe
@@ -62,12 +64,6 @@ def NO_GUI():
     import matplotlib as mpl
 
     mpl.use("Agg")
-
-
-def getSimulation():
-    from .global_vars import sim
-
-    return sim
 
 
 def _patch_data_ids(restart_file_dir):
@@ -125,8 +121,7 @@ def clearDict():
     pp.stop()
 
 
-def populateDict():
-    from .global_vars import sim as simulation
+def dict_populator():
     import pybindlibs.dictator as pp
 
     # pybind complains if receiving wrong type
@@ -148,7 +143,34 @@ def populateDict():
     def add_vector_int(path, val):
         pp.add_vector_int(path, list(val))
 
-    add_string = pp.add_string
+    class DictPopulator:
+        def __init__(self):
+            self.add_int = add_int
+            self.add_bool = add_bool
+            self.add_double = add_double
+            self.add_size_t = add_size_t
+            self.add_vector_int = add_vector_int
+            self.add_string = pp.add_string
+
+    return DictPopulator()
+
+
+def populateDict(simulation=None):
+    import pybindlibs.dictator as pp
+
+    if simulation is None:
+        from .global_vars import sim
+
+        simulation = sim
+
+    dp = dict_populator()
+    add_int = dp.add_int
+    add_bool = dp.add_bool
+    add_double = dp.add_double
+    add_size_t = dp.add_size_t
+    add_vector_int = dp.add_vector_int
+    add_string = dp.add_string
+
     addInitFunction = getattr(pp, "addInitFunction{:d}".format(simulation.ndim) + "D")
 
     add_string("simulation/name", "simulation_test")
@@ -311,6 +333,8 @@ def populateDict():
         name_path = type_path + diag.name
         add_string(name_path + "/" + "type", diag.type)
         add_string(name_path + "/" + "quantity", diag.quantity)
+        if diag.file_key != diag.quantity:
+            add_string(name_path + "/" + "file_key", diag.file_key)
         add_size_t(name_path + "/" + "flush_every", diag.flush_every)
         pp.add_array_as_vector(
             name_path + "/" + "write_timestamps", diag.write_timestamps
