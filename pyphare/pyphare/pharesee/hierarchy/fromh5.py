@@ -110,7 +110,11 @@ def add_to_patchdata(patch_datas, h5_patch_grp, basename, layout):
                     )
                 )
 
-            pdata = FieldData(layout, field_qties[dataset_name], dataset)
+            ghosts_kwargs = {}
+            if "ghosts" in dataset.attrs:
+                g = int(dataset.attrs["ghosts"])
+                ghosts_kwargs["ghosts_nbr"] = np.array([g] * layout.box.ndim, dtype=int)
+            pdata = FieldData(layout, field_qties[dataset_name], dataset, **ghosts_kwargs)
 
             pdata_name = field_qties[dataset_name]
 
