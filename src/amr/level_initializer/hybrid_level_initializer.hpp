@@ -105,6 +105,9 @@ namespace solver
                 auto layout = amr::layoutFromPatch<GridLayoutT>(*patch);
                 core::resetMoments(ions);
                 core::depositParticles(ions, layout, interpolate_, core::DomainDeposit{});
+
+                if (!isRootLevel(levelNumber))
+                    core::depositParticles(ions, layout, interpolate_, core::LevelGhostDeposit{});
             }
 
             // at this point flux and density is computed for all pops
@@ -118,15 +121,7 @@ namespace solver
             // we now complete them by depositing levelghost particles
             for (auto& patch : rm.enumerate(level, ions))
             {
-                if (!isRootLevel(levelNumber))
-                {
-                    auto layout = amr::layoutFromPatch<GridLayoutT>(*patch);
-                    core::depositParticles(ions, layout, interpolate_, core::LevelGhostDeposit{});
-                }
-
-
-                // now all nodes are complete, the total ion moments
-                // can safely be computed.
+                // now all nodes are complete, the total ion moments can safely be computed.
                 ions.computeChargeDensity();
                 ions.computeBulkVelocity();
             }

@@ -152,7 +152,7 @@ private:
 
         for (auto const& patch : level)
             if (auto [it, suc] = levelBoxing.try_emplace(
-                    amr::to_string(patch->getGlobalId()),
+                    core::to_string(patch->getGlobalId()),
                     Boxing_t{amr::layoutFromPatch<GridLayout>(*patch),
                              amr::makeNonLevelGhostBoxFor<GridLayout>(*patch, hierarchy)});
                 !suc)
@@ -537,7 +537,7 @@ void SolverPPC<HybridModel, AMR_Types>::moveIons_(level_t& level, HybridModel& m
         auto dt = newTime - currentTime;
         for (auto& patch : rm.enumerate(level, ions, electromagAvg_))
             ionUpdater_.updatePopulations(ions, electromagAvg_,
-                                          levelBoxing.at(amr::to_string(patch->getGlobalId())), dt,
+                                          levelBoxing.at(core::to_string(patch->getGlobalId())), dt,
                                           mode);
     }
     catch (core::DictionaryException const& ex)
