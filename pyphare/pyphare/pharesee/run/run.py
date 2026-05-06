@@ -29,6 +29,11 @@ quantities_per_file = {
     "ions_bulkVelocity": "Vi",
     "ions_charge_density": "Ni",
     "particle_count": "nppc",
+    "mhd_rho": "mhd_rho",
+    "mhd_V": "mhd_V",
+    "mhd_P": "mhd_P",
+    "mhd_rhoV": "mhd_rhoV",
+    "mhd_Etot": "mhd_Etot",
 }
 
 
@@ -181,58 +186,58 @@ class Run:
     ):
         if merged:
             all_primal = False
-        hier = self._get_hier_for(time, "mhd_rho", **kwargs)
+        hier = self._get_hierarchy(time, "mhd_rho.h5", **kwargs)
         if not all_primal:
             return self._get(hier, time, merged, interp)
 
         h = compute_hier_from(_compute_to_primal, hier, value="mhdRho")
-        return ScalarField(h)
+        return ScalarField.FROM(h)
 
     def GetMHDV(self, time, merged=False, interp="nearest", all_primal=True, **kwargs):
         if merged:
             all_primal = False
-        hier = self._get_hier_for(time, "mhd_V", **kwargs)
+        hier = self._get_hierarchy(time, "mhd_V.h5", **kwargs)
         if not all_primal:
             return self._get(hier, time, merged, interp)
 
         h = compute_hier_from(_compute_to_primal, hier, x="mhdVx", y="mhdVy", z="mhdVz")
-        return VectorField(h)
+        return VectorField.FROM(h)
 
     def GetMHDP(self, time, merged=False, interp="nearest", all_primal=True, **kwargs):
         if merged:
             all_primal = False
-        hier = self._get_hier_for(time, "mhd_P", **kwargs)
+        hier = self._get_hierarchy(time, "mhd_P.h5", **kwargs)
         if not all_primal:
             return self._get(hier, time, merged, interp)
 
         h = compute_hier_from(_compute_to_primal, hier, value="mhdP")
-        return ScalarField(h)
+        return ScalarField.FROM(h)
 
     def GetMHDrhoV(
         self, time, merged=False, interp="nearest", all_primal=True, **kwargs
     ):
         if merged:
             all_primal = False
-        hier = self._get_hier_for(time, "mhd_rhoV", **kwargs)
+        hier = self._get_hierarchy(time, "mhd_rhoV.h5", **kwargs)
         if not all_primal:
             return self._get(hier, time, merged, interp)
 
         h = compute_hier_from(
             _compute_to_primal, hier, x="mhdRhoVx", y="mhdRhoVy", z="mhdRhoVz"
         )
-        return VectorField(h)
+        return VectorField.FROM(h)
 
     def GetMHDEtot(
         self, time, merged=False, interp="nearest", all_primal=True, **kwargs
     ):
         if merged:
             all_primal = False
-        hier = self._get_hier_for(time, "mhd_Etot", **kwargs)
+        hier = self._get_hierarchy(time, "mhd_Etot.h5", **kwargs)
         if not all_primal:
             return self._get(hier, time, merged, interp)
 
         h = compute_hier_from(_compute_to_primal, hier, value="mhdEtot")
-        return ScalarField(h)
+        return ScalarField.FROM(h)
 
     def GetMagneticFlux(
         self, time, interp="nearest", xn=None, yn=None, Xn=None, Yn=None

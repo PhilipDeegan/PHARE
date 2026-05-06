@@ -38,6 +38,15 @@ field_qties = {
     "mass_density": "rho",
     "charge_density": "rho",
     "tags": "tags",
+    "rho": "mhdRho",
+    "V_x": "mhdVx",
+    "V_y": "mhdVy",
+    "V_z": "mhdVz",
+    "P": "mhdP",
+    "rhoV_x": "mhdRhoVx",
+    "rhoV_y": "mhdRhoVy",
+    "rhoV_z": "mhdRhoVz",
+    "Etot": "mhdEtot",
 }
 
 

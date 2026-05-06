@@ -1,0 +1,78 @@
+#
+#
+#
+
+
+import sys
+import numpy as np
+
+import pyphare.pharein as ph
+
+
+def config(*, diagdir: str, T: float):
+    cells = (512,)
+    dl = (0.25,)
+    L = cells[0] * dl[0]
+
+    time_step = 0.001
+    final_time = 20.0
+
+    sim = ph.Simulation(
+        cells=cells,
+        dl=dl,
+        time_step=time_step,
+        final_time=final_time,
+        boundary_types="periodic",
+        refinement="tagging",
+        max_nbr_levels=1,
+        max_mhd_level=1,
+        gamma=5.0 / 3.0,
+        mhd_timestepper="TVDRK3",
+        reconstruction="WENOZ",
+        limiter="None",
+        riemann="Rusanov",
+        model_options=["MHDModel"],
+        diag_options={
+            "format": "phareh5",
+            "options": {"dir": diagdir, "mode": "overwrite"},
+        },
+    )
+
+    ph.MHDModel(
+        density=lambda x: 1.0,
+        vx=lambda x: np.sin(2 * np.pi / L * x) * 1.5,
+        vy=lambda x: 0.0,
+        vz=lambda x: 0.0,
+        bx=lambda x: 1.0,
+        by=lambda x: 0.0,
+        bz=lambda x: 0.0,
+        p=lambda x: T,
+    )
+
+    dt = time_step * 500
+    timestamps = np.arange(0, final_time + time_step, dt)
+
+    for quantity in ["rho", "V", "P"]:
+        ph.MHDDiagnostics(quantity=quantity, write_timestamps=timestamps)
+
+    ph.ElectromagDiagnostics(quantity="B", write_timestamps=timestamps)
+
+    return sim
+
+
+def main():
+    from pyphare.simulator.simulator import Simulator
+
+    if len(sys.argv) != 3:
+        print('This code needs 2 parameters: diagdir, T')
+        sys.exit(1)
+
+    diagdir = sys.argv[1]
+    T = float(sys.argv[2])
+
+    Simulator(config(diagdir=diagdir, T=T), print_one_line=True).run().reset()
+    ph.global_vars.sim = None
+
+
+if __name__ == "__main__":
+    main()

@@ -271,6 +271,27 @@ def _ppd_to_ppp_domain_slicing(**kwargs):
         raise RuntimeError("dimension not yet implemented")
 
 
+def _ddd_to_ppp_domain_slicing(**kwargs):
+    """
+    return the slicing for (dual,dual,dual) to (primal,primal,primal)
+    centering that is the centering of MHD cell-centered quantities
+    """
+    nb_ghosts = kwargs["nb_ghosts"]
+    ndim = kwargs["ndim"]
+
+    inner, L, R = _inner_slices(nb_ghosts)
+
+    if ndim == 1:
+        return (inner,), (L, R)
+    elif ndim == 2:
+        return (inner, inner), ((L, L), (L, R), (R, L), (R, R))
+    else:
+        return (inner, inner, inner), (
+            (L, L, L), (L, L, R), (L, R, L), (L, R, R),
+            (R, L, L), (R, L, R), (R, R, L), (R, R, R),
+        )
+
+
 slices_to_primal_ = {
     "primal_primal_primal": _ppp_to_ppp_domain_slicing,
     "primal_dual_dual": _pdd_to_ppp_domain_slicing,
@@ -279,6 +300,7 @@ slices_to_primal_ = {
     "dual_primal_primal": _dpp_to_ppp_domain_slicing,
     "primal_dual_primal": _pdp_to_ppp_domain_slicing,
     "primal_primal_dual": _ppd_to_ppp_domain_slicing,
+    "dual_dual_dual": _ddd_to_ppp_domain_slicing,
 }
 
 
