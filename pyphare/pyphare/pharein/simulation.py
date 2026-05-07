@@ -442,7 +442,7 @@ def check_patch_size(ndim, **kwargs):
     min_per_interp = [6, 9, 9]  # SAMRAI BORDER BUG
     samrai_min = min_per_interp[interp - 1]
     smallest_patch_size = phare_utilities.np_array_ify(
-        max(samrai_min, int(small_invalid_patch_size) + 1), ndim
+        max(samrai_min, int(small_invalid_patch_size.max()) + 1), ndim
     )
     if "smallest_patch_size" in kwargs and kwargs["smallest_patch_size"] is not None:
         smallest_patch_size = phare_utilities.np_array_ify(

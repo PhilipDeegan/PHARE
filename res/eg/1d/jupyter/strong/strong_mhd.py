@@ -11,11 +11,13 @@ import pyphare.pharein as ph
 
 def config(*, diagdir: str, T: float, final_time: float):
     cells = (512,)
-    dl = (1.0 / cells[0],)
-    L = 1.0
+    dl = (8.0 / cells[0],)
+    L = cells[0] * dl[0]
 
     v_fast = np.sqrt(5.0 / 3.0 * T + 1.0)
-    time_step = 0.8 * dl[0] / v_fast
+    cfl_dt = 0.8 * dl[0] / v_fast
+    time_step_nbr = int(final_time / cfl_dt)
+    time_step = final_time / time_step_nbr
 
     sim = ph.Simulation(
         cells=cells,
@@ -50,7 +52,9 @@ def config(*, diagdir: str, T: float, final_time: float):
         p=lambda x: T,
     )
 
-    timestamps = np.linspace(0, final_time, 17)
+    output_every = max(1, round(final_time / 16 / time_step))
+    n_out = int(final_time / (output_every * time_step))
+    timestamps = np.arange(n_out + 1) * output_every * time_step
 
     for quantity in ["rho", "V", "P"]:
         ph.MHDDiagnostics(quantity=quantity, write_timestamps=timestamps)
