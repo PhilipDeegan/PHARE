@@ -43,7 +43,21 @@ yee_centering = {
         "Pyy": "primal",
         "Pyz": "primal",
         "Pzz": "primal",
+        # finite volume mhd quantities are 3ple dual
+        "mhdRho": "dual",
+        "mhdVx": "dual",
+        "mhdVy": "dual",
+        "mhdVz": "dual",
+        "mhdP": "dual",
+        "mhdRhoVx": "dual",
+        "mhdRhoVy": "dual",
+        "mhdRhoVz": "dual",
+        "mhdEtot": "dual",
         "tags": "dual",
+        "value": "primal",
+        "x": "primal",
+        "y": "primal",
+        "z": "primal",
     },
     "y": {
         "Bx": "dual",
@@ -78,7 +92,20 @@ yee_centering = {
         "Pyy": "primal",
         "Pyz": "primal",
         "Pzz": "primal",
+        "mhdRho": "dual",
+        "mhdVx": "dual",
+        "mhdVy": "dual",
+        "mhdVz": "dual",
+        "mhdP": "dual",
+        "mhdRhoVx": "dual",
+        "mhdRhoVy": "dual",
+        "mhdRhoVz": "dual",
+        "mhdEtot": "dual",
         "tags": "dual",
+        "value": "primal",
+        "x": "primal",
+        "y": "primal",
+        "z": "primal",
     },
     "z": {
         "Bx": "dual",
@@ -113,7 +140,20 @@ yee_centering = {
         "Pyy": "primal",
         "Pyz": "primal",
         "Pzz": "primal",
+        "mhdRho": "dual",
+        "mhdVx": "dual",
+        "mhdVy": "dual",
+        "mhdVz": "dual",
+        "mhdP": "dual",
+        "mhdRhoVx": "dual",
+        "mhdRhoVy": "dual",
+        "mhdRhoVz": "dual",
+        "mhdEtot": "dual",
         "tags": "dual",
+        "value": "primal",
+        "x": "primal",
+        "y": "primal",
+        "z": "primal",
     },
 }
 yee_centering_lower = {
@@ -374,14 +414,13 @@ class GridLayout(object):
         ):
             qty = qty[0].upper() + qty[1:]
 
-        if "centering" in kwargs:
-            centering = kwargs["centering"]
-        else:
-            centering = yee_centering[direction][qty]
-
+        centering = kwargs.get("centering", None) or yee_centering[direction][qty]
+        nbrGhosts = kwargs.get("nbrGhosts", None) or self.nbrGhosts(
+            self.interp_order, centering
+        )
         return yeeCoordsFor(
             self.origin,
-            self.nbrGhosts(self.interp_order, centering),
+            nbrGhosts,
             self.dl,
             self.box.shape,
             qty,
