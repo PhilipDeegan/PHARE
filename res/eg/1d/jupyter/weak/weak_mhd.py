@@ -10,13 +10,13 @@ import pyphare.pharein as ph
 
 
 cells = (512,)
-dl = (8.0 / cells[0],)
-L = cells[0] * dl[0]
+dl = (1.0 / cells[0],)
+L = 1.0
 x0 = L / 2
-sigma = 2.0 / 128 * L
+sigma = 2.0 / 128
 
 v_fast = np.sqrt(5.0 / 3.0 + 1.0)
-final_time = 8.0
+final_time = 1.0
 time_step_nbr = int(final_time / (0.8 * dl[0] / v_fast))
 time_step = final_time / time_step_nbr
 output_every = max(1, round(final_time / 40 / time_step))
@@ -68,9 +68,9 @@ def config(*, diagdir):
         max_mhd_level=1,
         interp_order=2,
         gamma=5.0 / 3.0,
-        mhd_timestepper="TVDRK3",
-        reconstruction="WENOZ",
-        limiter="None",
+        mhd_timestepper="TVDRK2",
+        reconstruction="Linear",
+        limiter="VanLeer",
         riemann="Rusanov",
         model_options=["MHDModel"],
         diag_options={
