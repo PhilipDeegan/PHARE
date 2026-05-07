@@ -184,7 +184,8 @@ def new_patchdatas_from(compute, patchdatas, layout, id, **kwargs):
     new_patch_datas = {}
     datas = compute(patchdatas, patch_id=id, **kwargs)
     for data in datas:
-        pd = FieldData(layout, data["name"], data["data"], centering=data["centering"])
+        extra = {k: data[k] for k in ("ghosts_nbr",) if k in data}
+        pd = FieldData(layout, data["name"], data["data"], centering=data["centering"], **extra)
         new_patch_datas[data["name"]] = pd
     return new_patch_datas
 
@@ -441,11 +442,13 @@ def compute_rename(patch_datas, **kwargs):
     pd_attrs = []
 
     for new_name, pd_name in zip(new_names, patch_datas):
+        src = patch_datas[pd_name]
         pd_attrs.append(
             {
                 "name": new_name,
-                "data": patch_datas[pd_name].dataset,
-                "centering": patch_datas[pd_name].centerings,
+                "data": src.dataset,
+                "centering": src.centerings,
+                "ghosts_nbr": src.ghosts_nbr,
             }
         )
 

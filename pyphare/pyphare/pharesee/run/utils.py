@@ -353,7 +353,7 @@ def _compute_to_primal(patchdatas, patch_id, **kwargs):
             ds_[inner] = np.add(ds_[inner], ds[chunk] / len(chunks))
         ds_all_primal[inner] = ds_[inner]
 
-        pd_attrs.append({"name": name, "data": ds_all_primal, "centering": centerings})
+        pd_attrs.append({"name": name, "data": ds_all_primal, "centering": centerings, "ghosts_nbr": [nb_ghosts] * ndim})
 
     return tuple(pd_attrs)
 
