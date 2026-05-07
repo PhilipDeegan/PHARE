@@ -113,14 +113,10 @@ public:
 
 
     NO_DISCARD auto getCompileTimeResourcesViewList()
-    {
-        return std::forward_as_tuple(Bold_, fluxSumE_);
-    }
+    { return std::forward_as_tuple(Bold_, fluxSumE_); }
 
     NO_DISCARD auto getCompileTimeResourcesViewList() const
-    {
-        return std::forward_as_tuple(Bold_, fluxSumE_);
-    }
+    { return std::forward_as_tuple(Bold_, fluxSumE_); }
 
 
 private:
