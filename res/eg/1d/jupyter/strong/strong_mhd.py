@@ -9,13 +9,13 @@ import numpy as np
 import pyphare.pharein as ph
 
 
-def config(*, diagdir: str, T: float):
+def config(*, diagdir: str, T: float, final_time: float):
     cells = (512,)
-    dl = (0.25,)
-    L = cells[0] * dl[0]
+    dl = (1.0 / cells[0],)
+    L = 1.0
 
-    time_step = 0.001
-    final_time = 20.0
+    v_fast = np.sqrt(5.0 / 3.0 * T + 1.0)
+    time_step = 0.8 * dl[0] / v_fast
 
     sim = ph.Simulation(
         cells=cells,
@@ -26,6 +26,7 @@ def config(*, diagdir: str, T: float):
         refinement="tagging",
         max_nbr_levels=1,
         max_mhd_level=1,
+        interp_order=2,
         gamma=5.0 / 3.0,
         mhd_timestepper="TVDRK3",
         reconstruction="WENOZ",
@@ -49,8 +50,7 @@ def config(*, diagdir: str, T: float):
         p=lambda x: T,
     )
 
-    dt = time_step * 500
-    timestamps = np.arange(0, final_time + time_step, dt)
+    timestamps = np.linspace(0, final_time, 17)
 
     for quantity in ["rho", "V", "P"]:
         ph.MHDDiagnostics(quantity=quantity, write_timestamps=timestamps)
@@ -63,14 +63,15 @@ def config(*, diagdir: str, T: float):
 def main():
     from pyphare.simulator.simulator import Simulator
 
-    if len(sys.argv) != 3:
-        print('This code needs 2 parameters: diagdir, T')
+    if len(sys.argv) != 4:
+        print('This code needs 3 parameters: diagdir, T, final_time')
         sys.exit(1)
 
     diagdir = sys.argv[1]
     T = float(sys.argv[2])
+    final_time = float(sys.argv[3])
 
-    Simulator(config(diagdir=diagdir, T=T), print_one_line=True).run().reset()
+    Simulator(config(diagdir=diagdir, T=T, final_time=final_time), print_one_line=True).run().reset()
     ph.global_vars.sim = None
 
 

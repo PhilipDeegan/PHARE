@@ -9,16 +9,16 @@ import numpy as np
 import pyphare.pharein as ph
 
 
-time_step = 0.005
-final_time = 100.0
-dt = time_step * 500
-timestamps = np.arange(0, final_time + dt, dt)
-
 cells = (512,)
-dl = (0.25,)
-L = cells[0] * dl[0]
+dl = (1.0 / cells[0],)
+L = 1.0
 x0 = L / 2
-sigma = 2.0
+sigma = 2.0 / 128
+
+v_fast = np.sqrt(5.0 / 3.0 + 1.0)
+time_step = 0.8 * dl[0] / v_fast
+final_time = 1.0
+timestamps = np.linspace(0, final_time, 41)
 
 
 def density(x):
@@ -63,6 +63,7 @@ def config(*, diagdir):
         refinement="tagging",
         max_nbr_levels=1,
         max_mhd_level=1,
+        interp_order=2,
         gamma=5.0 / 3.0,
         mhd_timestepper="TVDRK3",
         reconstruction="WENOZ",
