@@ -14,9 +14,10 @@ def config(*, diagdir: str, T: float, final_time: float):
     dl = (1.0 / cells[0],)
     L = 1.0
 
+    n_outputs = 4
     v_fast = np.sqrt(5.0 / 3.0 * T + 1.0) + 1.5
     cfl_dt = 0.8 * dl[0] / v_fast
-    time_step_nbr = int(final_time / cfl_dt)
+    time_step_nbr = int(np.ceil(int(final_time / cfl_dt) / n_outputs)) * n_outputs
     time_step = final_time / time_step_nbr
 
     sim = ph.Simulation(
@@ -52,11 +53,7 @@ def config(*, diagdir: str, T: float, final_time: float):
         p=lambda x: T,
     )
 
-    output_every = max(1, round(final_time / 16 / time_step))
-    n_out = int(final_time / (output_every * time_step))
-    timestamps = np.arange(n_out + 1) * output_every * time_step
-    if timestamps[-1] < final_time - time_step / 2:
-        timestamps = np.append(timestamps, final_time)
+    timestamps = np.arange(0, time_step_nbr + 1, time_step_nbr // n_outputs) * time_step
 
     for quantity in ["rho", "V", "P"]:
         ph.MHDDiagnostics(quantity=quantity, write_timestamps=timestamps)

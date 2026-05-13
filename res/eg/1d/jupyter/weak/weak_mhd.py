@@ -16,12 +16,11 @@ x0 = L / 2
 sigma = 2.0 / 128
 
 v_fast = np.sqrt(5.0 / 3.0 + 1.0)
-final_time = 1.0
-time_step_nbr = int(final_time / (0.8 * dl[0] / v_fast))
+final_time = 0.25
+n_outputs = 10
+time_step_nbr = int(np.ceil(int(final_time / (0.8 * dl[0] / v_fast)) / n_outputs)) * n_outputs
 time_step = final_time / time_step_nbr
-output_every = max(1, round(final_time / 40 / time_step))
-n_out = int(final_time / (output_every * time_step))
-timestamps = np.arange(n_out + 1) * output_every * time_step
+timestamps = np.arange(0, time_step_nbr + 1, time_step_nbr // n_outputs) * time_step
 
 
 def density(x):
