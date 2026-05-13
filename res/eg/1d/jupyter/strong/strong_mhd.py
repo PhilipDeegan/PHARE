@@ -29,7 +29,6 @@ def config(*, diagdir: str, T: float, final_time: float):
         refinement="tagging",
         max_nbr_levels=1,
         max_mhd_level=1,
-        interp_order=1,
         gamma=5.0 / 3.0,
         mhd_timestepper="TVDRK2",
         reconstruction="Linear",
