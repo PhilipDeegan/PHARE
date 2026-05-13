@@ -22,11 +22,16 @@ def gaussian_filter_uniform_grid(grid, sigma=2):
 
     ndim = grid.box.ndim
     nb_ghosts = grid.ghosts_nbr[0]
-    ds = np.asarray(grid[:])
-    ds_ = np.full(list(ds.shape), np.nan)
-    gf_ = gaussian_filter(ds, sigma=sigma)
+    ds = np.asarray(grid[:], dtype=float)
+    nan_mask = np.isnan(ds)
+    filled = np.where(nan_mask, 0.0, ds)
+    weights = np.where(nan_mask, 0.0, 1.0)
+    val_filt = gaussian_filter(filled, sigma=sigma)
+    w_filt = gaussian_filter(weights, sigma=sigma)
+    result = np.where(w_filt > 1e-6, val_filt / w_filt, np.nan)
     select = tuple([slice(nb_ghosts or None, -nb_ghosts or None) for _ in range(ndim)])
-    ds_[select] = np.asarray(gf_[select])
+    ds_ = np.full(ds.shape, np.nan)
+    ds_[select] = result[select]
     copy = deepcopy(grid)
     copy.dataset = ds_
     return copy
