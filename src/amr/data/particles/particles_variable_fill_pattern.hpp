@@ -4,7 +4,7 @@
 #include "core/logger.hpp"
 #include "core/def/phare_mpi.hpp" // IWYU pragma: keep
 
-#include <amr/utilities/box/amr_box.hpp>
+#include "amr/utilities/box/amr_box.hpp"
 
 #include <SAMRAI/pdat/CellOverlap.h>
 #include <SAMRAI/hier/BoxContainer.h>
@@ -21,11 +21,13 @@
 namespace PHARE::amr
 {
 
+
 /** ParticlesDomainOverlap is used as a signal in particles_data.hpp
   that we are performing an export from the patch ghost layer
   of one patch, to the domain of adjacent patch which is the analogue
   of the original patch ghost layer
   */
+
 class ParticlesDomainOverlap : public SAMRAI::pdat::CellOverlap
 {
     using Super = SAMRAI::pdat::CellOverlap;
@@ -39,6 +41,7 @@ public:
 
     ~ParticlesDomainOverlap() = default;
 };
+
 
 
 
@@ -131,11 +134,7 @@ private:
                             SAMRAI::hier::BoxContainer const& node_fill_boxes,
                             SAMRAI::hier::Box const& patch_box, SAMRAI::hier::Box const& data_box,
                             SAMRAI::hier::PatchDataFactory const& pdf) const override
-    {
-        PHARE_LOG_SCOPE(2, "ParticleDomainFromGhostFillPattern::computeFillBoxesOverlap");
-
-        throw std::runtime_error("no refinement supported or expected");
-    }
+    { throw std::runtime_error("no refinement supported or expected"); }
 };
 
 /**
@@ -160,9 +159,7 @@ public:
     void reset() { patchOwnedBoxes_.clear(); }
 
     void setOwnedBoxes(SAMRAI::hier::Box const& patchBox, SAMRAI::hier::BoxContainer const& owned)
-    {
-        patchOwnedBoxes_.emplace_back(patchBox, owned);
-    }
+    { patchOwnedBoxes_.emplace_back(patchBox, owned); }
 
     std::string const& getPatternName() const override { return s_name_id; }
 

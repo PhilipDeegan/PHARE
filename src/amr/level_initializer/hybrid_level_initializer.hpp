@@ -4,7 +4,7 @@
 #include "core/errors.hpp"
 #include "core/utilities/mpi_utils.hpp"
 #include "core/numerics/moments/moments.hpp"
-#include "core/numerics/interpolator/interpolator.hpp"
+#include "core/numerics/interpolator/interpolating.hpp"
 
 #include "amr/messengers/messenger.hpp"
 #include "amr/messengers/hybrid_messenger.hpp"
@@ -35,8 +35,12 @@ namespace solver
         static constexpr auto dimension    = GridLayoutT::dimension;
         static constexpr auto interp_order = GridLayoutT::interp_order;
 
-        using Ampere_t = AmpereLevelTransformer<HybridModel>;
-        using Ohm_t    = OhmLevelTransformer<HybridModel>;
+        using Ampere_t        = AmpereLevelTransformer<HybridModel>;
+        using Ohm_t           = OhmLevelTransformer<HybridModel>;
+        using ParticleArray_t = HybridModel::particle_array_type;
+        using Interpolating_t
+            = core::Interpolating<ParticleArray_t, interp_order, /*atomic_interp*/ false>;
+
         core::OhmInfo ohm_info;
 
 
@@ -53,7 +57,8 @@ namespace solver
                                 amr::IMessenger<IPhysicalModelT>& messenger, double initDataTime,
                                 bool isRegridding) override
         {
-            core::Interpolator<dimension, interp_order> interpolate_;
+            Interpolating_t interpolate_;
+
             auto& hybridModel = static_cast<HybridModel&>(model);
             auto& level       = amr_types::getLevel(*hierarchy, levelNumber);
 
@@ -97,6 +102,7 @@ namespace solver
                 throw core::DictionaryException{}("ID", "HybridLevelInitializer::initialize");
 
             // now all particles are here, we must compute moments.
+
             auto& ions = hybridModel.state.ions;
             auto& rm   = *hybridModel.resourcesManager;
 
@@ -109,6 +115,7 @@ namespace solver
                 if (!isRootLevel(levelNumber))
                     core::depositParticles(ions, layout, interpolate_, core::LevelGhostDeposit{});
             }
+
 
             // at this point flux and density is computed for all pops
             // but nodes on ghost box overlaps are not complete because they lack
@@ -175,7 +182,11 @@ namespace solver
             hybMessenger.prepareStep(hybridModel, level, initDataTime);
         }
     };
+
+
 } // namespace solver
+
 } // namespace PHARE
+
 
 #endif

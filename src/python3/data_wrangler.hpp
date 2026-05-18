@@ -33,7 +33,7 @@
 namespace PHARE::pydata
 {
 template<auto opts>
-class SimulatorCaster
+class __attribute__((visibility("hidden"))) SimulatorCaster
 {
 public:
     using Simulator_t = Simulator<opts>;

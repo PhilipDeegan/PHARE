@@ -47,6 +47,9 @@ class Patch:
             print(key, "not in", self.patch_datas.keys())
             raise e
 
+    def __iter__(self):
+        return self.patch_datas.values().__iter__()
+
     def copy(self):
         """does not copy patchdatas.datasets (see class PatchData)"""
         from copy import deepcopy

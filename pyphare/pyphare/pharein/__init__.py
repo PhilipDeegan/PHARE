@@ -1,5 +1,6 @@
 import os
 import sys
+import threading
 import subprocess
 import numpy as np
 
@@ -91,6 +92,8 @@ def _serialized_simulation_string(restart_file_dir):
 class py_fn_wrapper:
     def __init__(self, fn):
         self.fn = fn
+        self.ret = {}
+        self.lock = threading.Lock()
 
     def __call__(self, *xyz):
         args = [np.asarray(arg) for arg in xyz]
@@ -99,6 +102,14 @@ class py_fn_wrapper:
             ret = np.asarray(ret)
         if is_scalar(ret):
             ret = np.full(len(args[-1]), ret)
+
+        # assert threading.get_native_id() not in self.ret
+        # print("\n\n\n?Wrapped ", self.fn, threading.get_native_id())
+        # print("\n\n\n")
+        # with self.lock:
+        #     print("!Wrapped ", self.fn, threading.get_native_id())
+        #     self.ret[threading.get_native_id()] = ret  # keep alive
+        # sys.exit(1)
         return ret
 
 
@@ -113,6 +124,7 @@ class fn_wrapper(py_fn_wrapper):
 
         # convert numpy array to C++ SubSpan
         # couples vector init functions to C++
+        # return cpp_etc_lib().makeSpan(super().__call__(*xyz))
         return cpp_etc_lib().makePyArrayWrapper(super().__call__(*xyz))
 
 
