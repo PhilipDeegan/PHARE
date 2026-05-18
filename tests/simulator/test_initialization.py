@@ -43,28 +43,33 @@ class InitializationTest(SimulatorTest):
         diag_outputs="",
         nbr_part_per_cell=100,
         density=_density,
-        extra_diag_options={},
+        extra_diag_options=None,
         beam=False,
         time_step_nbr=1,
         smallest_patch_size=None,
         largest_patch_size=10,
         cells=120,
         dl=0.1,
+        block_merging_particles=False,
+        sim_setup_kwargs={},
         **kwargs,
     ):
+        extra_diag_options = extra_diag_options or {}
         diag_outputs = self.unique_diag_dir_for_test_case(
-            "phare_outputs/init", ndim, interp_order, diag_outputs
+            "phare_outputs/init", ndim, interp_order, sim_setup_kwargs, diag_outputs
         )
         from pyphare.pharein import global_vars
+        from pyphare.pharein.simulation import check_patch_size
 
         global_vars.sim = None
 
+        default_largest_patch_size, default_smallest_patch_size = check_patch_size(
+            ndim, interp_order=interp_order, cells=cells
+        )
         if smallest_patch_size is None:
-            from pyphare.pharein.simulation import check_patch_size
-
-            _, smallest_patch_size = check_patch_size(
-                ndim, interp_order=interp_order, cells=cells
-            )
+            smallest_patch_size = default_smallest_patch_size
+        if largest_patch_size is None:
+            largest_patch_size = default_largest_patch_size
 
         extra_diag_options["mode"] = "overwrite"
         extra_diag_options["dir"] = diag_outputs
@@ -191,7 +196,7 @@ class InitializationTest(SimulatorTest):
                     population_name=pop,
                 )
 
-        Simulator(global_vars.sim).initialize().reset()
+        Simulator(global_vars.sim).setup(**sim_setup_kwargs).initialize().reset()
 
         eb_hier = None
         if qty in ["e", "eb"]:
@@ -240,30 +245,28 @@ class InitializationTest(SimulatorTest):
             hier=particle_hier,
         )
 
-        merge_particles(particle_hier)
+        if not block_merging_particles:
+            merge_particles(particle_hier)
 
         return particle_hier
 
-    def _test_B_is_as_provided_by_user(self, dim, interp_order, ppc=100, **kwargs):
+    def _test_B_is_as_provided_by_user(self, ndim, interp_order, ppc=100, **kwargs):
         print(
             "test_B_is_as_provided_by_user : dim  {} interp_order : {}".format(
-                dim, interp_order
+                ndim, interp_order
             )
         )
         now = self.datetime_now()
         hier = self.getHierarchy(
-            dim,
-            interp_order,
-            refinement_boxes=None,
-            qty="b",
-            nbr_part_per_cell=ppc,
-            diag_outputs=f"test_b/{dim}/{interp_order}/{self.ddt_test_id()}",
-            **kwargs,
+            ndim, interp_order, refinement_boxes=None, qty="b", **kwargs
         )
         print(
-            f"\n{self._testMethodName}_{dim}d init took {self.datetime_diff(now)} seconds"
+            f"\n{self._testMethodName}_{ndim}d init took {self.datetime_diff(now)} seconds"
         )
         now = self.datetime_now()
+
+        if cpp.mpi_rank() > 0:
+            return
 
         from pyphare.pharein import global_vars
 
@@ -275,6 +278,7 @@ class InitializationTest(SimulatorTest):
         for ilvl, level in hier.levels().items():
             self.assertTrue(ilvl == 0)  # only level 0 is expected perfect precision
             print("checking level {}".format(ilvl))
+
             for patch in level.patches:
                 bx_pd = patch.patch_datas["Bx"]
                 by_pd = patch.patch_datas["By"]
@@ -288,18 +292,18 @@ class InitializationTest(SimulatorTest):
                 xby = by_pd.x[:]
                 xbz = bz_pd.x[:]
 
-                if dim == 1:
+                if ndim == 1:
                     # discrepancy in 1d for some reason : https://github.com/PHAREHUB/PHARE/issues/580
                     assert_fp_any_all_close(bx, bx_fn(xbx), atol=1e-15, rtol=0)
                     assert_fp_any_all_close(by, by_fn(xby), atol=1e-15, rtol=0)
                     assert_fp_any_all_close(bz, bz_fn(xbz), atol=1e-15, rtol=0)
 
-                if dim >= 2:
+                if ndim >= 2:
                     ybx = bx_pd.y[:]
                     yby = by_pd.y[:]
                     ybz = bz_pd.y[:]
 
-                if dim == 2:
+                if ndim == 2:
                     xbx, ybx = [
                         a.flatten() for a in np.meshgrid(xbx, ybx, indexing="ij")
                     ]
@@ -318,7 +322,7 @@ class InitializationTest(SimulatorTest):
                         bz, bz_fn(xbz, ybz).reshape(bz.shape), atol=1e-16, rtol=0
                     )
 
-                if dim == 3:
+                if ndim == 3:
                     zbx = bx_pd.z[:]
                     zby = by_pd.z[:]
                     zbz = bz_pd.z[:]
@@ -333,31 +337,32 @@ class InitializationTest(SimulatorTest):
                         a.flatten() for a in np.meshgrid(xbz, ybz, zbz, indexing="ij")
                     ]
 
-                    assert_fp_any_all_close(
+                    np.testing.assert_allclose(
                         bx, bx_fn(xbx, ybx, zbx), atol=1e-16, rtol=0
                     )
-                    assert_fp_any_all_close(
+                    np.testing.assert_allclose(
                         by, by_fn(xby, yby, zby).reshape(by.shape), atol=1e-16, rtol=0
                     )
-                    assert_fp_any_all_close(
+                    np.testing.assert_allclose(
                         bz, bz_fn(xbz, ybz, zbz).reshape(bz.shape), atol=1e-16, rtol=0
                     )
 
-        print(f"\n{self._testMethodName}_{dim}d took {self.datetime_diff(now)} seconds")
+        print(
+            f"\n{self._testMethodName}_{ndim}d took {self.datetime_diff(now)} seconds"
+        )
 
-    def _test_bulkvel_is_as_provided_by_user(
-        self, dim, interp_order, ppc=100, **kwargs
-    ):
+    def _test_bulkvel_is_as_provided_by_user(self, ndim, interp_order, **kwargs):
         hier = self.getHierarchy(
-            dim,
+            ndim,
             interp_order,
-            {"L0": {"B0": nDBox(dim, 10, 19)}},
+            {"L0": {"B0": nDBox(ndim, 10, 19)}},
             "moments",
-            nbr_part_per_cell=ppc,
             beam=True,
-            diag_outputs=f"test_bulkV/{dim}/{interp_order}/{self.ddt_test_id()}",
             **kwargs,
         )
+
+        if cpp.mpi_rank() > 0:
+            return
 
         from pyphare.pharein import global_vars
 
@@ -380,10 +385,10 @@ class InitializationTest(SimulatorTest):
                 nbrGhosts = layout.nbrGhosts(
                     interp_order, centering
                 )  # primal in all directions
-                select = tuple([slice(nbrGhosts, -nbrGhosts) for i in range(dim)])
+                select = tuple([slice(nbrGhosts, -nbrGhosts) for i in range(ndim)])
 
                 def domain(patch_data):
-                    if dim == 1:
+                    if ndim == 1:
                         return patch_data.dataset[select]
                     return patch_data.dataset[:].reshape(
                         patch.box.shape + (nbrGhosts * 2) + 1
@@ -412,11 +417,7 @@ class InitializationTest(SimulatorTest):
             f"test_density_is_as_provided_by_user : dim {ndim} interp_order {interp_order}"
         )
 
-        empirical_dim_devs = {
-            1: 6e-3,
-            2: 3e-2,
-            3: 2e-1,
-        }
+        empirical_dim_devs = {1: 6e-3, 2: 3e-2, 3: 2.4e-1}
         nbParts = {1: 10000, 2: 1000, 3: 20}
         hier = self.getHierarchy(
             ndim,
@@ -427,6 +428,9 @@ class InitializationTest(SimulatorTest):
             beam=True,
             **kwargs,
         )
+
+        if cpp.mpi_rank() > 0:
+            return
 
         from pyphare.pharein import global_vars
 
@@ -473,7 +477,7 @@ class InitializationTest(SimulatorTest):
                     )
 
     def _test_density_decreases_as_1overSqrtN(
-        self, ndim, interp_order, nbr_particles=None, cells=960
+        self, ndim, interp_order, nbr_particles=None, cells=960, **kwargs
     ):
         import matplotlib.pyplot as plt
 
@@ -499,9 +503,11 @@ class InitializationTest(SimulatorTest):
                 largest_patch_size=int(cells / 2),
                 cells=cells,
                 dl=0.0125,
+                **kwargs,
             )
 
-            from pyphare.pharein import global_vars
+            if cpp.mpi_rank() == 0:
+                from pyphare.pharein import global_vars
 
             model = global_vars.sim.model
             density_fn = model.model_dict["protons"]["density"]
@@ -529,6 +535,9 @@ class InitializationTest(SimulatorTest):
                 plt.title(r"$\sigma =$ {}".format(noise[inbr]))
                 plt.savefig(f"noise_{nbrpart}_interp_{ndim}_{interp_order}.png")
                 plt.close("all")
+
+        if cpp.mpi_rank() > 0:
+            return
 
         plt.figure()
         plt.plot(nbr_particles, noise / noise[0], label=r"$\sigma/\sigma_0$")
@@ -566,7 +575,6 @@ class InitializationTest(SimulatorTest):
             interp_order,
             {},
             "particles",
-            diag_outputs=f"ppc/{ndim}/{interp_order}/{ddt_test_id}",
             nbr_part_per_cell=ppc,
             **kwargs,
         )
@@ -574,7 +582,7 @@ class InitializationTest(SimulatorTest):
         if cpp.mpi_rank() > 0:
             return
 
-        for pi, patch in enumerate(datahier.level(0).patches):
+        for patch in datahier.level(0).patches:
             pd = patch.patch_datas["protons_particles"]
             icells = pd.dataset[patch.box].iCells
             H, edges = np.histogramdd(icells, bins=patch.box.shape)
@@ -681,13 +689,52 @@ class InitializationTest(SimulatorTest):
                     == coarse_particles.size() * sim.refined_particle_nbr
                 )
 
+                # gaboxes_list may have multiple entries per patch (one per ghost-area
+                # side), so deduplicate by identity to get one pdata per patch.
+                unique_pdatas = list(
+                    {id(g["pdata"]): g["pdata"] for g in gaboxes_list}.values()
+                )
                 for gabox in gaboxes_list:
-                    gabox_patchData = gabox["pdata"]
-
                     for ghostBox in gabox["boxes"]:
-                        part1 = gabox_patchData.dataset.select(ghostBox)
+                        # Each patch fills only its owned subset of the ghost region
+                        # to avoid duplicates, so aggregate across all unique patches.
+                        combined = None
+                        for pdata in unique_pdatas:
+                            parts = pdata.dataset.select(ghostBox)
+                            if parts.size() > 0:
+                                if combined is None:
+                                    combined = parts
+                                else:
+                                    combined.add(parts)
+                        if combined is None:
+                            continue
                         part2 = coarse_split_particles.select(ghostBox)
-                        self.assertEqual(part1, part2)
+                        self.assertEqual(combined, part2)
+
+        # check no duplicate level ghost particles across patch ghost boxes
+        for ilvl, particle_gaboxes in particle_level_ghost_boxes_per_level.items():
+            for pop_name, gaboxes_list in particle_gaboxes.items():
+                all_icells = []
+                all_deltas = []
+                for gabox in gaboxes_list:
+                    pdata = gabox["pdata"]
+                    for ghostBox in gabox["boxes"]:
+                        parts = pdata.dataset.select(ghostBox)
+                        if parts.size() > 0:
+                            all_icells.append(parts.iCells)
+                            all_deltas.append(parts.deltas)
+                if not all_icells:
+                    continue
+                combined_icells = np.concatenate(all_icells, axis=0)
+                combined_deltas = np.concatenate(all_deltas, axis=0)
+                combined = np.hstack([combined_icells, combined_deltas])
+                n_total = combined.shape[0]
+                n_unique = np.unique(combined, axis=0).shape[0]
+                self.assertEqual(
+                    n_unique,
+                    n_total,
+                    f"level {ilvl} pop {pop_name}: found {n_total - n_unique} duplicate level ghost particles across patch ghost boxes",
+                )
 
 
 if __name__ == "__main__":

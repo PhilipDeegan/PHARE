@@ -11,14 +11,28 @@ __all__ = ["validate"]
 _libs = {}
 
 
-def simulator_id(sim):
-    return f"{sim.ndim}_{sim.interp_order}_{sim.refined_particle_nbr}"
+def simulator_id(sim, layout=None, allocator=0):
+    layout = str(layout).split(".")[1] if layout else None
+    if layout and layout != "AoSMapped":
+        return "_".join(
+            str(s)
+            for s in [
+                sim.ndim,
+                sim.interp_order,
+                layout,
+                sim.refined_particle_nbr,
+            ]
+        )
+
+    return "_".join(
+        str(s) for s in [sim.ndim, sim.interp_order, sim.refined_particle_nbr]
+    )
 
 
-def cpp_lib(sim):
+def cpp_lib(sim, layout=None, allocator=0):
     global _libs
 
-    mod_str = f"pybindlibs.cpp_{simulator_id(sim)}"
+    mod_str = f"pybindlibs.cpp_{simulator_id(sim, layout, allocator)}"
     if mod_str not in _libs:
         _libs[mod_str] = importlib.import_module(mod_str)
     return _libs[mod_str]
@@ -44,13 +58,28 @@ def split_pyarrays_fn(sim):
     return getattr(cpp_lib(sim), "split_pyarray_particles")
 
 
+def mpi_is_init():
+    return getattr(cpp_etc_lib(), "mpi_is_init")()
+
+
 def mpi_rank():
+    # if not mpi_is_init():
+    #     raise RuntimeError("MPI is not initialized")
     return getattr(cpp_etc_lib(), "mpi_rank")()
 
 
 def mpi_size():
+    # if not mpi_is_init():
+    #     raise RuntimeError("MPI is not initialized")
     return getattr(cpp_etc_lib(), "mpi_size")()
 
 
 def mpi_barrier():
+    # if not mpi_is_init():
+    #     raise RuntimeError("MPI is not initialized")
     return getattr(cpp_etc_lib(), "mpi_barrier")()
+
+
+def supported_particle_layouts():
+    # see: src/core/data/particles/particle_array_def.hpp
+    return getattr(cpp_etc_lib(), "supported_layouts")()

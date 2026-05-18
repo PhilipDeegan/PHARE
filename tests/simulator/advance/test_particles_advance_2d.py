@@ -4,10 +4,12 @@
 """
 
 import unittest
+import itertools
 
 import matplotlib
 from ddt import data, ddt, unpack
 from pyphare.core.box import Box2D
+from pyphare.cpp import supported_particle_layouts
 
 from tests.simulator.test_advance import AdvanceTestBase
 
@@ -18,23 +20,34 @@ interp_orders = [1, 2, 3]
 ppc = 25
 
 
-def per_interp(dic):
-    return [(interp, dic) for interp in interp_orders]
+def permute(boxes={}):
+    return [
+        dict(
+            interp_order=interp_order,
+            refinement_boxes=boxes,
+            sim_setup_kwargs=dict(layout=layout),
+        )
+        for interp_order, layout in itertools.product(
+            interp_orders, supported_particle_layouts()
+        )
+    ]
 
 
 @ddt
 class AdvanceTest2D(AdvanceTestBase):
-    @data(*interp_orders)
-    def test_L0_particle_number_conservation(self, interp):
-        self._test_L0_particle_number_conservation(ndim, interp, ppc=ppc)
-
-    @data(
-        *per_interp(({"L0": {"B0": Box2D(10, 14)}})),
-    )
+    @data(*permute())
     @unpack
-    def test_domain_particles_on_refined_level(self, interp_order, refinement_boxes):
+    def test_L0_particle_number_conservation(self, interp_order, **kwargs):
+        print(f"{self._testMethodName}_{ndim}d")
+        self._test_L0_particle_number_conservation(
+            ndim, interp_order, ppc=ppc, **kwargs
+        )
+
+    @data(*permute({"L0": {"B0": Box2D(10, 14)}}))
+    @unpack
+    def test_domain_particles_on_refined_level(self, interp_order, **kwargs):
         self._test_domain_particles_on_refined_level(
-            ndim, interp_order, refinement_boxes, nbr_part_per_cell=ppc
+            ndim, interp_order, nbr_part_per_cell=ppc, **kwargs
         )
 
 
