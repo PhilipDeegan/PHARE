@@ -1,14 +1,16 @@
 
 
 #include "core/data/particles/particle_array.hpp"
-#include "core/numerics/ion_updater/ion_updater.hpp" // IWYU pragma: keep
+#include <core/numerics/ion_updater/ion_updater_def.hpp>
+#include "core/numerics/ion_updater/ion_updater/ion_updater_impl0.hpp"
+#include "core/numerics/ion_updater/ion_updater/ion_updater_impl1.hpp"
+
 
 #include "tests/core/data/electromag/test_electromag_fixtures.hpp"
 #include "tests/core/data/ion_population/test_ion_population_fixtures.hpp"
 
 
 #include "gtest/gtest.h"
-#include <core/numerics/ion_updater/ion_updater_def.hpp>
 #include <cstddef>
 
 
@@ -34,8 +36,6 @@ auto get_updater_for(Ions const&)
         return IonUpdater0<Ions>();
     if constexpr (impl == 1)
         return IonUpdater1<Ions>();
-    if constexpr (impl == 2)
-        return IonUpdater2<Ions>();
 }
 
 
@@ -258,9 +258,6 @@ using Permutations_t = ::testing::Types<
   , TestParam<PHARE::SimOpts{1, 1}, 1>
   , TestParam<PHARE::SimOpts{2, 1}, 1>
   , TestParam<PHARE::SimOpts{3, 1}, 1>
-  , TestParam<PHARE::SimOpts{1, 1}, 2>
-  , TestParam<PHARE::SimOpts{2, 1}, 2>
-  , TestParam<PHARE::SimOpts{3, 1}, 2>
 >;
 // clang-format on
 

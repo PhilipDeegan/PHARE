@@ -179,7 +179,7 @@ def plot(test, diag_dir):
                 filename=plot_file_for_qty(plot_dir, f"Bgaussian{c}", time), qty=f"B{c}"
             )
         Ngaussian = phc.filters.gaussian(run.GetN(time, pop_name=pop_name))
-        Ngaussian.plot(filename=plot_file_for_qty("Ngaussian", time))
+        Ngaussian.plot(filename=plot_file_for_qty(plot_dir, "Ngaussian", time))
 
         run.GetN(time, pop_name=pop_name).plot(
             filename=plot_file_for_qty(plot_dir, "N", time), plot_patches=True

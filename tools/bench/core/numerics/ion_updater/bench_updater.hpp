@@ -17,12 +17,7 @@ namespace PHARE::core
 template<std::uint16_t impl, typename Ions>
 auto get_updater_for(Ions const&)
 {
-    if constexpr (impl == 0)
-        return IonUpdater0<Ions>();
-    if constexpr (impl == 1)
-        return IonUpdater1<Ions>();
-    if constexpr (impl == 2)
-        return IonUpdater2<Ions>();
+    return core::IonUpdater<Ions>();
 }
 
 template<std::size_t dim_, std::size_t interp_, std::size_t impl_>

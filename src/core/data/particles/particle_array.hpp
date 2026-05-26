@@ -151,26 +151,6 @@ public:
     void empty_map() { cellMap_.empty(); }
 
 
-    template<typename Cell>
-    bool swap_last_reduce_by_one(Cell const& oldCell, std::size_t const idx)
-    {
-        // swap last to index
-        // swap idx to last
-        // --size
-        // return true if you need to repeat the current index == expected
-
-        bool const idx_is_last = idx == size() - 1;
-        if (!idx_is_last)
-        {
-            cellMap_.swap(oldCell, particles_[size() - 1].iCell, idx, size() - 1);
-            particles_[idx] = particles_[size() - 1];
-        }
-
-        cellMap_.erase(*this, oldCell, size() - 1); // doesn't erase from particles vector
-        resize(size() - 1);
-        return !idx_is_last;
-    }
-
 
     NO_DISCARD auto nbr_particles_in(box_t const& box) const { return cellMap_.size(box); }
 

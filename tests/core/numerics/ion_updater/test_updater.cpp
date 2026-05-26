@@ -3,7 +3,8 @@
 
 #include "phare_core.hpp"
 
-#include "core/numerics/ion_updater/ion_updater.hpp"
+#include "core/numerics/ion_updater/ion_updater/ion_updater_impl0.hpp"
+#include "core/numerics/ion_updater/ion_updater/ion_updater_impl1.hpp"
 
 #include "tests/core/data/vecfield/test_vecfield_fixtures.hpp"
 #include "tests/core/data/tensorfield/test_tensorfield_fixtures.hpp"
@@ -351,15 +352,6 @@ struct updater_test_bits<opts, 1>
     using IonUpdater = IonUpdater1<Ions>;
 };
 
-template<auto opts>
-struct updater_test_bits<opts, 2>
-{
-    using PHARETypes = PHARE::core::PHARE_Types<opts>;
-    using Ions       = PHARETypes::Ions_t;
-    using IonUpdater = IonUpdater2<Ions>;
-};
-
-
 
 
 template<typename TestParam_t>
@@ -672,9 +664,6 @@ using Permutations = ::testing::Types<
   , TestParam<PHARE::SimOpts{1, 1}, 1>
   , TestParam<PHARE::SimOpts{1, 2}, 1>
   , TestParam<PHARE::SimOpts{1, 3}, 1>
-  , TestParam<PHARE::SimOpts{1, 1}, 2>
-  , TestParam<PHARE::SimOpts{1, 2}, 2>
-  , TestParam<PHARE::SimOpts{1, 3}, 2>
 >;
 // clang-format on
 TYPED_TEST_SUITE(IonUpdaterTest, Permutations, );

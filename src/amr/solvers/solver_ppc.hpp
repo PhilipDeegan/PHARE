@@ -553,7 +553,7 @@ void SolverPPC<HybridModel, AMR_Types>::moveIons_(level_t& level, HybridModel& m
                                                   Messenger& fromCoarser, double const currentTime,
                                                   double const newTime, core::UpdaterMode mode)
 {
-    PHARE_DEBUG_DO(_debug_log_move_ions(views);)
+    PHARE_DEBUG_DO(_debug_log_move_ions(level, model);)
 
     TimeSetter setTime{level, model, newTime};
     auto& rm                = *model.resourcesManager;
@@ -590,7 +590,7 @@ void SolverPPC<HybridModel, AMR_Types>::moveIons_(level_t& level, HybridModel& m
         PHARE_LOG_SCOPE(1, "SolverPPC::moveIons::fillIonPopMomentGhosts");
         fromCoarser.fillIonPopMomentGhosts(ions, level, newTime);
     }
-    if (mode != core::UpdaterMode::domain_only)
+    if (mode != core::UpdaterMode::copy)
     {
         PHARE_LOG_SCOPE(1, "SolverPPC::moveIons::fillIonGhostParticles");
         fromCoarser.fillIonGhostParticles(ions, level, newTime);
