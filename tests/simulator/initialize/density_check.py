@@ -242,13 +242,13 @@ def main():
 
     H1 = hierarchy_from(
         hier=h1,
-        from_func=ions_mass_density_func1d,
+        from_func=fromfunc.ions_mass_density_func1d,
         masses=masses,
         densities=(densityMain_1d, densityBeam_1d),
     )
     H2 = hierarchy_from(
         hier=h2,
-        from_func=ions_charge_density_func1d,
+        from_func=fromfunc.ions_charge_density_func1d,
         charges=charges,
         densities=(densityMain_1d, densityBeam_1d),
     )
@@ -277,13 +277,13 @@ def main():
 
     H1 = hierarchy_from(
         hier=h1,
-        from_func=ions_mass_density_func2d,
+        from_func=fromfunc.ions_mass_density_func2d,
         masses=masses,
         densities=(densityMain_2d, densityBeam_2d),
     )
     H2 = hierarchy_from(
         hier=h2,
-        from_func=ions_charge_density_func2d,
+        from_func=fromfunc.ions_charge_density_func2d,
         charges=charges,
         densities=(densityMain_2d, densityBeam_2d),
     )

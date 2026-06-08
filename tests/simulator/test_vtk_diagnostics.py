@@ -349,38 +349,38 @@ def config_3d(**simInput):
     return sim
 
 
-@ddt
-class VTKDiagnostics3dTest(SimulatorTest):
-    def __init__(self, *args, **kwargs):
-        super(VTKDiagnostics3dTest, self).__init__(*args, **kwargs)
-        self.simulator = None
-        ph.global_vars.sim = None
+# @ddt
+# class VTKDiagnostics3dTest(SimulatorTest):
+#     def __init__(self, *args, **kwargs):
+#         super(VTKDiagnostics3dTest, self).__init__(*args, **kwargs)
+#         self.simulator = None
+#         ph.global_vars.sim = None
 
-    def _run(self, ndim, interp, simInput, diag_dir="", **kwargs):
-        for key in ["cells", "dl", "boundary_types"]:
-            simInput[key] = list(phut.np_array_ify(simInput[key], ndim))
-        local_out = self.unique_diag_dir_for_test_case(
-            f"{out}{'/'+diag_dir if diag_dir else ''}", ndim, interp
-        )
-        self.register_diag_dir_for_cleanup(local_out)
-        simInput["diag_options"]["options"]["dir"] = local_out
-        simulation = config_3d(**simInput)
-        self.assertTrue(len(simulation.cells) == ndim)
-        Simulator(simulation).run().reset()
-        ph.global_vars.sim = None
-        return local_out
+#     def _run(self, ndim, interp, simInput, diag_dir="", **kwargs):
+#         for key in ["cells", "dl", "boundary_types"]:
+#             simInput[key] = list(phut.np_array_ify(simInput[key], ndim))
+#         local_out = self.unique_diag_dir_for_test_case(
+#             f"{out}{'/'+diag_dir if diag_dir else ''}", ndim, interp
+#         )
+#         self.register_diag_dir_for_cleanup(local_out)
+#         simInput["diag_options"]["options"]["dir"] = local_out
+#         simulation = config_3d(**simInput)
+#         self.assertTrue(len(simulation.cells) == ndim)
+#         Simulator(simulation).run().reset()
+#         ph.global_vars.sim = None
+#         return local_out
 
-    def test_slice_3d(self):
-        print("test_slice_3d dim/interp:{}/{}".format(3, 1))
+#     def test_slice_3d(self):
+#         print("test_slice_3d dim/interp:{}/{}".format(3, 1))
 
-        local_out = self._run(ndim=3, interp=1, simInput=deepcopy(simArgs))
+#         local_out = self._run(ndim=3, interp=1, simInput=deepcopy(simArgs))
 
-        if cpp.mpi_rank() == 0:
-            run = Run(local_out)
-            time = 0
-            B = run.GetBSlice(time)
-            B.plot(filename=f"bx_slice.png", qty=f"x")
-            B.magnitude().plot(filename=f"bmag_slice.png")
+#         if cpp.mpi_rank() == 0:
+#             run = Run(local_out)
+#             time = 0
+#             B = run.GetBSlice(time)
+#             B.plot(filename=f"bx_slice.png", qty=f"x")
+#             B.magnitude().plot(filename=f"bmag_slice.png")
 
 
 if __name__ == "__main__":

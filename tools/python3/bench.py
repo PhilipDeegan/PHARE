@@ -23,6 +23,14 @@ def _as_lines(input):
         return file.readlines()
 
 
+def cores(n=64, c=192):
+    return n * c
+
+
+def steps_per(ilvl):
+    return 4**ilvl
+
+
 @dataclass
 class LevelStats:
     ilvl: int = 0
@@ -32,6 +40,18 @@ class LevelStats:
     level_ghost_cells: int = 0
     particles: int = 0
     cell_ratio: int = 0
+
+    def __repr__(self):
+        return (
+            "LevelStats:\n"
+            f"\t ilvl: {self.ilvl}\n"
+            f"\t patches: {self.patches}\n"
+            f"\t cells: {self.cells}\n"
+            f"\t patch_ghost_cells: {self.patch_ghost_cells}\n"
+            f"\t level_ghost_cells: {self.level_ghost_cells}\n"
+            f"\t cell_ratio: {self.cell_ratio}\n"
+            f"\t particles: {self.particles}\n"
+        )
 
 
 @dataclass
@@ -43,23 +63,34 @@ class SummaryFile:
     def __iter__(self):
         return iter((self.kwargs, self.levels, self.particles))
 
+    def normalized_nanoseconds_for_time_per_push(self, time_ns):
+        ppp = particles_per_push = 0
+        for ilvl, lvl in enumerate(self.levels):
+            # print("particles per level", ilvl, lvl.particles)
+            ppp += lvl.particles * steps_per(ilvl)
+        # print(f"normalized_nanoseconds_for_time_per_push: {time_ns} / {ppp}")
+        return ppp, time_ns / ppp * cores()
+
 
 def _parse_level_info(level):
     trim = [")", ","]
     while any(level.endswith(t) for t in trim):
         level = level[:-1]
+    # print("parse level:", level)
     bits = [s for s in level.strip().split(" ") if s]
     ilvl = bits[0].split(":")[1]
     for bit in bits:
         needle = "parts("
         if bit.startswith(needle):
-            particles = int(bit[len(needle)])
+            particles = int(bit[len(needle) :])
     bits = bits[1][1:-1].split(",")
     patches, cells, p_ghosts_cells, l_ghosts_cells = [int(s) for s in bits]
     ratio = (p_ghosts_cells + l_ghosts_cells) / cells
-    return LevelStats(
+    stats = LevelStats(
         ilvl, patches, cells, p_ghosts_cells, l_ghosts_cells, particles, ratio
     )
+    print("LevelStats", stats)
+    return stats
 
 
 def parse_summary_file(input):
@@ -103,12 +134,17 @@ def _print_stats(summary_file, timer_files, stat_files):
     tags = {k: v for k, v in summary_file.kwargs.items() if k.startswith("tag")}
     time = average_L0_advance_time_from(timer_files)
     max_mem = max_memory_required_from(stat_files)
+    ppp, push_time = summary_file.normalized_nanoseconds_for_time_per_push(time)
+    cell_ratios = ",".join(
+        [str(int(lvl.cell_ratio * 100)) for lvl in summary_file.levels]
+    )
     print(
         f"% refined:{pc_refined}",
         f"N particles:{summary_file.particles}",
-        f"cell_ratio:{int(summary_file.levels[1].cell_ratio*100)}",
-        f"time:{time / 1e9:.3f}s",
+        f"cell_ratios:{cell_ratios}",
+        f"time:{time / 1e9:.10f}s",
         f"MEM:{max_mem}mb",
+        f"pushs:{ppp} ppp time:{push_time:.3f}ns",
         tags,
     )
 
