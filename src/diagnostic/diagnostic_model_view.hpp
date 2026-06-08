@@ -31,16 +31,16 @@ template<typename Hierarchy, typename Model>
 class BaseModelView : public IModelView
 {
 public:
-    using GridLayout        = Model::gridlayout_type;
     using VecField          = Model::vecfield_type;
     using TensorFieldT      = Model::ions_type::tensorfield_type;
+    using GridLayout        = Model::gridlayout_type;
     using ResMan            = Model::resources_manager_type;
     using Field             = Model::field_type;
     using TensorFieldData_t = ResMan::template UserTensorField_t</*rank=*/2>::patch_data_type;
     static constexpr auto dimension = Model::dimension;
 
-
 public:
+    using Model_t = Model;
     using PatchProperties
         = cppdict::Dict<float, double, std::size_t, std::vector<int>, std::vector<std::uint32_t>,
                         std::vector<double>, std::vector<std::size_t>, std::string,
@@ -50,35 +50,6 @@ public:
         : model_{model}
         , hierarchy_{hierarchy}
     {
-        declareMomentumTensorAlgos();
-    }
-
-    NO_DISCARD std::vector<VecField*> getElectromagFields() const
-    {
-        return {&model_.state.electromag.B, &model_.state.electromag.E};
-    }
-
-    NO_DISCARD auto& getIons() const { return model_.state.ions; }
-
-    void fillPopMomTensor(auto& lvl, auto const time, auto const popidx)
-    {
-        using value_type = TensorFieldT::value_type;
-        auto constexpr N = core::detail::tensor_field_dim_from_rank<2>();
-
-        auto& rm   = *model_.resourcesManager;
-        auto& ions = model_.state.ions;
-
-        for (auto patch : rm.enumerate(lvl, ions, tmpTensor_))
-            for (std::uint8_t c = 0; c < N; ++c)
-                std::memcpy(tmpTensor_[c].data(), ions[popidx].momentumTensor()[c].data(),
-                            ions[popidx].momentumTensor()[c].size() * sizeof(value_type));
-
-        MTAlgos[popidx].getOrCreateSchedule(hierarchy_, lvl.getLevelNumber()).fillData(time);
-
-        for (auto patch : rm.enumerate(lvl, ions, tmpTensor_))
-            for (std::uint8_t c = 0; c < N; ++c)
-                std::memcpy(ions[popidx].momentumTensor()[c].data(), tmpTensor_[c].data(),
-                            ions[popidx].momentumTensor()[c].size() * sizeof(value_type));
     }
 
 
@@ -118,7 +89,7 @@ public:
         return std::string{GridLayout::implT::type};
     }
 
-    NO_DISCARD auto getPatchProperties(std::string patchID, GridLayout const& grid) const
+    NO_DISCARD auto getPatchProperties(std::string /*patchID*/, GridLayout const& grid) const
     {
         PatchProperties dict;
         dict["origin"]   = grid.origin().toVector();
@@ -152,36 +123,146 @@ public:
     }
 
 
-    auto& tmpField() { return tmpField_; }
-    auto& tmpVecField() { return tmpVec_; }
+    auto& tmpField() { return Model::tmpField; }
+    auto& tmpVecField() { return Model::tmpVec; }
 
     template<std::size_t rank = 2>
     auto& tmpTensorField()
     {
         static_assert(rank > 0 and rank < 3);
         if constexpr (rank == 1)
-            return tmpVec_;
+            return Model::tmpVec;
         else
-            return tmpTensor_;
+            return Model::tmpTensor;
     }
 
     NO_DISCARD auto getCompileTimeResourcesViewList()
     {
-        return std::forward_as_tuple(tmpField_, tmpVec_, tmpTensor_);
+        return std::forward_as_tuple(Model::tmpField, Model::tmpVec, Model::tmpTensor);
+    }
+    auto operator()() const { return model_.getCompileTimeResourcesViewList(); }
+
+
+    auto& field_reducer(auto& f)
+        requires(core::is_field_tile_set_v<Field>)
+    {
+        return core::reduce_single(Model::tmpField, f);
+    }
+    auto& field_reducer(auto& f) { return f; }
+
+    auto& field_reduced(auto& f)
+        requires(core::is_field_tile_set_v<Field>)
+    {
+        return Model::tmpField;
+    }
+    auto& field_reduced(auto& f) { return f; }
+
+    auto& vec_field_reduced(auto& vf_in)
+        requires(core::is_field_tile_set_v<Field>)
+    {
+        return Model::tmpVec;
+    }
+    auto& vec_field_reduced(auto& vf_in)
+        requires(core::is_field_v<Field>)
+    {
+        return vf_in; // no op for non-tiled fields
     }
 
+    auto& vec_field_reducer(auto& tf_in)
+        requires(core::is_field_tile_set_v<Field>)
+    {
+        for (std::size_t i = 0; i < 3; ++i)
+            core::reduce_single(Model::tmpVec[i], tf_in[i]);
+        return Model::tmpVec;
+    }
+    auto& vec_field_reducer(auto& f) { return f; }
+
+    auto& tensor_field_reducer(auto& f)
+        requires(core::is_field_tile_set_v<Field>)
+    {
+        for (std::size_t i = 0; i < 6; ++i)
+            core::reduce_single(Model::tmpTensor[i], f[i]);
+        return Model::tmpTensor;
+    }
+    auto& tensor_field_reducer(auto& f) { return f; }
+
+    auto& tensor_field_reduced(auto& f)
+        requires(core::is_field_tile_set_v<Field>)
+    {
+        return Model::tmpTensor;
+    }
+    auto& tensor_field_reduced(auto& f) { return f; }
 
 protected:
     Model& model_;
     Hierarchy& hierarchy_;
+};
 
+
+template<typename Hierarchy, typename Model, typename Enable = void>
+class ModelView;
+
+
+template<typename Hierarchy, typename Model_>
+class ModelView<Hierarchy, Model_, std::enable_if_t<solver::is_hybrid_model_v<Model_>>>
+    : public BaseModelView<Hierarchy, Model_>
+{
+    using Super    = BaseModelView<Hierarchy, Model_>;
+    using VecField = Model_::vecfield_type;
+
+public:
+    using GridLayout        = Super::GridLayout;
+    using TensorFieldData_t = Super::TensorFieldData_t;
+    using TensorFieldT      = Super::TensorFieldT;
+
+    using Model = Model_;
+    // using BaseModelView<Hierarchy, Model>::BaseModelView;
+
+
+    ModelView(Hierarchy& hierarchy, Model& model)
+        : Super{hierarchy, model}
+    {
+        declareMomentumTensorAlgos();
+    }
+
+
+    NO_DISCARD std::vector<VecField*> getElectromagFields() const
+    {
+        return {&this->model_.state.electromag.B, &this->model_.state.electromag.E};
+    }
+
+    NO_DISCARD auto& getIons() const { return this->model_.state.ions; }
+
+
+    void fillPopMomTensor(auto& lvl, auto const time, auto const popidx)
+    {
+        auto constexpr N = core::detail::tensor_field_dim_from_rank<2>();
+
+        auto& rm        = *this->model_.resourcesManager;
+        auto& ions      = this->model_.state.ions;
+        auto& tmpTensor = Model::tmpTensor;
+        auto& popTensor = ions[popidx].momentumTensor();
+
+        for (auto patch : rm.enumerate(lvl, ions, Model::tmpTensor))
+            for (std::uint8_t c = 0; c < N; ++c)
+                core::reduce_into(tmpTensor[c], popTensor[c]);
+
+        MTAlgos[popidx].getOrCreateSchedule(this->hierarchy_, lvl.getLevelNumber()).fillData(time);
+
+        for (auto patch : rm.enumerate(lvl, ions, Model::tmpTensor))
+            for (std::uint8_t c = 0; c < N; ++c)
+                core::copy_fields(popTensor[c], tmpTensor[c]);
+    }
+
+
+protected:
     void declareMomentumTensorAlgos()
     {
-        auto& rm = *model_.resourcesManager;
+        auto& rm = *this->model_.resourcesManager;
 
-        auto const dst_name = tmpTensor_.name();
+        auto const dst_name = Model::tmpTensor.name();
 
-        for (auto& pop : model_.state.ions)
+        for (auto& pop : this->model_.state.ions)
         {
             auto& MTAlgo        = MTAlgos.emplace_back();
             auto const src_name = pop.momentumTensor().name();
@@ -198,16 +279,19 @@ protected:
 
     struct MTAlgo
     {
+        using Grid_rt = Model::Super::storage_t::grid_type;
+        using TensorFieldData_rt // NEVER TILED!
+            = amr::TensorFieldData<2, GridLayout, Grid_rt, core::HybridQuantity>;
+        using BorderSumOp = core::FieldBorderSumOp<typename VecField::value_type>;
+
         auto& getOrCreateSchedule(auto& hierarchy, int const ilvl)
         {
-            using PlusEqualsOp = core::PlusEquals<typename VecField::value_type>;
             if (not MTschedules.count(ilvl))
                 MTschedules.try_emplace(
-                    ilvl,
-                    MTalgo->createSchedule(
-                        hierarchy.getPatchLevel(ilvl), 0,
-                        std::make_shared<amr::FieldBorderOpTransactionFactory<TensorFieldData_t,
-                                                                              PlusEqualsOp>>()));
+                    ilvl, MTalgo->createSchedule(
+                              hierarchy.getPatchLevel(ilvl), 0,
+                              std::make_shared<amr::FieldBorderOpTransactionFactory<
+                                  TensorFieldData_t, BorderSumOp, TensorFieldData_rt>>()));
             return *MTschedules[ilvl];
         }
 
@@ -217,32 +301,6 @@ protected:
     };
 
     std::vector<MTAlgo> MTAlgos;
-    Field tmpField_{"PHARE_sumField", core::HybridQuantity::Scalar::rho};
-    VecField tmpVec_{"PHARE_sumVec", core::HybridQuantity::Vector::V};
-    TensorFieldT tmpTensor_{"PHARE_sumTensor", core::HybridQuantity::Tensor::M};
-};
-
-
-template<typename Hierarchy, typename Model, typename Enable = void>
-class ModelView;
-
-
-template<typename Hierarchy, typename Model>
-class ModelView<Hierarchy, Model, std::enable_if_t<solver::is_hybrid_model_v<Model>>>
-    : public BaseModelView<Hierarchy, Model>
-{
-    using VecField = typename Model::vecfield_type;
-
-public:
-    using Model_t = Model;
-    using BaseModelView<Hierarchy, Model>::BaseModelView;
-
-    NO_DISCARD std::vector<VecField*> getElectromagFields() const
-    {
-        return {&this->model_.state.electromag.B, &this->model_.state.electromag.E};
-    }
-
-    NO_DISCARD auto& getIons() const { return this->model_.state.ions; }
 };
 
 
