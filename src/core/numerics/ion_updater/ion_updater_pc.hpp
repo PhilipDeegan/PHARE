@@ -30,7 +30,7 @@ private:
     // Pusher pusher_;
 
 public:
-    IonUpdaterPC(PHARE::initializer::PHAREDict const& /*dict*/) {}
+    IonUpdaterPC() {}
 
     void updatePopulations(Ions& ions, Electromag const& em, GridLayout const& layout,
                            double const& dt, UpdaterMode = UpdaterMode::all);

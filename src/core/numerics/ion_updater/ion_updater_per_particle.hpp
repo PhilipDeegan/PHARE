@@ -34,7 +34,7 @@ private:
     // Pusher pusher_;
 
 public:
-    IonUpdaterPP(PHARE::initializer::PHAREDict const& /*dict*/) {}
+    IonUpdaterPP() {}
 
     template<typename Boxing_t>
     void updatePopulations(Ions& ions, Electromag const& em, Boxing_t const& layout,

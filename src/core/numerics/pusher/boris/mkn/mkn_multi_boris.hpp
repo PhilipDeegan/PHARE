@@ -1,43 +1,25 @@
 // IWYU pragma: private, include "core/numerics/pusher/multi_boris.hpp"
 
-#ifndef PHARE_CORE_PUSHER_BORIS_TILE_BORIS_CAPTURE_HPP
-#define PHARE_CORE_PUSHER_BORIS_TILE_BORIS_CAPTURE_HPP
+#ifndef PHARE_CORE_PUSHER_BORIS_MKN_MULTI_BORIS_HPP
+#define PHARE_CORE_PUSHER_BORIS_MKN_MULTI_BORIS_HPP
 
-
-#include "core/def.hpp"
-#include "core/utilities/types.hpp"
-#include "core/utilities/kernels.hpp"
-#include "core/utilities/span.hpp"
-
-#include "core/data/electromag/electromag.hpp"
-#include "core/data/tensorfield/tensorfield.hpp"
 #include "core/data/particles/particle_array_def.hpp"
 
-// #include "core/numerics/pusher/boris/move.hpp"
-#include "core/numerics/pusher/boris/basics.hpp"
-#include "core/data/particles/particle_array_service.hpp"
-#include "core/numerics/interpolator/interpolating.hpp"
-
-#include "core/utilities/thread_pool.hpp" // defaults to 1 thread, setup during static init!
-
-#include <cmath>
-#include <memory>
-#include <cassert>
-#include <cstddef>
-
-
-namespace PHARE::core::detail
-{
-auto static const multi_boris_threads = get_env_as("PHARE_ASYNC_THREADS", std::size_t{1});
-
-} // namespace PHARE::core::detail
 
 namespace PHARE::core
 {
 
 enum class MultiBorisMode : std::uint16_t { REF = 0, COPY };
 
-// !!naive!!
+// Primary (incomplete) template — specialisations provide the implementation per
+// (LayoutMode, AllocatorMode) pair.  Add a new #include below for each new layout.
+template<LayoutMode layout, AllocatorMode alloc, typename GridLayout, typename Particles,
+         typename Electromag, typename Interpolator>
+struct MultiBorisPusherImpl;
+
+
+// ── MultiBoris state struct for AoSTS / ModelAccessor ─────────────────────────────────
+
 template<typename ModelAccessor>
 struct MultiBoris
 {
@@ -51,11 +33,9 @@ struct MultiBoris
     using Field_t             = Vecfield_t::field_type;
     using ParticleArray_v     = ParticleArray_t::view_t;
     using Box_t               = Box<int, dim>;
-    // using Boxes_t             = std::vector<Box_t>;
-    using Particles_ptrs     = std::vector<ParticleArray_t*>;
-    using StreamLauncher     = gpu::ThreadedStreamLauncher<ModelAccessor>;
-    using PerTileParticles_t = ParticleArray_t::per_tile_particles;
-
+    using Particles_ptrs      = std::vector<ParticleArray_t*>;
+    using StreamLauncher      = gpu::ThreadedStreamLauncher<ModelAccessor>;
+    using PerTileParticles_t  = ParticleArray_t::per_tile_particles;
 
     MultiBoris(double const dt_, ModelAccessor& _accessor, std::function<void(int)> fn_ = {})
         : dt{dt_}
@@ -76,7 +56,7 @@ struct MultiBoris
     double const dt;
     ModelAccessor& accessor;
     std::function<void(int)> fn;
-    StreamLauncher streamer{accessor, 1 /*detail::multi_boris_threads*/};
+    StreamLauncher streamer{accessor, 1};
     GpuBoxSpanSet_t gpu_nlgb;
 
     auto static mesh(std::array<double, dim> const& ms, double const& ts)
@@ -89,15 +69,17 @@ struct MultiBoris
 };
 
 
-template<auto particle_type, auto boris_mode, typename MultiBorisPusher_t>
+// ── Per-tile functors (shared between CPU and GPU specialisations) ─────────────────────
+
+template<auto particle_type, auto boris_mode, typename MultiBorisPusherImpl_t>
 struct MultiBorisFunctors
 {
     static_assert(all_are<ParticleType>(particle_type));
 
-    using GridLayout_t    = MultiBorisPusher_t::GridLayout_t;
-    using Particles_t     = MultiBorisPusher_t::Particles_t;
-    using Electromag_t    = MultiBorisPusher_t::Electromag_t;
-    using Interpolator_t  = MultiBorisPusher_t::Interpolator_t;
+    using GridLayout_t    = MultiBorisPusherImpl_t::GridLayout_t;
+    using Particles_t     = MultiBorisPusherImpl_t::Particles_t;
+    using Electromag_t    = MultiBorisPusherImpl_t::Electromag_t;
+    using Interpolator_t  = MultiBorisPusherImpl_t::Interpolator_t;
     using ParticleArray_v = Particles_t::view_t;
 
     using Vecfield_t    = Electromag_t::vecfield_type;
@@ -108,7 +90,6 @@ struct MultiBorisFunctors
 
     static constexpr auto dim = GridLayout_t::dimension;
     static_assert(Particles_t::storage_mode == StorageMode::VECTOR);
-
 
     MultiBorisFunctors(auto& in, auto& view, auto& pop, auto& parts, auto& em)
         : pps{*parts}
@@ -129,9 +110,8 @@ struct MultiBorisFunctors
         else if constexpr (Particles_t::alloc_mode == AllocatorMode::GPU_UNIFIED)
             on_gpu_tiles(in, i);
         else
-            throw std::runtime_error("Unknown mode");
+            throw std::runtime_error("Unknown alloc mode");
     }
-
 
     void on_gpu_tiles(auto& in, auto const i)
     {
@@ -146,17 +126,15 @@ struct MultiBorisFunctors
             return std::make_tuple(blockIdx.x, &pps()[blockIdx.x], threadIdx.x,
                                    kernel::warp_size());
         };
-
         launcher.stream(in.streamer.streams[i],
                         [=, self = *this] __device__() mutable { self.per_tile(tile_picker); });
-#endif // PHARE_HAVE_MKN_GPU
+#endif
     }
 
     void on_cpu_tiles(auto& /*in*/)
     {
         std::size_t tileidx    = 0;
         auto const tile_picker = [&]() { return std::make_tuple(tileidx, &pps()[tileidx], 0, 1); };
-
         for (; tileidx < pps().size(); ++tileidx)
             per_tile(tile_picker);
     }
@@ -165,7 +143,7 @@ struct MultiBorisFunctors
     {
         auto&& [tile_idx, tileptr, tidx, ws] = tile_picker();
         auto& tile                           = *tileptr;
-        auto const& layout                   = electromag.E[0][tile_idx].layout(); // any per tile
+        auto const& layout                   = electromag.E[0][tile_idx].layout();
         auto const& em                       = em_tile(tile_idx);
 
         using enum LayoutMode;
@@ -176,7 +154,7 @@ struct MultiBorisFunctors
         else
         {
             auto& parts          = tile();
-            auto const each      = pps()[tile_idx]().size() / ws; // SPAN SIZE!
+            auto const each      = pps()[tile_idx]().size() / ws;
             auto const tile_cell = pps.local_cell(tile.lower);
 
             std::size_t pid = 0;
@@ -187,6 +165,7 @@ struct MultiBorisFunctors
                     per_any_particle(parts, layout, tile_cell, pid * ws + tidx, em);
         }
     }
+
     void per_any_particle(auto& particles, auto&&... args) _PHARE_ALL_FN_
     {
         auto const& pidx = std::get<2>(std::forward_as_tuple(args...));
@@ -198,7 +177,6 @@ struct MultiBorisFunctors
 #endif
             per_particle(particles[pidx], args...);
     }
-
 
     void per_particle_still_in_ghost_box(auto&&... args) _PHARE_ALL_FN_
     {
@@ -226,7 +204,6 @@ struct MultiBorisFunctors
         check(particle);
     }
 
-
     void per_particle(auto&&... args) _PHARE_ALL_FN_
     {
         static constexpr auto alloc_mode                    = Particles_t::alloc_mode;
@@ -248,7 +225,6 @@ struct MultiBorisFunctors
             PHARE_ASSERT(false);
         }
     }
-
 
     void aos_cpu_mapped_ref_interp(auto&&... args) _PHARE_ALL_FN_
     {
@@ -272,6 +248,7 @@ struct MultiBorisFunctors
                 pps.template icell_changer<particle_type>(old_cell, cidx, particle.iCell());
         }
     }
+
     void aos_cpu_mapped_ref(auto&&... args) _PHARE_ALL_FN_
     {
         static constexpr auto alloc_mode = Particles_t::alloc_mode;
@@ -303,7 +280,6 @@ struct MultiBorisFunctors
         }
     }
 
-
     auto em_tile(auto const tidx) _PHARE_ALL_FN_
     {
         return electromag.template as<Electromag_vt>([&] _PHARE_ALL_FN_(auto const& vf) {
@@ -326,7 +302,7 @@ struct MultiBorisFunctors
         {
             auto& tile           = parts()[tile_idx];
             auto const tile_cell = parts.local_cell(tile.lower);
-            auto const& layout   = electromag.E[0][tile_idx].layout(); // any per tile
+            auto const& layout   = electromag.E[0][tile_idx].layout();
             auto const em        = em_tile(tile_idx);
             auto& rhoP           = pop.particleDensity()[tile_idx];
             auto& rhoC           = pop.chargeDensity()[tile_idx];
@@ -334,7 +310,7 @@ struct MultiBorisFunctors
             Interpolator_t interp;
 
             auto on_tile = [&]<bool border>() {
-                for (auto p : tile()) // copy particle!
+                for (auto p : tile())
                 {
                     per_particle(p, layout, tile_cell, 0, em);
                     if constexpr (!border)
@@ -354,15 +330,19 @@ struct MultiBorisFunctors
         }
     }
 
-
     ParticleArray_v pps;
     Electromag_t::Super const electromag;
     double const dto2m;
     std::array<double, dim> halfdt;
 };
 
-template<typename GridLayout, typename Particles, typename Electromag, typename Interpolator>
-class MultiBorisPusher
+
+// ── MultiBorisPusherImpl specialisations for AoSTS ────────────────────────────────────
+
+template<AllocatorMode alloc, typename GridLayout, typename Particles, typename Electromag,
+         typename Interpolator>
+struct MultiBorisPusherImpl<LayoutMode::AoSTS, alloc, GridLayout, Particles, Electromag,
+                            Interpolator>
 {
 public:
     static constexpr auto dim = GridLayout::dimension;
@@ -370,7 +350,8 @@ public:
     using Particles_t         = Particles;
     using Electromag_t        = Electromag;
     using Interpolator_t      = Interpolator;
-    using This                = MultiBorisPusher<GridLayout, Particles, Electromag, Interpolator>;
+    using This = MultiBorisPusherImpl<LayoutMode::AoSTS, alloc, GridLayout, Particles, Electromag,
+                                      Interpolator>;
 
     template<auto pt, auto mode>
     using Functors = MultiBorisFunctors<pt, mode, This>;
@@ -385,8 +366,6 @@ public:
 
         if constexpr (copy and is_gpu)
         {
-            // Build GPU-accessible SpanSet of nonLevelGhostBox for all patches at once.
-            // Span<Box_t> captured per-patch into device lambdas; data is in managed memory.
             std::vector<default_span_size_t> sizes;
             sizes.reserve(in.accessor.size());
             for (std::size_t i = 0; i < in.accessor.size(); ++i)
@@ -448,13 +427,12 @@ public:
 
         auto view       = in.accessor[i];
         auto [ions, em] = view.args;
-        // auto const em_super = em.super();
 
         for (auto& pop : ions)
         {
             auto const dto2m      = 0.5 * in.dt / pop.mass();
             auto const halfdt     = MultiBoris<ModelAccessor>::mesh(view.layout.meshSize(), in.dt);
-            auto const filter_box = in.gpu_nlgb[i]; // Span<Box_t> in managed memory — GPU safe
+            auto const filter_box = in.gpu_nlgb[i];
             auto rhop             = pop.particleDensity();
             auto rhoc             = pop.chargeDensity();
             auto flux             = *pop.flux();
@@ -530,7 +508,27 @@ public:
     }
 };
 
+
+// AoSMapped and AoSPC use the same tile-based functors as AoSTS
+template<AllocatorMode alloc, typename GridLayout, typename Particles, typename Electromag,
+         typename Interpolator>
+struct MultiBorisPusherImpl<LayoutMode::AoSMapped, alloc, GridLayout, Particles, Electromag,
+                            Interpolator>
+    : MultiBorisPusherImpl<LayoutMode::AoSTS, alloc, GridLayout, Particles, Electromag,
+                           Interpolator>
+{
+};
+
+template<AllocatorMode alloc, typename GridLayout, typename Particles, typename Electromag,
+         typename Interpolator>
+struct MultiBorisPusherImpl<LayoutMode::AoSPC, alloc, GridLayout, Particles, Electromag,
+                            Interpolator>
+    : MultiBorisPusherImpl<LayoutMode::AoSTS, alloc, GridLayout, Particles, Electromag,
+                           Interpolator>
+{
+};
+
 } // namespace PHARE::core
 
 
-#endif /*PHARE_CORE_PUSHER_BORIS_TILE_BORIS_CAPTURE_HPP*/
+#endif

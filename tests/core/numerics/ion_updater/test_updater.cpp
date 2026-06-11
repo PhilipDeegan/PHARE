@@ -1,11 +1,13 @@
 
 #include "phare_core.hpp"
+
 #include "core/utilities/types.hpp"
+#include "core/numerics/ion_updater/ion_updaters.hpp"
 #include "core/data/particles/particle_array_def.hpp"
+#include "core/numerics/interpolator/interpolating.hpp"
+#include "core/numerics/interpolator/interpolating.hpp"
 #include "core/data/particles/particle_array_appender.hpp"
 #include "core/data/particles/particle_array_converter.hpp"
-
-#include "core/numerics/ion_updater/ion_updaters.hpp"
 
 #include "tests/core/data/vecfield/test_vecfield_fixtures.hpp"
 #include "tests/core/data/electromag/test_electromag_fixtures.hpp"
@@ -553,8 +555,7 @@ TYPED_TEST_SUITE(IonUpdaterTest, Permutations, );
 
 TYPED_TEST(IonUpdaterTest, ionUpdaterTakesPusherParamsFromPHAREDictAtConstruction)
 {
-    typename IonUpdaterTest<TypeParam>::IonUpdater ionUpdater{
-        init_dict["simulation"]["algo"]["ion_updater"]};
+    typename IonUpdaterTest<TypeParam>::IonUpdater ionUpdater{};
 }
 
 
@@ -632,8 +633,7 @@ TYPED_TEST(IonUpdaterTest, loadsLevelGhostParticlesOnLeftGhostArea)
 
 TYPED_TEST(IonUpdaterTest, particlesUntouchedInMomentOnlyMode)
 {
-    typename IonUpdaterTest<TypeParam>::IonUpdater ionUpdater{
-        init_dict["simulation"]["algo"]["ion_updater"]};
+    typename IonUpdaterTest<TypeParam>::IonUpdater ionUpdater{};
 
     auto ionsBufferCpy = this->ions;
 
@@ -704,8 +704,7 @@ TYPED_TEST(IonUpdaterTest, particlesUntouchedInMomentOnlyMode)
 
 TYPED_TEST(IonUpdaterTest, momentsAreChangedInParticlesAndMomentsMode)
 {
-    typename IonUpdaterTest<TypeParam>::IonUpdater ionUpdater{
-        init_dict["simulation"]["algo"]["ion_updater"]};
+    typename IonUpdaterTest<TypeParam>::IonUpdater ionUpdater{};
 
     auto ionsBufferCpy = this->ions;
 
@@ -731,8 +730,7 @@ TYPED_TEST(IonUpdaterTest, momentsAreChangedInParticlesAndMomentsMode)
 
 TYPED_TEST(IonUpdaterTest, momentsAreChangedInMomentsOnlyMode)
 {
-    typename IonUpdaterTest<TypeParam>::IonUpdater ionUpdater{
-        init_dict["simulation"]["algo"]["ion_updater"]};
+    typename IonUpdaterTest<TypeParam>::IonUpdater ionUpdater{};
 
     auto ionsBufferCpy = this->ions;
 
@@ -752,8 +750,7 @@ TYPED_TEST(IonUpdaterTest, momentsAreChangedInMomentsOnlyMode)
 
 TYPED_TEST(IonUpdaterTest, thatNoNaNsExistOnPhysicalNodesMoments)
 {
-    typename IonUpdaterTest<TypeParam>::IonUpdater ionUpdater{
-        init_dict["simulation"]["algo"]["ion_updater"]};
+    typename IonUpdaterTest<TypeParam>::IonUpdater ionUpdater{};
 
     this->update(ionUpdater, UpdaterMode::domain_only);
 
@@ -865,7 +862,7 @@ void populate_particles(auto& ions, GridLayout& layout)
 //         EXPECT_EQ(pop.patchGhostParticles().size(), 0);
 //     }
 
-//     IonUpdater ionUpdater{init_dict["simulation"]["algo"]["ion_updater"]};
+//     IonUpdater ionUpdater{};
 //     this->update(ionUpdater, UpdaterMode::domain_only);
 
 //     std::int64_t icellSum = 0;
@@ -911,7 +908,7 @@ void populate_particles(auto& ions, GridLayout& layout)
 //     }
 //     EXPECT_DOUBLE_EQ(deltaSum, 103333.29999993632);
 
-//     IonUpdater ionUpdater{init_dict["simulation"]["algo"]["ion_updater"]};
+//     IonUpdater ionUpdater{};
 //     this->update(ionUpdater, UpdaterMode::all);
 
 //     std::size_t icellSum = 0, pCount = 0;

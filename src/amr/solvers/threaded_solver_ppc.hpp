@@ -17,8 +17,7 @@
 
 #include "amr/solvers/solver.hpp"
 
-#include "core/numerics/pusher/pusher.hpp"
-#include "core/numerics/pusher/pusher_factory.hpp"
+
 #include "core/numerics/interpolator/interpolator.hpp"
 #include "core/numerics/boundary_condition/boundary_condition.hpp"
 

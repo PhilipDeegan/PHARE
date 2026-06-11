@@ -94,7 +94,7 @@ public:
     explicit SolverPPC(PHARE::initializer::PHAREDict const& dict)
         : ISolver<AMR_Types>{"PPC"}
         , ohm_info{core::OhmInfo::FROM(dict["ohm"])}
-        , ionUpdater_{dict["ion_updater"]}
+        , ionUpdater_{}
 
     {
     }

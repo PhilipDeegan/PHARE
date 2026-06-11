@@ -38,9 +38,7 @@ void updater_routine(benchmark::State& state)
 
     auto particles_copy = patch_particles.domain_particles; // tmp storage between update modes
 
-    initializer::PHAREDict dict;
-    dict["pusher"]["name"] = std::string{"modified_boris"};
-    IonUpdater ionUpdater_{dict};
+    IonUpdater ionUpdater_{};
 
     double current_time = 1.0;
     double new_time     = 1.005;

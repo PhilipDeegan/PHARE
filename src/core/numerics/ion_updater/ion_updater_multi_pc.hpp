@@ -18,7 +18,6 @@ class IonUpdaterMultiPC
 {
     using Particles                     = typename Ions::particle_array_type;
     bool constexpr static atomic_interp = Particles::alloc_mode == AllocatorMode::GPU_UNIFIED;
-    // static_assert(Particles::alloc_mode == AllocatorMode::GPU_UNIFIED);
 
 public:
     auto static constexpr dimension    = GridLayout::dimension;
@@ -32,39 +31,28 @@ public:
 private:
     Interpolating_t interpolator_;
 
-
 public:
-    IonUpdaterMultiPC(PHARE::initializer::PHAREDict const& /*dict*/) {}
+    IonUpdaterMultiPC() {}
 
-    template<typename ModelViews>
-    void updatePopulations(ModelViews& views, double const& dt, UpdaterMode = UpdaterMode::all);
-
+    template<typename ModelAccessor_t, typename Boxing_t>
+    void updatePopulations(ModelAccessor_t&, Boxing_t const&, double const&,
+                           UpdaterMode = UpdaterMode::all);
 
     static void updateIons(Ions& ions)
     {
-        // fixMomentGhosts(ions, layout);
         ions.computeChargeDensity();
         ions.computeBulkVelocity();
     }
 
-    void reset()
-    {
-        // clear memory
-        tmp_particles_ = std::move(make_particles<Particles>(Box_t{}));
-    }
+    void reset() {}
 
 
 private:
-    template<typename ModelViews>
-    void updateAndDepositDomain_(ModelViews& views);
+    template<typename ModelAccessor_t, typename Boxing_t>
+    void updateAndDepositDomain_(ModelAccessor_t&, Boxing_t const&);
 
-    template<typename ModelViews>
-    void updateAndDepositAll_(ModelViews& views);
-
-
-
-    // dealloced on regridding/load balancing coarsest
-    Particles tmp_particles_;
+    template<typename ModelAccessor_t, typename Boxing_t>
+    void updateAndDepositAll_(ModelAccessor_t&, Boxing_t const&);
 
     double dt_ = 0;
 };
@@ -73,168 +61,109 @@ private:
 
 
 template<typename Ions, typename Electromag, typename GridLayout>
-template<typename ModelViews>
-void IonUpdaterMultiPC<Ions, Electromag, GridLayout>::updatePopulations(ModelViews& views,
+template<typename ModelAccessor_t, typename Boxing_t>
+void IonUpdaterMultiPC<Ions, Electromag, GridLayout>::updatePopulations(ModelAccessor_t& accessor,
+                                                                        Boxing_t const& boxings,
                                                                         double const& dt,
                                                                         UpdaterMode mode)
 {
     PHARE_LOG_SCOPE(1, "IonUpdaterMultiPC::updatePopulations");
-    // resetMoments(ions);
+
+    for (std::size_t i = 0; i < accessor.size(); ++i)
+    {
+        auto view      = accessor[i];
+        auto [ions, _] = view.args;
+        resetMoments(ions);
+    }
     dt_ = dt;
     if (mode == UpdaterMode::domain_only)
-        updateAndDepositDomain_(views);
+        updateAndDepositDomain_(accessor, boxings);
     else
-        updateAndDepositAll_(views);
+        updateAndDepositAll_(accessor, boxings);
 }
 
 
-
-
 template<typename Ions, typename Electromag, typename GridLayout>
-template<typename ModelViews>
-void IonUpdaterMultiPC<Ions, Electromag, GridLayout>::updateAndDepositDomain_(ModelViews& views)
+template<typename ModelAccessor_t, typename Boxing_t>
+void IonUpdaterMultiPC<Ions, Electromag, GridLayout>::updateAndDepositDomain_(
+    ModelAccessor_t& accessor, Boxing_t const& boxings)
 {
     PHARE_LOG_SCOPE(1, "IonUpdaterMultiPC::updateAndDepositDomain_");
 
-    constexpr static std::uint8_t N_ARRAYS       = 1;
-    constexpr static std::uint8_t DOMAIN_ID      = 0;
-    constexpr static std::uint8_t LEVEL_GHOST_ID = 2;
-
-    if (views.size() == 0)
+    if (accessor.size() == 0)
         return;
 
 #if PHARE_HAVE_MKN_GPU
-    std::uint16_t const group_size = N_ARRAYS * views[0].ions->size();
-    MultiBoris<ModelViews> in{dt_, views};
-    Pusher_t::move(in);
-
-    // finished moving particles on patch
-    in.streamer.group_barrier(group_size);
-
-    // add new domain particles
-    in.streamer.host_group_mutex(group_size, [&](auto const i) {
-        auto is_domain_particles = in.particle_type[i] == DOMAIN_ID;
-        if (is_domain_particles || in.particles[i]->size() == 0)
-            return;
-
-        auto copy_in = [&](auto const j) {
-            throw std::runtime_error("fix");
-            // ParticleArrayService::copy_ghost_into_domain(*in.particles[i], *in.particles[j]);
-        };
-
-        if (in.particle_type[i - 1] == DOMAIN_ID)
-            copy_in(i - 1);
-        else
-            return;
-        in.particles[i]->clear();
-        in.pviews[i].clear();
-    });
-
-
-    auto pps     = in.pviews.data();
-    auto rhos    = in.rhos.data();
-    auto fluxes  = in.fluxes.data();
-    auto layouts = in.layouts.data();
-
-    // finished adding new domain particles
-    in.streamer.group_barrier(group_size);
-
-    in.streamer.async_dev_idx(N_ARRAYS, DOMAIN_ID, [=](auto const i) { // 0 = domain
-        Interpolating_t::box_kernel(pps[i], layouts[i], fluxes[i], rhos[i]);
-    });
-    // no patch ghost as they're injected into domain
-    in.streamer.async_dev_idx(N_ARRAYS, LEVEL_GHOST_ID, [=](auto const i) { // 2 = level ghosts
-        Interpolating_t::box_kernel(pps[i], layouts[i], fluxes[i], rhos[i]);
-    });
-
-    in.streamer();
-    in.streamer.sync();
+    MultiBoris<ModelAccessor_t> in{dt_, accessor};
+    Pusher_t::template move<MultiBorisMode::COPY>(in, boxings);
+    in.streamer.join();
     in.streamer.dump_times(detail::timings_dir_str + "/updateAndDepositDomain_.txt");
-
 #else
-    // throw std::runtime_error("No available implementation")
+    throw std::runtime_error("No available implementation");
 #endif
-    //
 }
 
 
 template<typename Ions, typename Electromag, typename GridLayout>
-template<typename ModelViews>
-void IonUpdaterMultiPC<Ions, Electromag, GridLayout>::updateAndDepositAll_(ModelViews& views)
+template<typename ModelAccessor_t, typename Boxing_t>
+void IonUpdaterMultiPC<Ions, Electromag, GridLayout>::updateAndDepositAll_(
+    ModelAccessor_t& accessor, Boxing_t const& boxings)
 {
     PHARE_LOG_SCOPE(1, "IonUpdaterMultiPC::updateAndDepositAll_");
 
-    constexpr static std::uint8_t N_ARRAYS  = 1;
-    constexpr static std::uint8_t DOMAIN_ID = 0;
-    // constexpr static std::uint8_t LEVEL_GHOST_ID = 2;
-
-    if (views.size() == 0)
+    if (accessor.size() == 0)
         return;
 
 #if PHARE_HAVE_MKN_GPU
-    MultiBoris<ModelViews> in{dt_, views};
-    Pusher_t::move(in);
+    MultiBoris<ModelAccessor_t> in{dt_, accessor};
 
-    std::uint16_t const group_size = N_ARRAYS * views[0].ions->size();
+    Pusher_t::move(in, boxings);
 
-    // finished moving particles on patch
-    in.streamer.group_barrier(group_size);
+    in.streamer.host([&](auto const i) mutable {
+        auto view                 = accessor[i];
+        auto [ions, _]            = view.args;
+        auto const patch_id       = view.patchID();
+        auto const& patch_boxings = boxings.at(patch_id);
 
-    // add new domain particles
-    in.streamer.host_group_mutex(group_size, [&](auto const i) {
-        // hipStreamSynchronize(in.streamer.streams[i]);
-
-        auto is_domain_particles = in.particle_type[i] == DOMAIN_ID;
-        if (is_domain_particles || in.particles[i]->size() == 0)
-            return;
-
-        auto copy_in = [&](auto const j) {
-            throw std::runtime_error("fix");
-            // ParticleArrayService::copy_ghost_into_domain(*in.particles[i], *in.particles[j]);
-            in.pviews[j].reset(*in.particles[j]);
+        auto const per_pop = [&](auto& pop) {
+            auto& domain = pop.domainParticles();
+            delete_particles_not_in(domain, patch_boxings.nonLevelGhostBox);
+            move_in_ghost_layer(pop.patchGhostParticles(), domain, patch_boxings.domainBox,
+                                patch_boxings.nonLevelGhostBox);
+            move_in_domain(domain, pop.levelGhostParticles(), patch_boxings.domainBox);
+            delete_particles_not_in(pop.levelGhostParticles(), patch_boxings.ghostBox);
+            delete_particles_not_in(domain, patch_boxings.domainBox);
         };
 
-        if (in.particle_type[i - 1] == DOMAIN_ID)
-            copy_in(i - 1);
-        else if (in.particle_type[i - 2] == DOMAIN_ID)
-            copy_in(i - 2);
-
-        // means there is no particle to mesh for ghosts
-        in.particles[i]->clear();
-        in.pviews[i].clear();
+        for (auto& pop : ions)
+            per_pop(pop);
     });
 
+    in.streamer.host([&](auto const i) mutable {
+        auto view            = accessor[i];
+        auto [ions, _]       = view.args;
+        auto const patch_id  = view.patchID();
+        auto const& boxing_i = boxings.at(patch_id);
+        Interpolating_t interp;
+        for (auto& pop : ions)
+        {
+            interp.particleToMesh(pop.domainParticles(), boxing_i.layout, pop.particleDensity(),
+                                  pop.chargeDensity(), pop.flux());
+            interp.particleToMesh(pop.patchGhostParticles(), boxing_i.layout, pop.particleDensity(),
+                                  pop.chargeDensity(), pop.flux());
+        }
+    });
 
-    auto pps     = in.pviews.data();
-    auto rhos    = in.rhos.data();
-    auto fluxes  = in.fluxes.data();
-    auto layouts = in.layouts.data();
-
-    // finished adding new domain particles
-    in.streamer.group_barrier(group_size);
-
-    assert(GridLayout::nbrGhosts() == 2);
-    static_assert(GridLayout::nbrGhosts() == 2);
-
-    in.streamer.async_dev_chunk(
-        [=] _PHARE_DEV_FN_(auto const i) mutable {
-            Interpolating_t::chunk_kernel(pps[i], layouts[i], fluxes[i], rhos[i]);
-        },
-        4, 9 * 9 * 9 * 4 * 8);
-
-    in.streamer();
-    in.streamer.sync();
-    in.streamer.dump_times(detail::timings_dir_str + "/updateAndDepositAll_"
-                           + std::string{Particles::type_id} + ".txt");
+    in.streamer.join();
+    in.streamer.dump_times(detail::timings_dir_str + "/updateAndDepositAll_.txt");
 
 #else
-    // throw std::runtime_error("No available implementation")
+    throw std::runtime_error("No available implementation");
 #endif
-    //
 }
 
 
 } // namespace PHARE::core
 
 
-#endif // ION_UPDATER_HPP
+#endif // PHARE_ION_UPDATER_MULTI_PC_HPP

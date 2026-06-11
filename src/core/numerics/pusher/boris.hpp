@@ -5,7 +5,6 @@
 #include "core/logger.hpp"
 #include "core/vector.hpp"
 #include "core/utilities/range/range.hpp"
-#include "core/numerics/pusher/pusher.hpp"
 #include "core/data/particles/particle.hpp"
 #include "core/data/particles/particle_array_def.hpp"
 
@@ -24,16 +23,11 @@ namespace PHARE::core
 template<std::size_t dim, typename ParticleRange, typename Electromag, typename Interpolator,
          typename BoundaryCondition, typename GridLayout>
 class BorisPusher
-    : public Pusher<dim, ParticleRange, Electromag, Interpolator, BoundaryCondition, GridLayout>
 {
 public:
-    using Super
-        = Pusher<dim, ParticleRange, Electromag, Interpolator, BoundaryCondition, GridLayout>;
+    using ParticleSelector = std::function<ParticleRange(ParticleRange&)>;
 
-private:
-    using ParticleSelector = typename Super::ParticleSelector;
 
-public:
     BorisPusher() {} // default for shared_ptr usage
     BorisPusher(std::array<double, dim> const& ms, double const ts) { setMeshAndTimeStep(ms, ts); }
 
@@ -44,7 +38,7 @@ public:
     ParticleRange move(ParticleRange const& rangeIn, ParticleRange& rangeOut,
                        Electromag const& emFields, double mass, Interpolator& interpolator,
                        ParticleSelector const& particleIsNotLeaving, BoundaryCondition& bc,
-                       GridLayout const& layout) override
+                       GridLayout const& layout)
     {
             // push the particles of half a step
             // rangeIn : t=n, rangeOut : t=n+1/Z
@@ -86,7 +80,7 @@ public:
     ParticleRange move(ParticleRange const& rangeIn, ParticleRange& rangeOut,
                        Electromag const& emFields, double mass, Interpolator& interpolator,
                        GridLayout const& layout, ParticleSelector firstSelector,
-                       ParticleSelector secondSelector) override
+                       ParticleSelector secondSelector)
     {
         if (rangeIn.size() == 0)
             return rangeOut;
@@ -122,8 +116,7 @@ public:
 
 
     /** see Pusher::move() documentation*/
-    void setMeshAndTimeStep(std::array<double, dim> const& ms,
-                            double const ts) override _PHARE_ALL_FN_
+    void setMeshAndTimeStep(std::array<double, dim> const& ms, double const ts) _PHARE_ALL_FN_
     {
         std::transform(std::begin(ms), std::end(ms), std::begin(halfDtOverDl_),
                        [ts](double const& x) { return 0.5 * ts / x; });

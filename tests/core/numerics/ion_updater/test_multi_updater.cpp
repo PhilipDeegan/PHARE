@@ -73,9 +73,7 @@ auto& pool = *ThreadPool::INSTANCE().thread_pools[0];
 template<typename IonUpdater_t>
 auto construct_()
 {
-    PHARE::initializer::PHAREDict dict;
-    dict["simulation"]["algo"]["ion_updater"]["pusher"]["name"] = std::string{"modified_boris"};
-    return IonUpdater_t{dict["simulation"]["algo"]["ion_updater"]};
+    return IonUpdater_t{};
 }
 
 template<typename Ions, typename EM, typename GridLayout_t>

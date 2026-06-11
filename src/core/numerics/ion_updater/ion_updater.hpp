@@ -4,9 +4,10 @@
 #include "core/logger.hpp"
 #include "core/utilities/box/box.hpp"
 #include "core/utilities/range/range.hpp"
-#include "core/numerics/pusher/pusher.hpp"
+
+#include "core/numerics/pusher/boris.hpp"
 #include "core/numerics/moments/moments.hpp"
-#include "core/numerics/pusher/pusher_factory.hpp"
+
 #include "core/numerics/interpolator/interpolator.hpp"
 #include "core/numerics/boundary_condition/boundary_condition.hpp"
 
@@ -34,22 +35,11 @@ public:
     using ParticleRange     = IndexRange<ParticleArray_t>;
     using BoundaryCondition = PHARE::core::BoundaryCondition<dimension, interp_order>;
 
-    using Pusher = PHARE::core::Pusher<dimension, ParticleRange, Electromag, Interpolator,
-                                       BoundaryCondition, GridLayout>;
+    using Pusher = PHARE::core::BorisPusher<dimension, ParticleRange, Electromag, Interpolator,
+                                            BoundaryCondition, GridLayout>;
 
-private:
-    constexpr static auto makePusher
-        = PHARE::core::PusherFactory::makePusher<dimension, ParticleRange, Electromag, Interpolator,
-                                                 BoundaryCondition, GridLayout>;
 
-    std::unique_ptr<Pusher> pusher_;
-    Interpolator interpolator_;
-
-public:
-    IonUpdater(PHARE::initializer::PHAREDict const& dict)
-        : pusher_{makePusher(dict["pusher"]["name"].template to<std::string>())}
-    {
-    }
+    IonUpdater() {}
 
     template<typename Boxing_t>
     void updatePopulations(Ions& ions, Electromag const& em, Boxing_t const& boxing, double dt,
@@ -73,6 +63,8 @@ private:
     template<typename Boxing_t>
     void updateAndDepositAll_(Ions& ions, Electromag const& em, Boxing_t const& boxing);
 
+    Pusher pusher_;
+    Interpolator interpolator_;
 
     // dealloced on regridding/load balancing coarsest
     ParticleArray_t tmp_particles_{}; //{std::make_unique<ParticleArray>(Box{})};
@@ -90,7 +82,7 @@ void IonUpdater<Ions, Electromag, GridLayout>::updatePopulations(Ions& ions, Ele
     PHARE_LOG_SCOPE(3, "IonUpdater::updatePopulations");
 
     resetMoments(ions);
-    pusher_->setMeshAndTimeStep(boxing.layout.meshSize(), dt);
+    pusher_.setMeshAndTimeStep(boxing.layout.meshSize(), dt);
 
     if (mode == UpdaterMode::domain_only)
     {
@@ -137,8 +129,8 @@ void IonUpdater<Ions, Electromag, GridLayout>::updateAndDepositDomain_(Ions& ion
         // first push all domain particles twice
         // accumulate those inNonLevelGhostBox
         auto outRange = makeIndexRange(domain);
-        auto allowed = outRange = pusher_->move(outRange, outRange, em, pop.mass(), interpolator_,
-                                                layout, boxing.noop, boxing.inNonLevelGhostBox);
+        auto allowed = outRange = pusher_.move(outRange, outRange, em, pop.mass(), interpolator_,
+                                               layout, boxing.noop, boxing.inNonLevelGhostBox);
 
         interpolator_(allowed, pop.particleDensity(), pop.chargeDensity(), pop.flux(), layout);
 
@@ -151,8 +143,8 @@ void IonUpdater<Ions, Electromag, GridLayout>::updateAndDepositDomain_(Ions& ion
 
             auto outRange = makeIndexRange(tmp_particles_);
 
-            auto enteredInDomain = pusher_->move(outRange, outRange, em, pop.mass(), interpolator_,
-                                                 layout, boxing.inGhostBox, boxing.inDomainBox);
+            auto enteredInDomain = pusher_.move(outRange, outRange, em, pop.mass(), interpolator_,
+                                                layout, boxing.inGhostBox, boxing.inDomainBox);
 
             interpolator_(enteredInDomain, pop.particleDensity(), pop.chargeDensity(), pop.flux(),
                           layout);
@@ -197,8 +189,8 @@ void IonUpdater<Ions, Electromag, GridLayout>::updateAndDepositAll_(Ions& ions,
         auto& domainParticles = pop.domainParticles();
         auto domainPartRange  = makeIndexRange(domainParticles);
 
-        auto inDomain = pusher_->move(domainPartRange, domainPartRange, em, pop.mass(),
-                                      interpolator_, layout, boxing.noop, boxing.inDomainBox);
+        auto inDomain = pusher_.move(domainPartRange, domainPartRange, em, pop.mass(),
+                                     interpolator_, layout, boxing.noop, boxing.inDomainBox);
 
         auto now_ghosts = makeRange(domainParticles, inDomain.iend(), domainParticles.size());
         auto const not_level_ghosts = boxing.inNonLevelGhostBox(now_ghosts);
@@ -231,8 +223,8 @@ void IonUpdater<Ions, Electromag, GridLayout>::updateAndDepositAll_(Ions& ions,
         {
             auto particleRange = makeIndexRange(pop.levelGhostParticles());
             auto inGhostLayerRange
-                = pusher_->move(particleRange, particleRange, em, pop.mass(), interpolator_, layout,
-                                boxing.inGhostBox, boxing.inGhostLayer);
+                = pusher_.move(particleRange, particleRange, em, pop.mass(), interpolator_, layout,
+                               boxing.inGhostBox, boxing.inGhostLayer);
 
             auto& particleArray = particleRange.array();
             particleArray.export_particles(

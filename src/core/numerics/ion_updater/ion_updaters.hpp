@@ -18,12 +18,12 @@ struct IonUpdaterImplResolverFns
 
     auto static constexpr updater_impl()
     {
-        using enum core::LayoutMode;
+        using enum LayoutMode;
         if constexpr (any_in(ParticleArray_t::layout_mode, AoSMapped))
-            return _as_nullptr_<core::IonUpdater<Ions, Electromag, GridLayout>*>();
+            return _as_nullptr_<IonUpdater<Ions, Electromag, GridLayout>*>();
 #if PHARE_HAVE_MKN_GPU
         else if constexpr (is_tiled(ParticleArray_t::layout_mode))
-            return _as_nullptr_<core::mkn::IonUpdaterMultiTS<Ions, Electromag, GridLayout>*>();
+            return _as_nullptr_<mkn::IonUpdaterMultiTS<Ions, Electromag, GridLayout>*>();
 #endif // PHARE_HAVE_MKN_GPU
         else
             static_assert(dependent_false_v<Ions>);

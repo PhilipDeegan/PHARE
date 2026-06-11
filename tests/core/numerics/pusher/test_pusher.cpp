@@ -5,7 +5,6 @@
 #include "core/numerics/pusher/boris.hpp"
 #include "core/utilities/range/range.hpp"
 #include "core/data/particles/particle_array.hpp"
-#include "core/numerics/pusher/pusher_factory.hpp"
 #include "core/numerics/boundary_condition/boundary_condition.hpp"
 
 #include <array>
@@ -384,35 +383,6 @@ TEST_F(APusherWithLeavingParticles, pusherWithOrWithoutBCReturnsSameNbrOfStaying
 }
 #endif
 
-
-
-TEST(APusherFactory, canReturnABorisPusher)
-{
-    {
-        auto pusher
-            = PusherFactory::makePusher<1, IndexRange<AoSParticleArray<1>>, Electromag,
-                                        Interpolator, BoundaryCondition<1, 1>, DummyLayout<1>>(
-                "modified_boris");
-
-        EXPECT_NE(nullptr, pusher);
-    }
-    {
-        auto pusher
-            = PusherFactory::makePusher<1, IndexRange<AoSMappedParticleArray<1>>, Electromag,
-                                        Interpolator, BoundaryCondition<1, 1>, DummyLayout<1>>(
-                "modified_boris");
-
-        EXPECT_NE(nullptr, pusher);
-    }
-
-    // {
-    //     pusher = PusherFactory::makePusher<1, IndexRange<SoAParticleArray<1>>, Electromag,
-    //                                        Interpolator, BoundaryCondition<1, 1>,
-    //                                        DummyLayout<1>>(
-    //         "modified_boris");
-    //     EXPECT_NE(nullptr, pusher);
-    // }
-}
 
 
 
