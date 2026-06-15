@@ -30,11 +30,8 @@
 #include <string>
 
 
-
-
 namespace PHARE
 {
-
 
 class ISimulator
 {
@@ -51,7 +48,7 @@ public:
     virtual std::vector<double> const& cellWidth() const = 0;
     virtual std::size_t interporder() const              = 0;
 
-    virtual std::string to_str() = 0;
+    virtual std::string to_str() const = 0;
 
     virtual ~ISimulator() {}
 
@@ -112,7 +109,7 @@ public:
     NO_DISCARD auto& getMHDModel() { return mhd_.model_; }
     NO_DISCARD auto& getMultiPhysicsIntegrator() { return multiphysInteg_; }
 
-    NO_DISCARD std::string to_str() override;
+    NO_DISCARD std::string to_str() const override;
 
     bool dump_diagnostics(double timestamp, double timestep) override
     {
@@ -127,6 +124,8 @@ public:
         return false;
     }
 
+    std::string summary() const;
+
 
 protected:
     // provided to force flush for diags
@@ -135,35 +134,7 @@ protected:
 private:
     auto find_model(std::string name);
 
-    std::unique_ptr<std::ofstream> static log_file()
-    {
-        // ".log" directory is not created here, but in simulator.py
-        if (auto log = core::get_env("PHARE_LOG"))
-        {
-            if (log == "RANK_FILES")
-                return std::make_unique<std::ofstream>(".log/" + std::to_string(mpi::rank())
-                                                       + ".out");
-
-
-            if (log == "DATETIME_FILES")
-            {
-                auto date_time = mpi::date_time();
-                auto rank      = std::to_string(mpi::rank());
-                auto size      = std::to_string(mpi::size());
-                return std::make_unique<std::ofstream>(".log/" + date_time + "_" + rank + "_of_"
-                                                       + size + ".out");
-            }
-
-            if (log == "NULL")
-                return std::make_unique<std::ofstream>("/dev/null");
-
-            if (log != "CLI")
-                throw std::runtime_error(
-                    "PHARE_LOG invalid type, valid keys are RANK_FILES/DATETIME_FILES/CLI/NULL");
-        }
-
-        return nullptr;
-    }
+    std::unique_ptr<std::ofstream> static log_file();
 
     std::unique_ptr<std::ofstream> log_out{log_file()};
     std::streambuf* coutbuf = nullptr;
@@ -184,8 +155,7 @@ private:
     double currentTime_        = 0;
     std::size_t fineDumpLvlMax = 0;
     bool isInitialized         = false;
-
-    bool allowEmergencyDumps = false;
+    bool allowEmergencyDumps   = false;
 
     // empty when opts has the corresponding model disabled, see phare_solver.hpp
     solver::HybridSimState<opts> hyb_;
@@ -214,7 +184,39 @@ private:
     void handle_dictionary_exception(core::DictionaryException const& ex);
 };
 
+template<auto opts>
+std::unique_ptr<std::ofstream> Simulator<opts>::log_file()
+{
+    using namespace PHARE::core;
 
+    std::string const base = ".log/";
+    std::string const ext  = ".out";
+
+    // ".log" directory is not created here, but in simulator.py
+    if (auto log = get_env("PHARE_LOG"))
+    {
+        if (log == "RANK_FILES")
+            return std::make_unique<std::ofstream>(base + std::to_string(mpi::rank()) + ext);
+
+        if (log == "DATETIME_FILES")
+        {
+            auto date_time = mpi::date_time();
+            auto rank      = std::to_string(mpi::rank());
+            auto size      = std::to_string(mpi::size());
+            return std::make_unique<std::ofstream>(base + date_time + "_" + rank + "_of_" + size
+                                                   + ext);
+        }
+
+        if (log == "NULL")
+            return std::make_unique<std::ofstream>("/dev/null");
+
+        if (log != "CLI")
+            throw std::runtime_error(
+                "PHARE_LOG invalid type, valid keys are RANK_FILES/DATETIME_FILES/CLI/NULL");
+    }
+
+    return nullptr;
+}
 
 namespace
 {
@@ -435,7 +437,6 @@ Simulator<opts>::Simulator(PHARE::initializer::PHAREDict const& dict,
     // finalTime_ is computed in Python as start_time + time_step_nbr * time_step
     // (start_time == restart_time), so it already accounts for the restart offset.
 
-
     // we would need a different restart manager for mhd and hybrid if both models are used
 
     // the build enabling a model (static_assert in solver::PHARE_Types) is not enough: the dict
@@ -495,7 +496,7 @@ Simulator<opts>::Simulator(PHARE::initializer::PHAREDict const& dict,
 
 
 template<auto opts>
-std::string Simulator<opts>::to_str()
+std::string Simulator<opts>::to_str() const
 {
     std::stringstream ss;
     ss << "PHARE SIMULATOR\n";
@@ -518,7 +519,19 @@ std::string Simulator<opts>::to_str()
 }
 
 
+template<auto opts>
+std::string Simulator<opts>::summary() const
+{
+    std::stringstream ss;
 
+    // if (mhdModel_)
+    //     ss << mhdModel_->summarize(*hierarchy_);
+
+    if (hybridModel_)
+        ss << hybridModel_->summarize(*hierarchy_);
+
+    return ss.str();
+}
 
 template<auto opts>
 void Simulator<opts>::initialize()
@@ -610,8 +623,6 @@ double Simulator<opts>::advance(double dt)
             throw std::runtime_error(*error);
         throw std::runtime_error("forcing error");
     }
-
-
 
     return dt;
 }

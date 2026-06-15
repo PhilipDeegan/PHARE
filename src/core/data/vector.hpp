@@ -11,10 +11,10 @@ namespace PHARE::core
 
 // Will automagically shrink itself if the requested sizes are
 //  below a threshold for some number of requests
-template<typename T>
+template<typename T, typename Allocator = std::allocator<T>>
 struct MinimizingVector
 {
-    using vector_t = std::vector<T>;
+    using vector_t = std::vector<T, Allocator>;
 
     // resize to s, preserving existing content
     auto& get(std::size_t s)
