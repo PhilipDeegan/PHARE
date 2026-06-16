@@ -79,6 +79,7 @@ private:
             return val - core::detail::tensor_field_dim_from_rank<1>();
     }
 
+
     bool transformations_equal_(SAMRAI::hier::Transformation const& a,
                                 SAMRAI::hier::Transformation const& b)
     {

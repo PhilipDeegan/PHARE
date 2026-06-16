@@ -47,12 +47,6 @@ private:
         -> std::optional<core::Box<int, dimension>>;
 
     std::unordered_map<std::string, Info> mem;
-
-    auto isActiveDiag(DiagnosticProperties const& diagnostic, std::string const& tree,
-                      std::string var)
-    {
-        return diagnostic.quantity == tree + var;
-    };
 };
 
 
@@ -90,7 +84,7 @@ void ElectromagDiagnosticWriter<H5Writer>::setup_normal(DiagnosticProperties& di
     VTKFileInitializer initializer{diagnostic, this};
 
     auto const init = [&](auto const ilvl) -> std::optional<std::size_t> {
-        if (isActiveDiag(diagnostic, "/", "EM_B") || isActiveDiag(diagnostic, "/", "EM_E"))
+        if (diagnostic.quantity == "/EM_B" || diagnostic.quantity == "/EM_E")
             return initializer.template initTensorFieldFileLevel<1>(ilvl);
         return std::nullopt;
     };
@@ -114,7 +108,7 @@ void ElectromagDiagnosticWriter<H5Writer>::setup_sliced(
     VTKFileInitializer initializer{diagnostic, this};
 
     auto const init = [&](auto const ilvl) -> std::optional<std::size_t> {
-        if (isActiveDiag(diagnostic, "/", "EM_B") || isActiveDiag(diagnostic, "/", "EM_E"))
+        if (diagnostic.quantity == "/EM_B" || diagnostic.quantity == "/EM_E")
             return initializer.template initTensorFieldFileLevelWithSlice<1>(
                 ilvl, amr::refine_box(slice_box, ilvl));
         return std::nullopt;
@@ -143,26 +137,20 @@ void ElectromagDiagnosticWriter<H5Writer>::write(DiagnosticProperties& diagnosti
             VTKFileWriter writer{diagnostic, this, info.offset_per_level[ilvl]};
 
             auto const write_quantity = [&](auto& layout, auto const&, auto const) {
-                PHARE_LOG_SCOPE(3, "FluidDiagnosticWriter<H5Writer>::write_quantity");
+                PHARE_LOG_SCOPE(3, "ElectromagDiagnosticWriter<H5Writer>::write_quantity");
 
-                if (isActiveDiag(diagnostic, "/", "EM_B"))
-                {
-                    auto& B = this->h5Writer_.modelView().getB();
+                auto& mv = this->h5Writer_.modelView();
+                auto const writeField = [&](auto& field) {
                     if (info.slice_box)
                         writer.template writeTensorFieldSlice<1>(
-                            B, layout, amr::refine_box(*info.slice_box, ilvl));
+                            field, layout, amr::refine_box(*info.slice_box, ilvl));
                     else
-                        writer.template writeTensorField<1>(B, layout);
-                }
-                if (isActiveDiag(diagnostic, "/", "EM_E"))
-                {
-                    auto& E = this->h5Writer_.modelView().getE();
-                    if (info.slice_box)
-                        writer.template writeTensorFieldSlice<1>(
-                            E, layout, amr::refine_box(*info.slice_box, ilvl));
-                    else
-                        writer.template writeTensorField<1>(E, layout);
-                }
+                        writer.template writeTensorField<1>(field, layout);
+                };
+                if (diagnostic.quantity == "/EM_B")
+                    writeField(mv.getB());
+                if (diagnostic.quantity == "/EM_E")
+                    writeField(mv.getE());
             };
 
             modelView.visitHierarchy(write_quantity, ilvl, ilvl);

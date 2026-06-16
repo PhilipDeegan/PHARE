@@ -26,7 +26,7 @@ namespace PHARE::amr
  * inner fine faces are set by the MagneticRefinePatchStrategy
  */
 template<std::size_t dimension>
-class MagneticFieldRegrider // probably bad rebase, tbd
+class MagneticFieldRegrider
 {
 public:
     MagneticFieldRegrider(std::array<core::QtyCentering, dimension> const& centering,

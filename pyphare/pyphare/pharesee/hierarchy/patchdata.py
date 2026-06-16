@@ -104,7 +104,6 @@ class FieldData(PatchData):
             upper = self.layout.AMRToLocal(overlap.upper)
             select = tuple(slice(lower[i], upper[i] + 1) for i in range(box.ndim))
             return self.dataset[select]
-
         return np.array([])
 
     def __getitem__(self, box_or_slice):

@@ -76,7 +76,6 @@ def _parse_level_info(level):
     trim = [")", ","]
     while any(level.endswith(t) for t in trim):
         level = level[:-1]
-    # print("parse level:", level)
     bits = [s for s in level.strip().split(" ") if s]
     ilvl = bits[0].split(":")[1]
     for bit in bits:

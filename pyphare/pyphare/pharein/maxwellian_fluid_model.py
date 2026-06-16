@@ -91,8 +91,10 @@ class MaxwellianFluidModel(object):
             [global_vars.sim.dry_run, global_vars.sim.is_from_restart()]
         )
         self.validated = False
+
         if should_validate:
-            self.validate(global_vars.sim)
+            atol = 0 if global_vars.sim.strict == "very" else 1e-15
+            self.validate(global_vars.sim, atol)
             self.validated = True
 
         global_vars.sim.set_model(self)
@@ -410,7 +412,9 @@ class MaxwellianFluidModel(object):
 
     def validate3d(self, sim, atol):
         domain_box = Box([0] * sim.ndim, sim.cells)
-        layout = GridLayout(domain_box, domain_box.lower, sim.dl, sim.interp_order)
+        layout = HybridGridLayoutFor(
+            domain_box, domain_box.lower, sim.dl, sim.interp_order
+        )
         nbrDualGhosts = layout.nbrGhostsPrimal(sim.interp_order)
         nbrPrimalGhosts = layout.nbrGhostsPrimal(sim.interp_order)
         directions = ["X", "Y", "Z"]

@@ -334,7 +334,7 @@ def patch_levels_from_h5(vtk_file, time, selection_box=None):
                     basename,
                     layout,
                 )
-                patches.append(Patch(patch_datas, h5_patch, layout=layout))
+                patches.append(Patch(patch_datas, h5_patch, box=layout.box))
 
         if len(patches):
             patch_levels[ilvl] = PatchLevel(ilvl, patches)

@@ -221,6 +221,7 @@ def plot1d(hier, **kwargs):
 
 
 def plot2d(hier, **kwargs):
+    from matplotlib.collections import QuadMesh
     from matplotlib.patches import Rectangle
 
     from . import get_fig_ax
@@ -247,38 +248,53 @@ def plot2d(hier, **kwargs):
     if not isinstance(linestyles, dict):
         linestyles = dict(zip(usr_lvls, linestyles))
 
+    is_update = len(ax.collections) > 0 and isinstance(ax.collections[0], QuadMesh)
+    gidx = -1
+    im = None
     for lvl_nbr, _ in hier.levels(time).items():
         if lvl_nbr not in usr_lvls:
             continue
         for patch in hier.level(lvl_nbr, time).patches:
+            gidx += 1
             pdat = patch[qty]
             x, y, data = _pcolormesh_coords(pdat, patch.box)
-            dx, dy = pdat.dl
-            im = ax.pcolormesh(
-                x,
-                y,
-                data.T,
-                cmap=kwargs.get("cmap", "Spectral_r"),
-                vmin=kwargs.get("vmin", glob_min - 1e-6),
-                vmax=kwargs.get("vmax", glob_max + 1e-6),
-            )
-            if kwargs.get("plot_patches", False):
-                r = Rectangle(
-                    (patch.box.lower[0] * dx, patch.box.lower[1] * dy),
-                    patch.box.shape[0] * dx,
-                    patch.box.shape[1] * dy,
-                    fc="none",
-                    ec=patchcolors[lvl_nbr],
-                    alpha=0.4,
-                    lw=linewidths[lvl_nbr],
-                    ls=linestyles[lvl_nbr],
-                )
-                ax.add_patch(r)
+            dx, dy = pdat.dl[:2]
 
-    ax.set_aspect(kwargs.get("aspect", "equal"))
-    ax.set_xlabel(kwargs.get("xlabel", "x"))
-    ax.set_ylabel(kwargs.get("ylabel", "y"))
-    _add_colorbar(ax, im)
+            if is_update:
+                im = ax.collections[gidx]
+                im.set_array(data.T)
+                im.set_clim(
+                    vmin=kwargs.get("vmin", glob_min - 1e-6),
+                    vmax=kwargs.get("vmax", glob_max + 1e-6),
+                )
+                ax.draw_artist(im)
+            else:
+                im = ax.pcolormesh(
+                    x,
+                    y,
+                    data.T,
+                    cmap=kwargs.get("cmap", "Spectral_r"),
+                    vmin=kwargs.get("vmin", glob_min - 1e-6),
+                    vmax=kwargs.get("vmax", glob_max + 1e-6),
+                )
+                if kwargs.get("plot_patches", False):
+                    r = Rectangle(
+                        (patch.box.lower[0] * dx, patch.box.lower[1] * dy),
+                        patch.box.shape[0] * dx,
+                        patch.box.shape[1] * dy,
+                        fc="none",
+                        ec=patchcolors[lvl_nbr],
+                        alpha=0.4,
+                        lw=linewidths[lvl_nbr],
+                        ls=linestyles[lvl_nbr],
+                    )
+                    ax.add_patch(r)
+
+    if not is_update and im is not None:
+        ax.set_aspect(kwargs.get("aspect", "equal"))
+        ax.set_xlabel(kwargs.get("xlabel", "x"))
+        ax.set_ylabel(kwargs.get("ylabel", "y"))
+        _add_colorbar(ax, im)
 
     kwargs["ax"] = ax
     _finalize_ax(fig, **kwargs)

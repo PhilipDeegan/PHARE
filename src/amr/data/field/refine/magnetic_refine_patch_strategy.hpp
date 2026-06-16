@@ -4,12 +4,11 @@
 #include "core/logger.hpp"
 #include "core/utilities/types.hpp"
 #include "core/utilities/constants.hpp"
+#include "core/data/field/field_box_span.hpp"
 
 #include "amr/utilities/box/amr_box.hpp"
 #include "amr/data/field/field_geometry.hpp"
-#include "core/data/field/field_box_span.hpp"
 #include "amr/resources_manager/amr_utils.hpp"
-
 
 #include "SAMRAI/xfer/RefinePatchStrategy.h"
 

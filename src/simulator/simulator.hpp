@@ -28,12 +28,8 @@
 #include <string>
 
 
-
-
 namespace PHARE
 {
-
-
 
 class ISimulator
 {

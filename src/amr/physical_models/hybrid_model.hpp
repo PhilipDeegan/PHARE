@@ -69,7 +69,9 @@ public:
      * the given Patch at the given allocateTime
      */
     virtual void allocate(patch_t& patch, double const allocateTime) override
-    { resourcesManager->allocate(state, patch, allocateTime); }
+    {
+        resourcesManager->allocate(state, patch, allocateTime);
+    }
 
 
 
@@ -82,7 +84,9 @@ public:
 
 
     NO_DISCARD auto setOnPatch(patch_t& patch)
-    { return resourcesManager->setOnPatch(patch, *this); }
+    {
+        return resourcesManager->setOnPatch(patch, *this);
+    }
 
 
     HybridModel(PHARE::initializer::PHAREDict const& dict,
@@ -286,6 +290,10 @@ void HybridModel<GridLayoutT, Electromag, Ions, Electrons, AMR_Types, Grid_t>::i
         }
 
         state.electromag.initialize(layout);
+        // data initialized to NaN on construction
+        // and in 1D Jx is not worked on in Ampere so
+        // we need to zero J before anything happens
+        state.J.zero();
     }
 }
 
@@ -341,14 +349,19 @@ void HybridModel<GridLayoutT, Electromag, Ions, Electrons, AMR_Types, Grid_t>::f
 
 template<typename Model>
 auto constexpr is_hybrid_model(Model* m) -> decltype(m->model_type_name, bool())
-{ return Model::model_type_name == "HybridModel"; }
+{
+    return Model::model_type_name == "HybridModel";
+}
 
 template<typename... Args>
 auto constexpr is_hybrid_model(Args...)
-{ return false; }
+{
+    return false;
+}
 
 template<typename Model>
 auto constexpr is_hybrid_model_v = is_hybrid_model(static_cast<Model*>(nullptr));
+
 
 
 

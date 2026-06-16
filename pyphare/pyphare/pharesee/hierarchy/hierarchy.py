@@ -32,6 +32,7 @@ class PatchHierarchy(object):
         slice_box=None,
     ):
         self.slice_box = slice_box
+
         if not isinstance(times, (tuple, list)):
             times = phut.listify(times)
 
@@ -75,8 +76,11 @@ class PatchHierarchy(object):
         self.ephemerals = ephemerals
         self.update()
 
-    def finest(self, time, qty=None):
-        return func.GetFinest(self, time, qty)
+    def finest(self, time=None, qty=None):
+        from . import func
+
+        finest = func.GetFinest(self, time, qty)
+        return next(iter(finest.values())) if len(finest) == 1 else finest
 
     def __deepcopy__(self, memo):
         no_copy_keys = ["data_files"]  # do not copy these things
@@ -244,14 +248,15 @@ class PatchHierarchy(object):
             time = self._default_time()
         return list(self.levels(time).keys())
 
-    def add_time(self, time, patch_level, h5file, selection_box=None):
+    def add_time(self, time, patch_level, h5file=None, selection_box=None):
         formated_time = format_timestamp(time)
 
         self.time_hier[format_timestamp(time)] = patch_level
         if selection_box is not None:
             self.selection_box[formated_time] = selection_box
 
-        self.data_files[h5file.filename] = h5file
+        if h5file:
+            self.data_files[h5file.filename] = h5file
         self.update()
 
     def is_homogeneous(self):
@@ -376,17 +381,6 @@ class PatchHierarchy(object):
         from .plotting.plot_fields import plot1d
 
         return plot1d(self, **kwargs)
-
-    def _pcolormesh_coords(self, pdat, box):
-        """Strip ghosts and return (x, y, data) with edge coordinates for pcolormesh."""
-        ng = pdat.ghosts_nbr
-        data = pdat[box] if np.any(ng != 0) else pdat.dataset[:]
-        sx = slice(ng[0], -ng[0] if ng[0] else None)
-        sy = slice(ng[1], -ng[1] if ng[1] else None)
-        x = np.copy(pdat.x[sx])
-        y = np.copy(pdat.y[sy])
-
-        return x, y, data
 
     def plot2d(self, **kwargs):
         from .plotting.plot_fields import plot2d

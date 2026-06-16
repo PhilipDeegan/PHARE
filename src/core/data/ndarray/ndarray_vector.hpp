@@ -325,6 +325,8 @@ public:
     }
 
 
+
+
     NO_DISCARD auto& vector() { return data_; }
     NO_DISCARD auto& vector() const { return data_; }
 

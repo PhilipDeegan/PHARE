@@ -57,7 +57,7 @@ bool any_errors()
 void log_error(std::string const key, std::string const val)
 {
 #if PHARE_ERRORS_USE_MPI_ABORT
-    std::cout << "MPI ABORT: PHARE ERROR: " << key << " " << val << std::endl;
+    std::cerr << "PHARE ERROR! MPI ABORT: " << key << " " << val << std::endl;
     MPI_Abort(MPI_COMM_WORLD, -1);
 #else
     core::Errors::instance().log(key, val);
@@ -71,7 +71,7 @@ void barrier()
 
 
 
-std::string date_time(std::string format)
+std::string date_time(std::string const& format)
 {
     std::time_t t = std::time(NULL);
     char buffer[80];

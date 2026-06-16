@@ -22,6 +22,7 @@
 #include "amr/messengers/messenger.hpp"
 #include "amr/messengers/messenger_info.hpp"
 #include "amr/messengers/mhd_messenger_info.hpp"
+#include "amr/data/field/refine/field_refiner.hpp"
 #include "amr/data/field/refine/magnetic_refine_patch_strategy.hpp"
 #include "amr/data/field/field_variable_fill_pattern.hpp"
 

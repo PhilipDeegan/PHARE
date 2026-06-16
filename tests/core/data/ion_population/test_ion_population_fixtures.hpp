@@ -5,15 +5,14 @@
 #include "phare_core.hpp"
 #include "core/data/ions/ions.hpp"
 #include "core/data/ndarray/ndarray_vector.hpp"
-#include "core/data/particles/particle_array.hpp"
 #include "core/data/ions/ion_population/ion_population.hpp"
 
-#include "tests/core/data/gridlayout/test_gridlayout.hpp"
 #include "tests/core/data/vecfield/test_vecfield_fixtures.hpp"
 #include "tests/core/data/particles/test_particles_fixtures.hpp"
 
 
 #include <cassert>
+
 
 namespace PHARE::core
 {
@@ -64,8 +63,6 @@ class UsableIonsPopulation_ : public _defaults::IonPopulation_t
     using ParticleArray_t = _defaults::ParticleArray_t;
     using Super           = IonPopulation<ParticleArray_t, VecField_t, TensorField_t>;
 
-
-
     void set()
     {
         auto&& [_F, _M, _pd, _cd, _particles] = Super::getCompileTimeResourcesViewList();
@@ -79,6 +76,28 @@ class UsableIonsPopulation_ : public _defaults::IonPopulation_t
         assert(compare_fields(_pd, *rhoP));
     }
 
+public:
+    UsableIonsPopulation_(initializer::PHAREDict const& dict, GridLayout_t const& layout)
+        : Super{dict}
+        , particleDensity{this->name() + "_particleDensity", layout, HybridQuantity::Scalar::rho}
+        , chargeDensity{this->name() + "_chargeDensity", layout, HybridQuantity::Scalar::rho}
+        , F{this->name() + "_flux", layout, HybridQuantity::Vector::V}
+        , M{this->name() + "_momentumTensor", layout, HybridQuantity::Tensor::M}
+        , particles{this->name(), layout.AMRBox()}
+    {
+        set();
+    }
+
+    UsableIonsPopulation_(UsableIonsPopulation_ const& that)
+        : Super{pop_dict(that.name())}
+        , particleDensity{that.particleDensity}
+        , chargeDensity{that.chargeDensity}
+        , F{that.F}
+        , M{that.M}
+        , particles{that.particles}
+    {
+        set();
+    }
 
 public:
     UsableIonsPopulation_(initializer::PHAREDict const& dict, GridLayout_t const& layout)
@@ -126,6 +145,7 @@ template<typename ParticleArray_t, std::size_t interp = 1>
 using UsableIonsPopulation = UsableIonsPopulation_<UsableIonsDefaultTypes<ParticleArray_t, interp>>;
 
 
+
 template<typename _defaults>
 class UsableIons_
     : public Ions<typename _defaults::IonPopulation_t, typename _defaults::GridLayout_t>
@@ -133,7 +153,6 @@ class UsableIons_
     using Quantity     = _defaults::Quantity;
     using GridLayout_t = _defaults::GridLayout_t;
     using Super        = Ions<typename _defaults::IonPopulation_t, GridLayout_t>;
-
 
 
     template<typename PopNames>
@@ -145,7 +164,6 @@ class UsableIons_
             dict["pop" + std::to_string(i)] = pop_dict(pop_names[i], ppc);
         return dict;
     }
-
 
 
     auto static super(Super const supe)
@@ -194,6 +212,44 @@ public:
                 std::size_t const ppc = 0)
         : UsableIons_{layout, super(pop_names, ppc)}
     {
+        auto& super_pops = Super::getRunTimeResourcesViewList();
+        populations.reserve(super_pops.size());
+        for (std::size_t i = 0; i < super_pops.size(); ++i)
+            populations.emplace_back(dict["pop" + std::to_string(i)], layout);
+        set();
+    }
+
+    UsableIons_(GridLayout_t const& layout, std::vector<std::string> const& pop_names,
+                std::size_t const ppc = 0)
+        : UsableIons_{layout, super(pop_names, ppc)}
+    {
+    }
+
+    UsableIons_(GridLayout_t const& layout, std::size_t const ppc = 0)
+        : UsableIons_{layout, std::vector<std::string>{"protons"}, ppc}
+    {
+    }
+
+    UsableIons_(UsableIons_&& that)
+        : Super(super(*that))
+        , massDensity{std::move(that.massDensity)}
+        , chargeDensity{std::move(that.chargeDensity)}
+        , Vi{std::move(that.Vi)}
+        , M{std::move(that.M)}
+        , populations{std::move(that.populations)}
+    {
+        set();
+    }
+
+    UsableIons_(UsableIons_ const& that)
+        : Super(super(*that))
+        , massDensity{that.massDensity}
+        , chargeDensity{that.chargeDensity}
+        , Vi{that.Vi}
+        , M{that.M}
+        , populations{that.populations}
+    {
+        set();
     }
 
     UsableIons_(GridLayout_t const& layout, std::string const& pop = "protons")
@@ -243,6 +299,7 @@ public:
 
 template<typename ParticleArray_t, std::size_t interp = 1>
 using UsableIons = UsableIons_<UsableIonsDefaultTypes<ParticleArray_t, interp>>;
+
 
 
 

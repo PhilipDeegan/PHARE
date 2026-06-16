@@ -20,7 +20,13 @@ class UniformGrids:
     def __init__(self, grids: dict):
         self.grids = grids
 
-    def plot(self, qty, **kwargs):
+    def plot(self, qty=None, **kwargs):
+        if qty is None:
+            if len(self.grids) > 1:
+                raise ValueError(
+                    "qty required when UniformGrids has multiple quantities"
+                )
+            qty = next(iter(self.grids))
         self.grids[qty].plot(**kwargs)
 
     def items(self):

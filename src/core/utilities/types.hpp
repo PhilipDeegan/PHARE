@@ -604,6 +604,19 @@ auto static constexpr as_tuple(std::array<T, S> const& arr)
     return for_N<S, for_N_R_mode::forward_tuple>([&](auto i) -> auto& { return arr[i]; });
 };
 
+template<typename T0, typename T1, std::size_t... Is>
+bool _array_equals(T0 const& a, T1 const& b, std::index_sequence<Is...> const&&)
+{
+    return (... && (a[Is] == b[Is]));
+}
+
+template<typename T, std::size_t S>
+bool array_equals(std::array<T, S> const& a, std::array<T, S> const& b)
+{
+    return _array_equals(a, b, std::make_index_sequence<S>{});
+}
+
+
 } // namespace PHARE::core
 
 

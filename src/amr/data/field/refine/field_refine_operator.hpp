@@ -19,7 +19,6 @@
 
 namespace PHARE::amr
 {
-
 using core::dirX;
 using core::dirY;
 using core::dirZ;

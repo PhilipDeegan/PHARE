@@ -30,6 +30,8 @@ def GetFinest(hier, time, qty=None, interp="nearest"):
 
     if not hier.ephemerals:
         hier.ephemerals = {}
+
+    time = time or GetTime(hier)
     if time not in hier.ephemerals:
         hier.ephemerals[time] = {}
 
@@ -55,6 +57,14 @@ def get_interpolated_selection_from(hier, selection, quantity=None, interp="near
     times = hier.times()
     if len(times) > 1:
         raise ValueError("Error: interpolation does not support multiple times")
+    from ..hierarchy_utils import to_2d_from_slice
+
+    if hier.ndim == 3 and hier.slice_box:
+        hier = to_2d_from_slice(hier)
+
+    times = hier.times()
+    if len(times) > 1:
+        raise ValueError("TensorField interpolation does not support multiple times")
 
     from pyphare.pharesee.hierarchy import uniformgrid as uniform
     from ..interpolation import make_interpolator, flat_finest_field

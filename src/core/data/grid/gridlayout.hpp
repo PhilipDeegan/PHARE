@@ -1133,8 +1133,8 @@ namespace core
         }
 
         template<typename... Args>
-        void evalOnBiggerBox(auto const& field, Point<uint32_t, dimension> const& grow,
-                             auto&& fn, Args&&... args) const
+        void evalOnBiggerBox(auto const& field, Point<uint32_t, dimension> const& grow, auto&& fn,
+                             Args&&... args) const
         {
             auto box = domainBoxFor(field);
             for (std::size_t i = 0; i < dimension; ++i)

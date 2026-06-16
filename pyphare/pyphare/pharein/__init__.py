@@ -111,6 +111,8 @@ def dict_populator():
 
 
 def populateDict(simulation=None):
+    from . import initialize
+
     if simulation is None:
         from .global_vars import sim
 
