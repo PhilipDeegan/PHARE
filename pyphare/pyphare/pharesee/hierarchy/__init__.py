@@ -4,18 +4,12 @@
 
 from .scalarfield import ScalarField
 from .vectorfield import VectorField
+from .tensorfield import TensorField
 from .hierarchy import PatchHierarchy
+from pyphare.core import phare_utilities as phut
 from . import func
 
-
-from pyphare.core import phare_utilities as phut
-
-__all__ = [
-    "ScalarField",
-    "VectorField",
-    "PatchHierarchy",
-    "func",
-]
+__all__ = ["ScalarField", "VectorField", "TensorField", "PatchHierarchy", "func"]
 
 
 def hierarchy_from(

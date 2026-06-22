@@ -1,6 +1,11 @@
-from . import hierarchy_compute as hc
+#
+#
+#
+
+
 from . import tensorfield
-from .hierarchy_utils import compute_hier_from
+from . import compute as hc
+from . import hierarchy_utils as hootils
 
 
 class ScalarField(tensorfield.AnyTensorField):
@@ -9,33 +14,74 @@ class ScalarField(tensorfield.AnyTensorField):
 
     @classmethod
     def FROM(cls, hier):
-        renamed_hier = compute_hier_from(hc.compute_rename, hier, new_names=("value",))
-        return super().FROM(cls, renamed_hier)
+        return super().FROM(cls, hier)
 
     def __add__(self, other):
-        return ScalarField.FROM(compute_hier_from(hc.compute_add, self, operand=other))
+        return ScalarField.FROM(
+            hootils.compute_hier_from(hc.compute_add, self, **copy_kwargs(self, other))
+        )
 
     def __radd__(self, other):
         return self.__add__(other)
 
     def __sub__(self, other):
-        return ScalarField.FROM(compute_hier_from(hc.compute_sub, self, operand=other))
+        return ScalarField.FROM(
+            hootils.compute_hier_from(hc.compute_sub, self, **copy_kwargs(self, other))
+        )
 
     def __mul__(self, other):
-        return ScalarField.FROM(compute_hier_from(hc.compute_mul, self, operand=other))
+        return ScalarField.FROM(
+            hootils.compute_hier_from(hc.compute_mul, self, **copy_kwargs(self, other))
+        )
 
     def __rmul__(self, other):
         return self.__mul__(other)
 
     def __truediv__(self, other):
         return ScalarField.FROM(
-            compute_hier_from(hc.compute_truediv, self, operand=other)
+            hootils.compute_hier_from(
+                hc.compute_truediv, self, **copy_kwargs(self, other)
+            )
         )
 
     def __rtruediv__(self, other):
         return ScalarField.FROM(
-            compute_hier_from(hc.compute_rtruediv, self, operand=other)
+            hootils.compute_hier_from(
+                hc.compute_rtruediv, self, **copy_kwargs(self, other)
+            )
         )
 
     def __neg__(self):
         return self * -1
+
+    def gaussian(self, sigma=2):
+        return ScalarField.FROM(
+            hootils.compute_hier_from(
+                hc._compute_gaussian_filter_on_scalarfield,
+                self,
+                sigma=sigma,
+                qty=next(iter(self.quantities())),
+            )
+        )
+
+
+def copy_kwargs(scalar_field, other=None):
+    if other is not None:
+        return {"operand": other, "key_map": key_map(scalar_field, other)}
+    return {"key_map": key_map(scalar_field)}
+
+
+def key_map(scalar_field, other=None):
+    if len(scalar_field.quantities()) != 1:
+        raise ValueError("Invalid ScalarField 1!")
+
+    both_fields = other is not None and type(scalar_field) is type(other)
+    if both_fields and len(other.quantities()) != 1:
+        raise ValueError("Invalid ScalarField 2!")
+
+    def _(field):
+        return {field.quantities()[i]: "value" for i in range(len(field.quantities()))}
+
+    this = _(scalar_field)
+    that = _(other) if both_fields else {}
+    return {**this, **that}

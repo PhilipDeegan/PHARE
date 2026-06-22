@@ -161,10 +161,10 @@ def compute_hier_from(compute, hierarchies, **kwargs):
     time_hier = {}
     for t in reference_hier.times():
         patch_levels = {}
-        for ilvl in range(reference_hier.levelNbr()):
-            patch_levels[ilvl] = PatchLevel(
-                ilvl, new_patches_from(compute, hierarchies, ilvl, t, **kwargs)
-            )
+        for ilvl in reference_hier.levels(t).keys():
+            patches = new_patches_from(compute, hierarchies, ilvl, t, **kwargs)
+            if patches:
+                patch_levels[ilvl] = PatchLevel(ilvl, patches)
         time_hier[t] = patch_levels
 
     return PatchHierarchy(
@@ -195,6 +195,9 @@ def new_patchdatas_from(compute, patch, **kwargs):
 
 def new_patches_from(compute, hierarchies, ilvl, t, **kwargs):
     reference_hier = hierarchies[0]
+    if ilvl not in reference_hier.levels(t):
+        return []
+
     new_patches = []
     ref_patches = reference_hier.level(ilvl, time=t).patches
     for ip, ref_patch in enumerate(ref_patches):

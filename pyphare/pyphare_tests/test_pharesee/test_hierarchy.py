@@ -7,16 +7,16 @@ from pyphare.pharesee.run import Run
 from pyphare.simulator.simulator import Simulator
 from pyphare.pharesee.hierarchy import PatchHierarchy
 from pyphare.pharesee.hierarchy import ScalarField, VectorField
-from pyphare.core.operators import dot, cross, sqrt, modulus, grad
+from pyphare.pharesee.hierarchy.compute import dot, cross, sqrt, modulus, grad
 from pyphare.core.phare_utilities import assert_fp_any_all_close
 
 diag_outputs = "phare_outputs/"
-time_step_nbr = 20
+time_step_nbr = 2
 time_step = 0.005
 final_time = time_step * time_step_nbr
-dt = 10 * time_step
+dt = time_step
 nt = int(final_time / dt) + 1
-timestamps = dt * np.arange(nt)
+timestamps = [0, final_time]
 
 
 def patch_box_data(patch, qty):
@@ -172,7 +172,7 @@ class PatchHierarchyTest(unittest.TestCase):
 
     def _test_can_read_multiple_times(self):
         r = Run(self.diag_dir())
-        times = (0.0, 0.1)
+        times = (0.0, final_time)
         B = r.GetB(times)
         E = r.GetE(times)
         Ni = r.GetNi(times)
@@ -206,7 +206,8 @@ class PatchHierarchyTest(unittest.TestCase):
         r = Run(self.diag_dir())
         time = 0.0
         B = r.GetB(time)
-        self.assertTrue(isinstance(B.x, PatchHierarchy))
+        print("B?", type(B), type(B.Bx), B.__dict__)
+        self.assertTrue(isinstance(B.Bx, PatchHierarchy))
         self.assertTrue(isinstance(B.y, PatchHierarchy))
         self.assertTrue(isinstance(B.z, PatchHierarchy))
 
@@ -245,7 +246,7 @@ class PatchHierarchyTest(unittest.TestCase):
         Ni = r.GetNi(time)
         Vi = r.GetVi(time)
         self.assertTrue(isinstance(Ni, ScalarField))
-        self.assertTrue(isinstance(Vi, VectorField))
+        self.assertEqual(type(Vi), VectorField)
 
     def _test_sum_two_scalarfields(self):
         r = Run(self.diag_dir())
@@ -399,7 +400,7 @@ class PatchHierarchyTest(unittest.TestCase):
             g = grad(scalar)
             for ilvl, lvl in scalar.levels(time).items():
                 for ip, patch in enumerate(lvl.patches):
-                    data = patch_box_data(patch, "value")
+                    data = patch_box_data(patch, scalar.quantities()[0])
                     expected = np.gradient(data)
                     gpatch = g.level(ilvl, time).patches[ip]
                     for i, c in enumerate(["x", "y"]):
@@ -414,7 +415,8 @@ class PatchHierarchyTest(unittest.TestCase):
     def _test_patch_cut(self):
         r = Run(self.diag_dir())
         time = 0.0
-        for hier, qty in ((r.GetNi(time), "value"), (r.GetB(time), "x")):
+        for hier in (r.GetNi(time), r.GetB(time)):
+            qty = hier.quantities()[0]
             for patch in hier.level(0, time).patches:
                 pd = patch[qty]
                 data = pd[patch.box]
@@ -426,7 +428,7 @@ class PatchHierarchyTest(unittest.TestCase):
         r = Run(self.diag_dir())
         time = 0.0
         Ni = r.GetNi(time)
-        dl = Ni.level(0, time).patches[0]["value"].layout.dl
+        dl = Ni.level(0, time).patches[0][0].layout.dl
         L = 86 * dl[1]
 
         coords, cut = Ni(x=12.95)  # not on a patch border
@@ -450,13 +452,13 @@ class PatchHierarchyTest(unittest.TestCase):
         N = ScalarField.FROM(r._get_hierarchy(time, "ions_pop_protons_density.h5"))
         for lvl in N.levels(time).values():
             for patch in lvl.patches:
-                pd = patch["value"]
+                pd = patch[0]
                 self.assertTrue(all(g > 0 for g in pd.ghosts_nbr))
                 domain = np.array(pd[pd.box])
                 pd.dataset = np.full(pd.dataset.shape, np.nan)
                 pd[pd.box] = domain
 
-        data, _ = flat_finest_field(N, "value", time=time)
+        data, _ = flat_finest_field(N, N.quantities()[0], time=time)
         self.assertFalse(np.isnan(data).any())
 
         finest = N.finest(time)

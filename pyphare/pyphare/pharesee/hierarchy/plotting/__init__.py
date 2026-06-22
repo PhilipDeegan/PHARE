@@ -5,3 +5,9 @@ def get_fig_ax(**kwargs):
         return plt.subplots()
     ax = kwargs["ax"]
     return ax.figure, ax
+
+
+def box_to_Rectangle(box):
+    from matplotlib.patches import Rectangle
+
+    return Rectangle(box.lower, *box.shape)

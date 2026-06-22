@@ -36,36 +36,47 @@ def finest_field_plot(run_path, qty, **kwargs):
     dim = r.GetDl("finest", time).shape[0]
     interp = kwargs.get("interp", "nearest")
 
+    def _finest(hier):
+        from pyphare.pharesee.hierarchy.hierarchy_utils import flat_finest_field
+        from pyphare.pharesee.run.utils import make_interpolator, finest_coords_for
+
+        nbrGhosts = hier.level(0, time).patches[0][qty].ghosts_nbr
+        data, coords = flat_finest_field(hier, qty, time=time)
+        return (
+            make_interpolator(data, coords, interp),
+            finest_coords_for(r.GetDomainSize(), r.GetDl(time=time), qty, nbrGhosts),
+        )
+
     if qty in ["Bx", "By", "Bz"]:
         file = os.path.join(run_path, "EM_B.h5")
         if time is None:
             times = get_times_from_h5(file)
             time = times[0]
-        interpolator, finest_coords = r.GetB(time, merged=True, interp=interp)[qty]
+        interpolator, finest_coords = _finest(r.GetB(time, all_primal=False))
     elif qty in ["Ex", "Ey", "Ez"]:
         file = os.path.join(run_path, "EM_E.h5")
         if time is None:
             times = get_times_from_h5(file)
             time = times[0]
-        interpolator, finest_coords = r.GetE(time, merged=True, interp=interp)[qty]
+        interpolator, finest_coords = _finest(r.GetE(time, all_primal=False))
     elif qty in ["Vx", "Vy", "Vz"]:
         file = os.path.join(run_path, "ions_bulkVelocity.h5")
         if time is None:
             times = get_times_from_h5(file)
             time = times[0]
-        interpolator, finest_coords = r.GetVi(time, merged=True, interp=interp)[qty]
+        interpolator, finest_coords = _finest(r.GetVi(time))
     elif qty == "rho":
         file = os.path.join(run_path, "ions_charge_density.h5")
         if time is None:
             times = get_times_from_h5(file)
             time = times[0]
-        interpolator, finest_coords = r.GetNi(time, merged=True, interp=interp)[qty]
+        interpolator, finest_coords = _finest(r.GetNi(time))
     elif qty in ("Jx", "Jy", "Jz"):
         file = os.path.join(run_path, "EM_B.h5")
         if time is None:
             times = get_times_from_h5(file)
             time = times[0]
-        interpolator, finest_coords = r.GetJ(time, merged=True, interp=interp)[qty]
+        interpolator, finest_coords = _finest(r.GetJ(time, all_primal=False))
     else:
         # ___ TODO : should also include the files for a given population
         raise ValueError(

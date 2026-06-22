@@ -70,7 +70,7 @@ class FieldData(PatchData):
 
     def compare(self, that, atol=1e-16):
         try:
-            phut.assert_fp_any_all_close(self.dataset[:], that.dataset[:], atol=atol)
+            phut.assert_fp_any_all_close(self[:], that[:], atol=atol)
         except AssertionError as e:
             return phut.EqualityCheck(False, str(e))
         return self.name == that.name
@@ -166,13 +166,14 @@ class FieldData(PatchData):
 
     def copy_as(self, data=None, **kwargs):
         data = data if data is not None else self.dataset
-        name = kwargs.pop("name", self.name)
-        layout = self.layout
-        if "ghosts_nbr" in kwargs:
-            layout = self.layout.copy_as(ghosts_nbr=kwargs["ghosts_nbr"])
+        kwargs["name"] = kwargs.get("name", self.name)
         kwargs["centering"] = kwargs.get("centering", self.centerings)
+        layout = kwargs.get("layout", self.layout)
+        if "ghosts_nbr" in kwargs:
+            layout = layout.copy_as(ghosts_nbr=kwargs["ghosts_nbr"])
         kwargs["ghosts_nbr"] = kwargs.get("ghosts_nbr", self.ghosts_nbr)
-        return FieldData(layout, name, data, **kwargs)
+        kwargs["layout"] = layout
+        return FieldData(data=data, **kwargs)
 
     def yeeCoordsFor(self, idx):
         return self.layout.yeeCoordsFor(
@@ -180,7 +181,7 @@ class FieldData(PatchData):
             gridlayout.directions[idx],
             withGhosts=any(self.ghosts_nbr) and self.name != "tags",
             centering=self.centerings[idx],
-            ghosts_nbr=self.ghosts_nbr[idx],
+            nbrGhosts=self.ghosts_nbr[idx],
         )
 
     def _resolve_ghost_nbr(self, **kwargs):
@@ -251,7 +252,7 @@ def field_data_array_ufunc(patch_data, ufunc, method, *inputs, **kwargs):
     out_ = getattr(ufunc, method)(*in_, **kwargs)
 
     if isinstance(out_, np.ndarray) and out_.shape == patch_data.dataset.shape:
-        return type(patch_data)(
+        return patch_data.copy_as(
             layout=patch_data.layout,
             name=patch_data.name,
             data=out_,
@@ -271,7 +272,7 @@ def field_data_array_function(patch_data, func, types, args, kwargs):
     out_ = func(*in_, **kwargs)
 
     if isinstance(out_, np.ndarray) and out_.shape == patch_data.dataset.shape:
-        return type(patch_data)(
+        return patch_data.copy_as(
             layout=patch_data.layout,
             name=patch_data.name,
             data=out_,

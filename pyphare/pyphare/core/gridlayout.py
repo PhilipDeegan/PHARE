@@ -465,20 +465,15 @@ class GridLayout(object):
         ):
             qty = qty[0].upper() + qty[1:]
 
-        if "centering" in kwargs:
-            centering = kwargs["centering"]
+        centering = kwargs.get("centering") or yee_centering[direction][qty]
+        # explicit check, nbrGhosts can be 0
+        if "nbrGhosts" in kwargs:
+            nbrGhosts = kwargs["nbrGhosts"]
         else:
-            centering = yee_centering[direction][qty]
-
-        # Use provided ghosts_nbr if available, otherwise compute from interp_order
-        if "ghosts_nbr" in kwargs:
-            ghosts_nbr = kwargs["ghosts_nbr"]
-        else:
-            ghosts_nbr = self.nbrGhosts(self.interp_order, centering)
-
+            nbrGhosts = self.nbrGhosts(self.interp_order, centering)
         return yeeCoordsFor(
             self.origin,
-            ghosts_nbr,
+            nbrGhosts,
             self.dl,
             self.box.shape,
             qty,
