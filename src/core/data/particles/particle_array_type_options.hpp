@@ -74,6 +74,46 @@ struct ParticleArrayTypeOptions<opts, LayoutMode::AoSMapped, StorageMode::ARRAY>
 
 
 template<auto opts>
+struct ParticleArrayTypeOptions<opts, LayoutMode::AoSPC, StorageMode::VECTOR>
+{
+    std::size_t dim;
+    AllocatorMode alloc_mode;
+
+    ParticleArrayTypeOptions static constexpr FROM(auto o) { return {o.dim, o.alloc_mode}; }
+};
+template<auto opts>
+struct ParticleArrayTypeOptions<opts, LayoutMode::AoSPC, StorageMode::SPAN>
+{
+    std::size_t dim;
+    AllocatorMode alloc_mode;
+
+    ParticleArrayTypeOptions static constexpr FROM(auto o) { return {o.dim, o.alloc_mode}; }
+};
+template<auto opts>
+struct ParticleArrayTypeOptions<opts, LayoutMode::AoSPC, StorageMode::ARRAY>;
+
+
+template<auto opts>
+struct ParticleArrayTypeOptions<opts, LayoutMode::AoSPCTS, StorageMode::VECTOR>
+{
+    std::size_t dim;
+    AllocatorMode alloc_mode;
+
+    ParticleArrayTypeOptions static constexpr FROM(auto o) { return {o.dim, o.alloc_mode}; }
+};
+template<auto opts>
+struct ParticleArrayTypeOptions<opts, LayoutMode::AoSPCTS, StorageMode::SPAN>
+{
+    std::size_t dim;
+    AllocatorMode alloc_mode;
+
+    ParticleArrayTypeOptions static constexpr FROM(auto o) { return {o.dim, o.alloc_mode}; }
+};
+template<auto opts>
+struct ParticleArrayTypeOptions<opts, LayoutMode::AoSPCTS, StorageMode::ARRAY>;
+
+
+template<auto opts>
 struct ParticleArrayTypeOptions<opts, LayoutMode::AoSTS, StorageMode::VECTOR>
 {
     std::size_t dim;

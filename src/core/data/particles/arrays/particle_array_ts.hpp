@@ -749,18 +749,21 @@ struct TileSetParticles : public Super_
             return moved;
         }*/
 
-    template<auto type = ParticleType::Domain>
-    auto& icell_changer(std::array<std::uint32_t, dimension> const& cell, std::size_t const idx,
-                        std::array<int, dimension> const& newcell) _PHARE_ALL_FN_
+    template<auto particle_type>
+    auto& move_check(auto const& pt, std::size_t const idx,
+                     std::array<int, dimension> const& newcell) _PHARE_ALL_FN_
     {
-        // static constexpr auto layout_mode = per_tile_particles::layout_mode;
+        static_assert(particle_type == ParticleType::Domain);
+        if (array_equals(Super::local_tile_cell(newcell), pt.tile_cell))
+            return *this;
+
         bool constexpr static ATOMIC = true;
         bool constexpr static GPU    = alloc_mode == AllocatorMode::GPU_UNIFIED;
         using Op                     = Operators<typename Super::SIZE_T, ATOMIC, GPU>;
 
-        auto& gidx      = Super::gap_idx_(cell);
+        auto& gidx      = Super::gap_idx_(pt.tile_cell);
         auto const nidx = Op{gidx}.increment_return_old();
-        auto& gaps      = Super::gaps_(cell);
+        auto& gaps      = Super::gaps_(pt.tile_cell);
         assert(nidx < gaps.size());
         gaps[nidx] = idx;
 

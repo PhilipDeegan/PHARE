@@ -8,6 +8,7 @@
 // Mutators
 #include "core/data/particles/arrays/particle_array_pc.hpp"
 #include "core/data/particles/arrays/particle_array_ts.hpp"
+#include "core/data/particles/arrays/particle_array_pc_ts.hpp"
 
 // Impls
 #include "core/data/particles/arrays/particle_array_aos.hpp"
@@ -179,6 +180,23 @@ struct ParticleArrayLayoutResolver<opts, o, LayoutMode::AoSCMTS, StorageMode::SP
 {
     using Inner      = ParticleArray<opts.with_layout(LayoutMode::AoSMapped)>;
     using value_type = TileSetParticles<TileSetSpan<Inner>>;
+};
+
+
+
+template<auto opts, auto o>
+struct ParticleArrayLayoutResolver<opts, o, LayoutMode::AoSPCTS, StorageMode::VECTOR>
+{
+    using Inner      = ParticleArray<opts.with_layout(LayoutMode::AoSPC)>;
+    using value_type = PCTileSetParticles<PCTileSetVector<Inner>>;
+};
+template<auto opts, auto o> // NOT DEFINED CAUSE NOT SENSICAL!
+struct ParticleArrayLayoutResolver<opts, o, LayoutMode::AoSPCTS, StorageMode::ARRAY>;
+template<auto opts, auto o>
+struct ParticleArrayLayoutResolver<opts, o, LayoutMode::AoSPCTS, StorageMode::SPAN>
+{
+    using Inner      = ParticleArray<opts.with_layout(LayoutMode::AoSPC)>;
+    using value_type = PCTileSetParticles<PCTileSetSpan<Inner>>;
 };
 
 

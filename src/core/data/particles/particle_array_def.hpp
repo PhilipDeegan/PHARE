@@ -26,12 +26,13 @@ enum class LayoutMode : std::uint16_t {
     SoATS,     // 7
     SoAVXTS,   // 8
     SoAPC,     // 9
+    AoSPCTS,
 };
 
 bool constexpr is_tiled(LayoutMode lm)
 {
     using enum LayoutMode;
-    return any_in(lm, AoSTS, AoSCMTS, SoATS, SoAVXTS);
+    return any_in(lm, AoSTS, AoSCMTS, SoATS, SoAVXTS, AoSPCTS);
 }
 
 enum class StorageMode : std::uint16_t { ARRAY = 0, VECTOR, SPAN };

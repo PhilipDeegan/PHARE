@@ -64,6 +64,16 @@ EqualityReport compare_fields(Grid<T0s...> const& ref, GridTileSet<T1s...> const
 }
 
 
+template<typename... T0s, typename... T1s>
+EqualityReport compare_reduced_fields(Grid<T0s...> const& ref, Grid<T1s...> const& cmp,
+                                      double const diff = 1e-15)
+{
+    if (ref.size() != cmp.size())
+        return EqualityReport{false, "Grid shape/size mismatch"};
+    return compare_fields(*ref, *cmp, diff);
+}
+
+
 template<typename GridLayout_t, auto opts>
 void zero_ghost_layer(basic::Field<opts>& f, GridLayout_t const& layout)
 {

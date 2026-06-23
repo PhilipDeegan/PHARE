@@ -55,6 +55,20 @@ void ParticlesAppender<LM::AoSMapped, AM::CPU, LM::AoSCMTS, AM::CPU>::operator()
 }
 
 
+template<>
+template<auto type, typename Src, typename Dst>
+void ParticlesAppender<LM::AoSMapped, AM::CPU, LM::AoSPCTS, AM::CPU>::operator()( //
+    Src const& src, Dst& dst)
+{
+    PHARE_LOG_SCOPE(3, "ParticlesAppender<AoSMapped, CPU, AoSPCTS, CPU>::operator()");
+
+    for (auto const& p : src)
+        dst.emplace_back(p);
+
+    dst.template sync<2, type>();
+}
+
+
 
 
 template<>

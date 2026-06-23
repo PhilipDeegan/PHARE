@@ -275,6 +275,59 @@ void ParticlesExporter<AoSTS, GPU_UNIFIED>::delete_particles_not_in(Src& src, Bo
 }
 
 
+template<>
+template<typename Src, std::size_t dim>
+void ParticlesExporter<AoSPCTS, CPU>::delete_particles_not_in(Src& src, Box<int, dim> const& box)
+{
+    for (auto& tile : src())
+    {
+        auto& cps      = tile();
+        auto const& sb = cps.safe_box();
+        for (auto const& bix : cps.local_box(cps.ghost_box()))
+        {
+            auto& cell_parts = cps(bix);
+            if (cell_parts.size() == 0)
+                continue;
+            std::array<int, dim> gcell;
+            for (std::size_t d = 0; d < dim; ++d)
+                gcell[d] = sb.lower[d] + static_cast<int>(bix[d]);
+            if (!isIn(gcell, box))
+                cell_parts.clear();
+        }
+        cps.template sync<2, ParticleType::Ghost>();
+    }
+    src.sync();
+}
+
+template<>
+template<typename Src, typename Boxes>
+void ParticlesExporter<AoSPCTS, CPU>::delete_particles_not_in(Src& src, Boxes const& boxes)
+{
+    auto constexpr dim = Src::dimension;
+    for (auto& tile : src())
+    {
+        auto& cps      = tile();
+        auto const& sb = cps.safe_box();
+        for (auto const& bix : cps.local_box(cps.ghost_box()))
+        {
+            auto& cell_parts = cps(bix);
+            if (cell_parts.size() == 0)
+                continue;
+            std::array<int, dim> gcell;
+            for (std::size_t d = 0; d < dim; ++d)
+                gcell[d] = sb.lower[d] + static_cast<int>(bix[d]);
+            bool in_any = false;
+            for (auto const& b : boxes)
+                if (isIn(gcell, b)) { in_any = true; break; }
+            if (!in_any)
+                cell_parts.clear();
+        }
+        cps.template sync<2, ParticleType::Ghost>();
+    }
+    src.sync();
+}
+
+
 } // namespace PHARE::core
 
 

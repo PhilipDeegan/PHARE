@@ -19,8 +19,9 @@ namespace PHARE::core::mkn
 template<typename Ions, typename Electromag, typename GridLayout>
 class IonUpdaterMultiTS
 {
-    using Particles                     = Ions::particle_array_type;
-    bool constexpr static atomic_interp = Particles::alloc_mode == AllocatorMode::GPU_UNIFIED;
+    using Particles                       = Ions::particle_array_type;
+    bool constexpr static atomic_interp   = Particles::alloc_mode == AllocatorMode::GPU_UNIFIED;
+    bool constexpr static use_main_thread = true; // for perf
 
 public:
     auto static constexpr dimension    = GridLayout::dimension;
@@ -131,7 +132,10 @@ void IonUpdaterMultiTS<Ions, Electromag, GridLayout>::updateAndDepositAll_(
 
     Pusher_t::move(in, boxings);
 
-    in.streamer.host([&](auto const i) mutable {
+    if (use_main_thread)
+        in.streamer.join();
+
+    auto post_move_sync = [&](auto const i) mutable {
         auto view                 = accessor[i];
         auto [ions, _]            = view.args;
         auto const patch_id       = view.patchID();
@@ -149,11 +153,17 @@ void IonUpdaterMultiTS<Ions, Electromag, GridLayout>::updateAndDepositAll_(
 
         for (auto& pop : ions)
             per_pop(pop);
-    });
+    };
+
+    if (use_main_thread)
+        for (std::size_t i = 0; i < accessor.size(); ++i)
+            post_move_sync(i);
+    else
+        in.streamer.host(post_move_sync);
 
     if constexpr (any_in(Particles::alloc_mode, AllocatorMode::GPU_UNIFIED))
     {
-        in.streamer.host([&](auto const i) mutable {
+        auto deposit = [&](auto const i) mutable {
             auto view      = accessor[i];
             auto [ions, _] = view.args;
             for (std::size_t j = 0; j < ions.size(); ++j)
@@ -175,11 +185,17 @@ void IonUpdaterMultiTS<Ions, Electromag, GridLayout>::updateAndDepositAll_(
                     Interpolating_t::template on_tiles<Tile_vt>(domain, flux, pdensity, cdensity);
                 });
             }
-        });
+        };
+
+        if (use_main_thread)
+            for (std::size_t i = 0; i < accessor.size(); ++i)
+                deposit(i);
+        else
+            in.streamer.host(deposit);
     }
     else
     {
-        in.streamer.host([&](auto const i) mutable {
+        auto deposit = [&](auto const i) mutable {
             auto view            = accessor[i];
             auto [ions, _]       = view.args;
             auto const patch_id  = view.patchID();
@@ -192,7 +208,13 @@ void IonUpdaterMultiTS<Ions, Electromag, GridLayout>::updateAndDepositAll_(
                 interp.particleToMesh(pop.patchGhostParticles(), boxing_i.layout,
                                       pop.particleDensity(), pop.chargeDensity(), pop.flux());
             }
-        });
+        };
+
+        if (use_main_thread)
+            for (std::size_t i = 0; i < accessor.size(); ++i)
+                deposit(i);
+        else
+            in.streamer.host(deposit);
     }
 
     in.streamer.join();

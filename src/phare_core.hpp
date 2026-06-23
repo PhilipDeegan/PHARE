@@ -67,6 +67,13 @@ struct UsingResolver<GridLayout_t, LayoutMode::AoSCMTS, A_>
 {
 };
 
+template<typename GridLayout_t, auto A_>
+struct UsingResolver<GridLayout_t, LayoutMode::AoSPCTS, A_>
+    : UsingResolver<GridLayout_t, LayoutMode::AoSTS, A_>
+{
+};
+
+
 
 
 template<SimOpts opts>

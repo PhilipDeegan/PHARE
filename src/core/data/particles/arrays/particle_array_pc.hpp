@@ -62,6 +62,7 @@ public:
     auto static constexpr dimension    = dim;
     auto static constexpr storage_mode = StorageMode::SPAN;
     using Particle_t                   = typename ParticleDefaults<dim>::Particle_t;
+    using view_t                       = PerCellSpan<Particles, impl_v>;
 
     template<typename PerCellArray>
     PerCellSpan(PerCellArray& arr)
@@ -169,7 +170,9 @@ public:
     using Particle_t                   = typename ParticleDefaults<dim>::Particle_t;
     using value_type                   = Particle_t;
     using PSpan_t                      = typename Particles::Span_t;
+    using view_t                       = PerCellSpan<Particles, impl_v>;
     using per_cell_particles           = Particles;
+    using per_tile_particles           = Particles; // MultiBoris compatibility
 
     template<typename T>
     using vec_helper = PHARE::Vector<T, alloc_mode, 1>;
@@ -199,6 +202,8 @@ public:
 
     template<auto type = ParticleType::Domain>
     auto& reserve_ppc(std::size_t const& ppc);
+
+    void reserve(std::size_t const&) {} // per-cell storage pre-allocated; hint is a no-op
 
     auto size() const { return total_size; }
     auto size(std::array<std::uint32_t, dim> const& icell) const { return cell_size_(icell); }
@@ -780,6 +785,7 @@ struct PerCellParticles : public Super_
     using This               = PerCellParticles<Super>;
     using Particle_t         = typename Super::Particle_t;
     using per_cell_particles = typename Super::per_cell_particles;
+    using view_t             = PerCellParticles<typename Super::view_t>;
 
     auto static constexpr impl_v     = Super::impl_v;
     auto static constexpr alloc_mode = Super::alloc_mode;

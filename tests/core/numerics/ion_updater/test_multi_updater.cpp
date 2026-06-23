@@ -7,12 +7,10 @@
 
 // USE HIP_VISIBLE_DEVICES OR CUDA_VISIBLE_DEVICES env vars
 
-#include <tuple>
 #define PHARE_UNDEF_ASSERT
 #include "core/logger.hpp"
 #define PHARE_SKIP_MPI_IN_CORE
 
-#include "initializer/data_provider.hpp"
 #include "core/utilities/thread_pool.hpp" // defaults to 1 thread, setup during static init!
 #include "core/data/particles/particle_array.hpp"
 #include "core/numerics/ion_updater/ion_updaters.hpp" // IWYU pragma: keep
@@ -26,6 +24,9 @@
 
 
 #include "gtest/gtest.h"
+
+
+#include <tuple>
 #include <cstddef>
 
 
@@ -33,14 +34,15 @@ namespace PHARE::core
 {
 // RUNTIME ENV VAR OVERRIDES
 auto static const bytes     = get_env_as("PHARE_GPU_BYTES", std::uint64_t{500000000}); // .5GB
-auto static const cells     = get_env_as("PHARE_CELLS", std::uint32_t{5});
-auto static const ppc       = get_env_as("PHARE_PPC", std::size_t{5});
+auto static const cells     = get_env_as("PHARE_CELLS", std::uint32_t{30});
+auto static const ppc       = get_env_as("PHARE_PPC", std::size_t{100});
 auto static const seed      = get_env_as("PHARE_SEED", std::size_t{1067});
 auto static const n_patches = get_env_as("PHARE_PATCHES", std::size_t{1});
 auto static const dt        = get_env_as("PHARE_TIMESTEP", double{.001});
 auto static const shufle    = get_env_as("PHARE_UNSORTED", std::size_t{0});
 auto static const do_cmp    = get_env_as("PHARE_COMPARE", std::size_t{1});
 auto static const n_threads = get_env_as("PHARE_THREADS", std::size_t{1});
+auto static const n_push    = get_env_as("PHARE_PUSHES", std::size_t{1});
 auto static const cmp_only  = get_env_as("PHARE_CMP_ONLY", std::size_t{0});
 auto static const ref_only  = get_env_as("PHARE_REF_ONLY", std::size_t{0});
 
@@ -60,9 +62,9 @@ bool static const premain = []() {
         PHARE_LOG_LINE_SS("particle MB ≈ " << n_patches * std::pow(cells, 3) * ppc * 76 / 1e6);
 
         using namespace std::literals;
-        if (auto const e = get_env("PHARE_SCOPE_TIMING", "false"); e == "1" || e == "true")
-            phlop::scope_timer().file_name(".phare_times.0.txt").init();
+        // if (auto const e = get_env("PHARE_SCOPE_TIMING", "false"); e == "1" || e == "true")
     })
+    phlop::scope_timer().file_name(".phare_times.0.txt").init();
     ThreadPool::threads_per_pool = n_threads;
     return true;
 }();
@@ -83,8 +85,6 @@ auto get_updater_for(Ions& /*ions*/, EM const& /*em*/, GridLayout_t const& /*lay
     using Particles = typename Ions::particle_array_type;
     if constexpr (any_in(Particles::layout_mode, LayoutMode::AoSMapped))
         return construct_<IonUpdater<Ions, EM, GridLayout_t>>();
-    // else if constexpr (any_in(Particles::layout_mode, AoSPC, SoAPC))
-    //     return construct_<IonUpdaterMultiPC<Ions, EM, GridLayout_t>>();
     else if constexpr (is_tiled(Particles::layout_mode))
         return construct_<mkn::IonUpdaterMultiTS<Ions, EM, GridLayout_t>>();
     else
@@ -113,19 +113,20 @@ void ref_update(UpdaterMode mode, Patches& patches)
     PHARE_LOG_LINE_STR(function_id);
     PHARE_LOG_SCOPE(1, function_id);
 
-    for (auto& patch : patches)
-    {
-        auto& [layout, ions, em, electromag] = patch.model.state;
-        auto updater                         = get_updater_for(ions, electromag, layout);
-        using IonUpdater_t                   = std::decay_t<decltype(updater)>;
-        using Boxing_t
-            = std::decay_t<decltype(*selection_boxing_impl<IonUpdater_t, GridLayout_t>())>;
+    for (std::size_t i = 0; i < n_push; ++i)
+        for (auto& patch : patches)
+        {
+            auto& [layout, ions, em, electromag] = patch.model.state;
+            auto updater                         = get_updater_for(ions, electromag, layout);
+            using IonUpdater_t                   = std::decay_t<decltype(updater)>;
+            using Boxing_t
+                = std::decay_t<decltype(*selection_boxing_impl<IonUpdater_t, GridLayout_t>())>;
 
-        Boxing_t const boxing{layout, {layout.AMRBox()}};
-        updater.updatePopulations(ions, electromag, boxing, dt, mode);
-        ions.computeChargeDensity();
-        ions.computeBulkVelocity();
-    }
+            Boxing_t const boxing{layout, {layout.AMRBox()}};
+            updater.updatePopulations(ions, electromag, boxing, dt, mode);
+            ions.computeChargeDensity();
+            ions.computeBulkVelocity();
+        }
 }
 
 template<typename Patches>
@@ -278,7 +279,7 @@ void compare(GridLayout_t const& layout, R& ref, C& cmp)
     double diff = 1e-15;
     if constexpr (ParticleArray_t::alloc_mode == GPU_UNIFIED)
         diff *= 1e3; // atomics no order guaranteed
-    else if constexpr (any_in(ParticleArray_t::layout_mode, AoSTS, SoATS))
+    else if constexpr (any_in(ParticleArray_t::layout_mode, AoSTS, SoATS, AoSCMTS))
         diff *= 1e1; // p2m op order diff
 
     check_particles(layout, ref.populations[0].particles.domain_particles,
@@ -396,6 +397,12 @@ using Permutations_t = testing::Types< // ! notice commas !
      TestParam<1, LayoutMode::AoSTS, AllocatorMode::CPU, UpdaterMode::domain_only>
     ,TestParam<1, LayoutMode::AoSTS, AllocatorMode::CPU, UpdaterMode::all>
 
+    // ,TestParam<1, LayoutMode::AoSPCTS, AllocatorMode::CPU, UpdaterMode::domain_only> // passes
+    // ,TestParam<1, LayoutMode::AoSPCTS, AllocatorMode::CPU, UpdaterMode::all> // fails
+
+    // ,TestParam<1, LayoutMode::AoSCMTS, AllocatorMode::CPU, UpdaterMode::domain_only>
+    // ,TestParam<1, LayoutMode::AoSCMTS, AllocatorMode::CPU, UpdaterMode::all>
+
     // ,TestParam<2, LayoutMode::AoSTS, AllocatorMode::CPU, UpdaterMode::domain_only>
     // ,TestParam<2, LayoutMode::AoSTS, AllocatorMode::CPU, UpdaterMode::all>
 
@@ -440,10 +447,9 @@ void PrintTo(ParticleArray<opts> const& arr, std::ostream* os)
 
 int main(int argc, char** argv)
 {
-    // assert(phlop::ScopeTimerMan::INSTANCE().active);
     ::testing::InitGoogleTest(&argc, argv);
     auto r = RUN_ALL_TESTS();
-    // PHARE_WITH_PHLOP(phlop::threaded::ScopeTimerMan::reset());
+    PHARE_WITH_PHLOP(phlop::threaded::ScopeTimerMan::reset());
     PHARE::core::MemoryMonitoring::PRINT();
     return r;
 }

@@ -41,33 +41,35 @@ void move_in_domain(Dst& dst, Src& src, Box_t const& domain_box)
     // todo move to dispatcher and optimize
     static_assert(Dst::layout_mode == Src::layout_mode);
 
-
-    for (std::size_t tidx = 0; tidx < src().size(); ++tidx)
+    if constexpr (Src::layout_mode != LayoutMode::AoSPCTS)
     {
-        auto& src_tile = src()[tidx];
-        auto& dst_tile = dst()[tidx];
-
-        auto const tile_ghost_box = grow(src_tile, 1);
-        assert(src_tile == dst_tile);
-
-        if (tile_ghost_box * domain_box == tile_ghost_box) // not border tile
-            continue;
-
-        auto const end = src_tile().size();
-
-        for (std::size_t i = end; i-- > 0;)
+        for (std::size_t tidx = 0; tidx < src().size(); ++tidx)
         {
-            auto const& p = src_tile()[i];
-            if (isIn(p, domain_box))
+            auto& src_tile = src()[tidx];
+            auto& dst_tile = dst()[tidx];
+
+            auto const tile_ghost_box = grow(src_tile, 1);
+            assert(src_tile == dst_tile);
+
+            if (tile_ghost_box * domain_box == tile_ghost_box) // not border tile
+                continue;
+
+            auto const end = src_tile().size();
+
+            for (std::size_t i = end; i-- > 0;)
             {
-                dst.push_back(p);
-                src_tile().vector().erase(src_tile().vector().begin() + i);
+                auto const& p = src_tile()[i];
+                if (isIn(p, domain_box))
+                {
+                    dst.push_back(p);
+                    src_tile().vector().erase(src_tile().vector().begin() + i);
+                }
             }
         }
-    }
 
-    src.sync();
-    dst.sync();
+        src.sync();
+        dst.sync();
+    }
 }
 
 template<typename Dst, typename Src, typename T, std::size_t dim> //
@@ -77,42 +79,40 @@ void move_in_ghost_layer(Dst& dst, Src& src, Box<T, dim> const& domain_box,
     // todo move to dispatcher and optimize
     static_assert(Dst::layout_mode == Src::layout_mode);
 
-    auto const ghost_layer_boxes = ghost_box.remove(domain_box);
-
-    for (std::size_t tidx = 0; tidx < src().size(); ++tidx)
+    if constexpr (Src::layout_mode != LayoutMode::AoSPCTS)
     {
-        auto& src_tile = src()[tidx];
-        auto& dst_tile = dst()[tidx];
+        auto const ghost_layer_boxes = ghost_box.remove(domain_box);
 
-        auto const tile_ghost_box = grow(src_tile, 1);
-        assert(src_tile == dst_tile);
-
-        if (tile_ghost_box * domain_box == tile_ghost_box) // not border tile
-            continue;
-
-        // auto const in_box = partition_particles(src_tile(), domain_box);
-        // auto const start  = in_box.size();
-        // auto const end    = src_tile().size();
-        // auto const size   = end - start;
-
-        auto const end = src_tile().size();
-        for (std::size_t i = end; i-- > 0;)
+        for (std::size_t tidx = 0; tidx < src().size(); ++tidx)
         {
-            auto const& p = src_tile()[i];
-            for (auto const& ghost_layer : ghost_layer_boxes)
+            auto& src_tile = src()[tidx];
+            auto& dst_tile = dst()[tidx];
+
+            auto const tile_ghost_box = grow(src_tile, 1);
+            assert(src_tile == dst_tile);
+
+            if (tile_ghost_box * domain_box == tile_ghost_box) // not border tile
+                continue;
+
+            auto const end = src_tile().size();
+            for (std::size_t i = end; i-- > 0;)
             {
-                if (isIn(p, ghost_layer))
+                auto const& p = src_tile()[i];
+                for (auto const& ghost_layer : ghost_layer_boxes)
                 {
-                    dst_tile().push_back(p);
-                    src_tile().vector().erase(src_tile().vector().begin() + i);
-                    break;
+                    if (isIn(p, ghost_layer))
+                    {
+                        dst_tile().push_back(p);
+                        src_tile().vector().erase(src_tile().vector().begin() + i);
+                        break;
+                    }
                 }
             }
         }
-    }
 
-    src.sync();
-    dst.sync();
+        src.sync();
+        dst.sync();
+    }
 }
 
 template<typename Dst, typename Src, typename T, std::size_t dim, typename Boxes>

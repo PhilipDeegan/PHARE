@@ -50,7 +50,7 @@ public:
         PHARE_LOG_SCOPE(3, "Interpolating::particleToMesh");
 
         using enum LayoutMode;
-        if constexpr (any_in(Particles::layout_mode, AoSTS, AoSCMTS))
+        if constexpr (any_in(Particles::layout_mode, AoSTS, AoSCMTS, AoSPCTS))
         {
             // using GridTile_t  = Field::value_type;
             using Field_vt    = Field::value_type; // GridTile_t::value_type::field_type;
@@ -63,12 +63,24 @@ public:
 
                 for (std::size_t tidx = 0; tidx < particles().size(); ++tidx)
                 {
-                    auto const& parts = particles()[tidx];
-                    auto& rhop        = rhoP()[tidx];
-                    auto& rhoc        = rhoC()[tidx];
+                    auto& rhop = rhoP()[tidx];
+                    auto& rhoc = rhoC()[tidx];
                     auto F = flux.template as<VecField_vt>([&](auto& c) { return c()[tidx]; });
-                    for (auto const& p : parts())
-                        interp_.particleToMesh(p, rhop(), rhoc(), F, rhop.layout(), coef);
+
+                    if constexpr (any_in(Particles::layout_mode, AoSTS, AoSCMTS))
+                    {
+                        auto const& parts = particles()[tidx];
+                        for (auto const& p : parts())
+                            interp_.particleToMesh(p, rhop(), rhoc(), F, rhop.layout(), coef);
+                    }
+                    else // AoSPCTS: per cell per tile
+                    {
+                        auto& pctile = particles()[tidx];
+                        auto& cps    = pctile();
+                        for (auto const& bix : cps.local_box(cps.box()))
+                            for (auto const& p : cps(bix))
+                                interp_.particleToMesh(p, rhop(), rhoc(), F, rhop.layout(), coef);
+                    }
                 }
             }
             else

@@ -129,7 +129,9 @@ using SoAParticleArray = ParticleArray<ParticleArrayOptions{dim, LayoutMode::SoA
 template<auto opts>
 std::ostream& operator<<(std::ostream& out, ParticleArray<opts> const& arr)
 {
-    if constexpr (ParticleArray<opts>::layout_mode == LayoutMode::SoAPC) {}
+    if constexpr (ParticleArray<opts>::layout_mode == LayoutMode::SoAPC)
+    {
+    }
     else
         for (auto const& p : arr)
             out << p.copy();
@@ -212,7 +214,8 @@ template<typename ParticleArray_t>
 auto constexpr base_layout_type()
 {
     using enum LayoutMode;
-    if constexpr (any_in(ParticleArray_t::layout_mode, AoS, AoSMapped, AoSPC, AoSTS, AoSCMTS))
+    auto constexpr layout_mode = ParticleArray_t::layout_mode;
+    if constexpr (any_in(layout_mode, AoS, AoSMapped, AoSPC, AoSTS, AoSCMTS, AoSPCTS))
         return AoS;
     return SoA;
 }
