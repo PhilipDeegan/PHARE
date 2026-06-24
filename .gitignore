@@ -26,3 +26,4 @@ PHARE_REPORT.zip
 .cache
 .gdbinit
 .phlop
+.ipynb_checkpoints

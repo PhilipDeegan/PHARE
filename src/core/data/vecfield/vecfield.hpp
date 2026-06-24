@@ -18,26 +18,6 @@ namespace core
     using VecField = TensorField<Field_t, PhysicalQuantity, /*rank=*/1>;
 
 
-    struct VecFieldNames
-    {
-        std::string vecName;
-        std::string xName;
-        std::string yName;
-        std::string zName;
-
-        VecFieldNames() = default;
-
-        template<typename VecFieldT>
-        VecFieldNames(VecFieldT const& v)
-            : vecName{v.name()}
-            , xName{v.getComponentName(core::Component::X)}
-            , yName{v.getComponentName(core::Component::Y)}
-            , zName{v.getComponentName(core::Component::Z)}
-
-        {
-        }
-    };
-
 
 } // namespace core
 } // namespace PHARE

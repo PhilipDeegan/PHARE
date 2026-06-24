@@ -5,15 +5,20 @@ from .patch import Patch
 from .patchlevel import PatchLevel
 from .hierarchy import PatchHierarchy
 from ..particles import Particles
-from ...core.gridlayout import GridLayout
+from ...core import gridlayout  #  import GridLayout, HybridGridLayoutFor
 from ...core.box import Box
 
 import numpy as np
 
 
-def patch_gridlayout(patch, dl, interp_order):
-    return GridLayout(
-        Box(patch.lower, patch.upper), patch.origin, dl, interp_order=interp_order
+def make_layout_for(simulator, patch, qty, dl):
+    model = "mhd" if str(qty).startswith("mhd") else "hybrid"
+    box = Box(patch.lower, patch.upper)
+    origin = patch.origin
+    if model == "hybrid":
+        return gridlayout.HybridGridLayoutFor(box, origin, dl, simulator.interp_order())
+    return gridlayout.MHDGridLayoutFor(
+        box, origin, dl, simulator.simulation.reconstruction
     )
 
 
@@ -22,6 +27,7 @@ def hierarchy_from_sim(simulator, qty, pop="", hier=None, sync=False):
     sync==True will copy all data to rank 0!
     leaving other ranks with an empty hierarch!
     """
+
 
     dw = simulator.data_wrangler()
     nbr_levels = dw.getNumberOfLevels()
@@ -46,9 +52,7 @@ def hierarchy_from_sim(simulator, qty, pop="", hier=None, sync=False):
                     continue
 
             for patch_data in patch_datas:
-                layout = patch_gridlayout(
-                    patch_data, lvl_cell_width, simulator.interp_order()
-                )
+                layout = make_layout_for(simulator, patch_data, qty, lvl_cell_width)
                 patches[ilvl].append(
                     Patch({qty: FieldData(layout, field_qties[qty], patch_data.data)})
                 )
@@ -60,9 +64,7 @@ def hierarchy_from_sim(simulator, qty, pop="", hier=None, sync=False):
                 raise ValueError("must specify pop argument for particles")
 
             for patch_data in getters[qty](pop):
-                layout = patch_gridlayout(
-                    patch_data, lvl_cell_width, simulator.interp_order()
-                )
+                layout = make_layout_for(simulator, patch_data, qty, lvl_cell_width)
 
                 patches[ilvl].append(  # ParticleData is SoA COPY!
                     Patch({qty: FieldData(layout, "tags", patch_data.data)})

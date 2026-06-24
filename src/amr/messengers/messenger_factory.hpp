@@ -105,7 +105,7 @@ public:
 
             auto messengerStrategy
                 = std::make_unique<MHDHybridMessengerStrategy<MHDModel, HybridModel>>(
-                    mhdResourcesManager, firstLevel);
+                    hybridResourcesManager, firstLevel);
 
             return std::make_unique<HybridMessenger<HybridModel>>(std::move(messengerStrategy));
         }

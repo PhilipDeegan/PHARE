@@ -2,6 +2,7 @@
 #define PHARE_SRC_AMR_TENSORFIELD_TENSORFIELD_DATA_HPP
 
 
+#include "core/data/vector.hpp"
 #include "core/def/phare_mpi.hpp" // IWYU pragma: keep
 
 #include "core/logger.hpp"
@@ -239,10 +240,8 @@ public:
         PHARE_LOG_SCOPE(3, "TensorFieldData::packStream");
 
         std::size_t const expectedSize = getDataStreamSize_(overlap) / sizeof(value_type);
-        std::vector<typename Grid_t::type> buffer;
-        buffer.reserve(expectedSize);
-
-        auto& tFieldOverlap = dynamic_cast<TensorFieldOverlap_t const&>(overlap);
+        auto& buffer                   = tmp.reserve_and_clear(expectedSize)();
+        auto& tFieldOverlap            = dynamic_cast<TensorFieldOverlap_t const&>(overlap);
 
         SAMRAI::hier::Transformation const& transformation = tFieldOverlap.getTransformation();
 
@@ -251,10 +250,7 @@ public:
                 "Rotations are not supported in PHARE (TensorFieldData::packStream)");
 
         for (std::size_t c = 0; c < N; ++c)
-        {
-            auto const& fOverlap = tFieldOverlap[c];
-
-            for (auto const& box : fOverlap->getDestinationBoxContainer())
+            for (auto const& box : tFieldOverlap[c]->getDestinationBoxContainer())
             {
                 auto const& source = src[c];
                 SAMRAI::hier::Box packBox{box};
@@ -269,7 +265,6 @@ public:
                 core::FieldBox<Grid_t const> src{source, gridLayout, finalBox};
                 src.template append_to<Operator>(buffer);
             }
-        }
 
         // Once we have fill the buffer, we send it on the stream
         stream.pack(buffer.data(), buffer.size());
@@ -299,7 +294,7 @@ public:
             throw std::runtime_error("Rotations are not supported in PHARE");
 
         // For unpacking we need to know how much element we will need to extract
-        std::vector<value_type> buffer(getDataStreamSize(overlap) / sizeof(value_type), 0.);
+        auto& buffer = tmp.get_no_copy(getDataStreamSize(overlap) / sizeof(value_type))();
 
         // We flush a portion of the stream on the buffer.
         stream.unpack(buffer.data(), buffer.size());
@@ -371,6 +366,7 @@ public:
 private:
     tensor_t quantity_; ///! PhysicalQuantity used for this field data
 
+    static inline core::MinimizingVector<value_type> tmp; // LESS ALLOCATIONS
 
 
 

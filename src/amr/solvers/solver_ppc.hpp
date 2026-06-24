@@ -4,6 +4,7 @@
 #include "core/def/phare_mpi.hpp" // IWYU pragma: keep
 #include "core/numerics/ohm/ohm.hpp"
 #include "core/utilities/algorithm.hpp"
+#include "core/utilities/mpi_utils.hpp"
 #include "core/data/vecfield/vecfield.hpp"
 #include "core/data/electrons/electrons.hpp"
 #include "core/data/electromag/electromag.hpp"
@@ -19,6 +20,7 @@
 #include "amr/messengers/hybrid_messenger.hpp"
 #include "amr/resources_manager/amr_utils.hpp"
 #include "amr/solvers/solver_field_evolvers.hpp"
+#include "amr/solvers/solver_hybrid_field_evolvers.hpp"
 #include "amr/physical_models/physical_model.hpp"
 #include "amr/messengers/hybrid_messenger_info.hpp"
 
@@ -124,7 +126,7 @@ public:
     void reflux(IPhysicalModel_t& model, SAMRAI::hier::PatchLevel& level, IMessenger& messenger,
                 double const time) override;
 
-    void advanceLevel(hierarchy_t const& hierarchy, int const levelNumber, IPhysicalModel_t& views,
+    void advanceLevel(hierarchy_t const& hierarchy, int const levelNumber, IPhysicalModel_t& model,
                       IMessenger& fromCoarserMessenger, double const currentTime,
                       double const newTime) override;
 
@@ -286,10 +288,11 @@ void SolverPPC<HybridModel, AMR_Types>::accumulateFluxSum(IPhysicalModel_t& mode
     PHARE_LOG_SCOPE(1, "SolverPPC::accumulateFluxSum");
 
     auto& hybridModel = dynamic_cast<HybridModel&>(model);
-    auto& rm          = *hybridModel.resourcesManager;
     auto& Eavg        = electromagAvg_.E;
+    auto& rm          = *hybridModel.resourcesManager;
+
     for (auto& patch : rm.enumerate(level, fluxSumE_, Eavg))
-        accumulate(fluxSumE_, Eavg, coef);
+        core::operate<core::PlusEqualsProduct>(fluxSumE_, Eavg, coef);
 }
 
 

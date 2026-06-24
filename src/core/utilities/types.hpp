@@ -16,6 +16,7 @@
 #include <vector>
 #include <cassert>
 #include <cstdint>
+#include <cassert>
 #include <iomanip>
 #include <numeric>
 #include <sstream>
@@ -287,8 +288,6 @@ namespace core
         return t;
     }
 
-
-
 } // namespace core
 } // namespace PHARE
 
@@ -449,6 +448,17 @@ NO_DISCARD auto constexpr min_from(Container const& container, Fn fn = accessor)
 }
 
 
+template<typename... Ts>
+auto constexpr is_any_of(auto const& t)
+{
+    return ((std::is_same_v<Ts, std::decay_t<decltype(t)>>) || ...);
+}
+
+template<typename T, typename... Ts>
+auto constexpr is_any_of()
+{
+    return ((std::is_same_v<Ts, T>) || ...);
+}
 
 
 template<typename SignedInt, typename UnsignedInt>
@@ -717,6 +727,7 @@ struct SetMax
 
 
 
+
 std::uint64_t inline now_in_microseconds()
 {
     return std::chrono::duration_cast<std::chrono::microseconds>(
@@ -922,6 +933,12 @@ struct DekayT
 template<typename T>
 DekayT(T t) -> DekayT<T>;
 
+template<typename D>
+struct PlusEqualsProduct
+{
+    void operator()(auto& d0, auto& o) { d += d0 * o; }
+    D& d;
+};
 
 
 } // namespace PHARE::core

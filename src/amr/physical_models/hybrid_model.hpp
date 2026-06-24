@@ -69,6 +69,7 @@ public:
     using patch_t                = AMR_Types::patch_t;
     using level_t                = AMR_Types::level_t;
     using State_t                = core::HybridState<Electromag, Ions, Electrons>;
+    using physical_quantity_type = core::HybridQuantity;
     using gridlayout_type        = GridLayoutT;
     using electromag_type        = Electromag;
     using vecfield_type          = Electromag::vecfield_type;

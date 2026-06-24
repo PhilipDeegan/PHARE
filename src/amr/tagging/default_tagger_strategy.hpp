@@ -1,24 +1,29 @@
-#ifndef DEFAULT_HYBRID_TAGGER_STRATEGY_H
-#define DEFAULT_HYBRID_TAGGER_STRATEGY_H
+#ifndef DEFAULT_TAGGER_STRATEGY_H
+#define DEFAULT_TAGGER_STRATEGY_H
 
 #include "core/utilities/types.hpp"
 #include "core/data/grid/gridlayoutdefs.hpp"
+#include "core/data/ndarray/ndarray_vector.hpp"
 #include "core/data/tensorfield/tensorfield.hpp"
 #include "core/data/particles/particle_array_def.hpp"
 
-#include "hybrid_tagger_strategy.hpp"
+#include "amr/physical_models/mhd_model.hpp"
+#include "amr/physical_models/hybrid_model.hpp"
+
+#include "tagger_strategy.hpp"
 #include "initializer/data_provider.hpp"
 
 #include <cstddef>
+#include <stdexcept>
 
 namespace PHARE::amr
 {
 
-template<typename HybridModel>
+template<typename Model>
 struct DefaultHybridFieldTagger
 {
-    using gridlayout_type           = typename HybridModel::gridlayout_type;
-    static auto constexpr dimension = HybridModel::dimension;
+    using gridlayout_type           = typename Model::gridlayout_type;
+    static auto constexpr dimension = Model::dimension;
 
     void tag(auto const& layout, int* tags, auto const& B, auto const& layout1,
              auto const& offset) const;
@@ -27,69 +32,81 @@ struct DefaultHybridFieldTagger
 };
 
 
-template<typename HybridModel>
-class DefaultHybridTaggerStrategy : public HybridTaggerStrategy<HybridModel>
+template<typename Model>
+class DefaultTaggerStrategy : public TaggerStrategy<Model>
 {
-    using ParticleArray_t           = typename HybridModel::particle_array_type;
-    using gridlayout_type           = typename HybridModel::gridlayout_type;
-    static auto constexpr dimension = HybridModel::dimension;
-
+    using gridlayout_type           = typename Model::gridlayout_type;
+    static auto constexpr dimension = Model::dimension;
 
 public:
-    DefaultHybridTaggerStrategy(initializer::PHAREDict const& dict)
+    DefaultTaggerStrategy(initializer::PHAREDict const& dict)
         : threshold_{cppdict::get_value(dict, "threshold", 0.1)}
     {
     }
-    void tag(HybridModel& model, gridlayout_type const& layout, int* tags) const override;
+    void tag(Model& model, gridlayout_type const& layout, int* tags) const override;
 
 private:
+    auto& getB(auto& model) const
+    {
+        if constexpr (solver::is_hybrid_model_v<Model>)
+            return model.state.electromag.B;
+        else if constexpr (solver::is_mhd_model_v<Model>)
+            return model.state.B;
+        else
+            static_assert(core::dependent_false_v<Model>);
+
+        throw std::runtime_error("DefaultTaggerStrategy::getB Shouldn't happen!");
+    }
+
     double threshold_ = 0.1;
 };
 
 
-template<typename HybridModel>
-void DefaultHybridTaggerStrategy<HybridModel>::tag(HybridModel& model,
-                                                   gridlayout_type const& layout, int* tags) const
+template<typename Model>
+void DefaultTaggerStrategy<Model>::tag(Model& model, gridlayout_type const& layout, int* tags) const
 {
-    DefaultHybridFieldTagger<HybridModel> tagger{threshold_};
+    DefaultHybridFieldTagger<Model> tagger{threshold_};
 
-    auto& B = model.state.electromag.B;
+    auto& B = getB(model);
 
-    using enum core::LayoutMode;
-
-    if constexpr (core::any_in(ParticleArray_t::layout_mode, AoSTS))
+    if constexpr (solver::is_hybrid_model_v<Model>)
     {
-        using Field_vt       = HybridModel::field_type::value_type;
-        using TensorField_vt = core::basic::TensorField<Field_vt, 1>;
+        using ParticleArray_t = Model::particle_array_type;
+        using enum core::LayoutMode;
 
-        auto const ntiles = B[0]().size();
-        for (std::size_t tidx = 0; tidx < ntiles; ++tidx)
+        if constexpr (core::any_in(ParticleArray_t::layout_mode, AoSTS))
         {
-            auto Btile = B.template as<TensorField_vt>([&](auto& c) { return c()[tidx]; });
+            using Field_vt       = Model::field_type::value_type;
+            using TensorField_vt = core::basic::TensorField<Field_vt, 1>;
 
-            auto const& tile_layout    = B[0]()[tidx].layout();
-            auto const& tile_amr_box   = tile_layout.AMRBox();
-            auto const tag_local_lower = layout.AMRToLocal(tile_amr_box.lower)
-                                         - gridlayout_type::nbrGhosts();
+            auto const ntiles = B[0]().size();
+            for (std::size_t tidx = 0; tidx < ntiles; ++tidx)
+            {
+                auto Btile = B.template as<TensorField_vt>([&](auto& c) { return c()[tidx]; });
 
-            tagger.tag(layout, tags, Btile, tile_layout, tag_local_lower);
+                auto const& tile_layout    = B[0]()[tidx].layout();
+                auto const& tile_amr_box   = tile_layout.AMRBox();
+                auto const tag_local_lower = layout.AMRToLocal(tile_amr_box.lower)
+                                             - gridlayout_type::nbrGhosts();
+
+                tagger.tag(layout, tags, Btile, tile_layout, tag_local_lower);
+            }
+            return;
         }
     }
-    else
-    {
-        tagger.tag(layout, tags, B, layout, core::Point{ConstArray<int, dimension>()});
-    }
+
+    tagger.tag(layout, tags, B, layout, core::Point{ConstArray<int, dimension>()});
 }
 
-template<typename HybridModel>
-void DefaultHybridFieldTagger<HybridModel>::tag(auto const& layout, int* tags, auto const& B,
-                                                auto const& layout1, auto const& offset) const
+
+template<typename Model>
+void DefaultHybridFieldTagger<Model>::tag(auto const& layout, int* tags, auto const& B,
+                                          auto const& layout1, auto const& offset) const
 {
     auto& [Bx, By, Bz] = B();
 
     // we loop on cell indexes for all qties regardless of their centering
-    auto const& start_x
-        = layout.physicalStartIndex(PHARE::core::QtyCentering::dual, PHARE::core::Direction::X);
+    auto const& start_x = layout.physicalStartIndex(core::QtyCentering::dual, core::Direction::X);
 
     // override end_x because the tag buffer does not have ghost cells
     // and physicalEnd will account for ghost cells
@@ -148,7 +165,7 @@ void DefaultHybridFieldTagger<HybridModel>::tag(auto const& layout, int* tags, a
     if constexpr (dimension == 2)
     {
         auto const& start_y
-            = layout.physicalStartIndex(PHARE::core::QtyCentering::dual, PHARE::core::Direction::Y);
+            = layout.physicalStartIndex(core::QtyCentering::dual, core::Direction::Y);
 
         auto const& end_y = layout1.nbrCells()[1] - 1;
 
@@ -188,9 +205,9 @@ void DefaultHybridFieldTagger<HybridModel>::tag(auto const& layout, int* tags, a
     if constexpr (dimension == 3)
     {
         auto const& start_y
-            = layout.physicalStartIndex(PHARE::core::QtyCentering::dual, PHARE::core::Direction::Y);
+            = layout.physicalStartIndex(core::QtyCentering::dual, core::Direction::Y);
         auto const& start_z
-            = layout.physicalStartIndex(PHARE::core::QtyCentering::dual, PHARE::core::Direction::Z);
+            = layout.physicalStartIndex(core::QtyCentering::dual, core::Direction::Z);
 
         auto const& end_y = layout1.nbrCells()[1] - 1;
         auto const& end_z = layout1.nbrCells()[2] - 1;
@@ -238,4 +255,4 @@ void DefaultHybridFieldTagger<HybridModel>::tag(auto const& layout, int* tags, a
 
 } // namespace PHARE::amr
 
-#endif // DEFAULT_HYBRID_TAGGER_STRATEGY_H
+#endif // DEFAULT_TAGGER_STRATEGY_H

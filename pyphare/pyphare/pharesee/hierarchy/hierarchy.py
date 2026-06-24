@@ -453,6 +453,17 @@ class PatchHierarchy(object):
         if "filename" in kwargs:
             fig.savefig(kwargs["filename"])
 
+    def _pcolormesh_coords(self, pdat, box):
+        """Strip ghosts and return (x, y, data) with edge coordinates for pcolormesh."""
+        ng = pdat.ghosts_nbr
+        data = pdat[box] if np.any(ng != 0) else pdat.dataset[:]
+        sx = slice(ng[0], -ng[0] if ng[0] else None)
+        sy = slice(ng[1], -ng[1] if ng[1] else None)
+        x = np.copy(pdat.x[sx])
+        y = np.copy(pdat.y[sy])
+
+        return x, y, data
+
     def plot2d(self, **kwargs):
         from matplotlib.patches import Rectangle
         from mpl_toolkits.axes_grid1 import make_axes_locatable
@@ -491,25 +502,9 @@ class PatchHierarchy(object):
             if lvl_nbr not in usr_lvls:
                 continue
             for patch in self.level(lvl_nbr, time).patches:
-                pdat = patch.patch_datas[qty]
-                data = pdat.dataset[:]
-                nbrGhosts = pdat.ghosts_nbr
-                x = pdat.x
-                y = pdat.y
-
-                # if nbrGhosts is 0, we cannot do array[0,-0]
-                if np.all(nbrGhosts == np.zeros_like(nbrGhosts)):
-                    x = np.copy(x)
-                    y = np.copy(y)
-                else:
-                    data = pdat[patch.box]
-                    x = np.copy(x[nbrGhosts[0] : -nbrGhosts[0]])
-                    y = np.copy(y[nbrGhosts[1] : -nbrGhosts[1]])
-                dx, dy = pdat.layout.dl
-                x -= dx * 0.5
-                y -= dy * 0.5
-                x = np.append(x, x[-1] + dx)
-                y = np.append(y, y[-1] + dy)
+                pdat = patch[qty]
+                x, y, data = self._pcolormesh_coords(pdat, patch.box)
+                dx, dy = pdat.dl
                 im = ax.pcolormesh(
                     x,
                     y,
@@ -518,7 +513,6 @@ class PatchHierarchy(object):
                     vmin=kwargs.get("vmin", glob_min - 1e-6),
                     vmax=kwargs.get("vmax", glob_max + 1e-6),
                 )
-
                 if kwargs.get("plot_patches", False) is True:
                     r = Rectangle(
                         (patch.box.lower[0] * dx, patch.box.lower[1] * dy),
@@ -651,6 +645,53 @@ class PatchHierarchy(object):
                 final[pop] = kwargs["select"](particles)
 
         return final, dp(final, **kwargs)
+
+    def __array_ufunc__(self, ufunc, method, *inputs, **kwargs):
+        return hierarchy_array_ufunc(self, ufunc, method, *inputs, **kwargs)
+
+    def __array_function__(self, func, types, args, kwargs):
+        return hierarchy_array_function(self, func, types, args, kwargs)
+
+
+def hierarchy_array_ufunc(hier, ufunc, method, *inputs, **kwargs):
+    if method != "__call__":
+        return NotImplemented
+
+    def extract(time, ilvl):
+        return [x.level(ilvl, time) if type(x) is type(hier) else x for x in inputs]
+
+    from copy import deepcopy
+
+    ret = deepcopy(hier)
+    for time in hier.time_hier:
+        for ilvl in hier.levels(time):
+            ret.time_hier[time][ilvl] = getattr(ufunc, method)(
+                *extract(time, ilvl), **kwargs
+            )
+    ret.update()
+    return ret
+
+
+def hierarchy_array_function(hier, func, types, args, kwargs):
+    def extract(time, ilvl):
+        return [x.level(ilvl, time) if type(x) is type(hier) else x for x in args]
+
+    time_hier = {}
+    for time in hier.time_hier:
+        time_hier[time] = {}
+        for ilvl in hier.levels(time):
+            time_hier[time][ilvl] = func(*extract(time, ilvl), **kwargs)
+
+    any_level = next(iter(next(iter(time_hier.values())).values()))
+    if type(any_level[0]) is dict:
+        return time_hier  # return a dictionary of times[]
+
+    from copy import deepcopy
+
+    ret = deepcopy(hier)
+    ret.time_hier = time_hier
+    ret.update()
+    return ret
 
 
 def finest_part_data(hierarchy, time=None):

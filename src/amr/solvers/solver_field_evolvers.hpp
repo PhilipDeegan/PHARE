@@ -1,7 +1,6 @@
 #ifndef PHARE_AMR_SOLVERS_SOLVER_FIELD_EVOLVERS_HPP
 #define PHARE_AMR_SOLVERS_SOLVER_FIELD_EVOLVERS_HPP
 
-#include "core/numerics/ohm/ohm.hpp"
 #include "core/numerics/ampere/ampere.hpp"
 #include "core/numerics/faraday/faraday.hpp"
 #include "core/data/grid/grid_tiles.hpp"
@@ -196,6 +195,7 @@ OhmLevelTransformer(core::OhmInfo, typename Model::amr_types::level_t&, Model&)
 
 
 
+
 template<typename level_t, typename Model>
 struct TimeSetter
 {
@@ -213,6 +213,15 @@ struct TimeSetter
 
 template<typename level_t, typename Model>
 TimeSetter(level_t&, Model&, double) -> TimeSetter<level_t, Model>;
+
+
+
+template<typename Model>
+struct FieldEvolverDispatchers
+{
+    using Faraday_t = FaradayLevelTransformer<Model>;
+    using Ampere_t  = AmpereLevelTransformer<Model>;
+};
 
 
 } // namespace PHARE::solver

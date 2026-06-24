@@ -12,8 +12,17 @@ _libs = {}
 
 
 def simulator_id(sim, layout=None, allocator=0):
+    if getattr(sim, "mhd_timestepper", None):
+        Hall = "true" if sim.hall else "false"
+        Res = "true" if sim.res else "false"
+        Hyper_Res = "true" if sim.hyper_res else "false"
+        return (
+            f"{sim.ndim}_{sim.interp_order}_{sim.refined_particle_nbr}_"
+            f"{sim.mhd_timestepper}_{sim.reconstruction}_{sim.limiter}_"
+            f"{sim.riemann}_{Hall}_{Res}_{Hyper_Res}"
+        )
+
     layout = str(layout) if layout else None
-    # print("layout", layout)
     if layout:
         if type(layout) is str and "." in layout:
             layout = str(layout).split(".")[1] if layout else None

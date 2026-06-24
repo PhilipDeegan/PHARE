@@ -6,23 +6,23 @@ class Patch:
     A patch represents a hyper-rectangular region of space
     """
 
-    def __init__(self, patch_datas, patch_id="", layout=None, attrs=None):
+    def __init__(self, patch_datas, patch_id="", box=None, attrs=None):
         """
         :param patch_datas: a list of PatchData objects
         these are assumed to "belong" to the Patch so to
         share the same origin, mesh size and box.
         """
-        if layout is not None:
-            self.layout = layout
-            self.box = layout.box
-            self.origin = layout.origin
-            self.dl = layout.dl
-            self.patch_datas = patch_datas
-            self.id = patch_id
+
+        self.patch_datas = patch_datas
+        self.id = patch_id
+        self.box = box
+        self.origin = None
+        self.dl = None
+        self.layout = None
 
         if len(patch_datas):
             pdata0 = list(patch_datas.values())[0]  # 0 represents all others
-            self.layout = pdata0.layout
+            self.layout = pdata0.layout  # deprecated!
             self.box = pdata0.layout.box
             self.origin = pdata0.layout.origin
             self.dl = pdata0.layout.dl
@@ -44,7 +44,7 @@ class Patch:
         if key in self.patch_datas:
             return self.patch_datas[key]
 
-        raise KeyError(key, "not in", self.patch_datas.keys())
+        raise KeyError(f"No patchdata for key: {key} in {self.patch_datas}")
 
     def __iter__(self):
         return self.patch_datas.values().__iter__()
@@ -76,3 +76,37 @@ class Patch:
             return pd.dataset[idx + nbrGhosts, nbrGhosts:-nbrGhosts]
         elif idim == 1:
             return pd.dataset[nbrGhosts:-nbrGhosts, idx + nbrGhosts]
+
+    def __array_ufunc__(self, ufunc, method, *inputs, **kwargs):
+        return patch_array_ufunc(self, ufunc, method, *inputs, **kwargs)
+
+    def __array_function__(self, func, types, args, kwargs):
+        return patch_array_function(self, func, types, args, kwargs)
+
+
+def patch_array_ufunc(patch, ufunc, method, *inputs, **kwargs):
+    if method != "__call__":
+        return NotImplemented
+
+    def extract(key):
+        return [x.patch_datas[key] if type(x) is type(patch) else x for x in inputs]
+
+    patch_datas = {
+        key: getattr(ufunc, method)(*extract(key), **kwargs)
+        for key in patch.patch_datas
+    }
+    return type(patch)(patch_datas, patch_id=patch.id, box=patch.box, attrs=patch.attrs)
+
+
+def patch_array_function(patch, func, types, args, kwargs):
+    def extract(key):
+        return [x.patch_datas[key] if type(x) is type(patch) else x for x in args]
+
+    final = {key: func(*extract(key), **kwargs) for key in patch.patch_datas}
+    any_patch_data = next(iter(patch.patch_datas.values()))
+    any_data = next(iter(final.values()))
+
+    if type(any_patch_data) is not type(any_data):
+        return final
+
+    return type(patch)(final, patch_id=patch.id, box=patch.box, attrs=patch.attrs)

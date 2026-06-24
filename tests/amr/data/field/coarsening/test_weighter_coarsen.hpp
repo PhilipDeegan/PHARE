@@ -1,12 +1,13 @@
 #ifndef PHARE_TEST_WEIGHTER_COARSEN_HPP
 #define PHARE_TEST_WEIGHTER_COARSEN_HPP
 
-#include <numeric>
 
 #include "amr/data/field/coarsening/coarsen_weighter.hpp"
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
+
+#include <numeric>
 
 using testing::DoubleEq;
 using testing::DoubleNear;

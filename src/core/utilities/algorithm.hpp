@@ -22,6 +22,7 @@
 #include <algorithm>
 #include <stdexcept>
 
+
 namespace PHARE
 {
 namespace core
@@ -97,12 +98,22 @@ auto convert_to_primal(        //
     else if (qty == PQ::Bz)
         return GridLayout::template project<GridLayout::BzToMoments>(src, lix);
 
-    else if (qty == PQ::Ex)
-        return GridLayout::template project<GridLayout::ExToMoments>(src, lix);
-    else if (qty == PQ::Ey)
-        return GridLayout::template project<GridLayout::EyToMoments>(src, lix);
-    else if (qty == PQ::Ez)
-        return GridLayout::template project<GridLayout::EzToMoments>(src, lix);
+
+    // ONLY EVER Scalar type!
+    if constexpr (std::is_same_v<PhysicalQuantity, HybridQuantity::Scalar>)
+    {
+        if (qty == PQ::Ex)
+            return GridLayout::template project<GridLayout::ExToMoments>(src, lix);
+        else if (qty == PQ::Ey)
+            return GridLayout::template project<GridLayout::EyToMoments>(src, lix);
+        else if (qty == PQ::Ez)
+            return GridLayout::template project<GridLayout::EzToMoments>(src, lix);
+    }
+    if constexpr (std::is_same_v<PhysicalQuantity, MHDQuantity::Scalar>)
+    {
+        // if we are not the magnetic field, then all scalars and vectors are cell-centered in MHD
+        return GridLayout::template project<GridLayout::cellCenterToFullPrimal>(src, lix);
+    }
 
     throw std::runtime_error("Quantity not supported for conversion to primal.");
 }
@@ -258,6 +269,35 @@ void accumulate(basic::TensorField<Field_t, 1>& dst, basic::TensorField<Field_t,
 {
     for (std::size_t c = 0; c < dst.size(); ++c)
         accumulate_field(dst[c], src[c], coeff);
+}
+
+template<template<typename> typename Op, typename Field_t>
+void operate_field(Field_t& dst, Field_t const& src, auto&&... args)
+    requires(not is_field_tile_set_v<Field_t>)
+{
+    using Operator = Op<typename Field_t::type>;
+    for (std::size_t i = 0; i < dst.size(); ++i)
+        Operator{dst.data()[i]}(src.data()[i], args...);
+}
+
+template<template<typename> typename Op, typename Field_t>
+void operate_field(Field_t& dst, Field_t const& src, auto&&... args)
+    requires(is_field_tile_set_v<Field_t>)
+{
+    auto& dst_tiles = dst();
+    auto& src_tiles = src();
+    if (dst_tiles.size() != src_tiles.size())
+        throw std::runtime_error("operate_field: tile count mismatch");
+    for (std::size_t i = 0; i < dst_tiles.size(); ++i)
+        operate_field<Op>(dst_tiles[i](), src_tiles[i](), args...);
+}
+
+template<template<typename> typename Op, typename Field_t, typename PQ, std::size_t rank>
+void operate(TensorField<Field_t, PQ, rank>& dst, TensorField<Field_t, PQ, rank> const& src,
+             auto&&... args)
+{
+    for (std::size_t ci = 0; ci < dst.size(); ++ci)
+        operate_field<Op>(dst[ci], src[ci], args...);
 }
 
 

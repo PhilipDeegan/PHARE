@@ -251,3 +251,8 @@ def NO_GUI():
     import matplotlib as mpl
 
     mpl.use("Agg")
+
+
+def cast_to(obj, cls):
+    obj.__class__ = cls
+    return obj
