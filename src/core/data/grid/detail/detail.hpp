@@ -13,6 +13,10 @@
 #include "core/data/grid/detail/kokkos.hpp"
 #endif
 
+#include "core/utilities/box/box.hpp"
+
+#include <cstddef>
+
 namespace PHARE::core::gpu
 {
 struct GridLayout

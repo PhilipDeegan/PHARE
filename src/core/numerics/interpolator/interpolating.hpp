@@ -231,10 +231,10 @@ public:
     static void on_tiles(auto& particles, auto& Flux, auto& Rhop, auto& Rhoc,
                          double coef = 1.) _PHARE_DEV_FN_
     {
-        static_assert(PHARE_HAVE_MKN_GPU_HW);
 
 #if PHARE_HAVE_MKN_GPU_HW
         // printf("L:%d i %llu \n", __LINE__, blockIdx.x);
+        static_assert(PHARE_HAVE_MKN_GPU_HW);
 
         static_assert(atomic_ops, "GPU must be atomic");
         using TensorField_t = basic::TensorField<typename Field_t::value_type, 1>;

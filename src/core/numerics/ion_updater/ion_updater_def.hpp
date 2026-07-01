@@ -2,8 +2,8 @@
 #define PHARE_ION_UPDATER_DEF_HPP
 
 
-#include "core/hybrid/hybrid_quantities.hpp"
 #include "core/utilities/box/box.hpp"
+#include "core/hybrid/hybrid_quantities.hpp"
 #include "core/data/tiles/tile_set_overlaps.hpp"
 #include "core/data/particles/particle_array_def.hpp"
 

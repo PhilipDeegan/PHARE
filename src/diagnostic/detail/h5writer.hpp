@@ -7,6 +7,8 @@
 
 #include "initializer/data_provider.hpp"
 
+#include "diagnostic/diagnostic_model_view.hpp"
+#include "hdf5/detail/h5/h5_file.hpp"
 
 
 #include "diagnostic/diagnostic_props.hpp"
@@ -16,6 +18,7 @@
 #include "diagnostic/detail/types/fluid.hpp"
 #include "diagnostic/detail/types/particle.hpp"
 #include "diagnostic/detail/types/electromag.hpp"
+#include "diagnostic/detail/types/mhd.hpp"
 
 
 
@@ -56,6 +59,26 @@ public:
         , flags{_flags}
         , filePath_{hifivePath}
     {
+        if constexpr (solver::is_hybrid_model_v<Model>)
+        {
+            typeWriters_ = {
+                {"info", make_writer<InfoDiagnosticWriter<This>>()},
+                {"meta", make_writer<MetaDiagnosticWriter<This>>()},
+                {"fluid", make_writer<FluidDiagnosticWriter<This>>()},
+                {"electromag", make_writer<ElectromagDiagnosticWriter<This>>()},
+                {"particle", make_writer<ParticlesDiagnosticWriter<This>>()} //
+            };
+        }
+        else if constexpr (solver::is_mhd_model_v<Model>)
+        {
+            typeWriters_ = {
+                {"meta", make_writer<MetaDiagnosticWriter<This>>()},
+                {"mhd", make_writer<MHDDiagnosticWriter<This>>()},
+                {"electromag", make_writer<ElectromagDiagnosticWriter<This>>()} //
+            };
+        }
+        else
+            static_assert(!core::dependent_false_v<Model>, "Unsupported model type in H5Writer");
     }
 
     ~H5Writer() {}
@@ -78,7 +101,6 @@ public:
     template<typename String>
     auto getDiagnosticWriterForType(String& type)
     {
-        assert(typeWriters_.count(type));
         return typeWriters_.at(type);
     }
 
@@ -155,8 +177,7 @@ public:
 
 
     template<typename TensorField>
-    static void writeTensorFieldAsDataset(HighFiveFile& h5, std::string path,
-                                          TensorField const& tField)
+    static void writeTensorFieldAsDataset(HighFiveFile& h5, std::string path, TensorField& tField)
     {
         for (auto& [id, type] : core::Components::componentMap<TensorField::rank>())
             h5.write_data_set_flat<dimension>(path + "_" + id, tField.getComponent(type).data());
@@ -181,13 +202,7 @@ private:
 
     std::unordered_map<std::string, HiFile::AccessMode> file_flags;
 
-    std::unordered_map<std::string, std::shared_ptr<H5TypeWriter<This>>> typeWriters_{
-        {"info", make_writer<InfoDiagnosticWriter<This>>()},
-        {"meta", make_writer<MetaDiagnosticWriter<This>>()},
-        {"fluid", make_writer<FluidDiagnosticWriter<This>>()},
-        {"electromag", make_writer<ElectromagDiagnosticWriter<This>>()},
-        {"particle", make_writer<ParticlesDiagnosticWriter<This>>()} //
-    };
+    std::unordered_map<std::string, std::shared_ptr<H5TypeWriter<This>>> typeWriters_;
 
     template<typename Writer>
     std::shared_ptr<H5TypeWriter<This>> make_writer()
@@ -196,8 +211,8 @@ private:
     }
 
 
-    void initializeDatasets_(DiagnosticProperties*);
-    void writeDatasets_(DiagnosticProperties*);
+    void initializeDatasets_(std::vector<DiagnosticProperties*> const& diagnotics);
+    void writeDatasets_(std::vector<DiagnosticProperties*> const& diagnotics);
 
     H5Writer(H5Writer const&)            = delete;
     H5Writer(H5Writer&&)                 = delete;
@@ -209,6 +224,7 @@ private:
     //  block public access to internal state
     friend class FluidDiagnosticWriter<This>;
     friend class ElectromagDiagnosticWriter<This>;
+    friend class MHDDiagnosticWriter<This>;
     friend class ParticlesDiagnosticWriter<This>;
     friend class MetaDiagnosticWriter<This>;
     friend class InfoDiagnosticWriter<This>;
@@ -246,15 +262,11 @@ void H5Writer<ModelView>::dump(std::vector<DiagnosticProperties*> const& diagnos
         if (!file_flags.count(diagnostic->type + diagnostic->quantity))
             file_flags[diagnostic->type + diagnostic->quantity] = this->flags;
 
-    for (auto* diag : diagnostics)
-        typeWriters_.at(diag->type)->createFiles(*diag);
+    initializeDatasets_(diagnostics);
+    writeDatasets_(diagnostics);
 
     for (auto* diagnostic : diagnostics)
     {
-        initializeDatasets_(diagnostic);
-        writeDatasets_(diagnostic);
-
-        assert(typeWriters_.count(diagnostic->type));
         typeWriters_.at(diagnostic->type)->finalize(*diagnostic);
         // don't truncate past first dump
         file_flags[diagnostic->type + diagnostic->quantity] = READ_WRITE;
@@ -282,11 +294,14 @@ void H5Writer<ModelView>::dump_level(std::size_t level,
 
 
 template<typename ModelView>
-void H5Writer<ModelView>::initializeDatasets_(DiagnosticProperties* diagnostic)
+void H5Writer<ModelView>::initializeDatasets_(std::vector<DiagnosticProperties*> const& diagnostics)
 {
     std::size_t maxLocalLevel = 0;
     std::unordered_map<std::size_t, std::vector<std::string>> lvlPatchIDs;
     Attributes patchAttributes; // stores dataset info/size for synced MPI creation
+
+    for (auto* diag : diagnostics)
+        typeWriters_.at(diag->type)->createFiles(*diag);
 
     auto collectPatchAttributes = [&](GridLayout&, std::string patchID, std::size_t iLevel) {
         if (!lvlPatchIDs.count(iLevel))
@@ -294,8 +309,10 @@ void H5Writer<ModelView>::initializeDatasets_(DiagnosticProperties* diagnostic)
 
         lvlPatchIDs.at(iLevel).emplace_back(patchID);
 
-        typeWriters_.at(diagnostic->type)
-            ->getDataSetInfo(*diagnostic, iLevel, patchID, patchAttributes);
+        for (auto* diag : diagnostics)
+        {
+            typeWriters_.at(diag->type)->getDataSetInfo(*diag, iLevel, patchID, patchAttributes);
+        }
         maxLocalLevel = iLevel;
     };
 
@@ -307,14 +324,17 @@ void H5Writer<ModelView>::initializeDatasets_(DiagnosticProperties* diagnostic)
         if (!lvlPatchIDs.count(lvl))
             lvlPatchIDs.emplace(lvl, std::vector<std::string>());
 
-    typeWriters_.at(diagnostic->type)
-        ->initDataSets(*diagnostic, lvlPatchIDs, patchAttributes, maxMPILevel);
+    for (auto* diagnostic : diagnostics)
+    {
+        typeWriters_.at(diagnostic->type)
+            ->initDataSets(*diagnostic, lvlPatchIDs, patchAttributes, maxMPILevel);
+    }
 }
 
 
 
 template<typename ModelView>
-void H5Writer<ModelView>::writeDatasets_(DiagnosticProperties* diagnostic)
+void H5Writer<ModelView>::writeDatasets_(std::vector<DiagnosticProperties*> const& diagnostics)
 {
     std::unordered_map<std::size_t, std::vector<std::pair<std::string, Attributes>>>
         patchAttributes;
@@ -326,7 +346,8 @@ void H5Writer<ModelView>::writeDatasets_(DiagnosticProperties* diagnostic)
         patchPath_ = getPatchPathAddTimestamp(iLevel, patchID);
         patchAttributes[iLevel].emplace_back(patchID,
                                              modelView_.getPatchProperties(patchID, gridLayout));
-        typeWriters_.at(diagnostic->type)->write(*diagnostic);
+        for (auto* diagnostic : diagnostics)
+            typeWriters_.at(diagnostic->type)->write(*diagnostic);
         maxLocalLevel = iLevel;
     };
 
@@ -338,8 +359,9 @@ void H5Writer<ModelView>::writeDatasets_(DiagnosticProperties* diagnostic)
         if (!patchAttributes.count(lvl))
             patchAttributes.emplace(lvl, std::vector<std::pair<std::string, Attributes>>{});
 
-    typeWriters_.at(diagnostic->type)
-        ->writeAttributes(*diagnostic, fileAttributes_, patchAttributes, maxMPILevel);
+    for (auto* diagnostic : diagnostics)
+        typeWriters_.at(diagnostic->type)
+            ->writeAttributes(*diagnostic, fileAttributes_, patchAttributes, maxMPILevel);
 }
 
 

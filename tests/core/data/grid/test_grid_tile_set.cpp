@@ -25,7 +25,7 @@ struct TestParam
 {
     auto constexpr static dim = _dim;
 
-    constexpr static SimOpts opts{dim, interp, lm, am};
+    constexpr static auto opts = SimOpts::make(dim, interp, lm, am);
 
     using PhareTypes = core::PHARE_Types<opts>;
 

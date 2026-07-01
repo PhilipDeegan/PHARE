@@ -2,6 +2,7 @@
 #define DIAGNOSTIC_MODEL_VIEW_HPP
 
 #include "core/def.hpp"
+#include "core/mhd/mhd_quantities.hpp"
 #include "core/utilities/mpi_utils.hpp"
 
 #include "amr/amr_constants.hpp"
@@ -15,6 +16,7 @@
 #include <SAMRAI/xfer/RefineAlgorithm.h>
 
 #include <type_traits>
+#include <utility>
 
 namespace PHARE::diagnostic
 {
@@ -27,20 +29,17 @@ public:
 IModelView::~IModelView() {}
 
 
-template<typename Hierarchy, typename Model>
+template<typename Derived, typename Hierarchy, typename Model>
 class BaseModelView : public IModelView
 {
 public:
-    using VecField          = Model::vecfield_type;
-    using TensorFieldT      = Model::ions_type::tensorfield_type;
     using GridLayout        = Model::gridlayout_type;
+    using VecField          = Model::vecfield_type;
     using ResMan            = Model::resources_manager_type;
     using Field             = Model::field_type;
     using TensorFieldData_t = ResMan::template UserTensorField_t</*rank=*/2>::patch_data_type;
     static constexpr auto dimension = Model::dimension;
 
-public:
-    using Model_t = Model;
     using PatchProperties
         = cppdict::Dict<float, double, std::size_t, std::vector<int>, std::vector<std::uint32_t>,
                         std::vector<double>, std::vector<std::size_t>, std::string,
@@ -51,7 +50,6 @@ public:
         , hierarchy_{hierarchy}
     {
     }
-
 
     template<typename Action>
     void onLevels(Action&& action, std::size_t const minlvl = 0,
@@ -89,7 +87,7 @@ public:
         return std::string{GridLayout::implT::type};
     }
 
-    NO_DISCARD auto getPatchProperties(std::string /*patchID*/, GridLayout const& grid) const
+    NO_DISCARD auto getPatchProperties(std::string patchID, GridLayout const& grid) const
     {
         PatchProperties dict;
         dict["origin"]   = grid.origin().toVector();
@@ -123,23 +121,16 @@ public:
     }
 
 
-    auto& tmpField() { return Model::tmpField; }
-    auto& tmpVecField() { return Model::tmpVec; }
-
-    template<std::size_t rank = 2>
-    auto& tmpTensorField()
-    {
-        static_assert(rank > 0 and rank < 3);
-        if constexpr (rank == 1)
-            return Model::tmpVec;
-        else
-            return Model::tmpTensor;
-    }
-
     NO_DISCARD auto getCompileTimeResourcesViewList()
     {
-        return std::forward_as_tuple(Model::tmpField, Model::tmpVec, Model::tmpTensor);
+        return derived().getCompileTimeResourcesViewList();
     }
+
+    NO_DISCARD auto getCompileTimeResourcesViewList() const
+    {
+        return derived().getCompileTimeResourcesViewList();
+    }
+
     auto operator()() const { return model_.getCompileTimeResourcesViewList(); }
 
 
@@ -196,6 +187,10 @@ public:
 protected:
     Model& model_;
     Hierarchy& hierarchy_;
+
+private:
+    Derived& derived() { return static_cast<Derived&>(*this); }
+    Derived const& derived() const { return static_cast<Derived const&>(*this); }
 };
 
 
@@ -203,21 +198,18 @@ template<typename Hierarchy, typename Model, typename Enable = void>
 class ModelView;
 
 
-template<typename Hierarchy, typename Model_>
-class ModelView<Hierarchy, Model_, std::enable_if_t<solver::is_hybrid_model_v<Model_>>>
-    : public BaseModelView<Hierarchy, Model_>
+template<typename Hierarchy, typename Model>
+class ModelView<Hierarchy, Model, std::enable_if_t<solver::is_hybrid_model_v<Model>>>
+    : public BaseModelView<ModelView<Hierarchy, Model>, Hierarchy, Model>
 {
-    using Super    = BaseModelView<Hierarchy, Model_>;
-    using VecField = Model_::vecfield_type;
+    using Super        = BaseModelView<ModelView<Hierarchy, Model>, Hierarchy, Model>;
+    using Field        = Model::field_type;
+    using VecField     = Model::vecfield_type;
+    using TensorFieldT = Model::ions_type::tensorfield_type;
 
 public:
-    using GridLayout        = Super::GridLayout;
-    using TensorFieldData_t = Super::TensorFieldData_t;
-    using TensorFieldT      = Super::TensorFieldT;
-
-    using Model = Model_;
-    // using BaseModelView<Hierarchy, Model>::BaseModelView;
-
+    using Model_t                = Model;
+    using physical_quantity_type = Model::physical_quantity_type;
 
     ModelView(Hierarchy& hierarchy, Model& model)
         : Super{hierarchy, model}
@@ -225,33 +217,55 @@ public:
         declareMomentumTensorAlgos();
     }
 
+    NO_DISCARD VecField& getB() const { return this->model_.state.electromag.B; }
 
-    NO_DISCARD std::vector<VecField*> getElectromagFields() const
-    {
-        return {&this->model_.state.electromag.B, &this->model_.state.electromag.E};
-    }
+    NO_DISCARD VecField& getE() const { return this->model_.state.electromag.E; }
 
     NO_DISCARD auto& getIons() const { return this->model_.state.ions; }
 
+    auto& tmpField() { return Model::tmpField; }
+
+    auto& tmpVecField() { return Model::tmpVec; }
+
+    template<std::size_t rank = 2>
+    auto& tmpTensorField()
+    {
+        static_assert(rank > 0 and rank < 3);
+        if constexpr (rank == 1)
+            return Model::tmpVec;
+        else
+            return Model::tmpTensor;
+    }
+
+    NO_DISCARD auto getCompileTimeResourcesViewList()
+    {
+        return std::forward_as_tuple(Model::tmpField, Model::tmpVec, Model::tmpTensor);
+    }
+
+    NO_DISCARD auto getCompileTimeResourcesViewList() const
+    {
+        return std::forward_as_tuple(Model::tmpField, Model::tmpVec, Model::tmpTensor);
+    }
 
     void fillPopMomTensor(auto& lvl, auto const time, auto const popidx)
     {
+        using value_type = TensorFieldT::value_type;
         auto constexpr N = core::detail::tensor_field_dim_from_rank<2>();
 
-        auto& rm        = *this->model_.resourcesManager;
-        auto& ions      = this->model_.state.ions;
-        auto& tmpTensor = Model::tmpTensor;
-        auto& popTensor = ions[popidx].momentumTensor();
+        auto& rm   = *this->model_.resourcesManager;
+        auto& ions = this->model_.state.ions;
 
         for (auto patch : rm.enumerate(lvl, ions, Model::tmpTensor))
             for (std::uint8_t c = 0; c < N; ++c)
-                core::reduce_into(tmpTensor[c], popTensor[c]);
+                std::memcpy(Model::tmpTensor[c].data(), ions[popidx].momentumTensor()[c].data(),
+                            ions[popidx].momentumTensor()[c].size() * sizeof(value_type));
 
         MTAlgos[popidx].getOrCreateSchedule(this->hierarchy_, lvl.getLevelNumber()).fillData(time);
 
         for (auto patch : rm.enumerate(lvl, ions, Model::tmpTensor))
             for (std::uint8_t c = 0; c < N; ++c)
-                core::copy_fields(popTensor[c], tmpTensor[c]);
+                std::memcpy(ions[popidx].momentumTensor()[c].data(), Model::tmpTensor[c].data(),
+                            ions[popidx].momentumTensor()[c].size() * sizeof(value_type));
     }
 
 
@@ -271,7 +285,8 @@ protected:
             MTAlgo.MTalgo->registerRefine(
                 idDst, idSrc, idDst, nullptr,
                 std::make_shared<
-                    amr::TensorFieldGhostInterpOverlapFillPattern<GridLayout, /*rank_=*/2>>());
+                    amr::TensorFieldGhostInterpOverlapFillPattern<typename Super::GridLayout,
+                                                                  /*rank_=*/2>>());
         }
 
         // can't create schedules here as the hierarchy has no levels yet
@@ -279,19 +294,15 @@ protected:
 
     struct MTAlgo
     {
-        using Grid_rt = Model::Super::storage_t::grid_type;
-        using TensorFieldData_rt // NEVER TILED!
-            = amr::TensorFieldData<2, GridLayout, Grid_rt, core::HybridQuantity>;
-        using BorderSumOp = core::FieldBorderSumOp<typename VecField::value_type>;
-
         auto& getOrCreateSchedule(auto& hierarchy, int const ilvl)
         {
+            using PlusEqualsOp = core::PlusEquals<typename VecField::value_type>;
             if (not MTschedules.count(ilvl))
                 MTschedules.try_emplace(
                     ilvl, MTalgo->createSchedule(
                               hierarchy.getPatchLevel(ilvl), 0,
                               std::make_shared<amr::FieldBorderOpTransactionFactory<
-                                  TensorFieldData_t, BorderSumOp, TensorFieldData_rt>>()));
+                                  typename Super::TensorFieldData_t, PlusEqualsOp>>()));
             return *MTschedules[ilvl];
         }
 
@@ -306,14 +317,81 @@ protected:
 
 template<typename Hierarchy, typename Model>
 class ModelView<Hierarchy, Model, std::enable_if_t<solver::is_mhd_model_v<Model>>>
-    : public BaseModelView<Hierarchy, Model>
+    : public BaseModelView<ModelView<Hierarchy, Model>, Hierarchy, Model>
 {
-    using Field    = typename Model::field_type;
-    using VecField = typename Model::vecfield_type;
+    using Field    = Model::field_type;
+    using VecField = Model::vecfield_type;
 
 public:
-    using Model_t = Model;
-    using BaseModelView<Hierarchy, Model>::BaseModelView;
+    using Model_t                = Model;
+    using physical_quantity_type = Model::physical_quantity_type;
+    using BaseModelView<ModelView<Hierarchy, Model>, Hierarchy, Model>::BaseModelView;
+
+    NO_DISCARD const Field& getRho() const { return this->model_.state.rho; }
+
+    NO_DISCARD const VecField& getRhoV() const { return this->model_.state.rhoV; }
+
+    NO_DISCARD const VecField& getB() const { return this->model_.state.B; }
+
+    NO_DISCARD const Field& getEtot() const { return this->model_.state.Etot; }
+
+    NO_DISCARD const VecField& getE() const
+    {
+        throw std::runtime_error("E not currently available in MHD diagnostics");
+    }
+
+    // for setBuffer function in visitHierarchy
+    NO_DISCARD Field& getRho() { return this->model_.state.rho; }
+
+    NO_DISCARD VecField& getRhoV() { return this->model_.state.rhoV; }
+
+    NO_DISCARD VecField& getB() { return this->model_.state.B; }
+
+    NO_DISCARD Field& getEtot() { return this->model_.state.Etot; }
+
+    NO_DISCARD VecField& getE()
+    {
+        throw std::runtime_error("E not currently available in MHD diagnostics");
+    }
+
+    // diag only
+    NO_DISCARD VecField& getV() { return V_diag_; }
+
+    NO_DISCARD const VecField& getV() const { return V_diag_; }
+
+    NO_DISCARD Field& getP() { return P_diag_; }
+
+    NO_DISCARD const Field& getP() const { return P_diag_; }
+
+    NO_DISCARD auto getCompileTimeResourcesViewList()
+    {
+        return std::forward_as_tuple(V_diag_, P_diag_, tmpField_, tmpVec_);
+    }
+
+    NO_DISCARD auto getCompileTimeResourcesViewList() const
+    {
+        return std::forward_as_tuple(V_diag_, P_diag_, tmpField_, tmpVec_);
+    }
+
+    auto& tmpField() { return tmpField_; }
+
+    auto& tmpVecField() { return tmpVec_; }
+
+    template<std::size_t rank = 2>
+    auto& tmpTensorField()
+    {
+        static_assert(rank == 1);
+        return tmpVec_;
+    }
+
+protected:
+    // not always current; computed from conservative vars when needed; registered/allocated in
+    // model
+    VecField V_diag_{"diagnostics_V_", core::MHDQuantity::Vector::V};
+    Field P_diag_{"diagnostics_P_", core::MHDQuantity::Scalar::P};
+
+    Field tmpField_{"PHARE_sumField_MHD", core::MHDQuantity::Scalar::ScalarAllPrimal};
+    VecField tmpVec_{"PHARE_sumVec_MHD", core::MHDQuantity::Vector::VecAllPrimal};
 };
 
 

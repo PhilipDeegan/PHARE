@@ -19,8 +19,8 @@ enum class HyperMode : std::uint8_t { constant = 0, spatial, LAST };
 
 struct OhmInfo
 {
-    double const eta_;
-    double const nu_;
+    double const eta;
+    double const nu;
     HyperMode const hyper_mode = HyperMode::spatial;
 
     OhmInfo static FROM(initializer::PHAREDict const& dict)
@@ -195,19 +195,19 @@ private:
         if constexpr (component == Component::X)
         {
             auto const jxOnEx = GridLayout::template project<GridLayout::JxToEx>(Jxyx, index);
-            return eta_ * jxOnEx;
+            return eta * jxOnEx;
         }
 
         if constexpr (component == Component::Y)
         {
             auto const jyOnEy = GridLayout::template project<GridLayout::JyToEy>(Jxyx, index);
-            return eta_ * jyOnEy;
+            return eta * jyOnEy;
         }
 
         if constexpr (component == Component::Z)
         {
             auto const jzOnEz = GridLayout::template project<GridLayout::JzToEz>(Jxyx, index);
-            return eta_ * jzOnEz;
+            return eta * jzOnEz;
         }
     }
 
@@ -230,7 +230,7 @@ private:
     auto constant_hyperresistive_(VecField const& J,
                                   MeshIndex<VecField::dimension> index) const _PHARE_ALL_FN_
     { // TODO : https://github.com/PHAREHUB/PHARE/issues/3
-        return -nu_ * layout_.laplacian(J(component), index);
+        return -nu * layout_.laplacian(J(component), index);
     }
 
 
@@ -248,7 +248,7 @@ private:
             auto const nOnE  = GridLayout::template project<nProj>(n, index);
             auto b           = std::sqrt(BxOnE * BxOnE + ByOnE * ByOnE + BzOnE * BzOnE);
 
-            return -nu_ * (b / (nOnE + min_density) + 1) * lvlCoeff
+            return -nu * (b / (nOnE + min_density) + 1) * lvlCoeff
                    * layout_.laplacian(J(component), index);
         };
         if constexpr (component == Component::X)

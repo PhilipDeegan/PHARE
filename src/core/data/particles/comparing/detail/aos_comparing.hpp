@@ -7,6 +7,7 @@
 #include "core/utilities/equality.hpp"
 #include "core/data/particles/particle_array_def.hpp"
 #include "core/data/particles/comparing/detail/def_comparing.hpp"
+#include "core/data/particles/arrays/particle_array_pc_ts.hpp"
 
 // #include <format>
 
@@ -141,6 +142,58 @@ EqualityReport ParticlesComparator<AoSCMTS, GPU_UNIFIED, AoSCMTS, GPU_UNIFIED>::
 {
     return EqualityReport{true};
 }
+
+
+template<>
+template<typename PS0, typename PS1>
+EqualityReport ParticlesComparator<AoSPC, CPU, AoSPC, CPU>::operator()(PS0 const& ps0,
+                                                                       PS1 const& ps1,
+                                                                       double const atol)
+{
+    if (ps0.size() != ps1.size())
+        return EqualityReport{false, "different sizes: " + std::to_string(ps0.size()) + " vs "
+                                         + std::to_string(ps1.size())};
+
+    ParticlesComparator<AoS, CPU, AoS, CPU> comparator;
+    for (auto const& cell : ps0.local_box())
+        if (auto eq = comparator(ps0(cell), ps1(cell), atol); !eq)
+            return eq;
+
+    return EqualityReport{true};
+}
+
+
+template<>
+template<typename PS0, typename PS1>
+EqualityReport ParticlesComparator<AoSPCTS, CPU, AoSPCTS, CPU>::operator()(PS0 const& ps0,
+                                                                           PS1 const& ps1,
+                                                                           double const atol)
+{
+    if (ps0.size() != ps1.size())
+        return EqualityReport{false, "different sizes: " + std::to_string(ps0.size()) + " vs "
+                                         + std::to_string(ps1.size())};
+
+    if (ps0().size() != ps1().size())
+        return EqualityReport{false, "different tile counts: " + std::to_string(ps0().size())
+                                         + " vs " + std::to_string(ps1().size())};
+
+    ParticlesComparator<AoSPC, CPU, AoSPC, CPU> comparator;
+    for (std::size_t ti = 0; ti < ps0().size(); ++ti)
+        if (auto eq = comparator(ps0()[ti](), ps1()[ti](), atol); !eq)
+            return eq;
+
+    return EqualityReport{true};
+}
+
+
+template<>
+template<typename PS0, typename PS1>
+EqualityReport ParticlesComparator<AoSPCTS, GPU_UNIFIED, AoSPCTS, GPU_UNIFIED>::operator()(
+    PS0 const& ps0, PS1 const& ps1, double const atol)
+{
+    return ParticlesComparator<AoSPCTS, CPU, AoSPCTS, CPU>{}(ps0, ps1, atol);
+}
+
 
 } // namespace PHARE::core
 

@@ -12,8 +12,10 @@
 #include "core/data/electromag/electromag.hpp"
 #include "core/data/ndarray/ndarray_vector.hpp"
 #include "core/data/grid/gridlayoutimplyee.hpp"
+#include "core/data/grid/gridlayoutimplyee_mhd.hpp"
 #include "core/data/particles/particle_array.hpp"
 #include "core/data/ions/ion_population/ion_population.hpp"
+#include "core/numerics/reconstructions/reconstruction_nghosts.hpp"
 #include "core/data/ions/particle_initializers/particle_initializer_factory.hpp"
 
 #include "phare_simulator_options.hpp"
@@ -79,8 +81,10 @@ struct UsingResolver<GridLayout_t, LayoutMode::AoSPCTS, A_>
 template<SimOpts opts>
 struct PHARE_Types
 {
-    auto static constexpr dimension      = opts.dimension;
-    auto static constexpr interp_order   = opts.interp_order;
+    auto static constexpr dimension    = opts.dimension;
+    auto static constexpr interp_order = opts.interp_order;
+    static constexpr auto mhd_reconstruction_nghosts
+        = MHDOpts::reconstruction_nghosts_v<opts.reconstruction_type>;
     auto static constexpr layout_mode    = opts.layout_mode;
     auto static constexpr allocator_mode = opts.alloc_mode;
 
@@ -88,7 +92,8 @@ struct PHARE_Types
     using ParticleArray_t = ParticleArray<ParticleArrayOptions{
         dimension, layout_mode, StorageMode::VECTOR, allocator_mode}>;
 
-    using GridLayout_t = GridLayout<GridLayoutImplYee<dimension, interp_order>>;
+    using YeeLayout_t  = GridLayoutImplYee<dimension, interp_order>;
+    using GridLayout_t = GridLayout<YeeLayout_t>;
 
     using Resolver_t = UsingResolver<GridLayout_t, layout_mode, allocator_mode>;
 
@@ -105,6 +110,15 @@ struct PHARE_Types
     using Ions_t           = Ions<IonPopulation_t, GridLayout_t>;
     using Electrons_t      = Electrons<Ions_t>;
     using ParticleInitializerFactory_t = ParticleInitializerFactory<ParticleArray_t, GridLayout_t>;
+
+
+
+    using Grid_MHD     = Grid<Array_t, MHDQuantity::Scalar>;
+    using Field_MHD    = Field<dimension, MHDQuantity::Scalar>;
+    using VecField_MHD = VecField<Field_MHD, MHDQuantity>;
+
+    using YeeLayout_MHD = GridLayoutImplYeeMHD<dimension, interp_order, mhd_reconstruction_nghosts>;
+    using GridLayout_MHD = GridLayout<YeeLayout_MHD>;
 };
 
 struct PHARE_Sim_Types

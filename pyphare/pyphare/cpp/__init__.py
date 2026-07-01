@@ -32,8 +32,8 @@ def simulator_id(sim, layout=None, allocator=0):
                 for s in [
                     sim.ndim,
                     sim.interp_order,
-                    layout,
                     sim.refined_particle_nbr,
+                    layout,
                 ]
             )
 

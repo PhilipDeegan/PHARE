@@ -304,7 +304,9 @@ NO_DISCARD Multiplies product(Container const& container, Multiplies mul = 1) _P
 
 template<typename Container, typename Return = typename Container::value_type>
 NO_DISCARD Return sum(Container const& container, Return r = 0) _PHARE_HST_FN_
-{ return std::accumulate(container.begin(), container.end(), r); }
+{
+    return std::accumulate(container.begin(), container.end(), r);
+}
 
 template<typename Container, typename F>
 NO_DISCARD auto sum_from(Container&& container, F fn)
@@ -332,18 +334,26 @@ auto& deref(Type&& type) _PHARE_ALL_FN_
 
 template<std::size_t Idx, typename F>
 NO_DISCARD auto constexpr generate_array__(F& f, auto&& arr)
-{ return f(arr[Idx]); }
+{
+    return f(arr[Idx]);
+}
 template<typename F, std::size_t... Is>
 NO_DISCARD auto constexpr generate_array_(F& f, auto&& arr,
                                           std::integer_sequence<std::size_t, Is...>)
-{ return std::array{generate_array__<Is>(f, arr)...}; }
+{
+    return std::array{generate_array__<Is>(f, arr)...};
+}
 
 template<typename F, typename Type, std::size_t Size>
 NO_DISCARD auto constexpr generate_from(F&& f, std::array<Type, Size> const& arr)
-{ return generate_array_(f, arr, std::make_integer_sequence<std::size_t, Size>{}); }
+{
+    return generate_array_(f, arr, std::make_integer_sequence<std::size_t, Size>{});
+}
 template<typename F, typename Type, std::size_t Size>
 NO_DISCARD auto constexpr generate_from(F&& f, std::array<Type, Size>& arr)
-{ return generate_array_(f, arr, std::make_integer_sequence<std::size_t, Size>{}); }
+{
+    return generate_array_(f, arr, std::make_integer_sequence<std::size_t, Size>{});
+}
 
 
 template<typename F>
@@ -362,7 +372,9 @@ NO_DISCARD auto generate_from(F&& f, std::size_t from, std::size_t to)
 
 template<typename F>
 NO_DISCARD auto generate_from(F&& f, std::size_t count)
-{ return generate_from(std::forward<F>(f), 0, count); }
+{
+    return generate_from(std::forward<F>(f), 0, count);
+}
 
 
 template<typename F, typename Container>
@@ -394,15 +406,21 @@ NO_DISCARD auto generate_from(F&& f, Container const& container)
 
 template<typename T>
 auto constexpr all_are(auto&&... ts)
-{ return ((std::is_same_v<T, std::decay_t<decltype(ts)>>) && ...); }
+{
+    return ((std::is_same_v<T, std::decay_t<decltype(ts)>>) && ...);
+}
 
 NO_DISCARD auto constexpr any(auto... bools)
     requires(all_are<bool>(bools...))
-{ return (bools || ...); }
+{
+    return (bools || ...);
+}
 
 NO_DISCARD auto constexpr all(auto... bools)
     requires(all_are<bool>(bools...))
-{ return (bools && ...); }
+{
+    return (bools && ...);
+}
 
 
 // calls operator bool() or copies bool
@@ -411,18 +429,24 @@ auto constexpr static to_bool = [](auto const& v) { return bool{v}; };
 
 template<typename Container, typename Fn = decltype(to_bool)>
 NO_DISCARD auto constexpr all(Container const& container, Fn fn = to_bool)
-{ return std::all_of(container.begin(), container.end(), fn); }
+{
+    return std::all_of(container.begin(), container.end(), fn);
+}
 
 template<typename Container, typename Fn = decltype(to_bool)>
 NO_DISCARD auto constexpr any(Container const& container, Fn fn = to_bool)
-{ return std::any_of(container.begin(), container.end(), fn); }
+{
+    return std::any_of(container.begin(), container.end(), fn);
+}
 
 
 
 
 template<typename Container, typename Fn = decltype(to_bool)>
 NO_DISCARD auto constexpr none(Container const& container, Fn fn = to_bool)
-{ return std::none_of(container.begin(), container.end(), fn); }
+{
+    return std::none_of(container.begin(), container.end(), fn);
+}
 
 auto constexpr static accessor = [](auto const& v, auto const& i) -> auto& { return v[i]; };
 template<typename Container, typename Fn = decltype(accessor)>
@@ -447,18 +471,6 @@ NO_DISCARD auto constexpr min_from(Container const& container, Fn fn = accessor)
     return t;
 }
 
-
-template<typename... Ts>
-auto constexpr is_any_of(auto const& t)
-{
-    return ((std::is_same_v<Ts, std::decay_t<decltype(t)>>) || ...);
-}
-
-template<typename T, typename... Ts>
-auto constexpr is_any_of()
-{
-    return ((std::is_same_v<Ts, T>) || ...);
-}
 
 
 template<typename SignedInt, typename UnsignedInt>
@@ -505,7 +517,9 @@ void inline abort_if_not(bool b)
 
 
 auto inline float_equals(float const& a, float const& b, float diff = 1e-6)
-{ return std::abs(a - b) < diff; }
+{
+    return std::abs(a - b) < diff;
+}
 
 auto inline float_equals(double const& a, double const& b, double diff = 1e-12)
 {
@@ -593,7 +607,9 @@ struct Apply
 {
     template<T i>
     auto constexpr operator()()
-    { return std::integral_constant<T, i>{}; }
+    {
+        return std::integral_constant<T, i>{};
+    }
 };
 
 template<typename Apply, std::uint16_t... Is>
@@ -606,7 +622,9 @@ constexpr auto apply_N(Apply& f, std::integer_sequence<std::uint16_t, Is...> con
 
 template<std::uint16_t N, typename Apply>
 constexpr auto apply_N(Apply&& f)
-{ return apply_N(f, std::make_integer_sequence<std::uint16_t, N>{}); }
+{
+    return apply_N(f, std::make_integer_sequence<std::uint16_t, N>{});
+}
 
 enum class for_N_R_mode {
     make_tuple = 0,
@@ -651,22 +669,30 @@ constexpr auto for_N(Fn& fn) _PHARE_ALL_FN_
 
 template<std::uint16_t N, auto M = for_N_R_mode::make_tuple, typename Fn>
 constexpr auto for_N(Fn&& fn)
-{ return for_N<N, M>(fn); }
+{
+    return for_N<N, M>(fn);
+}
 
 
 template<std::uint16_t N, typename Fn>
 constexpr auto for_N_make_array(Fn&& fn)
-{ return for_N<N, for_N_R_mode::make_array>(fn); }
+{
+    return for_N<N, for_N_R_mode::make_array>(fn);
+}
 
 
 
 template<std::uint16_t N, typename Fn>
 NO_DISCARD constexpr auto for_N_all(Fn&& fn)
-{ return all(for_N<N, for_N_R_mode::make_array>(fn)); }
+{
+    return all(for_N<N, for_N_R_mode::make_array>(fn));
+}
 
 template<std::uint16_t N, typename Fn>
 NO_DISCARD constexpr auto for_N_any(Fn&& fn)
-{ return any(for_N<N, for_N_R_mode::make_array>(fn)); }
+{
+    return any(for_N<N, for_N_R_mode::make_array>(fn));
+}
 
 template<std::size_t S>
 bool inline float_equals(std::array<double, S> const& a, std::array<double, S> const& b,
@@ -691,7 +717,9 @@ using NamedTuple = decltype(named_pair_seq<Args...>());
 
 template<typename... Pairs>
 auto make_named_tuple(Pairs&&... pairs)
-{ return std::make_tuple(pairs...); }
+{
+    return std::make_tuple(pairs...);
+}
 
 
 
@@ -771,14 +799,18 @@ struct to_string_view
         {
             std::size_t len = t > 0 ? 1 : 2;
             if (t < -9 or t > 9)
-                for (auto n = t; n; len++, n /= 10) {}
+                for (auto n = t; n; len++, n /= 10)
+                {
+                }
             return len;
         }
         else
         {
             std::size_t len = 1;
             if (t > 9)
-                for (auto n = t; n; len++, n /= 10) {}
+                for (auto n = t; n; len++, n /= 10)
+                {
+                }
             return len;
         }
     }
@@ -817,11 +849,15 @@ static constexpr auto to_string_view_v = to_string_view<T, t>::value;
 
 template<typename T0, typename T1, std::size_t... Is>
 bool _array_equals(T0 const& a, T1 const& b, std::index_sequence<Is...> const&&) _PHARE_ALL_FN_
-{ return (... && (a[Is] == b[Is])); }
+{
+    return (... && (a[Is] == b[Is]));
+}
 
 template<typename T, std::size_t S> // array == doesn't exist on GPU!
 bool array_equals(std::array<T, S> const& a, std::array<T, S> const& b) _PHARE_ALL_FN_
-{ return _array_equals(a, b, std::make_index_sequence<S>{}); }
+{
+    return _array_equals(a, b, std::make_index_sequence<S>{});
+}
 
 
 template<typename As, typename T, std::size_t... Is>
@@ -834,7 +870,9 @@ auto _array_minus(T const& a, T const& b, std::index_sequence<Is...> const&&) _P
 
 template<typename As, typename T, std::size_t S>
 auto array_minus(std::array<T, S> const& a, std::array<T, S> const& b) _PHARE_ALL_FN_
-{ return _array_minus<As>(a, b, std::make_index_sequence<S>{}); }
+{
+    return _array_minus<As>(a, b, std::make_index_sequence<S>{});
+}
 
 template<typename Op, template<typename, std::size_t> typename A0,
          template<typename, std::size_t> typename A1, typename T, std::size_t S>
@@ -860,30 +898,42 @@ auto constexpr pow(T const v, std::uint16_t const power) _PHARE_ALL_FN_
 
 
 auto constexpr all_in(auto const a, auto&&... ts) _PHARE_ALL_FN_
-{ return ((a == ts) && ...); }
+{
+    return ((a == ts) && ...);
+}
 
 auto constexpr any_in([[maybe_unused]] auto const a, auto&&... ts) _PHARE_ALL_FN_
-{ return ((a == ts) || ...); }
+{
+    return ((a == ts) || ...);
+}
 
 template<typename T>
 auto constexpr any_are(auto&&... ts) _PHARE_ALL_FN_
-{ return ((std::is_same_v<T, std::decay_t<decltype(ts)>>) || ...); }
+{
+    return ((std::is_same_v<T, std::decay_t<decltype(ts)>>) || ...);
+}
 
 
 
 template<typename... Ts>
 auto constexpr is_any_of(auto const& t) _PHARE_ALL_FN_
-{ return ((std::is_same_v<Ts, std::decay_t<decltype(t)>>) || ...); }
+{
+    return ((std::is_same_v<Ts, std::decay_t<decltype(t)>>) || ...);
+}
 
 template<typename T, typename... Ts>
 auto constexpr is_any_of() _PHARE_ALL_FN_
-{ return ((std::is_same_v<Ts, T>) || ...); }
+{
+    return ((std::is_same_v<Ts, T>) || ...);
+}
 
 
 template<typename Tuple, std::size_t... Is>
 constexpr auto _tuple_element_value_type_refs_(Tuple& tup, std::size_t index,
                                                std::index_sequence<Is...> const&&)
-{ return std::forward_as_tuple(std::get<Is>(tup)[index]...); }
+{
+    return std::forward_as_tuple(std::get<Is>(tup)[index]...);
+}
 template<typename Tuple>
 auto constexpr _tuple_element_value_type_refs(Tuple& tuple, std::size_t index)
 {
@@ -920,7 +970,9 @@ struct Zipper
 
 template<typename... Args>
 auto zip(Args&&... args)
-{ return Zipper<Args...>{std::forward_as_tuple(args...)}; }
+{
+    return Zipper<Args...>{std::forward_as_tuple(args...)};
+}
 
 
 template<typename T>

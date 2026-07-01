@@ -84,18 +84,24 @@ void DefaultTaggerStrategy<Model>::tag(Model& model, gridlayout_type const& layo
             {
                 auto Btile = B.template as<TensorField_vt>([&](auto& c) { return c()[tidx]; });
 
-                auto const& tile_layout    = B[0]()[tidx].layout();
-                auto const& tile_amr_box   = tile_layout.AMRBox();
-                auto const tag_local_lower = layout.AMRToLocal(tile_amr_box.lower)
-                                             - gridlayout_type::nbrGhosts();
+                auto const& tile_layout  = B[0]()[tidx].layout();
+                auto const& tile_amr_box = tile_layout.AMRBox();
+                auto const tag_local_lower
+                    = layout.AMRToLocal(tile_amr_box.lower) - gridlayout_type::nbrGhosts();
 
                 tagger.tag(layout, tags, Btile, tile_layout, tag_local_lower);
             }
             return;
         }
+        else
+        {
+            tagger.tag(layout, tags, B, layout, core::Point{ConstArray<int, dimension>()});
+        }
     }
-
-    tagger.tag(layout, tags, B, layout, core::Point{ConstArray<int, dimension>()});
+    else
+    {
+        tagger.tag(layout, tags, B, layout, core::Point{ConstArray<int, dimension>()});
+    }
 }
 
 

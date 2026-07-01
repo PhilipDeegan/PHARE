@@ -11,7 +11,7 @@ from ddt import data, ddt, unpack
 from pyphare.core.box import Box3D
 from pyphare.cpp import supported_particle_layouts
 
-from tests.simulator.test_advance import AdvanceTestBase
+from tests.simulator.advance.test_advance_hybrid import HybridAdvanceTest
 
 matplotlib.use("Agg")  # for systems without GUI
 
@@ -34,13 +34,11 @@ def permute(boxes={}):
 
 
 @ddt
-class AdvanceTest3D(AdvanceTestBase):
+class AdvanceTest3D(HybridAdvanceTest):
     @data(*permute())
     @unpack
     def test_L0_particle_number_conservation(self, interp_order, **kwargs):
-        self._test_L0_particle_number_conservation(
-            ndim, interp_order, ppc=ppc, cells=20, **kwargs
-        )
+        self._test_L0_particle_number_conservation(ndim, interp_order, ppc=ppc, cells=20, **kwargs)
 
     @data(*permute({"L0": {"B0": Box3D(10, 14)}}))
     @unpack

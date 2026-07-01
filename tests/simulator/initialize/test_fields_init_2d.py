@@ -1,27 +1,30 @@
 """
-  This file exists independently from test_initialization.py to isolate dimension
-    test cases and allow each to be overridden in some way if required.
+This file exists independently from test_initialization.py to isolate dimension
+  test cases and allow each to be overridden in some way if required.
 """
 
-import unittest
 import itertools
-import matplotlib
+import unittest
 import numpy as np
 from ddt import data, ddt, unpack
 
+import pyphare.pharein as ph
+from pyphare.core import phare_utilities as phut
 from pyphare.cpp import supported_particle_layouts
 
-from tests.simulator.test_initialization import InitializationTest
+from tests.simulator.initialize.test_init_mhd import MHDInitializationTest
+from tests.simulator.initialize.test_init_hybrid import HybridInitializationTest
 
-matplotlib.use("Agg")  # for systems without GUI
+ph.NO_GUI()
 
 ndim = 2
 interp_orders = [1, 2, 3]
 
 
-def permute():
+def permute_hybrid():
     return [
         dict(
+            super_class=HybridInitializationTest,
             interp_order=interp_order,
             sim_setup_kwargs=dict(layout=layout),
         )
@@ -31,32 +34,44 @@ def permute():
     ]
 
 
+def permute_mhd():
+    return [dict(super_class=MHDInitializationTest, hall=False)]
+
+
+def permute(hybrid=True, mhd=False):
+    return (permute_hybrid() if hybrid else []) + (permute_mhd() if mhd else [])
+
+
 @ddt
-class Initialization2DTest(InitializationTest):
+class Initialization2DTest(MHDInitializationTest, HybridInitializationTest):
     @data(*permute())
     @unpack
-    def test_B_is_as_provided_by_user(self, interp_order, **kwargs):
+    def test_B_is_as_provided_by_user(self, super_class, **kwargs):
         print(f"\n{self._testMethodName}_{ndim}d")
-        self._test_B_is_as_provided_by_user(ndim, interp_order, **kwargs)
+        phut.cast_to(self, super_class)
+        self._test_B_is_as_provided_by_user(ndim, **kwargs)
 
     @data(*permute())
     @unpack
-    def test_bulkvel_is_as_provided_by_user(self, interp_order, **kwargs):
+    def test_bulkvel_is_as_provided_by_user(self, super_class, **kwargs):
         print(f"\n{self._testMethodName}_{ndim}d")
-        self._test_bulkvel_is_as_provided_by_user(ndim, interp_order, **kwargs)
+        phut.cast_to(self, super_class)
+        self._test_bulkvel_is_as_provided_by_user(ndim, **kwargs)
 
     @data(*permute())
     @unpack
-    def test_density_is_as_provided_by_user(self, interp_order, **kwargs):
+    def test_density_is_as_provided_by_user(self, super_class, **kwargs):
         print(f"\n{self._testMethodName}_{ndim}d")
-        self._test_density_is_as_provided_by_user(ndim, interp_order, **kwargs)
+        phut.cast_to(self, super_class)
+        self._test_density_is_as_provided_by_user(ndim, **kwargs)
 
     @data(*permute())
     @unpack
-    def test_density_decreases_as_1overSqrtN(self, interp_order, **kwargs):
+    def test_density_decreases_as_1overSqrtN(self, super_class, **kwargs):
         print(f"{self._testMethodName}_{ndim}d")
+        phut.cast_to(self, super_class)
         self._test_density_decreases_as_1overSqrtN(
-            ndim, interp_order, np.asarray([50, 500, 1000, 2222]), cells=100, **kwargs
+            ndim, nbr_particles=np.asarray([50, 500, 1000, 2222]), cells=100, **kwargs
         )
 
 

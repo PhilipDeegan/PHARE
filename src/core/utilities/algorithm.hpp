@@ -118,11 +118,11 @@ auto convert_to_primal(        //
     throw std::runtime_error("Quantity not supported for conversion to primal.");
 }
 
-template<std::size_t dim, typename PQ, typename T, auto am>
-auto& convert_to_fortran_primal(       // DOES NOT WORK ON GHOST BOX!
-    Field<dim, PQ, T, am>& dst,        //
-    Field<dim, PQ, T, am> const& src,  //
-    auto const& layout, auto const qty //
+template<std::size_t dim, typename pq, typename data_t, auto alloc_mode>
+auto& convert_to_fortran_primal(                   // DOES NOT WORK ON GHOST BOX!
+    Field<dim, pq, data_t, alloc_mode>& dst,       //
+    Field<dim, pq, data_t, alloc_mode> const& src, //
+    auto const& layout                             //
 )
 {
     bool static constexpr c_ordering = false;
@@ -131,7 +131,7 @@ auto& convert_to_fortran_primal(       // DOES NOT WORK ON GHOST BOX!
         throw std::runtime_error("Invalid operation, all directions must be primal");
 
     auto const all_primal
-        = all(layout.centering(qty), [](auto const c) { return c == QtyCentering::primal; });
+        = all(layout.centering(src), [](auto const c) { return c == QtyCentering::primal; });
 
     auto const lcl_box = layout.AMRToLocal(layout.AMRBoxFor(dst));
     auto dst_view      = make_array_view<c_ordering>(dst.data(), *lcl_box.shape());
@@ -149,7 +149,7 @@ auto& convert_to_fortran_primal(       // DOES NOT WORK ON GHOST BOX!
 
     else
         for (auto const [lix, lix0] : boxes_iterator(lcl_box, lcl_zero_box))
-            dst_view(lix0) = convert_to_primal(src, layout, lix, qty);
+            dst_view(lix0) = convert_to_primal(src, layout, lix, src.physicalQuantity());
 
     return dst;
 }
@@ -158,11 +158,11 @@ template<typename Field_t, typename PQ, std::size_t rank>
 auto& convert_to_fortran_primal(               //
     TensorField<Field_t, PQ, rank>& dst,       //
     TensorField<Field_t, PQ, rank> const& src, //
-    auto const& layout, auto const quantities  //
+    auto const& layout                         //
 )
 {
     for (std::size_t ci = 0; ci < src.size(); ++ci)
-        convert_to_fortran_primal(dst[ci], src[ci], layout, quantities[ci]);
+        convert_to_fortran_primal(dst[ci], src[ci], layout);
     return dst;
 }
 

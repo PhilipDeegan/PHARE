@@ -12,8 +12,6 @@
 #include "core/data/particles/particle_array_def.hpp"
 #include "core/data/particles/arrays/particle_array_pc.hpp"
 
-#include <iterator>
-#include <stdexcept>
 
 
 namespace PHARE::core
@@ -35,6 +33,11 @@ public:
         , particles{box, ghost_cells}
     {
     }
+
+    PCParticlesTile(PCParticlesTile const&)            = default;
+    PCParticlesTile(PCParticlesTile&&)                 = default;
+    PCParticlesTile& operator=(PCParticlesTile const&) = default;
+    PCParticlesTile& operator=(PCParticlesTile&&)      = default;
 
     template<typename OtherPerCell>
     PCParticlesTile(PCParticlesTile<OtherPerCell>& other)
@@ -77,7 +80,7 @@ public:
     using This               = PCTileSetSpan<Particles>;
     using lobox_t            = Box<std::uint32_t, dim>;
     using per_tile_particles = Particles;
-    using Tile_t            = PCParticlesTile<Particles>;
+    using Tile_t             = PCParticlesTile<Particles>;
 
 private:
     using locell_t = std::array<std::uint32_t, dim>;
@@ -107,7 +110,10 @@ public:
     }
 
     auto size() const _PHARE_ALL_FN_ { return size_; }
-    auto size(std::size_t const& idx) const _PHARE_ALL_FN_ { return particles_.data()[idx]().size(); }
+    auto size(std::size_t const& idx) const _PHARE_ALL_FN_
+    {
+        return particles_.data()[idx]().size();
+    }
 
     auto& box() const _PHARE_ALL_FN_ { return box_; }
     auto& ghost_box() const _PHARE_ALL_FN_ { return ghost_box_; }
@@ -151,7 +157,9 @@ public:
     }
 
     template<auto type, typename... Args>
-    void sync(Args&&... /*args*/) _PHARE_ALL_FN_ {} // TODO
+    void sync(Args&&... /*args*/) _PHARE_ALL_FN_
+    {
+    } // TODO
 
     void clear() {} // TODO
 
@@ -192,7 +200,7 @@ public:
     using value_type                   = Particle_t;
     using PSpan_t                      = typename Particles::view_t;
     using per_tile_particles           = Particles;
-    using Tile_t                      = PCParticlesTile<Particles>;
+    using Tile_t                       = PCParticlesTile<Particles>;
     using SpnTile                      = PCParticlesTile<PSpan_t>;
 
     template<typename T>

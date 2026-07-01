@@ -33,7 +33,7 @@ struct TestParam
     static_assert(all_are<AllocatorMode>(am));
 
     auto constexpr static dim      = _dim;
-    auto constexpr static sim_opts = SimOpts{dim, interp, lm, am};
+    auto constexpr static sim_opts = SimOpts::make(dim, interp, lm, am);
 
     using PhareTypes   = core::PHARE_Types<sim_opts>;
     using Box_t        = PHARE::core::Box<int, dim>;

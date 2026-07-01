@@ -167,7 +167,7 @@ struct FaradayTileTest : public ::testing::Test
     auto constexpr static layout_mode = Param::layout_mode;
     auto constexpr static alloc_mode  = Param::alloc_mode;
 
-    auto constexpr static sim_opts = SimOpts{dim, interp, layout_mode, alloc_mode};
+    auto constexpr static sim_opts = SimOpts::make(dim, interp, layout_mode, alloc_mode);
 
     template<typename T, auto am>
     using nd_array_t       = NdArrayVector<dim, T, c_order, am>;

@@ -1,18 +1,19 @@
 """
-  This file exists independently from test_advance.py to isolate dimension
-    test cases and allow each to be overridden in some way if required.
+This file exists independently from test_advance.py to isolate dimension
+  test cases and allow each to be overridden in some way if required.
 """
 
 import unittest
 import itertools
-import matplotlib
 from ddt import data, ddt, unpack
+
+import pyphare.pharein as ph
 from pyphare.core.box import Box1D
 from pyphare.cpp import supported_particle_layouts
 
-from tests.simulator.test_advance import AdvanceTestBase
+from tests.simulator.advance.test_advance_hybrid import HybridAdvanceTest
 
-matplotlib.use("Agg")  # for systems without GUI
+ph.NO_GUI()
 
 ndim = 1
 interp_orders = [1, 2, 3]
@@ -32,15 +33,14 @@ def permute(boxes={}):
 
 
 @ddt
-class AdvanceTest1D(AdvanceTestBase):
+class AdvanceTest1D(HybridAdvanceTest):
     @data(*permute())
     @unpack
     def test_L0_particle_number_conservation(self, interp_order, **kwargs):
-        print(f"{self._testMethodName}_{ndim}d")
         self._test_L0_particle_number_conservation(ndim, interp_order, **kwargs)
 
     @data(
-        *permute(({"L0": {"B0": Box1D(10, 14)}})),
+        *permute({"L0": {"B0": Box1D(10, 14)}}),
     )
     @unpack
     def test_domain_particles_on_refined_level(self, interp_order, **kwargs):

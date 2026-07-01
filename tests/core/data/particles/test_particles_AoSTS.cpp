@@ -50,7 +50,7 @@ struct ParticleArrayConsistencyTest : public ::testing::Test
 };
 
 
-using Permutations_t = testing::Types<TestParam<SimOpts{3, 1, LayoutMode::AoSTS}>>;
+using Permutations_t = testing::Types<TestParam<SimOpts::make(3, 1, LayoutMode::AoSTS)>>;
 
 TYPED_TEST_SUITE(ParticleArrayConsistencyTest, Permutations_t, );
 

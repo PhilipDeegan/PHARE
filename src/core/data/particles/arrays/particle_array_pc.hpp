@@ -169,8 +169,8 @@ public:
     using locell_t                     = std::array<std::uint32_t, dim>;
     using Particle_t                   = typename ParticleDefaults<dim>::Particle_t;
     using value_type                   = Particle_t;
-    using PSpan_t                      = typename Particles::Span_t;
-    using view_t                       = PerCellSpan<Particles, impl_v>;
+    using PSpan_t                      = typename Particles::view_t;
+    using view_t                       = PerCellSpan<PSpan_t, impl_v>;
     using per_cell_particles           = Particles;
     using per_tile_particles           = Particles; // MultiBoris compatibility
 

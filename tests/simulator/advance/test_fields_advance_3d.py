@@ -9,22 +9,26 @@ import itertools
 import matplotlib
 from ddt import data, ddt, unpack
 from pyphare.core.box import Box3D
+from pyphare.core import phare_utilities as phut
 from pyphare.cpp import supported_particle_layouts
 
-from tests.simulator.test_advance import AdvanceTestBase
+from tests.simulator.advance.test_advance_mhd import MHDAdvanceTest
+from tests.simulator.advance.test_advance_hybrid import HybridAdvanceTest
 
 matplotlib.use("Agg")  # for systems without GUI
 
 ndim = 3
 interp_orders = [1, 2, 3]
-ppc, cells = 10, 30
+ppc = 10
 
 
-def permute(boxes={}):
+def permute_hybrid(boxes={}):
     return [
         dict(
+            super_class=HybridAdvanceTest,
             interp_order=interp_order,
             refinement_boxes=boxes,
+            nbr_part_per_cell=ppc,
             sim_setup_kwargs=dict(layout=layout),
         )
         for interp_order, layout in itertools.product(
@@ -33,47 +37,62 @@ def permute(boxes={}):
     ]
 
 
+def permute_mhd(boxes={}):
+    return [dict(super_class=MHDAdvanceTest, hall=False, refinement_boxes=boxes)]
+
+
+def permute(boxes={}, hybrid=True, mhd=False):
+    return (permute_hybrid(boxes) if hybrid else []) + (
+        permute_mhd(boxes) if mhd else []
+    )
+
+
 @ddt
-class AdvanceTest3D(AdvanceTestBase):
+class AdvanceTest3D(HybridAdvanceTest, MHDAdvanceTest):
     @data(
         *permute({}),
         *permute({"L0": [Box3D(4, 8)]}),
     )
     @unpack
-    def test_overlaped_fields_are_equal(self, interp_order, **kwargs):
+    def test_overlaped_fields_are_equal(self, super_class, **kwargs):
         print(f"{self._testMethodName}_{ndim}d")
+        phut.cast_to(self, super_class)
         time_step_nbr = 3
         time_step = 0.001
 
         datahier = self.getHierarchy(
             ndim,
-            interp_order,
             qty="eb",
             cells=20,
             time_step=time_step,
             time_step_nbr=time_step_nbr,
-            nbr_part_per_cell=ppc,
             **kwargs,
         )
         self._test_overlaped_fields_are_equal(datahier, time_step_nbr, time_step)
 
     # needs updating tests/simulator/utilities/field_coarsening.py
     # @data(
-    #     *permute({"L0": {"B0": Box3D(10, 14)}}),
-    #     *permute({"L0": {"B0": Box3D(10, 14), "B1": Box3D(15, 19)}}),
-    #     *permute({"L0": {"B0": Box3D(6, 23)}}),
-    #     *permute({"L0": {"B0": Box3D(2, 12), "B1": Box3D(13, 25)}}),
-    #     *permute({"L0": {"B0": Box3D(5, 20)}, "L1": {"B0": Box3D(15, 19)}}),
-    #     *permute({
-    #         "L0": {"B0": Box3D(5, 20)},
-    #         "L1": {"B0": Box3D(12, 38)},
-    #         "L2": {"B0": Box3D(30, 52)},
-    #     }),
+    #     *permute(({"L0": {"B0": Box3D(10, 14)}})),
+    #     *permute(({"L0": {"B0": Box3D(10, 14), "B1": Box3D(15, 19)}})),
+    #     *permute(({"L0": {"B0": Box3D(6, 23)}})),
+    #     *permute(({"L0": {"B0": Box3D(2, 12), "B1": Box3D(13, 25)}})),
+    #     *permute(({"L0": {"B0": Box3D(5, 20)}, "L1": {"B0": Box3D(15, 19)}})),
+    #     *permute(
+    #         (
+    #             {
+    #                 "L0": {"B0": Box3D(5, 20)},
+    #                 "L1": {"B0": Box3D(12, 38)},
+    #                 "L2": {"B0": Box3D(30, 52)},
+    #             }
+    #         )
+    #     ),
     # )
     # @unpack
-    # def test_field_coarsening_via_subcycles(self, interp_order, **kwargs):
+    # def test_field_coarsening_via_subcycles(self, interp_order, refinement_boxes):
     #     print(f"{self._testMethodName}_{ndim}d")
-    #     self._test_field_coarsening_via_subcycles(ndim, interp_order, dl=0.3, cells=cells, **kwargs)
+    #     self._test_field_coarsening_via_subcycles(
+    #         ndim, interp_order, refinement_boxes, dl=0.3, cells=cells
+    #     )
 
     @unittest.skip("should change to work on moments")
     @data(  # only supports a hierarchy with 2 levels
@@ -85,11 +104,12 @@ class AdvanceTest3D(AdvanceTestBase):
     )
     @unpack
     def test_field_level_ghosts_via_subcycles_and_coarser_interpolation(
-        self, interp_order, **kwargs
+        self, super_class, **kwargs
     ):
         print(f"{self._testMethodName}_{ndim}d")
+        phut.cast_to(self, super_class)
         self._test_field_level_ghosts_via_subcycles_and_coarser_interpolation(
-            ndim, interp_order, **kwargs
+            ndim, **kwargs
         )
 
 

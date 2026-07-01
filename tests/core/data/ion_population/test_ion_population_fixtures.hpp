@@ -27,7 +27,7 @@ public:
     auto static constexpr dim         = ParticleArray_::dimension;
     auto static constexpr alloc_mode  = ParticleArray_::alloc_mode;
     auto static constexpr layout_mode = ParticleArray_::layout_mode;
-    SimOpts static constexpr opts{dim, interp_, layout_mode, alloc_mode};
+    auto static constexpr opts        = SimOpts::make(dim, interp_, layout_mode, alloc_mode);
 
     using PHARE_Types     = PHARE::core::PHARE_Types<opts>;
     using GridLayout_t    = PHARE_Types::GridLayout_t;

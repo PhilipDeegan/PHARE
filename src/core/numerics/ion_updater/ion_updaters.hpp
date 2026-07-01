@@ -1,7 +1,7 @@
 #ifndef PHARE_ION_UPDATERS_HPP
 #define PHARE_ION_UPDATERS_HPP
 
-
+#include "core/def/phare_config.hpp"
 #include "core/numerics/ion_updater/ion_updater.hpp"          // IWYU pragma: keep
 #include "core/numerics/ion_updater/ion_updater_multi_ts.hpp" // IWYU pragma: keep
 // #include "core/numerics/ion_updater/ion_updater_multi_pc.hpp" // IWYU pragma: keep

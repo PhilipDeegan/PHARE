@@ -3,7 +3,7 @@
 Tests that tile-based particle layouts produce identical initialization
 and time-advance results to the reference (AoSMapped) layout.
 """
-import os
+
 import unittest
 import itertools
 from ddt import data, ddt, unpack
@@ -15,8 +15,8 @@ from pyphare.core.box import nDBox
 # from pyphare.cpp import supported_particle_layouts
 from pyphare.pharesee.hierarchy.hierarchy_utils import hierarchy_compare
 
-from tests.simulator.test_initialization import InitializationTest
-from tests.simulator.test_advance import AdvanceTestBase
+from tests.simulator.initialize.test_init_hybrid import HybridInitializationTest
+from tests.simulator.advance.test_advance_hybrid import HybridAdvanceTest
 
 
 ndim_list = [2]
@@ -40,7 +40,7 @@ def permute():
     ]
 
 
-class ALayoutInitTest(InitializationTest):
+class ALayoutInitTest(HybridInitializationTest):
     def compare_init(self, ndim, interp_order, qty, cmp_layout, atol=0, **kwargs):
         common = dict(
             qty=qty,
@@ -167,7 +167,7 @@ class LayoutInitL1Test(ALayoutInitTest):
         self._compare_init(ndim, interp_order, "particles", cmp_layout, atol=0)
 
 
-class ALayoutAdvanceTest(AdvanceTestBase):
+class ALayoutAdvanceTest(HybridAdvanceTest):
     def compare_advance(self, ndim, interp_order, qty, cmp_layout, atol=0, **kwargs):
         common = dict(
             qty=qty,

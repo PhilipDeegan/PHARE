@@ -7,6 +7,9 @@
 #include "core/utilities/algorithm.hpp"
 #include "core/utilities/mpi_utils.hpp"
 #include "core/data/tensorfield/tensorfield.hpp"
+#include "core/mhd/mhd_quantities.hpp"
+#include "core/hybrid/hybrid_quantities.hpp"
+
 
 #include "amr/resources_manager/amr_utils.hpp"
 
@@ -364,8 +367,7 @@ void H5TypeWriter<Writer>::VTKFileWriter::writeField(auto const& field, auto con
 
     auto const size     = local_box(layout).size();
     auto const& reduced = modelView.field_reducer(field);
-    auto const& frimal  = core::convert_to_fortran_primal( //
-        modelView.tmpField(), reduced, layout, field.physicalQuantity());
+    auto const& frimal = core::convert_to_fortran_primal(modelView.tmpField(), reduced, layout);
     auto ds             = h5file.getDataSet(level_data_path(layout.levelNumber()));
 
     PHARE_LOG_SCOPE(3, "VTKFileWriter::writeField::0");
@@ -392,9 +394,8 @@ void H5TypeWriter<Writer>::VTKFileWriter::writeTensorField(auto const& tf, auto 
             return modelView.tensor_field_reducer(tf);
     }();
 
-    auto const& frimal = core::convert_to_fortran_primal( //
-        modelView.template tmpTensorField<rank>(), reduced, layout,
-        componentsQuantities(tf.physicalQuantity()));
+    auto const& frimal = core::convert_to_fortran_primal(
+        modelView.template tmpTensorField<rank>(), reduced, layout);
     auto const size    = local_box(layout).size();
     auto ds            = h5file.getDataSet(level_data_path(layout.levelNumber()));
 

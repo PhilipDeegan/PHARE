@@ -76,7 +76,7 @@ auto samrai_version()
     return ss.str();
 }
 
-auto constexpr supported_layouts()
+auto supported_layouts()
 {
     using enum core::LayoutMode;
     std::vector layouts{AoSMapped};

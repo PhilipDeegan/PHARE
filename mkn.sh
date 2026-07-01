@@ -48,6 +48,6 @@ set -x
 
 (
   set -xe
-  mkn -tp core_tests ${CARGS} clean build test run "$@"
-  mkn -tp more_tests ${CARGS} clean build test run "$@"
-)
+  mkn -tp core_tests clean build test run -w mkn.gpu -x res/mkn/mpi ${CARGS} "$@"
+  mkn -tp more_tests clean build test run -w mkn.gpu -x res/mkn/mpi ${CARGS} "$@"
+) 1> >(tee $CWD/.mkn.sh.out ) 2> >(tee $CWD/.mkn.sh.err >&2 )

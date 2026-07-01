@@ -34,7 +34,7 @@ struct TestParam
     auto constexpr static interp      = _interp;
     auto constexpr static layout_mode = lm;
     auto constexpr static alloc_mode  = am;
-    SimOpts static constexpr opts{dim, interp, layout_mode, alloc_mode};
+    auto static constexpr opts        = SimOpts::make(dim, interp, layout_mode, alloc_mode);
 
     using PhareTypes   = PHARE::core::PHARE_Types<opts>;
     using Box_t        = Box<int, dim>;
@@ -232,11 +232,11 @@ auto from_layout_for_quantity(TileSetTest_t& self)
 
 // clang-format off
 using Permutations_t = testing::Types<
-    TestParam<1, 1,LayoutMode::AoSTS, AllocatorMode::CPU>
-   ,TestParam<2, 2,LayoutMode::AoSTS, AllocatorMode::CPU>
-   ,TestParam<3, 3,LayoutMode::AoSTS, AllocatorMode::CPU>
+    TestParam<1, 1, LayoutMode::AoSTS, AllocatorMode::CPU>
+   ,TestParam<2, 2, LayoutMode::AoSTS, AllocatorMode::CPU>
+   ,TestParam<3, 3, LayoutMode::AoSTS, AllocatorMode::CPU>
 PHARE_WITH_GPU(
-    ,TestParam<3, 3,LayoutMode::AoSTS, AllocatorMode::GPU_UNIFIED>
+   ,TestParam<3, 3, LayoutMode::AoSTS, AllocatorMode::GPU_UNIFIED>
 )
 >;
 // clang-format on

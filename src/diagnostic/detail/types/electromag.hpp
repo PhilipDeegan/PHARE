@@ -59,7 +59,8 @@ private:
 template<typename H5Writer>
 void ElectromagDiagnosticWriter<H5Writer>::createFiles(DiagnosticProperties& diagnostic)
 {
-    for (auto* vecField : this->h5Writer_.modelView().getElectromagFields())
+    auto& mv = this->h5Writer_.modelView();
+    for (auto* vecField : std::array{&mv.getB(), &mv.getE()})
         checkCreateFileFor_(diagnostic, fileData_, "/", vecField->name());
 }
 
@@ -72,7 +73,7 @@ void ElectromagDiagnosticWriter<H5Writer>::getDataSetInfo(DiagnosticProperties& 
 {
     auto& h5Writer         = this->h5Writer_;
     auto& modelView        = h5Writer.modelView();
-    auto vecFields         = h5Writer.modelView().getElectromagFields();
+    auto vecFields         = std::array{&modelView.getB(), &modelView.getE()};
     std::string lvlPatchID = std::to_string(iLevel) + "_" + patchID;
 
     auto const infoVF = [&](auto& vecF_in, std::string name, auto& attr) {
@@ -103,9 +104,10 @@ void ElectromagDiagnosticWriter<H5Writer>::initDataSets(
     std::unordered_map<std::size_t, std::vector<std::string>> const& patchIDs,
     Attributes& patchAttributes, std::size_t maxLevel)
 {
-    auto& h5Writer = this->h5Writer_;
-    auto& h5file   = Super::h5FileForQuantity(diagnostic);
-    auto vecFields = h5Writer.modelView().getElectromagFields();
+    auto& h5Writer  = this->h5Writer_;
+    auto& h5file    = Super::h5FileForQuantity(diagnostic);
+    auto& modelView = h5Writer.modelView();
+    auto vecFields  = std::array{&modelView.getB(), &modelView.getE()};
 
     auto const initVF = [&](auto& path, auto& attr, std::string key, auto null) {
         for (auto& [id, type] : core::Components::componentMap())
@@ -144,7 +146,7 @@ void ElectromagDiagnosticWriter<H5Writer>::write(DiagnosticProperties& diagnosti
     auto& h5Writer  = this->h5Writer_;
     auto& modelView = h5Writer.modelView();
 
-    for (auto* vecField : h5Writer.modelView().getElectromagFields())
+    for (auto* vecField : std::array{&modelView.getB(), &modelView.getE()})
         if (diagnostic.quantity == "/" + vecField->name())
             h5Writer.writeTensorFieldAsDataset(Super::h5FileForQuantity(diagnostic),
                                                h5Writer.patchPath() + "/" + vecField->name(),

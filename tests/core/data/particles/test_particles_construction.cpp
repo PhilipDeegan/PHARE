@@ -40,7 +40,7 @@ struct ParticleArrayConstructionTest : public ::testing::Test
     auto constexpr static interp      = 1;
     auto constexpr static layout_mode = Param::layout_mode;
     auto constexpr static alloc_mode  = Param::alloc_mode;
-    auto constexpr static sim_opts    = SimOpts{dim, interp, layout_mode, alloc_mode};
+    auto constexpr static sim_opts    = SimOpts::make(dim, interp, layout_mode, alloc_mode);
 
     using GridLayout_t = TestGridLayout<typename PHARE_Types<sim_opts>::GridLayout_t>;
     using ParticleArray_t

@@ -61,7 +61,8 @@ struct AParticleArraySelectingTest : public ::testing::Test
     auto constexpr static interp      = 1;
     auto constexpr static layout_mode = Param::layout_mode;
     auto constexpr static alloc_mode  = Param::alloc_mode;
-    auto constexpr static sim_opts    = SimOpts{dim, interp, Param::layout_mode, Param::alloc_mode};
+    auto constexpr static sim_opts
+        = SimOpts::make(dim, interp, Param::layout_mode, Param::alloc_mode);
 
     using GridLayout_t     = PHARE_Types<sim_opts>::GridLayout_t;
     using TestGridLayout_t = TestGridLayout<GridLayout_t>;
