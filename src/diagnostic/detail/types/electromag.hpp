@@ -75,8 +75,6 @@ void ElectromagDiagnosticWriter<H5Writer>::getDataSetInfo(DiagnosticProperties& 
                                                           Attributes& patchAttributes)
 {
     auto& h5Writer         = this->h5Writer_;
-    auto& modelView        = h5Writer.modelView();
-    auto vecFields         = std::array{&modelView.getB(), &modelView.getE()};
     std::string lvlPatchID = std::to_string(iLevel) + "_" + patchID;
 
     auto const infoVF = [&](auto& vec, std::string name, auto& attr) {
