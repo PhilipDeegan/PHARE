@@ -19,7 +19,7 @@ from tests.simulator.initialize.test_init_hybrid import HybridInitializationTest
 from tests.simulator.advance.test_advance_hybrid import HybridAdvanceTest
 
 
-ndim_list = [2]
+ndim_list = [1]
 interp_orders = [1]
 _ref_layout = "AoSMapped"
 cells = 32

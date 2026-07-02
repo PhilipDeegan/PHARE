@@ -173,24 +173,22 @@ void FluidDiagnosticWriter<H5Writer>::getDataSetInfo(DiagnosticProperties& diagn
         attr[name + "_ghosts"] = static_cast<std::size_t>(ghosts[0]);
     };
 
-    auto const infoDS = [&](auto& fieldIn, std::string name, auto& attr) {
+    auto const infoDS = [&](auto& field, std::string name, auto& attr) {
         // highfive doesn't accept uint32 which ndarray.shape() is
-        auto& field       = modelView.field_reducer(fieldIn);
+        // shape only - no reduction needed here, that happens on write()
         auto const& shape = field.shape();
         attr[name]        = std::vector<std::size_t>(shape.data(), shape.data() + shape.size());
         setGhostNbr(field, attr, name);
     };
 
-    auto const infoVF = [&](auto& vecFIn, std::string name, auto& attr) {
-        auto& vecF = modelView.vec_field_reducer(vecFIn);
+    auto const infoVF = [&](auto& vec, std::string name, auto& attr) {
         for (auto const& [id, type] : core::VectorComponents::map())
-            infoDS(vecF.getComponent(type), name + "_" + id, attr);
+            infoDS(vec.getComponent(type), name + "_" + id, attr);
     };
 
-    auto const infoTF = [&](auto& tensorFIn, std::string name, auto& attr) {
-        auto& tensorF = modelView.tensor_field_reducer(tensorFIn);
+    auto const infoTF = [&](auto& tf, std::string name, auto& attr) {
         for (auto const& [id, type] : core::TensorComponents::map())
-            infoDS(tensorF.getComponent(type), name + "_" + id, attr);
+            infoDS(tf.getComponent(type), name + "_" + id, attr);
     };
 
     for (auto& pop : ions)
@@ -297,13 +295,13 @@ void FluidDiagnosticWriter<H5Writer>::write(DiagnosticProperties& diagnostic)
 
     auto const writeDS = [&](auto path, auto& field) {
         h5file.template write_data_set_flat<GridLayout::dimension>(
-            path, modelView.field_reduced(field).data());
+            path, modelView.field_reducer(field).data());
     };
     auto const writeVF = [&](auto path, auto& vecF) {
-        h5Writer.writeTensorFieldAsDataset(h5file, path, modelView.vec_field_reduced(vecF));
+        h5Writer.writeTensorFieldAsDataset(h5file, path, modelView.vec_field_reducer(vecF));
     };
     auto const writeTF = [&](auto path, auto& tF) {
-        h5Writer.writeTensorFieldAsDataset(h5file, path, modelView.tensor_field_reduced(tF));
+        h5Writer.writeTensorFieldAsDataset(h5file, path, modelView.tensor_field_reducer(tF));
     };
 
     std::string path = h5Writer.patchPath() + "/";

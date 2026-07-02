@@ -76,15 +76,15 @@ void ElectromagDiagnosticWriter<H5Writer>::getDataSetInfo(DiagnosticProperties& 
     auto vecFields         = std::array{&modelView.getB(), &modelView.getE()};
     std::string lvlPatchID = std::to_string(iLevel) + "_" + patchID;
 
-    auto const infoVF = [&](auto& vecF_in, std::string name, auto& attr) {
-        auto& vecF = modelView.vec_field_reducer(vecF_in);
+    auto const infoVF = [&](auto& vec, std::string name, auto& attr) {
+        // shape only - no reduction needed here, that happens on write()
         for (auto& [id, type] : core::Components::componentMap())
         {
             // highfive doesn't accept uint32 which ndarray.shape() is
-            auto const& array_shape = vecF.getComponent(type).shape();
+            auto const& array_shape = vec.getComponent(type).shape();
             attr[name][id]          = std::vector<std::size_t>(array_shape.data(),
                                                                array_shape.data() + array_shape.size());
-            auto ghosts = GridLayout::nDNbrGhosts(vecF.getComponent(type).physicalQuantity());
+            auto ghosts = GridLayout::nDNbrGhosts(vec.getComponent(type).physicalQuantity());
             for (std::uint8_t i = 1; i < GridLayout::dimension; ++i)
                 if (ghosts[i] != ghosts[i - 1])
                     throw std::runtime_error("ghosts per direction must be constant");
@@ -150,7 +150,7 @@ void ElectromagDiagnosticWriter<H5Writer>::write(DiagnosticProperties& diagnosti
         if (diagnostic.quantity == "/" + vecField->name())
             h5Writer.writeTensorFieldAsDataset(Super::h5FileForQuantity(diagnostic),
                                                h5Writer.patchPath() + "/" + vecField->name(),
-                                               modelView.vec_field_reduced(*vecField));
+                                               modelView.vec_field_reducer(*vecField));
 }
 
 

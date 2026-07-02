@@ -141,24 +141,6 @@ public:
     }
     auto& field_reducer(auto& f) { return f; }
 
-    auto& field_reduced(auto& f)
-        requires(core::is_field_tile_set_v<Field>)
-    {
-        return Model::tmpField;
-    }
-    auto& field_reduced(auto& f) { return f; }
-
-    auto& vec_field_reduced(auto& vf_in)
-        requires(core::is_field_tile_set_v<Field>)
-    {
-        return Model::tmpVec;
-    }
-    auto& vec_field_reduced(auto& vf_in)
-        requires(core::is_field_v<Field>)
-    {
-        return vf_in; // no op for non-tiled fields
-    }
-
     auto& vec_field_reducer(auto& tf_in)
         requires(core::is_field_tile_set_v<Field>)
     {
@@ -176,13 +158,6 @@ public:
         return Model::tmpTensor;
     }
     auto& tensor_field_reducer(auto& f) { return f; }
-
-    auto& tensor_field_reduced(auto& f)
-        requires(core::is_field_tile_set_v<Field>)
-    {
-        return Model::tmpTensor;
-    }
-    auto& tensor_field_reduced(auto& f) { return f; }
 
 protected:
     Model& model_;
