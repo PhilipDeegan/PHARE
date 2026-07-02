@@ -63,9 +63,8 @@ private:
 template<typename H5Writer>
 void ElectromagDiagnosticWriter<H5Writer>::createFiles(DiagnosticProperties& diagnostic)
 {
-    auto& mv = this->h5Writer_.modelView();
-    for (auto* vecField : std::array{&mv.getB(), &mv.getE()})
-        checkCreateFileFor_(diagnostic, fileData_, "/", vecField->name());
+    std::string tree = "/";
+    checkCreateFileFor_(diagnostic, fileData_, tree, "EM_B", "EM_E");
 }
 
 
