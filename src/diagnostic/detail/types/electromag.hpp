@@ -156,17 +156,17 @@ void ElectromagDiagnosticWriter<H5Writer>::write(DiagnosticProperties& diagnosti
     std::string tree = "/";
     std::string path = h5Writer.patchPath() + "/";
 
-    auto const write_ds = [&](auto const& vf) {
+    auto const write_ds = [&](auto const& vf, std::string const name) {
         h5Writer.writeTensorFieldAsDataset(Super::h5FileForQuantity(diagnostic),
-                                           h5Writer.patchPath() + "/" + vf.name(),
+                                           h5Writer.patchPath() + "/" + name,
                                            modelView.vec_field_reducer(vf));
     };
 
     if (isActiveDiag(diagnostic, tree, "EM_B"))
-        write_ds(modelView.getB());
+        write_ds(modelView.getB(), "EM_B");
 
     if (isActiveDiag(diagnostic, tree, "EM_E"))
-        write_ds(modelView.getE());
+        write_ds(modelView.getE(), "EM_E");
 }
 
 
