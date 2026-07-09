@@ -94,6 +94,15 @@ private:
             return arr.particles_views_.make_view();
     }
 
+    template<typename PCTileSetArray>
+    auto resolve_gaps(PCTileSetArray& arr)
+    {
+        if constexpr (PCTileSetArray::storage_mode == StorageMode::SPAN)
+            return arr.gaps_;
+        else
+            return *arr.gap_views_;
+    }
+
 public:
     auto static constexpr dimension    = dim;
     auto static constexpr storage_mode = StorageMode::SPAN;
@@ -102,6 +111,12 @@ public:
     template<typename PCTileSetArray>
     PCTileSetSpan(PCTileSetArray& arr)
         : particles_{resolve(arr)}
+        , gaps_{resolve_gaps(arr)}
+        , gap_idx_{arr.gap_idx_}
+        , add_into_{arr.add_into_}
+        , cell_size_{arr.cell_size_}
+        , cap_{arr.cap_}
+        , left_{arr.left_}
         , size_{arr.size()}
         , box_{arr.box_}
         , ghost_box_{arr.ghost_box_}
@@ -146,13 +161,44 @@ public:
     }
 
     template<auto particle_type>
-    auto& move_check(auto const& pt, std::size_t const idx,
-                     std::array<int, dim> const& newcell) _PHARE_ALL_FN_
+    auto& move_check(auto const& pt, std::size_t const idx, auto& particle) _PHARE_ALL_FN_
     {
         static_assert(particle_type == ParticleType::Domain);
+
+        auto const& newcell = particle.iCell();
+
         if (array_equals(newcell, pt.icell))
+            return *this; // old cell == new cell, no change required
+
+        auto& old_tile           = *particles_.at(pt.tile_cell);
+        auto& old_cell_particles = old_tile();
+
+        if (isIn(newcell, box()) and not isIn(newcell, old_tile))
+        {
+            // tile change register — mirrors TileSetParticles::move_check: only register
+            // the move here, the actual cross-tile copy happens later during sync.
+            bool constexpr static ATOMIC = true;
+            bool constexpr static GPU    = alloc_mode == AllocatorMode::GPU_UNIFIED;
+            using Op                     = Operators<SIZE_T, ATOMIC, GPU>;
+
+            auto const old_lcl_cell = local_cell(pt.icell);
+
+            auto& gidx      = gap_idx_(old_lcl_cell);
+            auto const nidx = Op{gidx}.increment_return_old();
+            auto& gaps      = gaps_(old_lcl_cell);
+            assert(nidx < gaps.size());
+            gaps[nidx] = idx;
+
+            Op{add_into_(local_cell(newcell))}.increment_return_old();
             return *this;
-        // cross-cell registration: TODO — delegate to PerCellVector::icell_changer
+        }
+
+        // cell change register: still owned by (or ghosted into) the current tile.
+        // icell_changer's own ghost_box() check covers both "outside the domain, assumed
+        // still in this tile's ghost box" and "inside the domain, inside this tile".
+        old_cell_particles.icell_changer(particle, old_cell_particles.local_cell(pt.icell), idx,
+                                         newcell);
+
         return *this;
     }
 
@@ -168,6 +214,8 @@ protected:
     void sync_tile_rm_left(std::size_t const /*tidx*/) _PHARE_ALL_FN_ {} // TODO
 
     TileSetView<Tile_t> particles_;
+    NdArrayView<dim, Span<std::size_t>> gaps_;
+    NdArrayView<dim, SIZE_T> gap_idx_, add_into_, cell_size_, cap_, left_;
     std::size_t size_;
     Box<int, dim> box_, ghost_box_;
     lobox_t local_ghost_box_;
@@ -206,6 +254,18 @@ public:
     template<typename T>
     using nd_array_t = NdArrayVector<dim, T, c_order, alloc_mode>;
 
+    std::uint8_t constexpr static alloc_impl()
+    {
+        if (Particles::alloc_mode == AllocatorMode::GPU_UNIFIED)
+            return 1;
+        return 1;
+    }
+
+    template<typename T>
+    using vec_helper = PHARE::Vector<T, alloc_mode, alloc_impl()>;
+
+    using size_t_vector = typename vec_helper<std::size_t>::vector_t;
+
     PCTileSetVector(box_t const& box, auto const ghost_cells)
         : ghost_cells_{ghost_cells}
         , box_{box}
@@ -215,6 +275,12 @@ public:
               [](auto& tile) -> auto& { return tile; }, TileSetter<dim>{box, ghost_cells},
               particles_)}
     {
+        cell_size_.zero();
+        gap_idx_.zero();
+        add_into_.zero();
+        left_.zero();
+        cap_.zero();
+
         TileSet<Tile_t, alloc_mode>::build_links(particles_);
         TileSet<SpnTile, alloc_mode>::build_links(particles_views_);
     }
@@ -225,8 +291,8 @@ public:
     PCTileSetVector& operator=(PCTileSetVector const&) = default;
 
     auto size() const { return total_size; }
-    auto size(locell_t const& /*icell*/) const { return std::size_t{0}; /* TODO */ }
-    auto size(std::size_t const& /*idx*/) const { return std::size_t{0}; /* TODO */ }
+    auto size(locell_t const& icell) const { return cell_size_(icell); }
+    auto size(std::size_t const& idx) const { return cell_size_.data()[idx]; }
 
     template<auto type = ParticleType::Domain>
     auto& reserve_ppc(std::size_t const& ppc)
@@ -286,6 +352,8 @@ public:
     void reset_views()
     {
         update_from([&](std::size_t const i) { return SpnTile{particles_[i]}; }, particles_views_);
+        update_from([&](std::size_t const i) { return make_span(*(gaps_.data() + i)); },
+                    gap_views_);
     }
 
     void clear()
@@ -307,6 +375,16 @@ protected:
 
     std::size_t ghost_cells_;
     Box<int, dim> box_, ghost_box_;
+
+    nd_array_t<size_t_vector> gaps_{local_box().shape()};
+    nd_array_t<Span<std::size_t>> gap_views_{local_box().shape()};
+
+    nd_array_t<SIZE_T> gap_idx_{local_box().shape()};
+    nd_array_t<SIZE_T> add_into_{local_box().shape()};
+    nd_array_t<SIZE_T> left_{local_box().shape()};
+    nd_array_t<SIZE_T> cap_{local_box().shape()};
+    nd_array_t<SIZE_T> cell_size_{local_box().shape()};
+
     TileSet<Tile_t, alloc_mode> particles_;
     TileSet<SpnTile, alloc_mode> particles_views_;
     std::size_t total_size = 0;
@@ -361,8 +439,8 @@ struct PCTileSetParticles : public Super_
     auto data() _PHARE_ALL_FN_ { return static_cast<Particle_t*>(nullptr); }             // TODO
 
     template<auto particle_type>
-    auto& move_check(auto const& pt, std::size_t const /*idx*/,
-                     std::array<int, dimension> const& /*newcell*/) _PHARE_ALL_FN_
+    auto& move_check(auto const& /*pt*/, std::size_t const /*idx*/, auto& /*particle*/)
+        _PHARE_ALL_FN_
     {
         return *this; /* TODO */
     }
@@ -479,7 +557,8 @@ struct PCCrossTileCopyDAO
 
 template<auto type>
 void sync_pc_ts(auto& /*particles*/, auto&&... /*args*/)
-{ /* TODO */
+{
+    /* TODO */
 }
 
 

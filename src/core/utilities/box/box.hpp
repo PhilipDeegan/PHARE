@@ -331,36 +331,21 @@ struct boxes_iterator
     std::tuple<Boxes...> boxes;
 };
 
-
-template<typename Particle, typename Type>
+template<typename Particle>
 NO_DISCARD auto _PHARE_ALL_FN_ isIn(Particle const& particle,
-                                    Box<Type, Particle::dimension> const& box)
+                                    Box<int, Particle::dimension> const& box)
     -> decltype(isIn(particle.iCell(), box), bool())
 {
     return isIn(particle.iCell(), box);
 }
 
-
-
-/** This overload of isIn does the same as the one below but takes only
- * one box.
- */
-template<template<typename, std::size_t> typename Point_t, typename Type, std::size_t SIZE>
-NO_DISCARD bool isIn(Point_t<Type, SIZE> const& point, Box<Type, SIZE> const& box) _PHARE_ALL_FN_
-
+template<template<typename, std::size_t> typename Point, typename Type, std::size_t SIZE>
+NO_DISCARD bool isIn(Point<Type, SIZE> const& point, Box<Type, SIZE> const& box) _PHARE_ALL_FN_
 {
-    auto isIn1D = [](auto const pos, auto const lower, auto const upper) {
-        return pos >= lower && pos <= upper;
-    };
-
-    bool pointInBox = true;
-
-    for (auto iDim = 0u; iDim < SIZE; ++iDim)
-        pointInBox = pointInBox && isIn1D(point[iDim], box.lower[iDim], box.upper[iDim]);
-    if (pointInBox)
-        return pointInBox;
-
-    return false;
+    for (std::size_t iDim = 0; iDim < SIZE; ++iDim)
+        if (point[iDim] < box.lower[iDim] || point[iDim] > box.upper[iDim])
+            return false;
+    return true;
 }
 
 
@@ -368,31 +353,15 @@ NO_DISCARD bool isIn(Point_t<Type, SIZE> const& point, Box<Type, SIZE> const& bo
  * and returns true if the Point is at least in one of the boxes.
  * Returns occurs at the first box the point is in.
  */
-
-template<template<typename, std::size_t> typename ICell, typename T, std::size_t S,
-         typename BoxContainer, is_iterable<BoxContainer> = dummy::value>
-bool isIn(ICell<T, S> const& icell, BoxContainer const& boxes) _PHARE_ALL_FN_
+template<typename Boxes>
+NO_DISCARD bool _PHARE_ALL_FN_ isIn(auto const& point, Boxes const& boxes)
+    requires(is_iterable_v<Boxes>)
 {
-    if (boxes.size() == 0)
-        return false;
-
-    auto isIn1D = [](auto const& pos, auto const& lower, auto const& upper) {
-        return pos >= lower && pos <= upper;
-    };
-
     for (auto const& box : boxes)
-    {
-        bool pointInBox = true;
-
-        for (auto iDim = 0u; iDim < S; ++iDim)
-            pointInBox = pointInBox && isIn1D(icell[iDim], box.lower[iDim], box.upper[iDim]);
-        if (pointInBox)
-            return pointInBox;
-    }
-
+        if (isIn(point, box))
+            return true;
     return false;
 }
-
 
 
 

@@ -27,20 +27,15 @@ def simulator_id(sim, layout=None, allocator=None):
 
     if type(layout) is str and "." in layout:
         layout = str(layout).split(".")[1] if layout else None
-    if layout != "AoSMapped":
-        return "_".join(
-            str(s)
-            for s in [
-                sim.ndim,
-                sim.interp_order,
-                sim.refined_particle_nbr,
-                layout,
-                allocator,
-            ]
-        )
-
     return "_".join(
-        str(s) for s in [sim.ndim, sim.interp_order, sim.refined_particle_nbr]
+        str(s)
+        for s in [
+            sim.ndim,
+            sim.interp_order,
+            sim.refined_particle_nbr,
+            layout,
+            allocator,
+        ]
     )
 
 

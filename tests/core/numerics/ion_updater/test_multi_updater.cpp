@@ -397,7 +397,7 @@ using Permutations_t = testing::Types< // ! notice commas !
      TestParam<1, LayoutMode::AoSTS, AllocatorMode::CPU, UpdaterMode::domain_only>
     ,TestParam<1, LayoutMode::AoSTS, AllocatorMode::CPU, UpdaterMode::all>
 
-    // ,TestParam<1, LayoutMode::AoSPCTS, AllocatorMode::CPU, UpdaterMode::domain_only> // passes
+    ,TestParam<1, LayoutMode::AoSPCTS, AllocatorMode::CPU, UpdaterMode::domain_only> // passes
     // ,TestParam<1, LayoutMode::AoSPCTS, AllocatorMode::CPU, UpdaterMode::all> // fails
 
     // ,TestParam<1, LayoutMode::AoSCMTS, AllocatorMode::CPU, UpdaterMode::domain_only>

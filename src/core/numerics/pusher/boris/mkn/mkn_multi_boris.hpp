@@ -156,15 +156,34 @@ struct MultiBorisFunctors
         using enum LayoutMode;
 
         auto& parts          = tile();
-        auto const each      = pps()[tile_idx]().size() / ws;
         auto const tile_cell = pps.local_cell(tile.lower);
 
-        std::size_t pid = 0;
-        for (; pid < each; ++pid)
-            per_any_particle(parts, layout, tile_cell, pid * ws + tidx, em);
-        if constexpr (Particles_t::alloc_mode == AllocatorMode::GPU_UNIFIED)
-            if (tidx < parts.size() - (ws * each))
+        if constexpr (Particles_t::layout_mode == AoSPCTS)
+        {
+            // GPU_UNIFIED for AoSPCTS to be handled separately later
+            for (auto const& bix : parts.local_box())
+            {
+                auto& cell_particles = parts.particles_(bix);
+                for (std::size_t pid = 0; pid < cell_particles.size(); ++pid)
+                {
+                    // captured before per_particle's advance() overwrites iCell()
+                    auto const& old_cell = cell_particles[pid].iCell();
+                    ParticleTracker const pt{old_cell, pps.local_tile_cell(old_cell)};
+                    per_particle(cell_particles[pid], layout, pt, pid, em);
+                }
+            }
+        }
+        else
+        {
+            auto const each = pps()[tile_idx]().size() / ws;
+
+            std::size_t pid = 0;
+            for (; pid < each; ++pid)
                 per_any_particle(parts, layout, tile_cell, pid * ws + tidx, em);
+            if constexpr (Particles_t::alloc_mode == AllocatorMode::GPU_UNIFIED)
+                if (tidx < parts.size() - (ws * each))
+                    per_any_particle(parts, layout, tile_cell, pid * ws + tidx, em);
+        }
     }
 
     void per_any_particle(auto& particles, auto&&... args) _PHARE_ALL_FN_
@@ -182,6 +201,7 @@ struct MultiBorisFunctors
 
     struct ParticleTracker
     {
+        // AoSTS/else: particle's new cell. AoSPCTS: particle's old cell (absolute AMR iCell).
         std::array<int, dim> icell;
         std::array<std::uint32_t, dim> tile_cell;
 
@@ -197,8 +217,8 @@ struct MultiBorisFunctors
 
     void per_particle_still_in_ghost_box(auto&&... args) _PHARE_ALL_FN_
     {
-        static constexpr auto alloc_mode                    = Particles_t::alloc_mode;
-        auto const& [particle, layout, tile_cell, pidx, em] = std::forward_as_tuple(args...);
+        static constexpr auto alloc_mode              = Particles_t::alloc_mode;
+        auto const& [particle, layout, pt, pidx, em] = std::forward_as_tuple(args...);
 
         check_electromag(em);
         check(particle);
@@ -211,19 +231,30 @@ struct MultiBorisFunctors
         check(particle);
 
         if constexpr (boris_mode == MultiBorisMode::REF and particle_type == ParticleType::Domain)
-            if (isIn(particle, pps.box()))
+        {
+            using enum LayoutMode;
+            if constexpr (Particles_t::layout_mode == AoSPCTS)
             {
-                ParticleTracker const pt{particle.iCell(), tile_cell};
-                pps.template move_check<particle_type>(pt, pidx, particle.iCell());
+                // AoSPCTS tracks per-cell buckets even in the tile ghost layer, so a particle
+                // leaving the domain but staying in this tile's ghost box still needs
+                // registering. pt was already built as a ParticleTracker in per_tile,
+                // before advance() ran.
+                pps.template move_check<particle_type>(pt, pidx, particle);
             }
+            else if (isIn(particle, pps.box()))
+            {
+                ParticleTracker const tracker{particle.iCell(), pt};
+                pps.template move_check<particle_type>(tracker, pidx, particle);
+            }
+        }
 
         check(particle);
     }
 
     void per_particle(auto&&... args) _PHARE_ALL_FN_
     {
-        static constexpr auto alloc_mode                    = Particles_t::alloc_mode;
-        auto const& [particle, layout, tile_cell, pidx, em] = std::forward_as_tuple(args...);
+        static constexpr auto alloc_mode              = Particles_t::alloc_mode;
+        auto const& [particle, layout, pt, pidx, em] = std::forward_as_tuple(args...);
 
         check(particle);
         particle.iCell() = boris::advance<alloc_mode>(particle, halfdt);

@@ -750,10 +750,10 @@ struct TileSetParticles : public Super_
         }*/
 
     template<auto particle_type>
-    auto& move_check(auto const& pt, std::size_t const idx,
-                     std::array<int, dimension> const& newcell) _PHARE_ALL_FN_
+    auto& move_check(auto const& pt, std::size_t const idx, auto& particle) _PHARE_ALL_FN_
     {
         static_assert(particle_type == ParticleType::Domain);
+        auto const& newcell = particle.iCell();
         if (array_equals(Super::local_tile_cell(newcell), pt.tile_cell))
             return *this;
 
