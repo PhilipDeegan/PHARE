@@ -25,11 +25,7 @@ while(THIS_FILE)
     list(LENGTH LINE_LIST LINE_LENGTH)
 
     SET(_OFFSET 3)
-    if(withMkn)
-      SET(_OFFSET 4) # todo
-    endif()
-
-    SET(_PREFIXES "TimeIntegratorType;ReconstructionType;SlopeLimiterType;RiemannSolverType")
+    SET(_PREFIXES "LayoutMode;AllocatorMode;TimeIntegratorType;ReconstructionType;SlopeLimiterType;RiemannSolverType")
     foreach(PREFIX IN LISTS _PREFIXES)
       if(LINE_LENGTH GREATER ${_OFFSET})
           list(TRANSFORM LINE_LIST PREPEND "${PREFIX}::" AT ${_OFFSET})

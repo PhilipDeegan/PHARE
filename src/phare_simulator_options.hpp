@@ -29,7 +29,6 @@ struct SimOpts
     core::LayoutMode layout_mode = core::LayoutMode::AoSMapped;
     AllocatorMode alloc_mode     = AllocatorMode::CPU;
 
-
     MHDOpts::TimeIntegratorType time_integrator_type = MHDOpts::TimeIntegratorType::Default;
     MHDOpts::ReconstructionType reconstruction_type  = MHDOpts::ReconstructionType::Default;
     MHDOpts::SlopeLimiterType slope_limiter_type     = MHDOpts::SlopeLimiterType::None;
@@ -37,34 +36,6 @@ struct SimOpts
     bool Hall                                        = false;
     bool Resistivity                                 = false;
     bool HyperResistivity                            = false;
-
-    auto static constexpr make(std::size_t const dim, std::size_t const interp,
-                               std::size_t const nbRefinedPart)
-    {
-        return SimOpts{.dimension = dim, .interp_order = interp, .nbRefinedPart = nbRefinedPart};
-    }
-
-    auto static constexpr make(std::size_t const dim, std::size_t const interp,
-                               core::LayoutMode const layout_mode,
-                               AllocatorMode const alloc_mode = AllocatorMode::CPU)
-    {
-        return SimOpts{dim, interp, core::defaultNbrRefinedParts(dim, interp), layout_mode,
-                       alloc_mode};
-    }
-
-    auto static constexpr make(std::size_t const dim, std::size_t const interp,
-                               std::size_t const nbRefinedPart, core::LayoutMode const layout_mode)
-    {
-        return SimOpts{dim, interp, nbRefinedPart, layout_mode, AllocatorMode::CPU};
-    }
-
-    auto static constexpr make(std::size_t const dim, std::size_t const interp,
-                               std::size_t const nbRefinedPart, auto&&... args)
-    {
-        return SimOpts{
-            dim, interp, nbRefinedPart, core::LayoutMode::AoSMapped, AllocatorMode::CPU, args...};
-    }
-
 
     template<auto>
     struct Particles;

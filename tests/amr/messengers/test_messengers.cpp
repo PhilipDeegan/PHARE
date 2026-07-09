@@ -451,7 +451,7 @@
 // struct AfullHybridBasicHierarchy
 // {
 //     static constexpr std::size_t interpOrder = 1;
-//     static constexpr auto opts = PHARE::SimOpts::make(dimension, interpOrder, nbRefinePart);
+//     static constexpr auto opts = PHARE::SimOpts{dimension, interpOrder, nbRefinePart};
 
 //     using Simulator         = PHARE::Simulator<opts>;
 //     using HybridModelT      = Simulator::HybridModel;

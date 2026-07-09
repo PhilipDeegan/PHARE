@@ -19,7 +19,7 @@ using namespace PHARE::amr;
 
 TEST(test_tagger, fromFactoryValid)
 {
-    auto static constexpr opts = PHARE::SimOpts::make(1ul, 1ul, 2ul);
+    auto static constexpr opts = PHARE::SimOpts{1ul, 1ul, 2ul};
     using phare_types          = PHARE::solver::PHARE_Types<opts>;
     using hybrid_model         = phare_types::HybridModel_t;
     PHARE::initializer::PHAREDict dict;
@@ -31,7 +31,7 @@ TEST(test_tagger, fromFactoryValid)
 
 TEST(test_tagger, fromFactoryInvalid)
 {
-    auto static constexpr opts = PHARE::SimOpts::make(1ul, 1ul, 2ul);
+    auto static constexpr opts = PHARE::SimOpts{1ul, 1ul, 2ul};
     using phare_types          = PHARE::solver::PHARE_Types<opts>;
     using hybrid_model         = phare_types::HybridModel_t;
     PHARE::initializer::PHAREDict dict;
@@ -166,7 +166,7 @@ struct TestTagger : public ::testing::Test
     auto static constexpr dim            = TaggingTestInfo_t::dim;
     auto static constexpr interp_order   = TaggingTestInfo_t::interp;
     auto static constexpr refinedPartNbr = TaggingTestInfo_t::refinedPartNbr;
-    auto static constexpr opts           = PHARE::SimOpts::make(dim, interp_order, refinedPartNbr);
+    auto static constexpr opts           = PHARE::SimOpts{dim, interp_order, refinedPartNbr};
 
     using phare_types = PHARE::solver::PHARE_Types<opts>;
     using Electromag  = phare_types::Electromag_t;

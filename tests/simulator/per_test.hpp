@@ -84,7 +84,7 @@ struct SimulatorTest : public ::testing::Test
 {
 };
 
-using Simulators = testing::Types<SimulatorTestParam<SimOpts::make(1, 1, 2)>>;
+using Simulators = testing::Types<SimulatorTestParam<SimOpts{1, 1, 2}>>;
 TYPED_TEST_SUITE(SimulatorTest, Simulators);
 
 
@@ -96,11 +96,11 @@ struct Simulator1dTest : public ::testing::Test
 // clang-format off
 using Simulators1d = testing::Types<
 
-    SimulatorTestParam<SimOpts::make(1, 1, 2)>, SimulatorTestParam<SimOpts::make(1, 1, 3)>,
-    SimulatorTestParam<SimOpts::make(1, 2, 2)>, SimulatorTestParam<SimOpts::make(1, 2, 3)>,
-    SimulatorTestParam<SimOpts::make(1, 2, 4)>, SimulatorTestParam<SimOpts::make(1, 3, 2)>,
-    SimulatorTestParam<SimOpts::make(1, 3, 3)>, SimulatorTestParam<SimOpts::make(1, 3, 4)>,
-    SimulatorTestParam<SimOpts::make(1, 3, 5)>
+    SimulatorTestParam<SimOpts{1, 1, 2}>, SimulatorTestParam<SimOpts{1, 1, 3}>,
+    SimulatorTestParam<SimOpts{1, 2, 2}>, SimulatorTestParam<SimOpts{1, 2, 3}>,
+    SimulatorTestParam<SimOpts{1, 2, 4}>, SimulatorTestParam<SimOpts{1, 3, 2}>,
+    SimulatorTestParam<SimOpts{1, 3, 3}>, SimulatorTestParam<SimOpts{1, 3, 4}>,
+    SimulatorTestParam<SimOpts{1, 3, 5}>
 
 PHARE_WITH_MKN_GPU(
    // ,SimulatorTestParam<SimOpts{1, 1, AoSTS, PHARE::AllocatorMode::CPU}>
@@ -118,13 +118,13 @@ struct Simulator2dTest : public ::testing::Test
 
 using Simulators2d = testing::Types<
 
-    SimulatorTestParam<SimOpts::make(2, 1, 4)>, SimulatorTestParam<SimOpts::make(2, 1, 5)>,
-    SimulatorTestParam<SimOpts::make(2, 1, 8)>, SimulatorTestParam<SimOpts::make(2, 1, 9)>,
-    SimulatorTestParam<SimOpts::make(2, 2, 4)>, SimulatorTestParam<SimOpts::make(2, 2, 5)>,
-    SimulatorTestParam<SimOpts::make(2, 2, 8)>, SimulatorTestParam<SimOpts::make(2, 2, 9)>,
-    SimulatorTestParam<SimOpts::make(2, 2, 16)>, SimulatorTestParam<SimOpts::make(2, 3, 4)>,
-    SimulatorTestParam<SimOpts::make(2, 3, 5)>, SimulatorTestParam<SimOpts::make(2, 3, 8)>,
-    SimulatorTestParam<SimOpts::make(2, 3, 25)>
+    SimulatorTestParam<SimOpts{2, 1, 4}>, SimulatorTestParam<SimOpts{2, 1, 5}>,
+    SimulatorTestParam<SimOpts{2, 1, 8}>, SimulatorTestParam<SimOpts{2, 1, 9}>,
+    SimulatorTestParam<SimOpts{2, 2, 4}>, SimulatorTestParam<SimOpts{2, 2, 5}>,
+    SimulatorTestParam<SimOpts{2, 2, 8}>, SimulatorTestParam<SimOpts{2, 2, 9}>,
+    SimulatorTestParam<SimOpts{2, 2, 16}>, SimulatorTestParam<SimOpts{2, 3, 4}>,
+    SimulatorTestParam<SimOpts{2, 3, 5}>, SimulatorTestParam<SimOpts{2, 3, 8}>,
+    SimulatorTestParam<SimOpts{2, 3, 25}>
 
 PHARE_WITH_MKN_GPU(
    // ,SimulatorTestParam<SimOpts{2, 1, AoSTS, PHARE::AllocatorMode::CPU}>
@@ -138,9 +138,9 @@ template<typename Simulator>
 struct Simulator3dTest : public ::testing::Test
 {
 };
-using Simulator3d = testing::Types<SimulatorTestParam<SimOpts::make(3, 1, 6)>,
-                                   SimulatorTestParam<SimOpts::make(3, 2, 6)>,
-                                   SimulatorTestParam<SimOpts::make(3, 3, 6)>>;
+using Simulator3d = testing::Types<SimulatorTestParam<SimOpts{3, 1, 6}>,
+                                   SimulatorTestParam<SimOpts{3, 2, 6}>,
+                                   SimulatorTestParam<SimOpts{3, 3, 6}>>;
 TYPED_TEST_SUITE(Simulator3dTest, Simulator3d);
 
 // clang-format on

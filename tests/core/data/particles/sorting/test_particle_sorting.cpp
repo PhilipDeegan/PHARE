@@ -33,7 +33,8 @@ class ParticleArraySortingTest : public ::testing::Test
     static constexpr std::size_t dim = 3;
     auto constexpr static interp     = 1;
     auto constexpr static sim_opts
-        = SimOpts::make(dim, interp, Param::layout_mode, Param::alloc_mode);
+        = SimOpts{.dimension = dim, .interp_order = interp, .layout_mode = Param::layout_mode,
+                 .alloc_mode = Param::alloc_mode};
     using Particle_t       = Particle<dim>;
     using box_t            = Box<int, dim>;
     using GridLayout_t     = PHARE_Types<sim_opts>::GridLayout_t;

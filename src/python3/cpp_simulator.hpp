@@ -46,10 +46,10 @@ namespace PHARE::pydata
 {
 auto static constexpr resolve_simulator_options()
 {
+    using namespace PHARE;
+    using namespace PHARE::core;
     using namespace PHARE::MHDOpts;
-    using enum PHARE::AllocatorMode;
-    using enum PHARE::core::LayoutMode;
-    return SimOpts::make(PHARE_SIM_STR);
+    return SimOpts{PHARE_SIM_STR};
 }
 
 

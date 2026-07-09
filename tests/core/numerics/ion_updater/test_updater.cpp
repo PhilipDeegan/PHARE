@@ -544,7 +544,7 @@ using Permutations = ::testing::Types<
   , TestParam<SimOpts{1, 2}>
   , TestParam<SimOpts{1, 3}>
 PHARE_WITH_MKN_GPU(
-  , TestParam<SimOpts::make(1, 1, LayoutMode::AoSTS)>
+  , TestParam<SimOpts{.dimension = 1, .interp_order = 1, .layout_mode = LayoutMode::AoSTS}>
 )
 >;
 // clang-format on

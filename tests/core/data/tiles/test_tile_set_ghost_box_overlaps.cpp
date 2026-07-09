@@ -34,7 +34,8 @@ struct TestParam
     auto constexpr static interp      = _interp;
     auto constexpr static layout_mode = lm;
     auto constexpr static alloc_mode  = am;
-    auto static constexpr opts        = SimOpts::make(dim, interp, layout_mode, alloc_mode);
+    auto static constexpr opts        = SimOpts{.dimension = dim, .interp_order = interp,
+                                          .layout_mode = layout_mode, .alloc_mode = alloc_mode};
 
     using PhareTypes   = PHARE::core::PHARE_Types<opts>;
     using Box_t        = Box<int, dim>;

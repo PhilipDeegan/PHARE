@@ -42,7 +42,8 @@ struct ParticleArraySerializationTest : public AParticleArraySerializationTest
     auto constexpr static layout_mode = Param::layout_mode;
     auto constexpr static alloc_mode  = Param::alloc_mode;
 
-    auto constexpr static sim_opts = SimOpts::make(dim, interp, layout_mode, alloc_mode);
+    auto constexpr static sim_opts = SimOpts{.dimension = dim, .interp_order = interp,
+                                             .layout_mode = layout_mode, .alloc_mode = alloc_mode};
 
     template<auto lm>
     using Particles_t

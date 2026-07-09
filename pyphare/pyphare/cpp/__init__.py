@@ -11,31 +11,33 @@ __all__ = ["validate"]
 _libs = {}
 
 
-def simulator_id(sim, layout=None, allocator=0):
+def simulator_id(sim, layout=None, allocator=None):
+    layout = str(layout) if layout else "AoSMapped"
+    allocator = str(allocator) if allocator else "CPU"
+
     if getattr(sim, "mhd_timestepper", None):
         Hall = "true" if sim.hall else "false"
         Res = "true" if sim.res else "false"
         Hyper_Res = "true" if sim.hyper_res else "false"
         return (
-            f"{sim.ndim}_{sim.interp_order}_{sim.refined_particle_nbr}_"
+            f"{sim.ndim}_{sim.interp_order}_{sim.refined_particle_nbr}_{layout}_{allocator}_"
             f"{sim.mhd_timestepper}_{sim.reconstruction}_{sim.limiter}_"
             f"{sim.riemann}_{Hall}_{Res}_{Hyper_Res}"
         )
 
-    layout = str(layout) if layout else None
-    if layout:
-        if type(layout) is str and "." in layout:
-            layout = str(layout).split(".")[1] if layout else None
-        if layout != "AoSMapped":
-            return "_".join(
-                str(s)
-                for s in [
-                    sim.ndim,
-                    sim.interp_order,
-                    sim.refined_particle_nbr,
-                    layout,
-                ]
-            )
+    if type(layout) is str and "." in layout:
+        layout = str(layout).split(".")[1] if layout else None
+    if layout != "AoSMapped":
+        return "_".join(
+            str(s)
+            for s in [
+                sim.ndim,
+                sim.interp_order,
+                sim.refined_particle_nbr,
+                layout,
+                allocator,
+            ]
+        )
 
     return "_".join(
         str(s) for s in [sim.ndim, sim.interp_order, sim.refined_particle_nbr]
