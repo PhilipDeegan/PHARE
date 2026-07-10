@@ -240,8 +240,12 @@ template<typename Particles>
 class TileSetVector
 {
     using This                    = TileSetVector<Particles>;
-    using SIZE_T                  = default_span_size_t;
     bool static constexpr c_order = true;
+
+protected:
+    using SIZE_T = default_span_size_t;
+
+private:
 
     template<typename P>
     friend class TileSetSpan;

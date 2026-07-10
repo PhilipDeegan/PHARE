@@ -17,7 +17,7 @@
 namespace PHARE::core
 {
 
-template<typename Particles, std::uint8_t impl_ = 0>
+template<typename Particles>
 class PerCellSpan
 {
 protected:
@@ -26,8 +26,7 @@ protected:
 public:
     auto static constexpr alloc_mode = Particles::alloc_mode;
     auto static constexpr dim        = Particles::dimension;
-    auto static constexpr impl_v     = impl_;
-    using This                       = PerCellSpan<Particles, impl_v>;
+    using This                       = PerCellSpan<Particles>;
     using lobox_t                    = Box<std::uint32_t, dim>;
     using per_cell_particles         = Particles;
 
@@ -62,7 +61,7 @@ public:
     auto static constexpr dimension    = dim;
     auto static constexpr storage_mode = StorageMode::SPAN;
     using Particle_t                   = typename ParticleDefaults<dim>::Particle_t;
-    using view_t                       = PerCellSpan<Particles, impl_v>;
+    using view_t                       = PerCellSpan<Particles>;
 
     template<typename PerCellArray>
     PerCellSpan(PerCellArray& arr)
@@ -148,18 +147,20 @@ protected:
 }; // PerCellSpan
 
 
-template<typename Particles, std::uint8_t impl_ = 0>
+template<typename Particles>
 class PerCellVector
 {
-    using This   = PerCellVector<Particles, impl_>;
+    using This = PerCellVector<Particles>;
+
+protected:
     using SIZE_T = default_span_size_t;
 
-    template<typename P, std::uint8_t i>
+private:
+    template<typename>
     friend class PerCellSpan;
 
 public:
     auto static constexpr dim          = Particles::dimension;
-    auto static constexpr impl_v       = impl_;
     auto static constexpr alloc_mode   = Particles::alloc_mode;
     auto static constexpr layout_mode  = Particles::layout_mode;
     auto static constexpr storage_mode = StorageMode::VECTOR;
@@ -170,7 +171,7 @@ public:
     using Particle_t                   = typename ParticleDefaults<dim>::Particle_t;
     using value_type                   = Particle_t;
     using PSpan_t                      = typename Particles::view_t;
-    using view_t                       = PerCellSpan<PSpan_t, impl_v>;
+    using view_t                       = PerCellSpan<PSpan_t>;
     using per_cell_particles           = Particles;
     using per_tile_particles           = Particles; // MultiBoris compatibility
 
@@ -264,7 +265,6 @@ public:
             [&](auto const i) { return make_span(*(gaps_.data() + i)); }, gaps_);
     }
 
-    void reset_index_wrapper_map();
 
     auto& box() const { return box_; }
     auto& ghost_box() const { return ghost_box_; }
@@ -296,6 +296,9 @@ public:
     void sync(); // after move
 
     template<auto type>
+    void sync_moved(); // realloc for particles registered as incoming via add_into_
+
+    template<auto type>
     void trim();
 
 
@@ -318,9 +321,9 @@ public:
     void cap()
     {
         PHARE_LOG_SCOPE(1, "PerCellVector::cap");
-        if constexpr (any_in(impl_v, 1, 2))
-            for (auto& p : particles_)
-                resize(p, p.capacity());
+        // if constexpr (any_in(impl_v, 1, 2))
+        for (auto& p : particles_)
+            resize(p, p.capacity());
     }
 
 
@@ -435,8 +438,8 @@ protected:
 
 
 
-template<typename Particles, std::uint8_t impl>
-auto& PerCellVector<Particles, impl>::insert(PerCellVector const& src)
+template<typename Particles>
+auto& PerCellVector<Particles>::insert(PerCellVector const& src)
 {
     std::size_t added = 0;
     for (auto const& bix : local_box(box()))
@@ -453,8 +456,8 @@ auto& PerCellVector<Particles, impl>::insert(PerCellVector const& src)
     return *this;
 }
 
-template<typename Particles, std::uint8_t impl>
-auto& PerCellVector<Particles, impl>::insert_domain_from(PerCellVector const& src)
+template<typename Particles>
+auto& PerCellVector<Particles>::insert_domain_from(PerCellVector const& src)
 {
     // auto const on_box = [&](auto&& box, auto&& fn) {
     //     for (auto const& bix : box)
@@ -494,9 +497,9 @@ auto& PerCellVector<Particles, impl>::insert_domain_from(PerCellVector const& sr
     return *this;
 }
 
-template<typename Particles, std::uint8_t impl>
+template<typename Particles>
 template<auto type>
-auto& PerCellVector<Particles, impl>::reserve_ppc(std::size_t const& ppc)
+auto& PerCellVector<Particles>::reserve_ppc(std::size_t const& ppc)
 {
     static_assert(std::is_same_v<decltype(type), ParticleType>);
 
@@ -524,9 +527,23 @@ auto& PerCellVector<Particles, impl>::reserve_ppc(std::size_t const& ppc)
 
 
 
-template<typename Particles, std::uint8_t impl>
+template<typename Particles>
 template<auto type>
-void PerCellVector<Particles, impl>::trim()
+void PerCellVector<Particles>::sync_moved()
+{
+    static_assert(std::is_same_v<decltype(type), ParticleType>);
+
+    for (auto const& bix : local_box())
+    {
+        auto& real = particles_(bix);
+        reserve(real, real.size() + add_into_(bix));
+    }
+}
+
+
+template<typename Particles>
+template<auto type>
+void PerCellVector<Particles>::trim()
 {
     static_assert(std::is_same_v<decltype(type), ParticleType>);
 
@@ -545,69 +562,64 @@ void PerCellVector<Particles, impl>::trim()
     }
 }
 
-template<typename Particles, std::uint8_t impl>
+template<typename Particles>
 template<auto type>
-void PerCellVector<Particles, impl>::sync_cpu_gaps_and_tmp()
+void PerCellVector<Particles>::sync_cpu_gaps_and_tmp()
 {
     // PHARE_LOG_LINE_STR("sync_cpu_gaps_and_tmp " << magic_enum::enum_name(type));
     auto const lbox = local_box();
 
+    // add incoming particles - icell_changer only registered the move, the particle's own
+    // iCell() was already updated by the caller before registering, so it tells us where
+    // each registered departure from this cell should actually land
     for (auto const& bix : lbox)
     {
-        auto& real = particles_(bix);
-        auto& gaps = gaps_(bix);
-        int diff   = real.size() - cell_size_(bix); // new additions
-        if (diff < 0)
+        auto& real             = particles_(bix);
+        auto const& gaps       = gaps_(bix);
+        auto const& gaps_size  = gap_idx_(bix);
+        for (std::size_t gidx = 0; gidx < gaps_size; ++gidx)
         {
-            PHARE_LOG_LINE_STR(real.size()
-                               << " " << gaps.size() << " " << cell_size_(bix) << " " << diff);
+            auto const& idx     = gaps[gidx];
+            auto const& newcell = local_cell(real.iCell(idx));
+            emplace_back(particles_(newcell), real, idx);
         }
-        PHARE_ASSERT(diff >= 0);
+    }
 
-        // std::sort(gaps.begin(), gaps.end(), std::greater<>()); // use thrust?
-
-        while (gaps.size() and diff)
+    // delete outgoing particles from their old cell (descending order keeps indices valid)
+    for (auto const& bix : lbox)
+    {
+        auto const& gaps_size = gap_idx_(bix);
         {
-            PHARE_ASSERT(gaps.back() < real.size());
-            real[gaps.back()] = real.back();
-            gaps.pop_back();
-            real.pop_back();
-            --diff;
+            auto& gaps = gaps_(bix);
+            std::sort(gaps.begin(), gaps.begin() + gaps_size, std::greater<>());
         }
-
-        // total_size -= gaps.size();
-        while (gaps.size())
+        auto& real       = particles_(bix);
+        auto const& gaps = gaps_(bix);
+        for (std::size_t gidx = 0; gidx < gaps_size; ++gidx)
         {
-            if (gaps.back() != real.size() - 1)
-                real[gaps.back()] = real.back();
-            gaps.pop_back();
+            auto const& idx = gaps[gidx];
+            real.assign(real.size() - 1, idx);
             real.pop_back();
         }
-
-        PHARE_ASSERT(gaps.size() == 0);
+        gap_idx_(bix)  = 0;
+        add_into_(bix) = 0;
     }
 }
 
 
-template<typename Particles, std::uint8_t impl>
+template<typename Particles>
 template<auto type>
-void PerCellVector<Particles, impl>::sync_gpu_gaps_and_tmp_impl0()
+void PerCellVector<Particles>::sync_gpu_gaps_and_tmp_impl0()
 {
     auto const lbox = local_box();
 
     {
         PHARE_LOG_SCOPE(1, "PerCellVector::sync_gpu_gaps_and_tmp::reserve_scan ");
         for (auto const& bix : lbox)
-        { // calculate reserve size
+        {
             auto& real = particles_(bix);
-            if constexpr (any_in(impl_v, 1, 2))
-            {
-                // push_back is done on device requires over allocation
-                // cell_size_(bix) = particles_views_(bix).size();
-                // real.resize(particles_views_(bix).size());
-                resize(real, particles_views_(bix).size());
-            }
             reserve(real, real.size() + add_into_(bix));
+            resize(real, particles_views_(bix).size());
         }
     }
 
@@ -652,17 +664,17 @@ void PerCellVector<Particles, impl>::sync_gpu_gaps_and_tmp_impl0()
     }
 }
 
-template<typename Particles, std::uint8_t impl>
+template<typename Particles>
 template<auto type>
-void PerCellVector<Particles, impl>::sync_gpu_gaps_and_tmp_impl1()
+void PerCellVector<Particles>::sync_gpu_gaps_and_tmp_impl1()
 {
 }
 
 
 
-template<typename Particles, std::uint8_t impl>
+template<typename Particles>
 template<auto type>
-void PerCellVector<Particles, impl>::sync_gpu_gaps_and_tmp()
+void PerCellVector<Particles>::sync_gpu_gaps_and_tmp()
 {
     // PHARE_LOG_LINE_STR("sync_gpu_gaps_and_tmp " << magic_enum::enum_name(type));
     PHARE_LOG_SCOPE(1, "PerCellVector::sync_gpu_gaps_and_tmp ");
@@ -679,45 +691,10 @@ void PerCellVector<Particles, impl>::sync_gpu_gaps_and_tmp()
     //     throw std::runtime_error("No impl");
 }
 
-template<typename Particles, std::uint8_t impl>
-void PerCellVector<Particles, impl>::reset_index_wrapper_map()
-{
-    resize(p2c_, total_size);
 
-    auto const fill = [](auto p, auto o, auto s, auto b) { std::fill(p + o, p + o + s, *b); };
-
-    std::size_t offset = 0;
-    for (auto const& bix : local_box())
-    {
-        auto const& cs = cell_size_(bix);
-        resize(gaps_(bix), cs);
-        off_sets_(bix) = offset;
-
-        if (cs)
-        {
-            if constexpr (alloc_mode == AllocatorMode::GPU_UNIFIED)
-            {
-                PHARE_WITH_THRUST( //
-                    thrust::fill(thrust::device, p2c_.begin() + offset, p2c_.begin() + offset + cs,
-                                 *bix));
-                PHARE_WITH_THRUST_ELSE(
-                    PHARE_LOG_LINE_SS("Thrust not found for PerCellVector<Particles, "
-                                      "impl>::reset_index_wrapper_map"); //
-                    fill(p2c_.begin(), offset, cs, bix);                 //
-                )
-            }
-            else
-                fill(p2c_.begin(), offset, cs, bix);
-        }
-
-        offset += cs;
-        cap_(bix) = particles_(bix).capacity();
-    }
-}
-
-template<typename Particles, std::uint8_t impl>
+template<typename Particles>
 template<std::uint8_t PHASE, auto type>
-void PerCellVector<Particles, impl>::sync()
+void PerCellVector<Particles>::sync()
 {
     static_assert(std::is_same_v<decltype(type), ParticleType>);
     static_assert(type != ParticleType::All);
@@ -734,42 +711,42 @@ void PerCellVector<Particles, impl>::sync()
     if constexpr (PHASE < 2 and alloc_mode == AllocatorMode::GPU_UNIFIED)
         sync_gpu_gaps_and_tmp<type>();
 
-    if constexpr (PHASE == 1 || type == ParticleType::Domain)
-        trim<ParticleType::Ghost>();
+    // ghosts are no longer trimmed implicitly here; call delete_particles_not_in(domain_box)
+    // explicitly where needed (see ion_updater_multi_ts.hpp / ion_updater_multi_pc.hpp)
 
     total_size = 0;
     for (auto const& bix : lbox)
         total_size += (cell_size_(bix) = particles_(bix).size());
 
-    if constexpr (alloc_mode == AllocatorMode::GPU_UNIFIED)
-    {
-        PHARE_LOG_SCOPE(1, "PerCellVector::sync::reset");
-        static_assert(impl < 3); // otherwise unhandled
-        if constexpr (impl < 2)
-        {
-            reset_index_wrapper_map();
-        }
-        else // if (PHASE == 2)
-        {
-            auto const per_cell = [&](auto& bix) {
-                auto const& cs  = cell_size_(bix);
-                auto const& cap = particles_(bix).capacity();
-                auto& gaps      = gaps_(bix);
-                if (gaps.size() < cs)
-                {
-                    reserve(gaps, cap, false);
-                    resize(gaps, cs, false);
-                }
-                cap_(bix) = cap;
-            };
+    // if constexpr (alloc_mode == AllocatorMode::GPU_UNIFIED)
+    // {
+    //     PHARE_LOG_SCOPE(1, "PerCellVector::sync::reset");
+    //     static_assert(impl < 3); // otherwise unhandled
+    //     if constexpr (impl < 2)
+    //     {
+    //         reset_index_wrapper_map();
+    //     }
+    //     else // if (PHASE == 2)
+    //     {
+    //         auto const per_cell = [&](auto& bix) {
+    //             auto const& cs  = cell_size_(bix);
+    //             auto const& cap = particles_(bix).capacity();
+    //             auto& gaps      = gaps_(bix);
+    //             if (gaps.size() < cs)
+    //             {
+    //                 reserve(gaps, cap, false);
+    //                 resize(gaps, cs, false);
+    //             }
+    //             cap_(bix) = cap;
+    //         };
 
-            if constexpr (type == ParticleType::Domain)
-                on_domain(per_cell);
+    //         if constexpr (type == ParticleType::Domain)
+    //             on_domain(per_cell);
 
-            // if constexpr (ParticleType::Domain)
-            //     on_ghost_layer(per_cell);
-        }
-    }
+    //         // if constexpr (ParticleType::Domain)
+    //         //     on_ghost_layer(per_cell);
+    //     }
+    // }
 
     {
         PHARE_LOG_SCOPE(1, "PerCellVector::sync::reset_views");
@@ -787,7 +764,6 @@ struct PerCellParticles : public Super_
     using per_cell_particles = typename Super::per_cell_particles;
     using view_t             = PerCellParticles<typename Super::view_t>;
 
-    auto static constexpr impl_v     = Super::impl_v;
     auto static constexpr alloc_mode = Super::alloc_mode;
     auto static constexpr dimension  = Super::dimension;
     // auto static constexpr layout_mode  = Super::layout_mode;
@@ -867,46 +843,26 @@ struct PerCellParticles : public Super_
                         std::size_t const& idx,
                         std::array<int, dimension> const& newcell) _PHARE_ALL_FN_
     {
-        if constexpr (alloc_mode == AllocatorMode::CPU)
-        {
-            Super::get_vec(Super::gaps_(cell)).emplace_back(idx);
-            if (isIn(newcell, Super::ghost_box()))
-                Super::get_vec(particles_(Super::local_cell(newcell))).emplace_back(p).iCell()
-                    = newcell;
-        }
-        else if constexpr (alloc_mode == AllocatorMode::GPU_UNIFIED)
-        {
-            bool constexpr static ATOMIC = alloc_mode == AllocatorMode::GPU_UNIFIED;
-            bool constexpr static GPU    = alloc_mode == AllocatorMode::GPU_UNIFIED;
+        bool constexpr static ATOMIC = true;
+        bool constexpr static GPU    = alloc_mode == AllocatorMode::GPU_UNIFIED;
 
-            using Op = Operators<typename Super::SIZE_T, ATOMIC, GPU>;
+        using Op = Operators<typename Super::SIZE_T, ATOMIC, GPU>;
 
-            Super::gaps_(cell)[Op{Super::gap_idx_(cell)}.increment_return_old()] = idx;
+        Super::gaps_(cell)[Op{Super::gap_idx_(cell)}.increment_return_old()] = idx;
 
-            if (isIn(newcell, Super::ghost_box()))
-            {
-                auto const nc = Super::local_cell(newcell);
-                Op{Super::add_into_(nc)}.increment_return_old();
-            }
-        }
-        else
-            throw std::runtime_error("no");
+        if (isIn(newcell, Super::ghost_box()))
+            Op{Super::add_into_(Super::local_cell(newcell))}.increment_return_old();
 
         return *this;
     }
 
-
-    template<typename T>
-    struct index_wrapper;
-
-    auto operator[](std::size_t const& s) _PHARE_ALL_FN_ { return index_wrapper<This>{this, s}; }
-    auto operator[](std::size_t const& s) const _PHARE_ALL_FN_
-    {
-        return index_wrapper<This const>{this, s};
-    }
+    // auto operator[](std::size_t const& s) _PHARE_ALL_FN_ { return index_wrapper<This>{this, s}; }
+    // auto operator[](std::size_t const& s) const _PHARE_ALL_FN_
+    // {
+    //     return index_wrapper<This const>{this, s};
+    // }
 
     void print() const {}
-
     void check() const {}
 
     auto max_size() const
@@ -1018,136 +974,12 @@ struct PerCellParticles<OuterSuper>::iterator_impl
     std::size_t l = 0, i = 0;
 };
 
-template<auto layout_mode, typename Particles>
-struct index_wrapper_storage;
 
-#if PHARE_HAVE_THRUST
-template<typename Particles>
-struct index_wrapper_storage<LayoutMode::SoA, Particles>
-{
-    bool static constexpr is_const = std::is_const_v<std::remove_reference_t<Particles>>;
-    using per_cell_particles       = typename std::decay_t<Particles>::per_cell_particles;
-    using Particle_t = typename SoAZipParticle_t<per_cell_particles, is_const>::value_type;
 
-    template<typename PerCellParticles_t>
-    index_wrapper_storage(PerCellParticles_t p, std::size_t const i) _PHARE_ALL_FN_
-        : /*particles{p},*/
-          particle{*p, i}
-    {
-    }
-
-    auto& operator*() _PHARE_ALL_FN_ { return particle; }
-    auto& operator*() const _PHARE_ALL_FN_ { return particle; }
-
-    per_cell_particles* particles;
-    Particle_t particle;
-};
-#else
-
-#endif // PHARE_HAVE_THRUST
 
 template<typename Particles>
-struct index_wrapper_storage<LayoutMode::AoS, Particles>
-{
-    bool static constexpr is_const = std::is_const_v<std::remove_reference_t<Particles>>;
-    using per_cell_particles       = typename std::decay_t<Particles>::per_cell_particles;
-    using Particle_t               = typename Particles::Particle_t;
-    using Particle_p = std::conditional_t<is_const, Particle_t const* const, Particle_t*>;
-
-    template<typename PerCellParticles_t>
-    index_wrapper_storage(PerCellParticles_t p, std::size_t const i) _PHARE_ALL_FN_
-        : /*particles{p},*/
-          particle{&p->data()[i]}
-    {
-    }
-
-    auto& operator*() _PHARE_ALL_FN_ { return *particle; }
-    auto& operator*() const _PHARE_ALL_FN_ { return *particle; }
-
-    // per_cell_particles* particles;
-    Particle_p particle;
-};
-
-template<auto layout_mode, typename Particles>
-struct index_wrapper_storage
-{
-    // unused
-}; // default;
-
-template<typename T>
-struct index_wrapper_super
-{
-    using per_cell_particles = typename std::decay_t<T>::per_cell_particles;
-    using value_type         = index_wrapper_storage<per_cell_particles::layout_mode, T>;
-};
-
-template<typename ParticlesSuper>
-template<typename T>
-struct PerCellParticles<ParticlesSuper>::index_wrapper : public index_wrapper_super<T>::value_type
-{
-    using outer_t = std::decay_t<T>;
-    using Super   = typename index_wrapper_super<T>::value_type;
-
-    auto static constexpr dimension = ParticlesSuper::dimension;
-    bool static constexpr is_const  = std::is_const_v<std::remove_reference_t<T>>;
-    using Particle_t                = typename outer_t::Particle_t;
-    using Particle_p = std::conditional_t<is_const, Particle_t const* const, Particle_t*>;
-
-
-    index_wrapper(T* pc_particles, std::size_t idx_) _PHARE_ALL_FN_
-        : Super{&pc_particles->particles_(cell(pc_particles, idx_)), index(pc_particles, idx_)},
-          pc_particles_ptr{pc_particles},
-          idx{idx_}
-    {
-        PHARE_ASSERT((**this).iCell()[0] > -10 and (**this).iCell()[0] < 1000); // bad memory
-        if constexpr (dimension > 1)
-        {
-            PHARE_ASSERT((**this).iCell()[1] > -10 and (**this).iCell()[1] < 1000); // bad memory
-        }
-        if constexpr (dimension > 2)
-        {
-            PHARE_ASSERT((**this).iCell()[2] > -10 and (**this).iCell()[2] < 1000); // bad memory
-        }
-    }
-
-    auto& c() const _PHARE_ALL_FN_ { return cell(pc_particles_ptr, idx); }
-    static auto& cell(T* arr, std::size_t const idx) _PHARE_ALL_FN_ { return arr->p2c_[idx]; }
-    auto i() const _PHARE_ALL_FN_ { return index(pc_particles_ptr, idx); }
-    static auto index(T* arr, std::size_t const idx) _PHARE_ALL_FN_
-    {
-        return idx - arr->off_sets_(cell(arr, idx));
-    }
-
-
-    auto icell_changer(std::array<int, dimension> const& newcell) _PHARE_ALL_FN_
-    {
-        pc_particles_ptr->icell_changer(**this, c(), i(), newcell);
-    }
-
-
-    Super& super() _PHARE_ALL_FN_ { return *this; }
-    Super const& super() const _PHARE_ALL_FN_ { return *this; }
-
-    auto& operator*() _PHARE_ALL_FN_ { return *super(); }
-    auto& operator*() const _PHARE_ALL_FN_ { return *super(); }
-
-    Particle<dimension> copy() const _PHARE_ALL_FN_
-    {
-        return {(**this).weight(), (**this).charge(), (**this).iCell(), (**this).delta(),
-                (**this).v()};
-    }
-
-
-    T* pc_particles_ptr;
-    std::size_t idx = 0;
-};
-
-
-
-
-template<typename Particles, std::uint8_t impl>
 template<std::uint8_t PHASE, auto type>
-void PerCellSpan<Particles, impl>::sync() _PHARE_ALL_FN_
+void PerCellSpan<Particles>::sync() _PHARE_ALL_FN_
 {
     PHARE_LOG_SCOPE(1, "PerCellSpan::sync()");
 
@@ -1161,9 +993,9 @@ void PerCellSpan<Particles, impl>::sync() _PHARE_ALL_FN_
     })
 }
 
-template<typename Particles, std::uint8_t impl>
+template<typename Particles>
 template<std::uint8_t PHASE, auto type, typename... Args>
-void PerCellSpan<Particles, impl>::sync(Args&&... args) _PHARE_ALL_FN_
+void PerCellSpan<Particles>::sync(Args&&... args) _PHARE_ALL_FN_
 {
     PHARE_LOG_SCOPE(1, "PerCellSpan::sync(stream)");
 
@@ -1179,9 +1011,9 @@ void PerCellSpan<Particles, impl>::sync(Args&&... args) _PHARE_ALL_FN_
 }
 
 
-template<typename Particles, std::uint8_t impl>
+template<typename Particles>
 template<std::uint8_t PHASE, auto type>
-void PerCellSpan<Particles, impl>::sync_add_new() _PHARE_ALL_FN_
+void PerCellSpan<Particles>::sync_add_new() _PHARE_ALL_FN_
 {
 #if PHARE_HAVE_MKN_GPU and PHARE_HAVE_THRUST
 
@@ -1228,9 +1060,9 @@ void PerCellSpan<Particles, impl>::sync_add_new() _PHARE_ALL_FN_
 
 
 // // working version guaranteed overallocated, no atomics
-// template<typename Particles, std::uint8_t impl>
+// template<typename Particles>
 // template<std::uint8_t PHASE, auto type>
-// void PerCellSpan<Particles, impl>::sync_add_new() _PHARE_ALL_FN_
+// void PerCellSpan<Particles>::sync_add_new() _PHARE_ALL_FN_
 // {
 // #if PHARE_HAVE_MKN_GPU
 //     using Op           = Operators<SIZE_T, true>;
@@ -1261,9 +1093,9 @@ void PerCellSpan<Particles, impl>::sync_add_new() _PHARE_ALL_FN_
 // }
 
 
-template<typename Particles, std::uint8_t impl>
+template<typename Particles>
 template<std::uint8_t PHASE, auto type>
-void PerCellSpan<Particles, impl>::sync_rm_left() _PHARE_ALL_FN_
+void PerCellSpan<Particles>::sync_rm_left() _PHARE_ALL_FN_
 {
 #if PHARE_HAVE_MKN_GPU
     auto const& kidx = mkn::gpu::idx();
@@ -1283,6 +1115,16 @@ void PerCellSpan<Particles, impl>::sync_rm_left() _PHARE_ALL_FN_
     }
 
 #endif // PHARE_HAVE_MKN_GPU
+}
+
+
+template<auto type>
+void sync_moved_pc(auto& particles, auto&&... args)
+{
+    particles.template sync_moved<type>();     // realloc
+    particles.template sync<1, type>(args...); // add + compact
+
+    particles.template sync<0, type>(); // finalize
 }
 
 

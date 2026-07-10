@@ -5,6 +5,7 @@
 #include "core/def.hpp"
 #include "core/logger.hpp"
 #include "core/utilities/types.hpp"
+#include "core/utilities/span.hpp"
 #include "core/utilities/point/point.hpp"
 #include "core/utilities/meta/meta_utilities.hpp"
 
@@ -355,7 +356,7 @@ NO_DISCARD bool isIn(Point<Type, SIZE> const& point, Box<Type, SIZE> const& box)
  */
 template<typename Boxes>
 NO_DISCARD bool _PHARE_ALL_FN_ isIn(auto const& point, Boxes const& boxes)
-    requires(is_iterable_v<Boxes>)
+    requires(is_span_like_v<Boxes>)
 {
     for (auto const& box : boxes)
         if (isIn(point, box))

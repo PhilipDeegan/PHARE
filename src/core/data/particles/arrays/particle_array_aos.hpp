@@ -13,7 +13,7 @@
 // #include "core/utilities/range/range.hpp"
 // #include "core/data/particles/particle.hpp"
 #include "core/data/particles/particle_array_def.hpp"
-#include "core/data/particles/particle_array_type_options.hpp"
+#include "core/data/particles/particle_array_type_options.hpp" // IWYU pragma: keep
 
 
 #include <vector>

@@ -439,8 +439,8 @@ struct PCTileSetParticles : public Super_
     auto data() _PHARE_ALL_FN_ { return static_cast<Particle_t*>(nullptr); }             // TODO
 
     template<auto particle_type>
-    auto& move_check(auto const& /*pt*/, std::size_t const /*idx*/, auto& /*particle*/)
-        _PHARE_ALL_FN_
+    auto& move_check(auto const& /*pt*/, std::size_t const /*idx*/,
+                     auto& /*particle*/) _PHARE_ALL_FN_
     {
         return *this; /* TODO */
     }
@@ -556,9 +556,21 @@ struct PCCrossTileCopyDAO
 
 
 template<auto type>
-void sync_pc_ts(auto& /*particles*/, auto&&... /*args*/)
+void sync_pc_ts(auto& particles, auto&&... args)
 {
-    /* TODO */
+    particles.template sync_moved<type>();     // realloc
+    (*particles).template sync<type>(args...); // cross-tile copy
+
+    PHARE_DEBUG_DO({
+        auto& tiles = particles();
+        auto& views = particles.views();
+        for (std::size_t i = 0; i < particles().size(); ++i)
+        {
+            assert(views[i]().size() == tiles[i]().size());
+        }
+    })
+
+    particles.template sync<0, type>(); // finalize
 }
 
 

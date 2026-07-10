@@ -189,7 +189,9 @@ namespace core
             Point p;
             std::istringstream split(csv);
             std::vector<std::string> tokens;
-            for (std::string each; std::getline(split, each, ','); tokens.push_back(each)) {}
+            for (std::string each; std::getline(split, each, ','); tokens.push_back(each))
+            {
+            }
             assert(tokens.size() == dimension);
             for (std::size_t i = 0; i < tokens.size(); i++)
             {
@@ -403,6 +405,14 @@ template<template<typename, std::size_t> typename Arr, typename T, std::size_t d
 auto as_point(Arr<T, dim> const& arr)
 {
     return Point<T, dim>{arr};
+}
+
+template<typename Type, std::size_t dim, typename Shifter>
+NO_DISCARD Point<Type, dim> shift(Point<Type, dim> const& point, Shifter const& offset)
+{
+    auto copy{point};
+    copy += offset;
+    return copy;
 }
 
 

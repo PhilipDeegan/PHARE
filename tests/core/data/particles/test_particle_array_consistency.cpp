@@ -47,12 +47,10 @@ struct ParticleArrayConsistencyTest : public ::testing::Test
 };
 
 
-
 using Permutations_t = testing::Types<ParticleArray<ParticleArrayOptions{1}>>;
 
 
 TYPED_TEST_SUITE(ParticleArrayConsistencyTest, Permutations_t, );
-
 
 
 TYPED_TEST(ParticleArrayConsistencyTest, test_is_consistent_after_swap_copy)

@@ -1,9 +1,7 @@
 
-
 #include "phare_core.hpp"
 #include "core/utilities/types.hpp"
 #include "core/data/particles/particle_array.hpp"
-// #include "core/data/particles/particle_array_service.hpp"
 #include "core/data/particles/particle_array_comparator.hpp"
 
 #include "tests/core/data/particles/test_particles.hpp"
@@ -31,17 +29,14 @@ struct TestParam
 };
 
 
-
-
 template<typename Param>
 struct ParticleArrayConstructionTest : public ::testing::Test
 {
     auto constexpr static dim         = Param::dim;
-    auto constexpr static interp      = 1;
     auto constexpr static layout_mode = Param::layout_mode;
     auto constexpr static alloc_mode  = Param::alloc_mode;
-    auto constexpr static sim_opts    = SimOpts{.dimension = dim, .interp_order = interp,
-                                              .layout_mode = layout_mode, .alloc_mode = alloc_mode};
+    auto constexpr static sim_opts
+        = SimOpts{.dimension = dim, .layout_mode = layout_mode, .alloc_mode = alloc_mode};
 
     using GridLayout_t = TestGridLayout<typename PHARE_Types<sim_opts>::GridLayout_t>;
     using ParticleArray_t
@@ -69,14 +64,15 @@ auto run(ParticleArrayConstructionTest_t& self)
 using Permutations_t = testing::Types< // ! notice commas !
 
     TestParam<3, LayoutMode::AoS, AllocatorMode::CPU>
-    // ,TestParam<3, LayoutMode::AoSMapped, AllocatorMode::CPU>
-    // // ,TestParam<3, LayoutMode::SoA, AllocatorMode::CPU>
+   ,TestParam<3, LayoutMode::AoSMapped, AllocatorMode::CPU>
+   ,TestParam<3, LayoutMode::AoSPC, AllocatorMode::CPU>
    ,TestParam<3, LayoutMode::AoSTS, AllocatorMode::CPU>
    ,TestParam<3, LayoutMode::AoSPCTS, AllocatorMode::CPU>
 
-// PHARE_WITH_THRUST(
-//     ,TestParam<3, LayoutMode::SoAPC, AllocatorMode::CPU>
-// )
+PHARE_WITH_THRUST(
+    ,TestParam<3, LayoutMode::SoA, AllocatorMode::CPU>
+    ,TestParam<3, LayoutMode::SoAPC, AllocatorMode::CPU>
+)
 
 PHARE_WITH_GPU(
     ,TestParam<3, LayoutMode::AoS, AllocatorMode::GPU_UNIFIED>
@@ -147,7 +143,6 @@ TYPED_TEST(ParticleArrayConstructionTest, test_copy_move)
 TYPED_TEST(ParticleArrayConstructionTest, test_move_on_create)
 {
     using ParticleArray_t = TestFixture::ParticleArray_t;
-
 
     // static_assert(std::is_trivially_move_assignable_v<ParticleArray_t>);
     // static_assert(std::is_trivially_move_constructible_v<ParticleArray_t>);
