@@ -1,13 +1,14 @@
 #!/usr/bin/env python3
 
 import pyphare.pharein as ph
-from pyphare.simulator.simulator import Simulator
 
-
+from matplotlib.pyplot import *
 import matplotlib as mpl
 import numpy as np
 
 mpl.use("Agg")
+
+diag_dir = "dispersion5"
 
 
 def fromNoise():
@@ -16,8 +17,8 @@ def fromNoise():
     # will be visible
 
     sim = ph.Simulation(
-        smallest_patch_size=20,
-        largest_patch_size=20,
+        # smallest_patch_size=20,
+        # largest_patch_size=20,
         # the following time step number
         # and final time mean that the
         # smallest frequency will be 2/100
@@ -31,7 +32,7 @@ def fromNoise():
         dl=0.2,
         diag_options={
             "format": "phareh5",
-            "options": {"dir": "dispersion", "mode": "overwrite"},
+            "options": {"dir": diag_dir, "mode": "overwrite"},
         },
     )
 
@@ -72,6 +73,7 @@ def fromNoise():
         "vthx": vthx,
         "vthy": vthy,
         "vthz": vthz,
+        "nbr_part_per_cell": 500,
     }
 
     ph.MaxwellianFluidModel(
@@ -111,7 +113,7 @@ def prescribedModes():
         dl=0.2,
         diag_options={
             "format": "phareh5",
-            "options": {"dir": "dispersion", "mode": "overwrite"},
+            "options": {"dir": diag_dir, "mode": "overwrite"},
         },
     )
 
@@ -156,6 +158,7 @@ def prescribedModes():
         "vthx": vthx,
         "vthy": vthy,
         "vthz": vthz,
+        "nbr_part_per_cell": 500,
     }
 
     ph.MaxwellianFluidModel(
@@ -180,7 +183,39 @@ def prescribedModes():
 
 
 def main():
+    from pyphare import cpp
+    from pyphare.simulator.simulator import Simulator, startMPI
+
+    startMPI()
     Simulator(fromNoise()).run()
+
+    if cpp.mpi_rank() == 0:
+        from numpy.fft import fft2
+        from numpy import abs, log
+        from pyphare.pharesee.run import Run
+        from pyphare.pharesee.hierarchy.hierarchy_utils import single_patch_for_LO
+
+        run = Run(diag_dir)
+        data = []
+        t_i = 0
+
+        for time in run.times("B"):
+            t_i += 1
+            if t_i % 200 != 0:
+                continue
+
+            Bz = (
+                single_patch_for_LO(run.GetB(time))
+                .levels()[0]
+                .patches[0]
+                .patch_datas["z"]
+            )
+            # Bz = run.GetB(time).finest()["z"]
+
+            data.append(Bz.dataset[:])
+
+        colorbar(imshow(log(abs(fft2(data)))[-250:, :250], aspect="auto"))
+        savefig("Bz2.png", dpi=200)
 
 
 if __name__ == "__main__":

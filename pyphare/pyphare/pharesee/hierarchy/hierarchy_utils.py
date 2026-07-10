@@ -166,6 +166,7 @@ def compute_hier_from(compute, hierarchies, **kwargs):
         domain_box,
         refinement_ratio,
         times=reference_hier.times(),
+        data_files=reference_hier.data_files,
     )
 
 
@@ -657,7 +658,7 @@ def single_patch_for_LO(hier, qties=None, skip=None):
     sim = hier.sim
     origin = [0] * len(sim.cells)
     box = Box(origin, sim.cells)
-    layout = GridLayout(box, origin, sim.dl, interp_order=sim.interp_order)
+
     p0 = Patch(patch_datas={}, patch_id="", box=box)
     for t in cier.times():
         cier.time_hier[format_timestamp(t)] = {0: cier.level(0, t)}
@@ -668,7 +669,13 @@ def single_patch_for_LO(hier, qties=None, skip=None):
                 continue
             if isinstance(v, FieldData):
                 l0_pds[k] = FieldData(
-                    layout,
+                    GridLayout(
+                        box,
+                        origin,
+                        sim.dl,
+                        interp_order=sim.interp_order,
+                        ghosts_nbr=v.ghosts_nbr,
+                    ),
                     v.field_name,
                     None,
                     centering=v.centerings,
