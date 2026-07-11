@@ -109,8 +109,12 @@ void IonUpdaterMultiTS<Ions, Electromag, GridLayout>::updateAndDepositDomain_(
 #if PHARE_HAVE_MKN_GPU
     MultiBoris<ModelAccessor_t> in{dt_, accessor};
     Pusher_t::template move<MultiBorisMode::COPY>(in, boxings);
-    in.streamer.join();
-    in.streamer.dump_times(detail::timings_dir_str + "/updateAndDepositDomain.txt");
+
+    if constexpr (not use_main_thread)
+    {
+        in.streamer.join();
+        in.streamer.dump_times(detail::timings_dir_str + "/updateAndDepositDomain.txt");
+    }
 #else
     throw std::runtime_error("No available implementation");
 #endif

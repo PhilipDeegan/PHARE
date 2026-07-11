@@ -12,6 +12,7 @@
 #include "core/utilities/monitoring.hpp"
 
 #include <tuple>
+#include <sstream>
 
 namespace PHARE::core
 {
@@ -292,15 +293,51 @@ void particle_array_domain_is_valid(ParticleArray<O> const& particles, auto cons
 {
     std::size_t in_domain_box = 0, not_in_domain_box = 0;
 
-    if constexpr (is_tiled(O.layout_mode))
+    if constexpr (O.layout_mode == LayoutMode::AoSPCTS)
     {
-        for (std::size_t tidx = 0; tidx < particles().size(); ++tidx)
+        for (auto const& tile : particles())
         {
-            auto const& tile = particles()[tidx];
-            for (std::size_t i = 0; i < tile().size(); ++i)
-                if (not isIn(tile()[i], tile))
-                    throw std::runtime_error("particle_array_domain is not valid");
+            auto const& pc = tile();
+
+            // every particle bucketed anywhere in this tile's ghost box (domain +
+            // halo) must actually sit inside the tile itself, and must be filed
+            // under the same cell its own iCell() maps to
+            for (auto const& bix : pc.ghost_box())
+            {
+                auto const local           = pc.local_cell(bix);
+                auto const& cell_particles = pc(local);
+                for (std::size_t i = 0; i < cell_particles.size(); ++i)
+                {
+                    auto const& p = cell_particles[i];
+                    if (not isIn(p, tile))
+                    {
+                        std::ostringstream oss;
+                        oss << "particle_array_domain is not valid: particle outside tile"
+                            << " storage_mode=" << static_cast<int>(O.storage_mode)
+                            << " tile_box=" << tile << " bix=" << Point{bix}
+                            << " local=" << Point{local} << " iCell=" << Point{p.iCell()};
+                        throw std::runtime_error(oss.str());
+                    }
+                    if (not array_equals(pc.local_cell(p.iCell()), local))
+                    {
+                        std::ostringstream oss;
+                        oss << "particle_array_domain is not valid: particle iCell does not "
+                               "match its per-cell bucket"
+                            << " storage_mode=" << static_cast<int>(O.storage_mode)
+                            << " tile_box=" << tile << " bix=" << Point{bix}
+                            << " local=" << Point{local} << " iCell=" << Point{p.iCell()};
+                        throw std::runtime_error(oss.str());
+                    }
+                }
+            }
         }
+    }
+    else if constexpr (is_tiled(O.layout_mode))
+    {
+        for (auto const& tile : particles())
+            for (auto const& p : tile())
+                if (not isIn(p, tile))
+                    throw std::runtime_error("particle_array_domain is not valid");
     }
 
     per_particle(particles, [&](auto const& p) {
@@ -312,6 +349,10 @@ void particle_array_domain_is_valid(ParticleArray<O> const& particles, auto cons
 
     if (not(not_in_domain_box == 0 and in_domain_box == particles.size()))
         throw std::runtime_error("Invalid particles");
+
+    // recurse once into the SPAN view so both storage sides are checked
+    if constexpr (O.storage_mode == StorageMode::VECTOR)
+        particle_array_domain_is_valid(*particles, domain_box);
 }
 
 template<auto O>

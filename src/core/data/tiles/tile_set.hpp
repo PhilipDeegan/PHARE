@@ -77,8 +77,12 @@ public:
         auto const& idx = cell_idx(indexes...);
 #if PHARE_DEBUG
         if (idx >= cells_.size())
-            throw std::runtime_error("out of bounds idx for size" + std::to_string(idx) + " : "
+        {
+            PHARE_LOG_LINE_SS("out of bounds idx for size " << std::to_string(idx) << " : "
+                                                            << std::to_string(cells_.size()));
+            throw std::runtime_error("out of bounds idx for size " + std::to_string(idx) + " : "
                                      + std::to_string(cells_.size()));
+        }
 #endif
 
         return cells_[idx];
@@ -274,10 +278,16 @@ public:
 
 
     template<typename View_t = Tile>
-    auto make_view() // const ?
+    auto make_view()
     {
         return TileSetView<View_t>{box_, tiles_.data(), tiles_.size(), cells_.data(),
                                    cells_.shape()};
+    }
+    template<typename View_t = Tile>
+    auto make_view() const
+    {
+        return TileSetView<View_t>{box_, const_cast<Tile*>(tiles_.data()), tiles_.size(),
+                                   const_cast<Tile**>(cells_.data()), cells_.shape()};
     }
 
     auto as(auto&& a, auto&&... args)

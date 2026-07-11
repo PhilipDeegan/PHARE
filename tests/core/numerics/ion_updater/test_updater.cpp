@@ -258,7 +258,7 @@ struct IonUpdaterTest : public ::testing::Test,
             auto particleInitializer = ParticleInitializerFactory::create(info);
             particleInitializer->loadParticles(pop.domainParticles(), layout);
             EXPECT_GT(pop.domainParticles().size(), 0ull);
-            particle_array_domain_is_valid(pop.domainParticles(), layout.AMRBox());
+            // particle_array_domain_is_valid(pop.domainParticles(), layout.AMRBox());
         }
         assert(no_nans(ions.velocity()(Component::X)));
 

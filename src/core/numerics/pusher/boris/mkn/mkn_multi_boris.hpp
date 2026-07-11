@@ -67,7 +67,7 @@ struct MultiBoris
     double const dt;
     ModelAccessor& accessor;
     std::function<void(int)> fn;
-    StreamLauncher streamer{accessor, 1};
+    StreamLauncher streamer{accessor, opts.use_main_thread ? 0 : 1};
     GpuBoxSpanSet_t gpu_nlgb;
 
     auto static mesh(std::array<double, dim> const& ms, double const& ts)
@@ -174,7 +174,6 @@ struct MultiBorisFunctors
                 auto& cell_particles = parts.particles_(bix);
                 for (std::size_t pid = 0; pid < cell_particles.size(); ++pid)
                 {
-                    // captured before per_particle's advance() overwrites iCell()
                     auto const& old_cell = cell_particles[pid].iCell();
                     TiledParticleTracker<dim> const pt{old_cell, pps.local_tile_cell(old_cell)};
                     per_particle(cell_particles[pid], layout, pt, pid, em);
@@ -496,19 +495,32 @@ public:
             }
         }
 
-        in.streamer.host([&](auto const i) mutable {
+        auto move = [&](auto const i) mutable {
             if constexpr (copy and is_cpu)
                 Super::template move_cpu_copy<mode>(in, boxings, i);
             else if constexpr (copy and is_gpu)
                 move_gpu_copy<mode>(in, i);
             else
                 Super::template move_rest<mode>(in, i);
-        });
-
-        in.streamer.host([&](auto const i) mutable {
+        };
+        auto sync = [&](auto const i) mutable {
             if constexpr (not copy)
                 Super::sync_ref(in, i);
-        });
+        };
+
+        if constexpr (in.opts.use_main_thread)
+        {
+            for (std::size_t i = 0; i < in.accessor.size(); ++i)
+            {
+                move(i);
+                sync(i);
+            }
+        }
+        else
+        {
+            in.streamer.host(move);
+            in.streamer.host(sync);
+        }
     }
 
 

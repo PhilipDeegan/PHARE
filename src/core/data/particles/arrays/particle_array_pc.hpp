@@ -76,7 +76,6 @@ public:
         , size_{arr.size()}
         , box_{arr.box_}
         , ghost_box_{arr.ghost_box()}
-        , safe_box_{arr.safe_box_}
         , local_ghost_box_{arr.local_box()}
     {
     }
@@ -84,13 +83,11 @@ public:
     auto size() const _PHARE_ALL_FN_ { return size_; }
     auto size(std::size_t const& idx) const _PHARE_ALL_FN_ { return particles_.data()[idx].size(); }
 
-    // void resize(std::size_t s) { particles_.s = s; }
-
     auto& box() const _PHARE_ALL_FN_ { return box_; }
     auto& ghost_box() const _PHARE_ALL_FN_ { return ghost_box_; }
     auto local_cell(std::array<int, dim> const& icell) const _PHARE_ALL_FN_
     {
-        return as_local_cell(safe_box_, icell);
+        return as_local_cell(ghost_box_, icell);
     }
     auto local_cell(Point<int, dim> const& icell) const _PHARE_ALL_FN_
     {
@@ -195,7 +192,7 @@ protected:
     Span<std::array<std::uint32_t, dim>> p2c_;
     std::size_t size_;
 
-    Box<int, dim> box_, ghost_box_, safe_box_;
+    Box<int, dim> box_, ghost_box_;
     lobox_t local_ghost_box_;
 
 
@@ -242,13 +239,14 @@ public:
         : ghost_cells_{ghost_cells}
         , box_{box}
         , ghost_box_{grow(box, ghost_cells)}
-        , safe_box_{grow(box, ghost_cells + 1)}
     {
         cell_size_.zero();
         gap_idx_.zero();
         add_into_.zero();
         left_.zero();
         cap_.zero();
+
+        reset_views();
     }
 
     PerCellVector(PerCellVector const& from)            = default;
@@ -264,13 +262,6 @@ public:
     auto size() const { return total_size; }
     auto size(std::array<std::uint32_t, dim> const& icell) const { return cell_size_(icell); }
     auto size(std::size_t const& idx) const { return cell_size_.data()[idx]; }
-
-    template<typename Iterator>
-    auto erase(Iterator first, Iterator last)
-    {
-        return particles_.erase(particles_.begin() + first.curr_pos,
-                                particles_.begin() + last.curr_pos);
-    }
 
     void _inc(locell_t const& locell)
     {
@@ -323,7 +314,6 @@ public:
 
     auto& box() const { return box_; }
     auto& ghost_box() const { return ghost_box_; }
-    auto& safe_box() const { return safe_box_; } // allocating box
 
 
     auto& operator()() const { return particles_; }
@@ -334,13 +324,13 @@ public:
 
     auto local_cell(std::array<int, dim> const& icell) const
     {
-        return as_local_cell(safe_box_, icell);
+        return as_local_cell(ghost_box_, icell);
     }
     auto local_cell(Point<int, dim> const& icell) const { return local_cell(icell.toArray()); }
     auto local_box() const
     {
         return box_from_zero_to_upper_minus_one(
-            safe_box_.shape().template toArray<std::uint32_t>());
+            ghost_box_.shape().template toArray<std::uint32_t>());
     }
     auto local_box(Box<int, dim> const& from) const
     {
@@ -379,18 +369,6 @@ public:
 
 
     auto& insert(PerCellVector const& src);
-
-
-
-
-    void cap()
-    {
-        PHARE_LOG_SCOPE(1, "PerCellVector::cap");
-        // if constexpr (any_in(impl_v, 1, 2))
-        for (auto& p : particles_)
-            resize(p, p.capacity());
-    }
-
 
 
     void static resize(Particles& ps, std::size_t const& s, bool const& copy = true)
@@ -440,7 +418,7 @@ protected:
 
     std::size_t ghost_cells_;
 
-    Box<int, dim> box_, ghost_box_, safe_box_;
+    Box<int, dim> box_, ghost_box_;
 
     NdArrayVector<dim, Particles, c_order, alloc_mode> particles_{local_box().shape()};
 
@@ -478,10 +456,6 @@ protected:
     void on_domain(auto&& fn) const { on_box(local_box(box()), fn); };
     void on_ghost_box(auto&& fn) { on_box(local_box(), fn); };
     void on_ghost_layer(auto&& fn) const { on_box_list(local_box().remove(local_box(box())), fn); };
-    void on_ghost_layer_plus_1_domain(auto&& fn) const
-    {
-        on_box_list(local_box().remove(shrink(local_box(box()), 1)), fn);
-    };
     void on_ghost_layer_plus_2_domain(auto&& fn) const
     {
         on_box_list(local_box().remove(shrink(local_box(box()), 2)), fn);
@@ -645,8 +619,8 @@ void PerCellVector<Particles>::sync()
     static_assert(type != ParticleType::All);
 
     PHARE_LOG_SCOPE(1, "PerCellVector::sync");
-    PHARE_LOG_LINE_STR("sync " << static_cast<std::uint32_t>(PHASE) << " "
-                               << magic_enum::enum_name(type));
+    // PHARE_LOG_LINE_STR("sync " << static_cast<std::uint32_t>(PHASE) << " "
+    //                            << magic_enum::enum_name(type));
 
     auto const lbox = local_box();
 
@@ -710,13 +684,6 @@ struct PerCellParticles : public Super_
     template<typename T>
     struct iterator_impl;
 
-    template<typename T, auto S = storage_mode,
-             typename = std::enable_if_t<S == StorageMode::VECTOR>>
-    auto erase(iterator_impl<T> a, iterator_impl<T> b)
-    {
-        return Super::erase(a, b);
-    }
-
     template<typename T, typename... Args>
     auto static it(T* t, Args&&... args)
     {
@@ -778,12 +745,6 @@ struct PerCellParticles : public Super_
 
         return *this;
     }
-
-    // auto operator[](std::size_t const& s) _PHARE_ALL_FN_ { return index_wrapper<This>{this, s}; }
-    // auto operator[](std::size_t const& s) const _PHARE_ALL_FN_
-    // {
-    //     return index_wrapper<This const>{this, s};
-    // }
 
     void print() const {}
     void check() const {}
@@ -866,7 +827,6 @@ struct PerCellParticles<OuterSuper>::iterator_impl
     auto operator!=(iterator_impl const& that) const { return !(*this == that); }
     auto operator<(iterator_impl const& that) const
     {
-        // PHARE_LOG_LINE_STR(l << " " << i);
         if (l < that.l)
             return true;
         if (l == that.l)
@@ -888,8 +848,6 @@ struct PerCellParticles<OuterSuper>::iterator_impl
 
     auto& operator*() _PHARE_ALL_FN_ { return particles.data()[l][i]; }
     auto& operator*() const _PHARE_ALL_FN_ { return particles.data()[l][i]; }
-
-    // auto icell_changer(std::array<int, dimension> const /*newcell*/) { PHARE_LOG_LINE_STR(""); }
 
     auto copy() const _PHARE_ALL_FN_ { return particles.data()[l][i]; }
 
@@ -977,40 +935,6 @@ void PerCellSpan<Particles>::sync_add_new(locell_t const& bix) _PHARE_ALL_FN_
         ++left;
     }
 }
-
-
-// // working version guaranteed overallocated, no atomics
-// template<typename Particles>
-// template<std::uint8_t PHASE, auto type>
-// void PerCellSpan<Particles>::sync_add_new() _PHARE_ALL_FN_
-// {
-// #if PHARE_HAVE_MKN_GPU
-//     using Op           = Operators<SIZE_T, true>;
-//     auto const& kidx   = mkn::gpu::idx();
-//     auto const& bix    = *(local_ghost_box_.begin() + kidx);
-//     auto const& n_gaps = gap_idx_(bix);
-//     {
-//         auto& gaps = gaps_(bix);
-//         thrust::sort(thrust::seq, gaps.data(), gaps.data() + n_gaps /*, std::greater<>()*/);
-//     }
-//     auto& real       = particles_(bix);
-//     auto const& gaps = gaps_(bix);
-//     auto& left       = left_(bix);
-//     for (std::size_t i = 0; i < n_gaps; ++i)
-//     {
-//         auto const& part   = real[gaps[n_gaps - (1 + i)]];
-//         auto const newcell = local_cell(part.iCell());
-//         auto& nparts       = particles_(newcell);
-//         auto const npidx   = Op{nparts.s}.increment_return_old();
-//         PHARE_ASSERT(npidx < cap_(newcell));
-//         // if (cap_(newcell) > npidx) // TBC
-//         {
-//             nparts[npidx] = part;
-//             ++left;
-//         }
-//     }
-// #endif // PHARE_HAVE_MKN_GPU
-// }
 
 
 template<typename Particles>

@@ -129,6 +129,7 @@ public:
     {
         return particles_.data()[idx]().size();
     }
+    auto size(locell_t const& icell) const _PHARE_ALL_FN_ { return cell_size_(icell); }
 
     auto& box() const _PHARE_ALL_FN_ { return box_; }
     auto& ghost_box() const _PHARE_ALL_FN_ { return ghost_box_; }
@@ -267,10 +268,6 @@ public:
         : ghost_cells_{ghost_cells}
         , box_{box}
         , ghost_box_{grow(box, ghost_cells)}
-        , particles_{TileSetter<dim>{box, ghost_cells}, ghost_cells}
-        , particles_views_{TileSet<SpnTile, alloc_mode>::make_from(
-              [](auto& tile) -> auto& { return tile; }, TileSetter<dim>{box, ghost_cells},
-              particles_)}
     {
         cell_size_.zero();
         gap_idx_.zero();
@@ -282,8 +279,26 @@ public:
         TileSet<SpnTile, alloc_mode>::build_links(particles_views_);
     }
 
-    PCTileSetVector(PCTileSetVector&& that)            = default;
-    PCTileSetVector(PCTileSetVector const& that)       = default;
+    PCTileSetVector(PCTileSetVector&& that)
+        : ghost_cells_{that.ghost_cells_}
+        , box_{that.box_}
+        , ghost_box_{that.ghost_box_}
+        , particles_{std::move(that.particles_)}
+        , total_size{that.total_size}
+    {
+        sync(); // without std::swap does not work well - mirrors TileSetVector
+    }
+
+    PCTileSetVector(PCTileSetVector const& that)
+        : ghost_cells_{that.ghost_cells_}
+        , box_{that.box_}
+        , ghost_box_{that.ghost_box_}
+        , particles_{that.particles_.copy(TileSetter<dim>{that.box_, that.ghost_cells_})}
+        , total_size{that.total_size}
+    {
+        sync();
+    }
+
     PCTileSetVector& operator=(PCTileSetVector&&)      = default;
     PCTileSetVector& operator=(PCTileSetVector const&) = default;
 
@@ -360,7 +375,7 @@ public:
 
             // fold in the cross-tile traffic registered against tile-set cells: arrivals
             // reserve into the receiving cell, departures shrink the source cell
-            for (auto const& amr : pc.safe_box())
+            for (auto const& amr : pc.ghost_box())
             {
                 std::size_t in = 0, out = 0;
                 if (isIn(amr, tbox))
@@ -434,8 +449,10 @@ protected:
     nd_array_t<SIZE_T> cap_{local_box().shape()};
     nd_array_t<SIZE_T> cell_size_{local_box().shape()};
 
-    TileSet<Tile_t, alloc_mode> particles_;
-    TileSet<SpnTile, alloc_mode> particles_views_;
+    // tiles build from amrbox, but `.at()` function maps ghosts box
+    TileSet<Tile_t, alloc_mode> particles_{TileSetter<dim>{box_, ghost_cells_}, ghost_cells_};
+    TileSet<SpnTile, alloc_mode> particles_views_ = TileSet<SpnTile, alloc_mode>::make_from(
+        [](auto& tile) -> auto& { return tile; }, TileSetter<dim>{box_, ghost_cells_}, particles_);
     std::size_t total_size = 0;
 
 }; // PCTileSetVector<Particles>

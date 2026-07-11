@@ -282,15 +282,15 @@ void ParticlesExporter<AoSPCTS, CPU>::delete_particles_not_in(Src& src, Box<int,
     for (auto& tile : src())
     {
         auto& cps      = tile();
-        auto const& sb = cps.safe_box();
-        for (auto const& bix : cps.local_box(cps.ghost_box()))
+        auto const& gb = cps.ghost_box();
+        for (auto const& bix : cps.local_box(gb))
         {
             auto& cell_parts = cps(bix);
             if (cell_parts.size() == 0)
                 continue;
             std::array<int, dim> gcell;
             for (std::size_t d = 0; d < dim; ++d)
-                gcell[d] = sb.lower[d] + static_cast<int>(bix[d]);
+                gcell[d] = gb.lower[d] + static_cast<int>(bix[d]);
             if (!isIn(gcell, box))
                 cell_parts.clear();
         }
@@ -307,15 +307,15 @@ void ParticlesExporter<AoSPCTS, CPU>::delete_particles_not_in(Src& src, Boxes co
     for (auto& tile : src())
     {
         auto& cps      = tile();
-        auto const& sb = cps.safe_box();
-        for (auto const& bix : cps.local_box(cps.ghost_box()))
+        auto const& gb = cps.ghost_box();
+        for (auto const& bix : cps.local_box(gb))
         {
             auto& cell_parts = cps(bix);
             if (cell_parts.size() == 0)
                 continue;
             std::array<int, dim> gcell;
             for (std::size_t d = 0; d < dim; ++d)
-                gcell[d] = sb.lower[d] + static_cast<int>(bix[d]);
+                gcell[d] = gb.lower[d] + static_cast<int>(bix[d]);
             bool in_any = false;
             for (auto const& b : boxes)
                 if (isIn(gcell, b)) { in_any = true; break; }

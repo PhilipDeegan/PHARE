@@ -246,7 +246,6 @@ protected:
     using SIZE_T = default_span_size_t;
 
 private:
-
     template<typename P>
     friend class TileSetSpan;
 
@@ -439,7 +438,6 @@ public:
     void trim();
 
 
-
     void clear()
     {
         for (auto& tile : particles_)
@@ -450,8 +448,6 @@ public:
         reset_views();
         total_size = 0;
     }
-
-
 
 
     void static resize(Particles& ps, std::size_t const& s, bool const& copy = true)
@@ -716,42 +712,6 @@ struct TileSetParticles : public Super_
     auto data() const _PHARE_ALL_FN_ { return particles_.data(); }
     auto data() _PHARE_ALL_FN_ { return particles_.data(); }
 
-    /*    template<auto type = ParticleType::Domain>
-        bool tile_changed(auto const old_local_cell, auto const& iCell) const
-        {
-            auto& tile                 = *particles_.at(old_local_cell);
-            auto const& patch_box      = this->box();
-            auto const& tile_ghost_box = tile().box();
-            if constexpr (type == ParticleType::Domain)
-            {
-                if (!isIn(iCell, patch_box))
-                    return false;
-                return !isIn(iCell, tile);
-            }
-            else if constexpr (type == ParticleType::LevelGhost)
-                return !isIn(iCell, tile_ghost_box);
-
-            // else compile error
-        };
-
-
-        template<auto type = ParticleType::Domain>
-        bool gaps_changed_tile(auto const tidx, auto const amr_cell) const
-        {
-            auto& real      = particles_[tidx]();
-            auto& map       = real.map(amr_cell);
-            auto const& lix = local_cell(amr_cell);
-            // moving between cells on the same tile doesn't count
-            std::size_t moved = 0;
-            for (std::size_t i = 0; i < gap_idx_(lix); ++i)
-            {
-                auto const& cidx     = map[i];
-                auto const& particle = real[cidx];
-                moved                = moved + tile_changed(lix, particle);
-            }
-
-            return moved;
-        }*/
 
     template<auto particle_type>
     auto& move_check(auto const& pt, std::size_t const idx, auto& particle) _PHARE_ALL_FN_

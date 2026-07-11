@@ -289,7 +289,6 @@ struct ThreadedStreamLauncher : public mkn::gpu::ThreadedStreamLauncher<Vectors>
     }
 
 
-
     template<std::uint16_t impl = 0, typename Fn>
     auto& async_dev_tiles(Fn&& fn, std::size_t const ds = 0)
     {

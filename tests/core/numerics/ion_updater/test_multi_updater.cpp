@@ -153,6 +153,17 @@ void cmp_update(UpdaterMode mode, Patches& patches)
 
     try
     {
+        particle_array_domain_is_valid(
+            patches[0].model.state.ions.populations[0].particles.domain_particles, layout.AMRBox());
+        PHARE_LOG_LINE_STR("pre-push domain_particles valid");
+    }
+    catch (std::exception const& e)
+    {
+        PHARE_LOG_LINE_SS("pre-push domain_particles INVALID: " << e.what());
+    }
+
+    try
+    {
         get_updater_for(patches[0].model.state.ions, patches[0].model.state.electromag, layout)
             .updatePopulations(accessor, boxings, dt, mode);
 
@@ -230,9 +241,13 @@ auto from_ions(GridLayout_t const& layout, Ions const& from)
         PHARE_LOG_LINE_SS("n tiles: " << ions.populations[0].particles.domain_particles().size());
     }
 
+    particle_array_domain_is_valid(ions.populations[0].particles.domain_particles, layout.AMRBox());
+
     _add_particles_from.template operator()<ParticleType::Domain>(
         from.populations[0].particles.domain_particles,
         ions.populations[0].particles.domain_particles);
+
+    particle_array_domain_is_valid(ions.populations[0].particles.domain_particles, layout.AMRBox());
 
     // _add_particles_from.template operator()<ParticleType::LevelGhost>(
     //     from.populations[0].particles.level_ghost_particles,
@@ -240,7 +255,7 @@ auto from_ions(GridLayout_t const& layout, Ions const& from)
 
     auto const particle_box = layout.AMRBox();
     EXPECT_EQ(ions.populations[0].particles.domain_particles.size(), particle_box.size() * ppc);
-    return std::move(ions);
+    return ions;
 }
 
 
@@ -251,7 +266,15 @@ void check_particles(GridLayout_t const& layout, P0& ref, P1& cmp_, double const
                                                        StorageMode::VECTOR, AllocatorMode::CPU}>;
 
     auto const box = layout.AMRBox();
-    // particle_array_domain_is_valid(cmp_, box);
+    try
+    {
+        particle_array_domain_is_valid(cmp_, box);
+        PHARE_LOG_LINE_STR("post-push cmp_ valid");
+    }
+    catch (std::exception const& e)
+    {
+        PHARE_LOG_LINE_SS("post-push cmp_ INVALID: " << e.what());
+    }
 
     auto const cmp = convert_particles_and_sort<CPU_ref>(cmp_, layout);
     sort_particles(ref, box);
@@ -377,6 +400,14 @@ struct MultiPatchIonUpdaterTest : public ::testing::Test
             for (std::size_t i = 0; i < n_patches; i++)
                 cmp_patches.emplace_back(
                     layout, from_ions<CmpParticleArray_t>(layout, ref.model.state.ions));
+
+        particle_array_domain_is_valid(
+            cmp_patches[0].model.state.ions.populations[0].particles.domain_particles,
+            layout.AMRBox());
+
+        // if (do_cmp)
+        //     for (auto& cmp : cmp_patches)
+        //         compare(*layout, ref_patches[0].model.state.ions, cmp.model.state.ions);
 
         if (!cmp_only)
             ref_update(updater_mode, ref_patches);

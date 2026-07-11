@@ -14,8 +14,8 @@ FILE="tests/core/data/tiles/test_tile.cpp"
 FILE="tests/amr/data/field/test_fields_schedules.cpp"
 FILE="tests/amr/level_initializer/test_hybrid_level_initializer.cpp"
 FILE="tests/core/data/particles/test_particles_construction.cpp"
-FILE="tests/core/numerics/ion_updater/test_multi_updater.cpp"
 FILE="tests/core/data/particles/test_particle_array_synchronisation.cpp"
+FILE="tests/core/numerics/ion_updater/test_multi_updater.cpp"
 CARGS=${CARGS:-""}
 
 set -x
