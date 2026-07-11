@@ -14,6 +14,11 @@ namespace PHARE::core
 
 enum class MultiBorisMode : std::uint16_t { REF = 0, COPY };
 
+struct MultiBorisOptions
+{
+    bool use_main_thread = true; // for perf
+};
+
 // Primary (incomplete) template — specialisations provide the implementation per
 // (LayoutMode, AllocatorMode) pair.  Add a new #include below for each new layout.
 template<LayoutMode layout, AllocatorMode alloc, typename GridLayout, typename Particles,
@@ -23,22 +28,25 @@ struct MultiBorisPusherImpl;
 
 // ── MultiBoris state struct for AoSTS / ModelAccessor ─────────────────────────────────
 
-template<typename ModelAccessor>
+template<typename ModelAccessor, auto _opts = MultiBorisOptions{}>
 struct MultiBoris
 {
     using Model_t      = ModelAccessor::Model_t;
     using GridLayout_t = ModelAccessor::GridLayout_t;
 
-    static constexpr auto dim = GridLayout_t::dimension;
-    using ParticleArray_t     = Model_t::particle_array_type;
-    using Electromag_t        = Model_t::electromag_type;
-    using Vecfield_t          = Electromag_t::vecfield_type;
-    using Field_t             = Vecfield_t::field_type;
-    using ParticleArray_v     = ParticleArray_t::view_t;
-    using Box_t               = Box<int, dim>;
-    using Particles_ptrs      = std::vector<ParticleArray_t*>;
-    using StreamLauncher      = gpu::ThreadedStreamLauncher<ModelAccessor>;
-    using PerTileParticles_t  = ParticleArray_t::per_tile_particles;
+    static constexpr auto opts = _opts;
+    static constexpr auto dim  = GridLayout_t::dimension;
+
+
+    using ParticleArray_t    = Model_t::particle_array_type;
+    using Electromag_t       = Model_t::electromag_type;
+    using Vecfield_t         = Electromag_t::vecfield_type;
+    using Field_t            = Vecfield_t::field_type;
+    using ParticleArray_v    = ParticleArray_t::view_t;
+    using Box_t              = Box<int, dim>;
+    using Particles_ptrs     = std::vector<ParticleArray_t*>;
+    using StreamLauncher     = gpu::ThreadedStreamLauncher<ModelAccessor>;
+    using PerTileParticles_t = ParticleArray_t::per_tile_particles;
 
     MultiBoris(double const dt_, ModelAccessor& _accessor, std::function<void(int)> fn_ = {})
         : dt{dt_}
@@ -168,7 +176,7 @@ struct MultiBorisFunctors
                 {
                     // captured before per_particle's advance() overwrites iCell()
                     auto const& old_cell = cell_particles[pid].iCell();
-                    ParticleTracker const pt{old_cell, pps.local_tile_cell(old_cell)};
+                    TiledParticleTracker<dim> const pt{old_cell, pps.local_tile_cell(old_cell)};
                     per_particle(cell_particles[pid], layout, pt, pid, em);
                 }
             }
@@ -199,25 +207,9 @@ struct MultiBorisFunctors
     }
 
 
-    struct ParticleTracker
-    {
-        // AoSTS/else: particle's new cell. AoSPCTS: particle's old cell (absolute AMR iCell).
-        std::array<int, dim> icell;
-        std::array<std::uint32_t, dim> tile_cell;
-
-        bool operator()(auto const& pps, auto const& particle)
-        {
-            using enum LayoutMode;
-            if constexpr (any_in(Particles_t::layout_mode, AoSTS))
-                return !array_equals(pps.local_tile_cell(particle.iCell()), tile_cell);
-
-            return !array_equals(particle.iCell(), icell);
-        }
-    };
-
     void per_particle_still_in_ghost_box(auto&&... args) _PHARE_ALL_FN_
     {
-        static constexpr auto alloc_mode              = Particles_t::alloc_mode;
+        static constexpr auto alloc_mode             = Particles_t::alloc_mode;
         auto const& [particle, layout, pt, pidx, em] = std::forward_as_tuple(args...);
 
         check_electromag(em);
@@ -237,13 +229,13 @@ struct MultiBorisFunctors
             {
                 // AoSPCTS tracks per-cell buckets even in the tile ghost layer, so a particle
                 // leaving the domain but staying in this tile's ghost box still needs
-                // registering. pt was already built as a ParticleTracker in per_tile,
+                // registering. pt was already built as a TiledParticleTracker in per_tile,
                 // before advance() ran.
                 pps.template move_check<particle_type>(pt, pidx, particle);
             }
             else if (isIn(particle, pps.box()))
             {
-                ParticleTracker const tracker{particle.iCell(), pt};
+                TiledParticleTracker<dim> const tracker{particle.iCell(), pt};
                 pps.template move_check<particle_type>(tracker, pidx, particle);
             }
         }
@@ -253,7 +245,7 @@ struct MultiBorisFunctors
 
     void per_particle(auto&&... args) _PHARE_ALL_FN_
     {
-        static constexpr auto alloc_mode              = Particles_t::alloc_mode;
+        static constexpr auto alloc_mode             = Particles_t::alloc_mode;
         auto const& [particle, layout, pt, pidx, em] = std::forward_as_tuple(args...);
 
         check(particle);
@@ -624,16 +616,30 @@ struct MultiBorisPusherImpl<LayoutMode::AoSPCTS, alloc, GridLayout, Particles, E
         static constexpr auto copy   = mode == MultiBorisMode::COPY;
         static constexpr auto is_cpu = Particles_t::alloc_mode == AllocatorMode::CPU;
 
-        in.streamer.host([&](auto const i) mutable {
+        auto move = [&](auto const i) mutable {
             if constexpr (copy and is_cpu)
                 Super::template move_cpu_copy<mode>(in, boxings, i);
             else
                 Super::template move_rest<mode>(in, i);
-        });
-        in.streamer.host([&](auto const i) mutable {
+        };
+        auto sync = [&](auto const i) mutable {
             if constexpr (not copy)
                 Super::sync_ref(in, i);
-        });
+        };
+
+        if constexpr (in.opts.use_main_thread)
+        {
+            for (std::size_t i = 0; i < in.accessor.size(); ++i)
+            {
+                move(i);
+                sync(i);
+            }
+        }
+        else
+        {
+            in.streamer.host(move);
+            in.streamer.host(sync);
+        }
     }
 };
 

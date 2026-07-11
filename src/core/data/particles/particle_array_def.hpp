@@ -77,6 +77,23 @@ struct ParticleDefaults
 };
 
 
+// carries where a particle came from when registering a move with move_check;
+// per-cell layouts read icell (old AMR cell)
+template<std::size_t dim>
+struct ParticleTracker
+{
+    std::array<int, dim> icell{};
+};
+
+// tiled layouts additionally read tile_cell (old local tile cell)
+template<std::size_t dim>
+struct TiledParticleTracker
+{
+    std::array<int, dim> icell{};
+    std::array<std::uint32_t, dim> tile_cell{};
+};
+
+
 template<typename R = std::uint32_t, std::size_t dim>
 auto as_local_cell(std::array<int, dim> const& lower,
                    std::array<int, dim> const& icell) _PHARE_ALL_FN_

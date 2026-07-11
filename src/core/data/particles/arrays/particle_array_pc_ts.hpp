@@ -194,24 +194,21 @@ public:
         }
 
         // cell change register: still owned by (or ghosted into) the current tile.
-        // icell_changer's own ghost_box() check covers both "outside the domain, assumed
+        // move_check's own ghost_box() check covers both "outside the domain, assumed
         // still in this tile's ghost box" and "inside the domain, inside this tile".
-        old_cell_particles.icell_changer(particle, old_cell_particles.local_cell(pt.icell), idx,
-                                         newcell);
+        old_cell_particles.template move_check<particle_type>(pt, idx, particle);
 
         return *this;
     }
 
     template<auto type, typename... Args>
-    void sync(Args&&... /*args*/) _PHARE_ALL_FN_
-    {
-    } // TODO
+    void sync(Args&&... args) _PHARE_ALL_FN_;
 
     void clear() {} // TODO
 
 protected:
-    void sync_tile_add_new(std::size_t const /*tidx*/) _PHARE_ALL_FN_ {} // TODO
-    void sync_tile_rm_left(std::size_t const /*tidx*/) _PHARE_ALL_FN_ {} // TODO
+    void sync_tile_add_new(std::size_t const tidx) _PHARE_ALL_FN_;
+    void sync_tile_rm_left(std::size_t const tidx) _PHARE_ALL_FN_;
 
     TileSetView<Tile_t> particles_;
     NdArrayView<dim, Span<std::size_t>> gaps_;
@@ -332,16 +329,52 @@ public:
     template<std::uint8_t PHASE = 0, auto type = ParticleType::Domain>
     void sync()
     {
-        if constexpr (PHASE == 1)
-            sync_check_realloc<type>();
         total_size = 0;
-        for (auto const& tile : particles_)
+        for (auto& tile : particles_)
+        {
+            tile().template sync<PHASE, type>(); // per-tile recount + gap sizing + views
             total_size += tile().size();
+        }
+
+        // only cells within ghost_cells_ of a tile wall can register cross-tile
+        // departures; size their gap vectors so move_check's operator[] has room
+        for (auto& tile : particles_)
+            on_tile_wall_cells(tile, [&](auto const& amr_cell) {
+                auto const c   = local_cell(amr_cell);
+                auto const& cs = tile()(tile().local_cell(amr_cell)).size();
+                cell_size_(c)  = cs;
+                if (auto& gaps = gaps_(c); gaps.size() < cs)
+                    gaps.resize(cs);
+            });
+
+        reset_views();
     }
 
     template<auto type>
-    void sync_moved()
-    { /* TODO */
+    void sync_moved() // realloc + resize ahead of the view-side copies
+    {
+        for (auto& tile : particles_)
+        {
+            Box<int, dim> const& tbox = tile;
+            auto& pc                  = tile();
+
+            // fold in the cross-tile traffic registered against tile-set cells: arrivals
+            // reserve into the receiving cell, departures shrink the source cell
+            for (auto const& amr : pc.safe_box())
+            {
+                std::size_t in = 0, out = 0;
+                if (isIn(amr, tbox))
+                {
+                    auto const cix = local_cell(amr);
+                    in             = add_into_(cix);
+                    out            = gap_idx_(cix);
+                    add_into_(cix) = 0;
+                }
+                pc.template sync_moved<type>(pc.local_cell(amr), in, out);
+            }
+            pc.reset_views(); // per-cell spans start the copy step at the pre-move sizes
+        }
+        reset_views();
     }
 
     template<auto type>
@@ -363,14 +396,30 @@ public:
         total_size = 0;
     }
 
+    auto& views() { return particles_views_; }
+    auto& views() const { return particles_views_; }
+
 protected:
-    template<auto type>
-    void sync_check_realloc()
+    // visit the AMR cells of a tile that sit within ghost_cells_ of its wall — the only
+    // cells a particle can enter or leave the tile from in one step
+    void on_tile_wall_cells(auto const& tile, auto&& fn) const
     {
-        // cross-tile realloc after moves — TODO: implement gap-based realloc
-        total_size = 0;
-        for (auto const& tile : particles_)
-            total_size += tile().size();
+        Box<int, dim> const& tbox = tile;
+        auto const w              = static_cast<int>(ghost_cells_);
+
+        bool whole = false;
+        for (std::size_t d = 0; d < dim; ++d)
+            whole |= tbox.shape()[d] <= 2 * w;
+
+        if (whole) // too small for an interior, every cell is a wall cell
+        {
+            for (auto const& bix : tbox)
+                fn(bix);
+            return;
+        }
+        for (auto const& b : tbox.remove(shrink(tbox, w)))
+            for (auto const& bix : b)
+                fn(bix);
     }
 
     std::size_t ghost_cells_;
@@ -438,12 +487,7 @@ struct PCTileSetParticles : public Super_
     auto data() const _PHARE_ALL_FN_ { return static_cast<Particle_t const*>(nullptr); } // TODO
     auto data() _PHARE_ALL_FN_ { return static_cast<Particle_t*>(nullptr); }             // TODO
 
-    template<auto particle_type>
-    auto& move_check(auto const& /*pt*/, std::size_t const /*idx*/,
-                     auto& /*particle*/) _PHARE_ALL_FN_
-    {
-        return *this; /* TODO */
-    }
+    // move_check lives on PCTileSetSpan — no stub here or it shadows the span's version
 
     auto nbr_particles_in(std::array<int, dimension> const /*arr*/) const
     {
@@ -545,32 +589,137 @@ struct PCTileSetParticles<OuterSuper>::iterator_impl : public pc_ts_iterator_sup
 template<typename Particles>
 struct PCCrossTileCopyDAO
 {
-    using Tile = PCParticlesTile<typename Particles::per_tile_particles>;
+    auto static constexpr dim = Particles::dim;
+    using Tile                = PCParticlesTile<typename Particles::per_tile_particles>;
 
     Particles& ps;
     std::size_t src_tile_idx;
+    Tile& tile = ps()[src_tile_idx];
 
-    void copy_in() _PHARE_ALL_FN_ { /* TODO */ }
-    void rm_left() _PHARE_ALL_FN_ { /* TODO */ }
+    void copy_in() _PHARE_ALL_FN_
+    {
+        auto& pc                           = tile();
+        Box<std::int32_t, dim> const& tbox = tile;
+
+        // within-tile movers (including off-domain movers headed for the tile's own
+        // ghost layer) — registered on the tile's own per-cell gap lists
+        for (auto const& amr : tbox)
+            pc.sync_add_new(pc.local_cell(amr));
+
+        // cross-tile leavers — registered against the tile-set cell; each lands in
+        // whichever tile owns its particle's new cell
+        for (auto const& amr : tbox)
+        {
+            auto const cix     = ps.local_cell(amr);
+            auto const& n_gaps = ps.gap_idx_(cix);
+            if (!n_gaps)
+                continue;
+            {
+                auto& gaps = ps.gaps_(cix);
+                pc.sort(gaps.data(), gaps.data() + n_gaps);
+            }
+            auto& src        = pc(pc.local_cell(amr));
+            auto& left       = ps.left_(cix);
+            auto const& gaps = ps.gaps_(cix);
+            for (std::size_t i = 0; i < n_gaps; ++i)
+            {
+                auto const& gidx    = gaps[n_gaps - (1 + i)];
+                auto const& newcell = src.iCell(gidx);
+                auto& dst_tile      = *ps().at(ps.local_cell(newcell));
+                auto& dst_pc        = dst_tile();
+                PHARE_ASSERT(not isIn(src[gidx], tile));
+                PHARE_ASSERT(isIn(src[gidx], dst_tile));
+                [[maybe_unused]] bool const ok
+                    = dst_pc.append_from(dst_pc.local_cell(newcell), src, gidx);
+                PHARE_ASSERT(ok); // capacity is exact-reserved in sync_moved
+                ++left;
+            }
+            PHARE_ASSERT(left == n_gaps);
+        }
+    }
+
+    // both leaver lists of a cell are consumed by one merged rm pass on the per-cell
+    // container — see sync_rm_left for why they cannot be two separate passes
+    void rm_left() _PHARE_ALL_FN_
+    {
+        auto& pc                           = tile();
+        Box<std::int32_t, dim> const& tbox = tile;
+
+        for (auto const& amr : tbox)
+        {
+            auto const cix = ps.local_cell(amr);
+            pc.sync_rm_left(pc.local_cell(amr), ps.gaps_(cix).data(), ps.gap_idx_(cix),
+                            ps.left_(cix));
+        }
+    }
 };
+
+
+template<typename Particles>
+template<auto type, typename... Args>
+void PCTileSetSpan<Particles>::sync(Args&&... args) _PHARE_ALL_FN_
+{
+    PHARE_LOG_SCOPE(3, "PCTileSetSpan::sync(stream)");
+
+    auto& view = *this;
+
+    if constexpr (alloc_mode == AllocatorMode::CPU)
+    {
+        for (std::size_t tidx = 0; tidx < particles_.size(); ++tidx)
+            sync_tile_add_new(tidx);
+
+        for (std::size_t tidx = 0; tidx < particles_.size(); ++tidx)
+            sync_tile_rm_left(tidx);
+    }
+    else if (alloc_mode == AllocatorMode::GPU_UNIFIED)
+    {
+        if (!PHARE_HAVE_MKN_GPU)
+            throw std::runtime_error("no gpu impl");
+
+        PHARE_WITH_MKN_GPU({
+            auto const& [stream] = std::forward_as_tuple(args...);
+            mkn::gpu::GDLauncher<true>{particles_.size()} //
+                .stream(stream, [=] _PHARE_ALL_FN_() mutable {
+                    view.sync_tile_add_new(mkn::gpu::idx());
+                    __syncthreads();
+                    view.sync_tile_rm_left(mkn::gpu::idx());
+                });
+        })
+    }
+    else
+        throw std::runtime_error(__func__);
+}
+
+
+template<typename Particles>
+void PCTileSetSpan<Particles>::sync_tile_add_new(std::size_t const tidx) _PHARE_ALL_FN_
+{
+    PCCrossTileCopyDAO<std::decay_t<decltype(*this)>>{*this, tidx}.copy_in();
+}
+
+
+template<typename Particles>
+void PCTileSetSpan<Particles>::sync_tile_rm_left(std::size_t const tidx) _PHARE_ALL_FN_
+{
+    PCCrossTileCopyDAO<std::decay_t<decltype(*this)>>{*this, tidx}.rm_left();
+}
 
 
 template<auto type>
 void sync_pc_ts(auto& particles, auto&&... args)
 {
-    particles.template sync_moved<type>();     // realloc
-    (*particles).template sync<type>(args...); // cross-tile copy
+    particles.template sync_moved<type>();     // realloc + resize
+    (*particles).template sync<type>(args...); // within-tile adds, cross-tile copies, rm
 
     PHARE_DEBUG_DO({
         auto& tiles = particles();
         auto& views = particles.views();
         for (std::size_t i = 0; i < particles().size(); ++i)
-        {
-            assert(views[i]().size() == tiles[i]().size());
-        }
+            for (auto const& bix : tiles[i]().local_box())
+                assert(views[i]()(bix).size() == tiles[i]()(bix).size());
     })
 
-    particles.template sync<0, type>(); // finalize
+    particles.template sync<0, type>(); // finalize: recount, size wall gaps, reset views
 }
 
 

@@ -12,6 +12,8 @@
 #include "tile_set_mapper.hpp"
 
 #include <array>
+#include <stdexcept>
+#include <string>
 #include <tuple>
 
 
@@ -65,12 +67,21 @@ public:
     template<typename... Index>
     NO_DISCARD auto at(Index... indexes) _PHARE_ALL_FN_
     {
-        return cells_[cell_idx(indexes...)];
+        auto const& idx = cell_idx(indexes...);
+        assert(idx < cells_.size());
+        return cells_[idx];
     }
     template<typename... Index>
     NO_DISCARD auto at(Index... indexes) const _PHARE_ALL_FN_
     {
-        return cells_[cell_idx(indexes...)];
+        auto const& idx = cell_idx(indexes...);
+#if PHARE_DEBUG
+        if (idx >= cells_.size())
+            throw std::runtime_error("out of bounds idx for size" + std::to_string(idx) + " : "
+                                     + std::to_string(cells_.size()));
+#endif
+
+        return cells_[idx];
     }
 
 

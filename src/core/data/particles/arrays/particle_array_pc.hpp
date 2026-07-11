@@ -120,6 +120,61 @@ public:
     template<std::uint8_t PHASE = 0, auto type = ParticleType::Domain>
     void sync_rm_left() _PHARE_ALL_FN_;
 
+    // per-cell equivalents of the above, callable from host or device
+    template<std::uint8_t PHASE = 0, auto type = ParticleType::Domain>
+    void sync_add_new(locell_t const& bix) _PHARE_ALL_FN_;
+
+    template<std::uint8_t PHASE = 0, auto type = ParticleType::Domain>
+    void sync_rm_left(locell_t const& bix) _PHARE_ALL_FN_;
+
+    // as above, but also removes an externally registered, ascending-sorted list of
+    // leavers in the same descending swap-pop — two separate passes would move particles
+    // the other list still indexes
+    template<std::uint8_t PHASE = 0, auto type = ParticleType::Domain>
+    void sync_rm_left(locell_t const& bix, std::size_t const* x_gaps, SIZE_T& x_size,
+                      SIZE_T& x_left) _PHARE_ALL_FN_;
+
+    // append src[idx] into cell bix if capacity allows — false when the cell is full
+    bool append_from(locell_t const& bix, auto const& src, std::size_t const idx) _PHARE_ALL_FN_
+    {
+        bool constexpr static GPU = alloc_mode == AllocatorMode::GPU_UNIFIED;
+
+        auto const& cap = cap_(bix);
+        auto& nparts    = particles_(bix);
+        using Op        = Operators<std::decay_t<decltype(*nparts.size_address())>, true, GPU>;
+        auto npidx      = nparts.size();
+        while (true)
+        {
+            if (npidx >= cap)
+                return false;
+            auto const old = Op::compare_and_swap(nparts.size_address(), npidx, npidx + 1);
+            if (npidx != old)
+            {
+                ++npidx;
+                continue;
+            }
+            break;
+        }
+        nparts.assign(src, idx, npidx);
+        return true;
+    }
+
+    void static sort(auto from, auto to) _PHARE_ALL_FN_
+    {
+        [[maybe_unused]] int sorted = 0;
+        PHARE_WITH_THRUST({ //
+            ++sorted;
+            thrust::sort(thrust::seq, from, to);
+        })
+        //
+        PHARE_WITH_THRUST_ELSE({ //
+            ++sorted;
+            std::sort(from, to);
+        }) //
+
+        assert(sorted == 1);
+    }
+
     void clear()
     {
         for (auto const& bix : local_box())
@@ -298,6 +353,18 @@ public:
     template<auto type>
     void sync_moved(); // realloc for particles registered as incoming via add_into_
 
+    // realloc + resize one cell ahead of span-side copies; in/out are externally
+    // registered arrivals/departures on top of this cell's own counters; records the
+    // pre-move size so freshly reset views start the copy step from it
+    template<auto type>
+    void sync_moved(locell_t const& bix, std::size_t const in, std::size_t const out);
+
+    template<auto type>
+    void sync_add_new(); // append registered movers into their new cells
+
+    template<auto type>
+    void sync_rm_left(); // swap-delete registered leavers, reset gap/add counters
+
     template<auto type>
     void trim();
 
@@ -312,8 +379,6 @@ public:
 
 
     auto& insert(PerCellVector const& src);
-
-    auto& insert_domain_from(PerCellVector const& src);
 
 
 
@@ -398,18 +463,6 @@ protected:
     std::size_t total_size = 0;
 
 
-
-    template<auto type>
-    void sync_cpu_gaps_and_tmp();
-    template<auto type>
-    void sync_gpu_gaps_and_tmp();
-
-    template<auto type>
-    void sync_gpu_gaps_and_tmp_impl0();
-
-    template<auto type>
-    void sync_gpu_gaps_and_tmp_impl1();
-
     static void on_box(auto&& box, auto&& fn)
     {
         for (auto const& bix : box)
@@ -457,47 +510,6 @@ auto& PerCellVector<Particles>::insert(PerCellVector const& src)
 }
 
 template<typename Particles>
-auto& PerCellVector<Particles>::insert_domain_from(PerCellVector const& src)
-{
-    // auto const on_box = [&](auto&& box, auto&& fn) {
-    //     for (auto const& bix : box)
-    //         fn(bix);
-    // };
-    // auto const on_box_list = [&](auto&& boxlist, auto&& fn) {
-    //     for (auto const& box : boxlist)
-    //         on_box(box, fn);
-    // };
-
-    std::size_t added = 0;
-
-    // this->check();
-    // src.check();
-
-    on_box_list(local_box(box()).remove(shrink(local_box(box()), 1)), [&](auto const& bix) {
-        auto& from = src(bix);
-        auto& to   = (*this)(bix);
-        added += from.size();
-        to.reserve(to.size() + from.size());
-
-        to.emplace_back(from);
-        // for (auto const& p : from)
-        //     to.emplace_back(p);
-
-        // std::copy(from.begin(), from.end(), std::back_inserter(to));
-    });
-
-    // this->check();
-
-
-    if (added)
-        sync<2>();
-
-    // this->check();
-
-    return *this;
-}
-
-template<typename Particles>
 template<auto type>
 auto& PerCellVector<Particles>::reserve_ppc(std::size_t const& ppc)
 {
@@ -540,6 +552,23 @@ void PerCellVector<Particles>::sync_moved()
     }
 }
 
+template<typename Particles>
+template<auto type>
+void PerCellVector<Particles>::sync_moved(locell_t const& bix, std::size_t const in,
+                                          std::size_t const out)
+{
+    static_assert(std::is_same_v<decltype(type), ParticleType>);
+
+    auto& real          = particles_(bix);
+    auto const old_size = real.size();
+    auto const nu       = add_into_(bix) + in;
+    cell_size_(bix)     = old_size;
+    reserve(real, old_size + nu); // copies transiently exceed the final size before rm
+    resize(real, old_size + nu - (gap_idx_(bix) + out));
+    cap_(bix)      = real.capacity();
+    add_into_(bix) = 0;
+}
+
 
 template<typename Particles>
 template<auto type>
@@ -562,21 +591,18 @@ void PerCellVector<Particles>::trim()
     }
 }
 
+// add incoming particles - move_check only registered the move, the particle's own
+// iCell() was already updated by the caller before registering, so it tells us where
+// each registered departure from this cell should actually land
 template<typename Particles>
 template<auto type>
-void PerCellVector<Particles>::sync_cpu_gaps_and_tmp()
+void PerCellVector<Particles>::sync_add_new()
 {
-    // PHARE_LOG_LINE_STR("sync_cpu_gaps_and_tmp " << magic_enum::enum_name(type));
-    auto const lbox = local_box();
-
-    // add incoming particles - icell_changer only registered the move, the particle's own
-    // iCell() was already updated by the caller before registering, so it tells us where
-    // each registered departure from this cell should actually land
-    for (auto const& bix : lbox)
+    for (auto const& bix : local_box())
     {
-        auto& real             = particles_(bix);
-        auto const& gaps       = gaps_(bix);
-        auto const& gaps_size  = gap_idx_(bix);
+        auto& real            = particles_(bix);
+        auto const& gaps      = gaps_(bix);
+        auto const& gaps_size = gap_idx_(bix);
         for (std::size_t gidx = 0; gidx < gaps_size; ++gidx)
         {
             auto const& idx     = gaps[gidx];
@@ -584,9 +610,14 @@ void PerCellVector<Particles>::sync_cpu_gaps_and_tmp()
             emplace_back(particles_(newcell), real, idx);
         }
     }
+}
 
-    // delete outgoing particles from their old cell (descending order keeps indices valid)
-    for (auto const& bix : lbox)
+// delete outgoing particles from their old cell (descending order keeps indices valid)
+template<typename Particles>
+template<auto type>
+void PerCellVector<Particles>::sync_rm_left()
+{
+    for (auto const& bix : local_box())
     {
         auto const& gaps_size = gap_idx_(bix);
         {
@@ -606,92 +637,6 @@ void PerCellVector<Particles>::sync_cpu_gaps_and_tmp()
     }
 }
 
-
-template<typename Particles>
-template<auto type>
-void PerCellVector<Particles>::sync_gpu_gaps_and_tmp_impl0()
-{
-    auto const lbox = local_box();
-
-    {
-        PHARE_LOG_SCOPE(1, "PerCellVector::sync_gpu_gaps_and_tmp::reserve_scan ");
-        for (auto const& bix : lbox)
-        {
-            auto& real = particles_(bix);
-            reserve(real, real.size() + add_into_(bix));
-            resize(real, particles_views_(bix).size());
-        }
-    }
-
-    {
-        PHARE_LOG_SCOPE(1, "PerCellVector::sync_gpu_gaps_and_tmp::add ");
-        for (auto const& bix : lbox)
-        { // add incoming particles
-            auto& real            = particles_(bix);
-            auto const& gaps      = gaps_(bix);
-            auto const& gaps_size = gap_idx_(bix);
-            for (std::size_t gidx = 0; gidx < gaps_size; ++gidx)
-            {
-                auto const& idx     = gaps[gidx];
-                auto const& newcell = local_cell(real.iCell(idx));
-                // auto const& p = real[idx];
-
-                /*particles_(local_cell(p.iCell())).*/ emplace_back(particles_(newcell), real, idx);
-            }
-        }
-    }
-
-    {
-        PHARE_LOG_SCOPE(1, "PerCellVector::sync_gpu_gaps_and_tmp::delete ");
-        for (auto const& bix : lbox)
-        { // delete outgoing particles
-            auto const& gaps_size = gap_idx_(bix);
-            {
-                auto& gaps = gaps_(bix);
-                std::sort(gaps.begin(), gaps.begin() + gaps_size, std::greater<>()); // use thrust?
-            }
-            auto& real       = particles_(bix);
-            auto const& gaps = gaps_(bix);
-            for (std::size_t gidx = 0; gidx < gaps_size; ++gidx)
-            {
-                auto const& idx = gaps[gidx];
-                real.assign(real.size() - 1, idx);
-                real.pop_back();
-            }
-            gap_idx_(bix)  = 0;
-            add_into_(bix) = 0;
-        }
-    }
-}
-
-template<typename Particles>
-template<auto type>
-void PerCellVector<Particles>::sync_gpu_gaps_and_tmp_impl1()
-{
-}
-
-
-
-template<typename Particles>
-template<auto type>
-void PerCellVector<Particles>::sync_gpu_gaps_and_tmp()
-{
-    // PHARE_LOG_LINE_STR("sync_gpu_gaps_and_tmp " << magic_enum::enum_name(type));
-    PHARE_LOG_SCOPE(1, "PerCellVector::sync_gpu_gaps_and_tmp ");
-
-    // if constexpr (impl == 0)
-    // {
-    sync_gpu_gaps_and_tmp_impl0<type>();
-    // }
-    // else if constexpr (impl == 1)
-    // {
-    //     sync_gpu_gaps_and_tmp_impl1<type>();
-    // }
-    // else
-    //     throw std::runtime_error("No impl");
-}
-
-
 template<typename Particles>
 template<std::uint8_t PHASE, auto type>
 void PerCellVector<Particles>::sync()
@@ -705,48 +650,26 @@ void PerCellVector<Particles>::sync()
 
     auto const lbox = local_box();
 
-    if constexpr (PHASE < 2 and alloc_mode == AllocatorMode::CPU)
-        sync_cpu_gaps_and_tmp<type>();
-
-    if constexpr (PHASE < 2 and alloc_mode == AllocatorMode::GPU_UNIFIED)
-        sync_gpu_gaps_and_tmp<type>();
-
-    // ghosts are no longer trimmed implicitly here; call delete_particles_not_in(domain_box)
-    // explicitly where needed (see ion_updater_multi_ts.hpp / ion_updater_multi_pc.hpp)
-
     total_size = 0;
     for (auto const& bix : lbox)
         total_size += (cell_size_(bix) = particles_(bix).size());
 
-    // if constexpr (alloc_mode == AllocatorMode::GPU_UNIFIED)
-    // {
-    //     PHARE_LOG_SCOPE(1, "PerCellVector::sync::reset");
-    //     static_assert(impl < 3); // otherwise unhandled
-    //     if constexpr (impl < 2)
-    //     {
-    //         reset_index_wrapper_map();
-    //     }
-    //     else // if (PHASE == 2)
-    //     {
-    //         auto const per_cell = [&](auto& bix) {
-    //             auto const& cs  = cell_size_(bix);
-    //             auto const& cap = particles_(bix).capacity();
-    //             auto& gaps      = gaps_(bix);
-    //             if (gaps.size() < cs)
-    //             {
-    //                 reserve(gaps, cap, false);
-    //                 resize(gaps, cs, false);
-    //             }
-    //             cap_(bix) = cap;
-    //         };
+    PHARE_LOG_SCOPE(1, "PerCellVector::sync::reset");
 
-    //         if constexpr (type == ParticleType::Domain)
-    //             on_domain(per_cell);
+    auto const per_cell = [&](auto& bix) {
+        auto const& cs  = cell_size_(bix);
+        auto const& cap = particles_(bix).capacity();
+        auto& gaps      = gaps_(bix);
+        if (gaps.size() < cs)
+        {
+            reserve(gaps, cap, false);
+            resize(gaps, cs, false);
+        }
+        cap_(bix) = cap;
+    };
 
-    //         // if constexpr (ParticleType::Domain)
-    //         //     on_ghost_layer(per_cell);
-    //     }
-    // }
+    if constexpr (type == ParticleType::Domain)
+        on_domain(per_cell);
 
     {
         PHARE_LOG_SCOPE(1, "PerCellVector::sync::reset_views");
@@ -764,27 +687,20 @@ struct PerCellParticles : public Super_
     using per_cell_particles = typename Super::per_cell_particles;
     using view_t             = PerCellParticles<typename Super::view_t>;
 
-    auto static constexpr alloc_mode = Super::alloc_mode;
-    auto static constexpr dimension  = Super::dimension;
-    // auto static constexpr layout_mode  = Super::layout_mode;
+    auto static constexpr alloc_mode   = Super::alloc_mode;
+    auto static constexpr dimension    = Super::dimension;
     auto static constexpr storage_mode = Super::storage_mode;
     auto static constexpr size_of_particle() { return sizeof(Particle_t); }
-
-    // template<std::size_t size>
-    // using array_type = AoSParticles<AoSArray<dimension, size>>;
 
     using Super::local_box;
     using Super::particles_;
     using Super::size;
-    // using Super::sync;
 
     template<typename... Args>
     PerCellParticles(Args&&... args)
         : Super{std::forward<Args>(args)...}
     {
     }
-
-
 
     PerCellParticles(PerCellParticles const& from)            = default;
     PerCellParticles(PerCellParticles&& from)                 = default;
@@ -838,17 +754,24 @@ struct PerCellParticles : public Super_
     Super const& operator*() const { return *this; }
 
 
-    template<typename _Particle>
-    auto& icell_changer(_Particle const& p, std::array<std::uint32_t, dimension> const& cell,
-                        std::size_t const& idx,
-                        std::array<int, dimension> const& newcell) _PHARE_ALL_FN_
+    // the particle already carries its NEW cell (set by the caller); pt carries the OLD
+    // cell so the departure can be registered against it — mirrors the TS/PCTS move_check
+    template<auto particle_type>
+    auto& move_check(auto const& pt, std::size_t const& idx, auto& particle) _PHARE_ALL_FN_
     {
+        static_assert(particle_type == ParticleType::Domain);
+
+        auto const& newcell = particle.iCell();
+        if (array_equals(newcell, pt.icell))
+            return *this; // old cell == new cell, no change required
+
         bool constexpr static ATOMIC = true;
         bool constexpr static GPU    = alloc_mode == AllocatorMode::GPU_UNIFIED;
 
         using Op = Operators<typename Super::SIZE_T, ATOMIC, GPU>;
 
-        Super::gaps_(cell)[Op{Super::gap_idx_(cell)}.increment_return_old()] = idx;
+        auto const old_lcl_cell = Super::local_cell(pt.icell);
+        Super::gaps_(old_lcl_cell)[Op{Super::gap_idx_(old_lcl_cell)}.increment_return_old()] = idx;
 
         if (isIn(newcell, Super::ghost_box()))
             Op{Super::add_into_(Super::local_cell(newcell))}.increment_return_old();
@@ -1000,14 +923,28 @@ void PerCellSpan<Particles>::sync(Args&&... args) _PHARE_ALL_FN_
     PHARE_LOG_SCOPE(1, "PerCellSpan::sync(stream)");
 
     auto view = *this;
-    PHARE_WITH_MKN_GPU({
-        auto const& [stream] = std::forward_as_tuple(args...);
-        auto const& gabox    = local_ghost_box_;
-        mkn::gpu::GDLauncher<true>{gabox.size()}.stream(
-            stream, [=] _PHARE_ALL_FN_() mutable { view.template sync_add_new<PHASE, type>(); });
-        mkn::gpu::GDLauncher<true>{gabox.size()}.stream(
-            stream, [=] _PHARE_ALL_FN_() mutable { view.template sync_rm_left<PHASE, type>(); });
-    })
+
+    if constexpr (alloc_mode == AllocatorMode::CPU)
+    {
+        for (auto const& bix : local_ghost_box_)
+            sync_add_new<PHASE, type>(bix.toArray());
+
+        for (auto const& bix : local_ghost_box_)
+            sync_rm_left<PHASE, type>(bix.toArray());
+    }
+    else if (alloc_mode == AllocatorMode::GPU_UNIFIED)
+    {
+        PHARE_WITH_MKN_GPU({
+            auto const& [stream] = std::forward_as_tuple(args...);
+            auto const& gabox    = local_ghost_box_;
+            mkn::gpu::GDLauncher<true>{gabox.size()}.stream(stream, [=] _PHARE_ALL_FN_() mutable {
+                view.template sync_add_new<PHASE, type>();
+            });
+            mkn::gpu::GDLauncher<true>{gabox.size()}.stream(stream, [=] _PHARE_ALL_FN_() mutable {
+                view.template sync_rm_left<PHASE, type>();
+            });
+        })
+    }
 }
 
 
@@ -1015,14 +952,19 @@ template<typename Particles>
 template<std::uint8_t PHASE, auto type>
 void PerCellSpan<Particles>::sync_add_new() _PHARE_ALL_FN_
 {
-#if PHARE_HAVE_MKN_GPU and PHARE_HAVE_THRUST
+#if PHARE_HAVE_MKN_GPU
+    sync_add_new<PHASE, type>((*(local_ghost_box_.begin() + mkn::gpu::idx())).toArray());
+#endif // PHARE_HAVE_MKN_GPU
+}
 
-    auto const& kidx   = mkn::gpu::idx();
-    auto const& bix    = *(local_ghost_box_.begin() + kidx);
+template<typename Particles>
+template<std::uint8_t PHASE, auto type>
+void PerCellSpan<Particles>::sync_add_new(locell_t const& bix) _PHARE_ALL_FN_
+{
     auto const& n_gaps = gap_idx_(bix);
     {
         auto& gaps = gaps_(bix);
-        thrust::sort(thrust::seq, gaps.data(), gaps.data() + n_gaps /*, std::greater<>()*/);
+        sort(gaps.data(), gaps.data() + n_gaps /*, std::greater<>()*/);
     }
     auto& real       = particles_(bix);
     auto& left       = left_(bix);
@@ -1030,32 +972,10 @@ void PerCellSpan<Particles>::sync_add_new() _PHARE_ALL_FN_
     for (std::size_t i = 0; i < n_gaps; ++i)
     {
         auto const& gidx = gaps[n_gaps - (1 + i)];
-        // auto const& part    = real[gaps[n_gaps - (1 + i)]];
-        auto const& newcell = local_cell(real.iCell(gidx));
-        auto const& cap     = cap_(newcell);
-        auto& nparts        = particles_(newcell);
-        auto npidx          = nparts.size();
-
-        while (true)
-        {
-            if (npidx >= cap)
-                return;
-            auto inc = npidx + 1;
-            auto old = atomicCAS(nparts.size_address(), npidx, inc);
-            if (npidx != old)
-            {
-                ++npidx;
-                continue;
-            }
-            else
-                break;
-        }
-
-        nparts.assign(real, gidx, npidx);
-        // nparts[npidx] = part;
+        if (!append_from(local_cell(real.iCell(gidx)), real, gidx))
+            return;
         ++left;
     }
-#endif // PHARE_HAVE_MKN_GPU
 }
 
 
@@ -1098,33 +1018,56 @@ template<std::uint8_t PHASE, auto type>
 void PerCellSpan<Particles>::sync_rm_left() _PHARE_ALL_FN_
 {
 #if PHARE_HAVE_MKN_GPU
-    auto const& kidx = mkn::gpu::idx();
-    auto const& bix  = *(local_ghost_box_.begin() + kidx);
+    sync_rm_left<PHASE, type>((*(local_ghost_box_.begin() + mkn::gpu::idx())).toArray());
+#endif // PHARE_HAVE_MKN_GPU
+}
+
+template<typename Particles>
+template<std::uint8_t PHASE, auto type>
+void PerCellSpan<Particles>::sync_rm_left(locell_t const& bix) _PHARE_ALL_FN_
+{
+    add_into_(bix) -= left_(bix);
+    SIZE_T x_size = 0, x_left = 0;
+    sync_rm_left<PHASE, type>(bix, nullptr, x_size, x_left);
+}
+
+template<typename Particles>
+template<std::uint8_t PHASE, auto type>
+void PerCellSpan<Particles>::sync_rm_left(locell_t const& bix, std::size_t const* x_gaps,
+                                          SIZE_T& x_size, SIZE_T& x_left) _PHARE_ALL_FN_
+{
     auto const& gaps = gaps_(bix);
     auto& real       = particles_(bix);
     auto& left       = left_(bix);
     auto& gaps_size  = gap_idx_(bix);
-    add_into_(bix) -= left;
-    while (left)
+    while (left or x_left)
     {
-        auto const& pidx = gaps[gaps_size - 1];
+        bool const own   = !x_left or (left and gaps[gaps_size - 1] > x_gaps[x_size - 1]);
+        auto const& pidx = own ? gaps[gaps_size - 1] : x_gaps[x_size - 1];
         real.assign(real.size() - 1, pidx); // real[pidx] = real[real.size() - 1];
         real.pop_back();
-        --gaps_size;
-        --left;
+        if (own)
+        {
+            --gaps_size;
+            --left;
+        }
+        else
+        {
+            --x_size;
+            --x_left;
+        }
     }
-
-#endif // PHARE_HAVE_MKN_GPU
 }
 
 
 template<auto type>
 void sync_moved_pc(auto& particles, auto&&... args)
 {
-    particles.template sync_moved<type>();     // realloc
-    particles.template sync<1, type>(args...); // add + compact
+    particles.template sync_moved<type>();   // realloc
+    particles.template sync_add_new<type>(); // movers appended to their new cells
+    particles.template sync_rm_left<type>(); // leavers compacted out of their old cells
 
-    particles.template sync<0, type>(); // finalize
+    particles.template sync<0, type>(args...); // finalize
 }
 
 

@@ -68,7 +68,7 @@ using Permutations_t = testing::Types< // ! notice commas !
    ,TestParam<3, LayoutMode::AoSMapped, AllocatorMode::CPU>
    ,TestParam<3, LayoutMode::AoSPC, AllocatorMode::CPU>
    ,TestParam<3, LayoutMode::AoSTS, AllocatorMode::CPU>
-   // ,TestParam<3, LayoutMode::AoSPCTS, AllocatorMode::CPU>
+   ,TestParam<3, LayoutMode::AoSPCTS, AllocatorMode::CPU>
 
 PHARE_WITH_THRUST(
     ,TestParam<3, LayoutMode::SoA, AllocatorMode::CPU>
@@ -155,6 +155,7 @@ struct MoveParticles<LayoutMode::AoSPC>
     template<typename Particles, typename Offsets>
     static void apply(Particles& particles, Offsets const& offsets)
     {
+        auto constexpr dim  = Particles::dimension;
         std::size_t counter = 0;
         for (auto const& bix : particles.local_box())
         {
@@ -163,9 +164,12 @@ struct MoveParticles<LayoutMode::AoSPC>
             for (std::size_t i = 0; i < n; ++i)
             {
                 auto& p            = cell_particles[i];
-                auto const newcell = add_icell(p.iCell(), offsets[counter % offsets.size()]);
+                auto const oldcell = p.iCell();
+                auto const newcell = add_icell(oldcell, offsets[counter % offsets.size()]);
                 ++counter;
-                particles.icell_changer(p, bix, i, newcell);
+                p.iCell() = newcell;
+                ParticleTracker<dim> const pt{oldcell};
+                particles.template move_check<ParticleType::Domain>(pt, i, p);
             }
         }
         sync_moved_pc<ParticleType::Domain>(particles);
@@ -192,11 +196,13 @@ struct MoveParticles<LayoutMode::AoSTS>
                 auto const newcell   = add_icell(oldcell, offsets[counter % offsets.size()]);
                 ++counter;
                 p.iCell() = newcell;
-                struct
+                // production contract (see MultiBoris): only particles staying in the patch
+                // box register; patch-leavers stay put in their tile with a ghost iCell
+                if (isIn(newcell, particles.box()))
                 {
-                    std::array<std::uint32_t, dim> tile_cell;
-                } const pt{tile_cell};
-                particles.template move_check<ParticleType::Domain>(pt, i, p);
+                    TiledParticleTracker<dim> const pt{oldcell, tile_cell};
+                    particles.template move_check<ParticleType::Domain>(pt, i, p);
+                }
             }
         }
         sync_ts<ParticleType::Domain>(particles);
@@ -206,11 +212,8 @@ struct MoveParticles<LayoutMode::AoSTS>
 template<>
 struct MoveParticles<LayoutMode::AoSPCTS>
 {
-    // KNOWN GAP: PCTileSetParticles::move_check is currently an unconditional stub
-    // (it ignores Super's real PCTileSetSpan::move_check), PCTileSetVector has no
-    // local_tile_cell (unlike TileSetVector), and sync_pc_ts itself is a stub.
-    // This is expected to be a no-op today; it exists so the test goes red here
-    // and drives the sync_pc_ts implementation work.
+    // registration goes through the span (move_check lives on PCTileSetSpan); the view's
+    // gap arrays alias the vector's, so sync_pc_ts on the vector sees every registration
     template<typename Particles, typename Offsets>
     static void apply(Particles& particles, Offsets const& offsets)
     {
@@ -231,11 +234,8 @@ struct MoveParticles<LayoutMode::AoSPCTS>
                     auto const tile_cell = view.local_tile_cell(oldcell);
                     auto const newcell   = add_icell(oldcell, offsets[counter % offsets.size()]);
                     ++counter;
-                    struct
-                    {
-                        std::array<int, dim> icell;
-                        std::array<std::uint32_t, dim> tile_cell;
-                    } const pt{oldcell, tile_cell};
+                    p.iCell() = newcell;
+                    TiledParticleTracker<dim> const pt{oldcell, tile_cell};
                     view.template move_check<ParticleType::Domain>(pt, i, p);
                 }
             }
@@ -249,6 +249,71 @@ template<typename Particles>
 void move_particles(Particles& particles)
 {
     MoveParticles<Particles::layout_mode>::apply(particles, corner_offsets<Particles::dimension>());
+}
+
+
+// every per-cell bucket must only hold particles whose iCell maps to that bucket
+template<typename Particles>
+void check_cell_buckets(Particles const& particles)
+{
+    using enum LayoutMode;
+    auto constexpr static dim = Particles::dimension;
+
+    if constexpr (any_in(Particles::layout_mode, AoSPC, AoSPCTS))
+    {
+        auto const check = [](auto const& cps, std::array<std::uint32_t, dim> const& cell) {
+            for (auto const& p : cps(cell))
+                EXPECT_TRUE(array_equals(cps.local_cell(p.iCell()), cell))
+                    << "particle in wrong cell bucket: " << Point{p.iCell()};
+        };
+
+        if constexpr (Particles::layout_mode == AoSPC)
+        {
+            for (auto const& bix : particles.local_box())
+                check(particles, bix);
+        }
+        else
+        {
+            for (auto const& tile : particles())
+                for (auto const& bix : tile().local_box())
+                    check(tile(), bix);
+        }
+    }
+}
+
+
+// only particles outside the patch domain box may sit outside their tile's box —
+// a particle inside the patch domain must never be stored in a tile's ghost cells
+template<typename Particles>
+void check_tile_ownership(Particles const& particles)
+{
+    using enum LayoutMode;
+
+    if constexpr (any_in(Particles::layout_mode, AoSTS, AoSPCTS))
+    {
+        auto const check = [&](auto const& tile, auto const& p) {
+            if (isIn(p.iCell(), particles.box()))
+                EXPECT_TRUE(isIn(p.iCell(), tile)) << "domain particle in tile ghost cells: "
+                                                   << Point{p.iCell()} << " tile: " << tile;
+        };
+
+        if constexpr (any_in(Particles::layout_mode, AoSTS))
+        {
+            for (auto const& tile : particles())
+                for (auto const& p : tile())
+                    check(tile, p);
+        }
+        else
+        {
+            for (auto const& tile : particles())
+            {
+                auto const& cps = tile();
+                for (auto const& bix : cps.local_box())
+                    for (auto const& p : cps(bix))
+                        check(tile, p);
+            }
+        }
+    }
 }
 
 
@@ -270,8 +335,16 @@ TYPED_TEST(ParticleArrayConstructionTest, test_move_sync_works)
     move_particles(particles);
     move_particles(reference);
 
-    auto converted = convert_particles_and_sort<AoSParticleArray_t>(particles, this->layout);
-    sort_particles(reference, this->layout.AMRBox());
+    check_tile_ownership(particles);
+    check_cell_buckets(particles);
+
+    // particles have moved out of AMRBox into the first ghost layer; sorting must use the
+    // grown box or distinct out-of-box cells alias to the same flat index and, with all
+    // deltas identical, the two arrays end up in different orders
+    auto const sort_box = grow(this->layout.AMRBox(), 1);
+    auto converted      = convert_particles<AoSParticleArray_t>(particles, this->layout);
+    sort_particles(converted, sort_box);
+    sort_particles(reference, sort_box);
 
     auto const report = compare_particles(reference, converted);
     EXPECT_TRUE(report) << report.why();

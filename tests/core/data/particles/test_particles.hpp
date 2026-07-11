@@ -150,7 +150,7 @@ void add_particles_in(Particles& particles, Box const& box, std::size_t const pp
         for (std::size_t i = 0; i < ppc; ++i)
             particles.emplace_back(particle(*bix, id++));
 
-    if constexpr (any_in(Particles::layout_mode, AoSPC, SoAPC, AoSTS))
+    if constexpr (any_in(Particles::layout_mode, AoSPC, SoAPC, AoSTS, AoSPCTS))
         particles.template sync<2, type>();
 }
 

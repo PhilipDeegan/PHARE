@@ -51,8 +51,10 @@ Dst ParticlesConverter<AoSPCTS, CPU, AoS, CPU>::operator()(Src const& src,
     out.reserve(src.size());
     for (auto const& tile : src())
     {
+        // full per-tile box: particles that left the patch domain live in tile ghost
+        // cells; tile ghost cells inside the patch stay empty (owner tiles hold those)
         auto const& cps = tile();
-        for (auto const& bix : cps.local_box(cps.box()))
+        for (auto const& bix : cps.local_box())
             std::copy(cps(bix).begin(), cps(bix).end(), std::back_inserter(out));
     }
     return out;

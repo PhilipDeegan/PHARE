@@ -19,9 +19,10 @@ namespace PHARE::core::mkn
 template<typename Ions, typename Electromag, typename GridLayout>
 class IonUpdaterMultiTS
 {
-    using Particles                       = Ions::particle_array_type;
-    bool constexpr static atomic_interp   = Particles::alloc_mode == AllocatorMode::GPU_UNIFIED;
-    bool constexpr static use_main_thread = true; // for perf
+    using Particles                        = Ions::particle_array_type;
+    auto constexpr static multi_boris_opts = MultiBorisOptions{};
+    bool constexpr static atomic_interp    = Particles::alloc_mode == AllocatorMode::GPU_UNIFIED;
+    bool constexpr static use_main_thread  = multi_boris_opts.use_main_thread; // for perf
 
 public:
     auto static constexpr dimension    = GridLayout::dimension;
@@ -129,11 +130,7 @@ void IonUpdaterMultiTS<Ions, Electromag, GridLayout>::updateAndDepositAll_(
 #if PHARE_HAVE_MKN_GPU
 
     MultiBoris<ModelAccessor_t> in{dt_, accessor};
-
     Pusher_t::move(in, boxings);
-
-    if (use_main_thread)
-        in.streamer.join();
 
     auto post_move_sync = [&](auto const i) mutable {
         auto view                 = accessor[i];
@@ -217,8 +214,11 @@ void IonUpdaterMultiTS<Ions, Electromag, GridLayout>::updateAndDepositAll_(
             in.streamer.host(deposit);
     }
 
-    in.streamer.join();
-    in.streamer.dump_times(detail::timings_dir_str + "/updateAndDepositAll.txt");
+    if constexpr (not use_main_thread)
+    {
+        in.streamer.join();
+        in.streamer.dump_times(detail::timings_dir_str + "/updateAndDepositAll.txt");
+    }
 
 #else
     throw std::runtime_error("No available implementation");

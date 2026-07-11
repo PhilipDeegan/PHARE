@@ -78,8 +78,9 @@ struct AnyBorisImpl<LayoutMode::AoSPC, AllocatorMode::CPU, dim, Interpolator, Gr
                     auto const& newCell = boris::advance<alloc_mode>(particle, halfDtOverDl);
                     if (newCell != particle.iCell())
                     {
-                        particles.icell_changer(particle, bix, idx, newCell);
+                        ParticleTracker<dim> const pt{particle.iCell()};
                         particle.iCell() = newCell;
+                        particles.template move_check<type>(pt, idx, particle);
                     }
                 }
         };
@@ -186,8 +187,9 @@ struct AnyBorisImpl<LayoutMode::AoSPC, AllocatorMode::GPU_UNIFIED, dim, Interpol
                 auto const& newCell = boris::advance<alloc_mode>(particle, halfDtOverDl_);
                 if (!array_equals(newCell, particle.iCell()))
                 {
-                    view.icell_changer(particle, locell, threadIdx, newCell);
+                    ParticleTracker<dim> const pt{particle.iCell()};
                     particle.iCell() = newCell;
+                    view.template move_check<type>(pt, threadIdx, particle);
                 }
             };
 
