@@ -1,6 +1,7 @@
 #ifndef PHARE_CORE_DEF_PHLOP_HPP
 #define PHARE_CORE_DEF_PHLOP_HPP
 
+
 #if __has_include("phlop/timing/mpi_scope_timer.hpp")                                              \
                   and (!defined(PHARE_HAVE_PHLOP) || PHARE_HAVE_PHLOP == 1)
 

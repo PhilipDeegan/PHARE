@@ -8,7 +8,6 @@ import numpy as np
 from dataclasses import dataclass, field
 
 from pyphare.pharesee.run import Run
-
 import phlop.timing.scope_timer as phst
 
 substeps_per_finer_level = 4
@@ -167,33 +166,6 @@ def make_scope_timer_file_from(input):
     return ScopeTimerFile(supe.id_keys, supe.roots, run=None)
 
 
-def _cli_args():
-    parser = argparse.ArgumentParser()
-    parser.add_argument("-f", "--file", default=None, help="timer file")
-    parser.add_argument(
-        "-F", "--filter", default=None, help="filter if function supports it"
-    )
-    return parser
-
-
-def write_scope_timer(scope_timer_filepath=None):
-    if scope_timer_filepath is None:  # assume cli
-        parser = _cli_args()
-        scope_timer_filepath = parser.parse_args().file
-        if not scope_timer_filepath:
-            parser.print_help()
-            sys.exit(1)
-
-    scope_timer_file = phst.file_parser(scope_timer_filepath)
-    phst.write_scope_timings(scope_timer_file, outfile="times.txt")
-    phst.write_root_as_csv(
-        scope_timer_file,
-        "times.csv",
-        ["fn", "dim", "layout", "alloc", "storage", "impl", "time", "norm_ppc"],
-        "update,",
-    )
-
-
 def write_root_as_csv(scope_timer_file, outfile, headers=None, regex=None):
     from contextlib import redirect_stdout
 
@@ -235,7 +207,7 @@ def print_variance_across(scope_timer_filepath=None, root_id=None):
             sys.exit(1)
         if args.filter:
             root_id = args.filter
-    phst.print_variance_across(scope_timer_filepath)
+    phst.print_variance_across(scope_timer_filepath, root_id)
 
 
 def print_scope_timings(scope_timer_filepath=None, sort_worst_first=True, root_id=None):

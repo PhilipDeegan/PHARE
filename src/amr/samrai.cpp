@@ -33,6 +33,7 @@ SamraiLifeCycle::SamraiLifeCycle(int argc, char** argv)
 SamraiLifeCycle::~SamraiLifeCycle()
 {
     PHARE_WITH_KOKKOS(Kokkos::finalize();)
+
     SAMRAI::tbox::SAMRAIManager::shutdown();
     SAMRAI::tbox::SAMRAIManager::finalize();
     SAMRAI::tbox::SAMRAI_MPI::finalize();
