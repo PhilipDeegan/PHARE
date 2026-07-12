@@ -30,9 +30,11 @@ class HybridInitializationTest(InitializationTest):
         time_step_nbr=1,
         smallest_patch_size=None,
         largest_patch_size=10,
+        block_merging_particles=False,
         cells=120,
         dl=0.1,
         diag_outputs="",
+        sim_setup_kwargs={},
         **kwargs,
     ):
         if smallest_patch_size is None:
@@ -179,7 +181,7 @@ class HybridInitializationTest(InitializationTest):
                     population_name=pop,
                 )
 
-        Simulator(sim).initialize().reset()
+        Simulator(sim).setup(**sim_setup_kwargs).initialize().reset()
 
         eb_hier = None
         if qty in ["e", "eb"]:
@@ -227,8 +229,8 @@ class HybridInitializationTest(InitializationTest):
             h5_filename=diag_outputs + "/ions_pop_protons_levelGhost.h5",
             hier=particle_hier,
         )
-
-        merge_particles(particle_hier)
+        if not block_merging_particles:
+            merge_particles(particle_hier)
 
         return particle_hier
 

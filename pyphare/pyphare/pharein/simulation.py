@@ -412,6 +412,7 @@ def check_patch_size(ndim, **kwargs):
     smallest_patch_size = small_invalid_patch_size + 1
     smallest_patch_size = phare_utilities.np_array_ify(smallest_patch_size, ndim)
 
+
     if "smallest_patch_size" in kwargs and kwargs["smallest_patch_size"] is not None:
         smallest_patch_size = phare_utilities.np_array_ify(
             kwargs["smallest_patch_size"], ndim
