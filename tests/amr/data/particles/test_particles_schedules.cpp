@@ -52,6 +52,7 @@ using ParticlesDatas = testing::Types<
 
 PHARE_WITH_MKN_GPU(
   ,TestParam<SimOpts{.layout_mode=LayoutMode::AoSTS}>
+  ,TestParam<SimOpts{.layout_mode=LayoutMode::AoSPCTS}>
 )
 
 >;
@@ -79,7 +80,7 @@ TYPED_TEST(ParticleScheduleHierarchyTest, testing_inject_ghost_layer)
         {
             pop.domainParticles().clear();
             EXPECT_EQ(pop.domainParticles().size(), 0);
-            if constexpr (any_in(ParticleArray_t::layout_mode, AoSTS))
+            if constexpr (core::is_tiled(ParticleArray_t::layout_mode))
                 for (auto const& tile : pop.domainParticles()())
                 {
                     EXPECT_EQ(tile().size(), 0);
@@ -122,7 +123,7 @@ TYPED_TEST(ParticleScheduleHierarchyTest, testing_inject_ghost_layer)
         {
             EXPECT_EQ(pop.domainParticles().size(), ncells * ppc);
 
-            if constexpr (any_in(ParticleArray_t::layout_mode, AoSTS))
+            if constexpr (core::is_tiled(ParticleArray_t::layout_mode))
                 for (auto const& tile : pop.domainParticles()())
                     check_array(tile());
             else

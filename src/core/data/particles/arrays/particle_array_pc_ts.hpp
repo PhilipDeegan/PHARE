@@ -4,13 +4,13 @@
 
 #include "core/def.hpp"
 #include "core/operators.hpp"
-#include "core/data/tiles/tile_set.hpp"
-#include "core/data/tiles/tile_set_traversal.hpp"
 #include "core/utilities/span.hpp"
 #include "core/utilities/box/box.hpp"
+#include "core/data/tiles/tile_set.hpp"
 #include "core/data/ndarray/ndarray_vector.hpp"
 #include "core/data/particles/particle_array_def.hpp"
-#include "core/data/particles/arrays/particle_array_pc.hpp"
+// #include "core/data/tiles/tile_set_traversal.hpp"
+// #include "core/data/particles/arrays/particle_array_pc.hpp"
 
 
 
@@ -48,6 +48,10 @@ public:
 
     auto& operator()() _PHARE_ALL_FN_ { return particles; }
     auto& operator()() const _PHARE_ALL_FN_ { return particles; }
+
+    Super& operator*() _PHARE_ALL_FN_ { return *this; }
+    Super const& operator*() const _PHARE_ALL_FN_ { return *this; }
+
     auto& link(std::size_t const idx) { return _links[idx]; }
     auto& links() { return _links; }
     auto& links() const { return _links; }
@@ -299,8 +303,25 @@ public:
         sync();
     }
 
-    PCTileSetVector& operator=(PCTileSetVector&&)      = default;
-    PCTileSetVector& operator=(PCTileSetVector const&) = default;
+    // not = default: see TileSetVector::operator= (particle_array_ts.hpp) -- the
+    // defaulted memberwise copy/move leaves particles_views_ stale, so reconstruct
+    // in place via the copy/move constructors instead, which call sync() themselves
+    PCTileSetVector& operator=(PCTileSetVector&& that)
+    {
+        if (this == &that)
+            return *this;
+        this->~PCTileSetVector();
+        new (this) PCTileSetVector(std::move(that));
+        return *this;
+    }
+    PCTileSetVector& operator=(PCTileSetVector const& that)
+    {
+        if (this == &that)
+            return *this;
+        this->~PCTileSetVector();
+        new (this) PCTileSetVector(that);
+        return *this;
+    }
 
     auto size() const { return total_size; }
     auto size(locell_t const& icell) const { return cell_size_(icell); }
@@ -320,6 +341,12 @@ public:
         assert(tile);
         (*tile)().emplace_back(p);
         ++total_size;
+    }
+
+    template<typename... Args>
+    void emplace_back(double const weight, Args&&... args)
+    {
+        this->emplace_back(Particle_t{weight, args...});
     }
 
     void push_back(Particle_t const& p) { emplace_back(p); }

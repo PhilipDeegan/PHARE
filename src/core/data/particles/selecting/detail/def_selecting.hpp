@@ -16,13 +16,19 @@ struct ParticlesSelector
     auto constexpr static layout_mode = layout_mde;
     auto constexpr static alloc_mode  = alloc_mde;
 
-    template<typename SrcParticles, typename DstParticles, typename box_t>
+    // particle_type says whether src physically lives in the domain or in a
+    // (tiled) ghost layer -- tiled layouts need this to know whether to
+    // intersect against a tile's domain box or its (clamped) ghost box
+    template<ParticleType particle_type = ParticleType::Domain, typename SrcParticles,
+             typename DstParticles, typename box_t>
     static void select(SrcParticles const&, DstParticles&, box_t const&);
 
-    template<typename SrcParticles, typename DstParticles, typename box_t, typename Shift>
+    template<ParticleType particle_type = ParticleType::Domain, typename SrcParticles,
+             typename DstParticles, typename box_t, typename Shift>
     static void select(SrcParticles const&, DstParticles&, box_t const&, Shift&&);
 
-    template<typename SrcParticles, typename box_t>
+    template<ParticleType particle_type = ParticleType::Domain, typename SrcParticles,
+             typename box_t>
     static std::size_t count(SrcParticles const&, box_t const&);
 };
 

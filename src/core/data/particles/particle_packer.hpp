@@ -62,7 +62,30 @@ public:
         using enum LayoutMode;
         if constexpr (ParticleArray_t::layout_mode == SoA)
             copy = particles_;
-        else if constexpr (any_in(ParticleArray_t::layout_mode, AoSTS))
+        else if constexpr (ParticleArray_t::layout_mode == AoSPCTS)
+        {
+            // iterate every cell (domain + ghost/halo): domain-content arrays are
+            // expected to have an empty halo once settled/synced, but ghost-content
+            // arrays (levelGhostParticles et al.) live entirely in the halo, so
+            // restricting to domain cells would silently drop all of their particles
+            std::size_t idx = 0;
+            for (auto const& tile : particles_())
+            {
+                auto const& pc = tile();
+                for (auto const& bix : pc.local_box())
+                    for (auto const& particle : pc(bix))
+                    {
+                        copy.weight(idx) = particle.weight();
+                        copy.charge(idx) = particle.charge();
+                        copy.iCell(idx)  = particle.iCell();
+                        copy.delta(idx)  = particle.delta();
+                        copy.v(idx)      = particle.v();
+                        ++idx;
+                    }
+            }
+            assert(idx == particles_.size());
+        }
+        else if constexpr (is_tiled(ParticleArray_t::layout_mode))
         {
             std::size_t idx = 0;
             for (auto const& tile : particles_())

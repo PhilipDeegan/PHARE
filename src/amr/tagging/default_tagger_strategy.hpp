@@ -72,9 +72,8 @@ void DefaultTaggerStrategy<Model>::tag(Model& model, gridlayout_type const& layo
     if constexpr (solver::is_hybrid_model_v<Model>)
     {
         using ParticleArray_t = Model::particle_array_type;
-        using enum core::LayoutMode;
 
-        if constexpr (core::any_in(ParticleArray_t::layout_mode, AoSTS))
+        if constexpr (core::is_tiled(ParticleArray_t::layout_mode))
         {
             using Field_vt       = Model::field_type::value_type;
             using TensorField_vt = core::basic::TensorField<Field_vt, 1>;

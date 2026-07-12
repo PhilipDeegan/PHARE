@@ -16,7 +16,7 @@ using enum AllocatorMode;
 // SoA, CPU
 
 template<>
-template<typename SrcParticles, typename DstParticles, typename box_t>
+template<ParticleType particle_type, typename SrcParticles, typename DstParticles, typename box_t>
 void ParticlesSelector<SoA, CPU>::select(SrcParticles const& src, DstParticles& dst,
                                          box_t const& box)
 {
@@ -24,7 +24,8 @@ void ParticlesSelector<SoA, CPU>::select(SrcParticles const& src, DstParticles& 
 }
 
 template<>
-template<typename SrcParticles, typename DstParticles, typename box_t, typename Shift>
+template<ParticleType particle_type, typename SrcParticles, typename DstParticles, typename box_t,
+         typename Shift>
 void ParticlesSelector<SoA, CPU>::select(SrcParticles const& src, DstParticles& dst,
                                          box_t const& box, Shift&& fn)
 {
@@ -32,7 +33,7 @@ void ParticlesSelector<SoA, CPU>::select(SrcParticles const& src, DstParticles& 
 }
 
 template<>
-template<typename SrcParticles, typename box_t>
+template<ParticleType particle_type, typename SrcParticles, typename box_t>
 std::size_t ParticlesSelector<SoA, CPU>::count(SrcParticles const& src, box_t const& box)
 {
     throw std::runtime_error("finish this");
@@ -45,7 +46,7 @@ std::size_t ParticlesSelector<SoA, CPU>::count(SrcParticles const& src, box_t co
 // SoA, GPU_UNIFIED
 
 template<>
-template<typename SrcParticles, typename DstParticles, typename box_t>
+template<ParticleType particle_type, typename SrcParticles, typename DstParticles, typename box_t>
 void ParticlesSelector<SoA, GPU_UNIFIED>::select(SrcParticles const& src, DstParticles& dst,
                                                  box_t const& box)
 {
@@ -53,7 +54,8 @@ void ParticlesSelector<SoA, GPU_UNIFIED>::select(SrcParticles const& src, DstPar
 }
 
 template<>
-template<typename SrcParticles, typename DstParticles, typename box_t, typename Shift>
+template<ParticleType particle_type, typename SrcParticles, typename DstParticles, typename box_t,
+         typename Shift>
 void ParticlesSelector<SoA, GPU_UNIFIED>::select(SrcParticles const& src, DstParticles& dst,
                                                  box_t const& box, Shift&& fn)
 {
@@ -61,7 +63,7 @@ void ParticlesSelector<SoA, GPU_UNIFIED>::select(SrcParticles const& src, DstPar
 }
 
 template<>
-template<typename SrcParticles, typename box_t>
+template<ParticleType particle_type, typename SrcParticles, typename box_t>
 std::size_t ParticlesSelector<SoA, GPU_UNIFIED>::count(SrcParticles const& src, box_t const& box)
 {
     throw std::runtime_error("finish this");
@@ -74,7 +76,7 @@ std::size_t ParticlesSelector<SoA, GPU_UNIFIED>::count(SrcParticles const& src, 
 // SoAPC, CPU
 
 template<>
-template<typename SrcParticles, typename DstParticles, typename box_t>
+template<ParticleType particle_type, typename SrcParticles, typename DstParticles, typename box_t>
 void ParticlesSelector<SoAPC, CPU>::select(SrcParticles const& src, DstParticles& dst,
                                            box_t const& box)
 {
@@ -103,7 +105,8 @@ void ParticlesSelector<SoAPC, CPU>::select(SrcParticles const& src, DstParticles
 }
 
 template<>
-template<typename SrcParticles, typename DstParticles, typename box_t, typename Shift>
+template<ParticleType particle_type, typename SrcParticles, typename DstParticles, typename box_t,
+         typename Shift>
 void ParticlesSelector<SoAPC, CPU>::select(SrcParticles const& src, DstParticles& dst,
                                            box_t const& box, Shift&& fn)
 {
@@ -132,7 +135,7 @@ void ParticlesSelector<SoAPC, CPU>::select(SrcParticles const& src, DstParticles
 // SoAPC, GPU_UNIFIED
 
 template<>
-template<typename SrcParticles, typename DstParticles, typename box_t>
+template<ParticleType particle_type, typename SrcParticles, typename DstParticles, typename box_t>
 void ParticlesSelector<SoAPC, GPU_UNIFIED>::select(SrcParticles const& src, DstParticles& dst,
                                                    box_t const& box)
 {
@@ -161,7 +164,8 @@ void ParticlesSelector<SoAPC, GPU_UNIFIED>::select(SrcParticles const& src, DstP
 }
 
 template<>
-template<typename SrcParticles, typename DstParticles, typename box_t, typename Shift>
+template<ParticleType particle_type, typename SrcParticles, typename DstParticles, typename box_t,
+         typename Shift>
 void ParticlesSelector<SoAPC, GPU_UNIFIED>::select(SrcParticles const& src, DstParticles& dst,
                                                    box_t const& box, Shift&& shift)
 {
@@ -188,7 +192,7 @@ void ParticlesSelector<SoAPC, GPU_UNIFIED>::select(SrcParticles const& src, DstP
 // SoAPC, CPU
 
 template<>
-template<typename SrcParticles, typename box_t>
+template<ParticleType particle_type, typename SrcParticles, typename box_t>
 std::size_t ParticlesSelector<SoAPC, CPU>::count(SrcParticles const& src, box_t const& box)
 {
     auto const lcl_box = src.local_box(box);
@@ -201,7 +205,7 @@ std::size_t ParticlesSelector<SoAPC, CPU>::count(SrcParticles const& src, box_t 
 // SoAPC, GPU_UNIFIED
 
 template<>
-template<typename SrcParticles, typename box_t>
+template<ParticleType particle_type, typename SrcParticles, typename box_t>
 std::size_t ParticlesSelector<SoAPC, GPU_UNIFIED>::count(SrcParticles const& src, box_t const& box)
 {
     auto const lcl_box = src.local_box(box);

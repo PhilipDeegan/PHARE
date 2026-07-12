@@ -6,7 +6,8 @@
 namespace PHARE::core
 {
 
-template<typename Src, typename Dst, typename box_t>
+template<ParticleType particle_type = ParticleType::Domain, typename Src, typename Dst,
+         typename box_t>
 void select_particles(Src const& src, Dst& dst, box_t const& box)
 {
     // static_assert(std::is_same_v<Src, Dst>);
@@ -16,11 +17,12 @@ void select_particles(Src const& src, Dst& dst, box_t const& box)
     auto constexpr function_id              = join_string_views_v<FN_ID, Dst::type_id>;
     PHARE_LOG_SCOPE(3, function_id);
 
-    Selector::select(src, dst, box);
+    Selector::template select<particle_type>(src, dst, box);
 }
 
 
-template<typename Src, typename Dst, typename box_t, typename Transformer>
+template<ParticleType particle_type = ParticleType::Domain, typename Src, typename Dst,
+         typename box_t, typename Transformer>
 void select_particles(Src const& src, Dst& dst, box_t const& box, Transformer&& transformer)
 {
     // static_assert(std::is_same_v<Src, Dst>);
@@ -30,15 +32,15 @@ void select_particles(Src const& src, Dst& dst, box_t const& box, Transformer&& 
     auto constexpr function_id              = join_string_views_v<FN_ID, Dst::type_id>;
     PHARE_LOG_SCOPE(3, function_id);
 
-    Selector::select(src, dst, box, transformer);
+    Selector::template select<particle_type>(src, dst, box, transformer);
 }
 
 
-template<typename Src, typename box_t>
+template<ParticleType particle_type = ParticleType::Domain, typename Src, typename box_t>
 std::size_t count_particles(Src const& src, box_t const& box)
 {
     using Selector = ParticlesSelector<Src::layout_mode, Src::alloc_mode>;
-    return Selector::count(src, box);
+    return Selector::template count<particle_type>(src, box);
 }
 
 

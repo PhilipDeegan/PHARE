@@ -284,6 +284,13 @@ public:
         dst.emplace_back(src, idx);
     }
 
+
+    template<typename... Args>
+    void emplace_back(double const weight, Args&&... args)
+    {
+        this->emplace_back(Particle_t{weight, args...});
+    }
+
     template<typename V>
     static auto& get_vec(V& v)
     {
@@ -619,8 +626,8 @@ void PerCellVector<Particles>::sync()
     static_assert(type != ParticleType::All);
 
     PHARE_LOG_SCOPE(1, "PerCellVector::sync");
-    // PHARE_LOG_LINE_STR("sync " << static_cast<std::uint32_t>(PHASE) << " "
-    //                            << magic_enum::enum_name(type));
+    PHARE_LOG_LINE_STR("sync " << static_cast<std::uint32_t>(PHASE) << " "
+                               << magic_enum::enum_name(type));
 
     auto const lbox = local_box();
 
@@ -643,7 +650,9 @@ void PerCellVector<Particles>::sync()
     };
 
     if constexpr (type == ParticleType::Domain)
-        on_domain(per_cell);
+        on_ghost_box(per_cell);
+    else
+        on_ghost_layer_plus_2_domain(per_cell);
 
     {
         PHARE_LOG_SCOPE(1, "PerCellVector::sync::reset_views");

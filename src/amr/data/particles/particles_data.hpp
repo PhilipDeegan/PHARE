@@ -5,13 +5,10 @@
 
 #include "core/def.hpp" // IWYU pragma: keep
 #include "core/logger.hpp"
-#include "core/vector.hpp"
 #include "core/def/phare_mpi.hpp" // IWYU pragma: keep
 #include "core/utilities/types.hpp"
-#include "core/utilities/point/point.hpp"
 #include "core/data/particles/particle_array.hpp"
 #include "core/data/particles/particle_array_service.hpp"
-#include "core/data/particles/particle_packer.hpp"
 #include "core/data/ions/ion_population/particle_pack.hpp"
 
 #include "amr/samrai.hpp" // IWYU pragma: keep
@@ -30,7 +27,6 @@
 #include <SAMRAI/tbox/MemoryUtilities.h>
 
 #include <tuple>
-#include <vector>
 #include <cstddef>
 #include <stdexcept>
 
@@ -74,9 +70,6 @@ namespace amr
         using SamBox        = SAMRAI::hier::Box;
 
         // using Particle_t          = typename ParticleArray::Particle_t;
-        static constexpr auto is_host_mem
-            = ParticleArray::alloc_mode == AllocatorMode::CPU
-              || ParticleArray::alloc_mode == AllocatorMode::GPU_UNIFIED;
         static constexpr auto dim = ParticleArray::dimension;
         // add one cell surrounding ghost box to map particles exiting the ghost layer
         static constexpr int ghostSafeMapLayer = 1;
@@ -131,125 +124,23 @@ namespace amr
         // SAMRAI interface
         void putToRestart(std::shared_ptr<SAMRAI::tbox::Database> const& restart_db) const override
         {
-            using Packer = core::ParticlePacker<ParticleArray>;
-
             Super::putToRestart(restart_db);
 
-            auto putParticles = [&](std::string const& name, auto& particles) {
-                // SAMRAI errors on writing 0 size arrays
-                if (particles.size() == 0)
-                    return;
-
-                if constexpr (any_in(ParticleArray::layout_mode, core::LayoutMode::AoSMapped))
-                    particles.sortMapping();
-
-                Packer packer{particles};
-                [[maybe_unused]] core::SoAParticleArray<dim> soa_;
-
-                using enum core::LayoutMode;
-                auto& soa = [&]() -> auto& {
-                    if constexpr (any_in(ParticleArray::layout_mode, AoS, AoSTS, AoSMapped, SoATS))
-                    {
-                        soa_.resize(particles.size());
-                        packer.pack(soa_);
-                        return soa_;
-                    }
-                    else
-                    {
-                        return particles;
-                    }
-                }();
-
-                std::size_t part_idx = 0;
-                core::apply(soa.as_tuple(), [&](auto const& v) {
-                    using Vector = std::decay_t<decltype(v)>;
-                    using T      = typename Vector::value_type;
-
-                    auto const put_vec = [&](auto const& vec) {
-                        putVectorToRestart(*restart_db, name + "_" + packer.keys()[part_idx++],
-                                           vec);
-                    };
-
-                    if constexpr (is_host_mem)
-                        put_vec(v);
-                    else
-                    {
-                        static std::vector<T> put_host_vec;
-                        put_host_vec.resize(v.size());
-                        PHARE::Vector<T>::copy(put_host_vec, v);
-                        put_vec(put_host_vec);
-                    }
-                });
-            };
-
-            putParticles("domainParticles", domainParticles);
-            putParticles("levelGhostParticles", levelGhostParticles);
-            putParticles("levelGhostParticlesNew", levelGhostParticlesNew);
-            putParticles("levelGhostParticlesOld", levelGhostParticlesOld);
+            putParticlesToRestart(*restart_db, "domainParticles", domainParticles);
+            putParticlesToRestart(*restart_db, "levelGhostParticles", levelGhostParticles);
+            putParticlesToRestart(*restart_db, "levelGhostParticlesNew", levelGhostParticlesNew);
+            putParticlesToRestart(*restart_db, "levelGhostParticlesOld", levelGhostParticlesOld);
         };
 
 
         void getFromRestart(std::shared_ptr<SAMRAI::tbox::Database> const& restart_db) override
         {
-            using Packer = core::ParticlePacker<ParticleArray>;
-
             Super::getFromRestart(restart_db);
 
-            auto getParticles = [&](std::string const name, auto& particles) {
-                std::array<bool, Packer::n_keys> const keys_exist = core::generate_from(
-                    [&](auto const& key) { return restart_db->keyExists(name + "_" + key); },
-                    Packer::keys());
-
-                bool all  = core::all(keys_exist);
-                bool none = core::none(keys_exist);
-                if (!(all or none))
-                    throw std::runtime_error("ParticlesData::getFromRestart has been given an "
-                                             "invalid input file, inconsistent state detected");
-
-                if (none) // can't read what doesn't exist
-                    return;
-
-                auto n_particles
-                    = restart_db->getArraySize(name + "_" + Packer::arbitrarySingleValueKey());
-                core::SoAParticleArray<dim> soa{n_particles};
-
-                {
-                    std::size_t part_idx = 0;
-                    core::apply(soa.as_tuple(), [&](auto& arg) {
-                        using Vector = std::decay_t<decltype(arg)>;
-                        using T      = typename Vector::value_type;
-
-                        auto& vec = [](auto& v) -> auto& {
-                            if constexpr (is_host_mem)
-                                return v;
-                            else
-                            {
-                                static std::vector<T> get_host_vec;
-                                get_host_vec.clear();
-                                return get_host_vec;
-                            }
-                        }(arg);
-
-                        getVectorFromRestart(*restart_db, name + "_" + Packer::keys()[part_idx++],
-                                             vec);
-
-                        if constexpr (not is_host_mem)
-                            PHARE::Vector<T>::copy(arg, vec);
-                    });
-                }
-
-                assert(particles.size() == 0);
-                // particles.reserve(n_particles);
-                for (std::size_t i = 0; i < n_particles; ++i)
-                    particles.emplace_back(soa.copy(i));
-
-                particles.check();
-            };
-
-            getParticles("domainParticles", domainParticles);
-            getParticles("levelGhostParticles", levelGhostParticles);
-            getParticles("levelGhostParticlesNew", levelGhostParticlesNew);
-            getParticles("levelGhostParticlesOld", levelGhostParticlesOld);
+            getParticlesFromRestart(*restart_db, "domainParticles", domainParticles);
+            getParticlesFromRestart(*restart_db, "levelGhostParticles", levelGhostParticles);
+            getParticlesFromRestart(*restart_db, "levelGhostParticlesNew", levelGhostParticlesNew);
+            getParticlesFromRestart(*restart_db, "levelGhostParticlesOld", levelGhostParticlesOld);
         }
 
 
@@ -642,8 +533,8 @@ void ParticlesData<ParticleArray_t>::copy_from_ghost(Args&&... args)
     auto const& noffset        = offset * -1;
 
     for (auto const& overlapBox : pOverlap.getDestinationBoxContainer())
-        core::select_particles(src_particles, dst_particles,
-                               shift(phare_box_from<dim>(overlapBox), noffset), offset);
+        core::select_particles<core::ParticleType::PatchGhost>(
+            src_particles, dst_particles, shift(phare_box_from<dim>(overlapBox), noffset), offset);
 }
 
 
@@ -671,8 +562,8 @@ void ParticlesData<ParticleArray_t>::pack_from_ghost(SAMRAI::tbox::MessageStream
 
     PackArray outBuffer;
     for (auto const& overlapBox : pOverlap.getDestinationBoxContainer())
-        core::select_particles(src_particles, outBuffer,
-                               shift(phare_box_from<dim>(overlapBox), noffset), offset);
+        core::select_particles<core::ParticleType::PatchGhost>(
+            src_particles, outBuffer, shift(phare_box_from<dim>(overlapBox), noffset), offset);
 
     stream << outBuffer.size();
     stream.growBufferAsNeeded();

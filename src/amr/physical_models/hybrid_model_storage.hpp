@@ -54,7 +54,11 @@ struct hybrid_model_storage<core::LayoutMode::AoSTS, TiledIons, Grid_t>
                                          PhysicalQuantity_t::Tensor::M};
 };
 
-
+template<typename TiledIons, typename Grid_t>
+struct hybrid_model_storage<core::LayoutMode::AoSPCTS, TiledIons, Grid_t>
+    : hybrid_model_storage<core::LayoutMode::AoSTS, TiledIons, Grid_t>
+{
+};
 
 template<auto layout_mode, typename Ions, typename Grid_t>
 struct hybrid_model_storage

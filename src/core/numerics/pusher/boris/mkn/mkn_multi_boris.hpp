@@ -16,7 +16,7 @@ enum class MultiBorisMode : std::uint16_t { REF = 0, COPY };
 
 struct MultiBorisOptions
 {
-    bool use_main_thread = true; // for perf
+    bool use_main_thread = false; // true for perf
 };
 
 // Primary (incomplete) template — specialisations provide the implementation per
@@ -518,8 +518,11 @@ public:
         }
         else
         {
-            in.streamer.host(move);
-            in.streamer.host(sync);
+            // .host() takes a forwarding reference: passing the named lvalues directly
+            // would deduce a reference type and store a dangling ref to this stack frame
+            // once move() returns, so move them in to get a real, owned copy instead
+            in.streamer.host(std::move(move));
+            in.streamer.host(std::move(sync));
         }
     }
 
@@ -649,8 +652,10 @@ struct MultiBorisPusherImpl<LayoutMode::AoSPCTS, alloc, GridLayout, Particles, E
         }
         else
         {
-            in.streamer.host(move);
-            in.streamer.host(sync);
+            // see AoSTS::move() above: .host() must receive an rvalue or it stores a
+            // dangling reference to this stack frame instead of an owned copy
+            in.streamer.host(std::move(move));
+            in.streamer.host(std::move(sync));
         }
     }
 };

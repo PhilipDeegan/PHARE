@@ -321,8 +321,25 @@ public:
     }
 
 
-    TileSetVector& operator=(TileSetVector&&)      = default;
-    TileSetVector& operator=(TileSetVector const&) = default;
+    // not = default: the defaulted memberwise copy/move leaves particles_views_
+    // stale (it isn't rebuilt the way sync()/reset_views() does at the end of the
+    // copy/move constructors), so reconstruct in place via those constructors instead
+    TileSetVector& operator=(TileSetVector&& that)
+    {
+        if (this == &that)
+            return *this;
+        this->~TileSetVector();
+        new (this) TileSetVector(std::move(that));
+        return *this;
+    }
+    TileSetVector& operator=(TileSetVector const& that)
+    {
+        if (this == &that)
+            return *this;
+        this->~TileSetVector();
+        new (this) TileSetVector(that);
+        return *this;
+    }
 
     template<auto type = ParticleType::Domain>
     auto& reserve_ppc(std::size_t const& ppc);

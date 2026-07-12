@@ -77,7 +77,9 @@ public:
                     {
                         auto& pctile = particles()[tidx];
                         auto& cps    = pctile();
-                        for (auto const& bix : cps.local_box(cps.box()))
+                        // full local box (domain + halo), not domain-only: level/patch
+                        // ghost particles live in the halo and must still be deposited
+                        for (auto const& bix : cps.local_box())
                             for (auto const& p : cps(bix))
                                 interp_.particleToMesh(p, rhop(), rhoc(), F, rhop.layout(), coef);
                     }
@@ -604,7 +606,7 @@ public:
 
         if constexpr (any_in(Particles_t::layout_mode, AoSMapped))
             interp_(particles, momentumTensor, layout, mass);
-        else if constexpr (any_in(Particles_t::layout_mode, AoSTS))
+        else if constexpr (is_tiled(Particles_t::layout_mode))
         {
             using Field_vt       = TensorField::field_type::value_type;
             using TensorField_vt = basic::TensorField<Field_vt, 2>;

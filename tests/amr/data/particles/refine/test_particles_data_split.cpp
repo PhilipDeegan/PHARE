@@ -216,6 +216,7 @@ using ParticlesDatas = testing::Types< //
 
 PHARE_WITH_MKN_GPU(
    ,TestParam<1, LayoutMode::AoSTS, AllocatorMode::CPU>
+   ,TestParam<1, LayoutMode::AoSPCTS, AllocatorMode::CPU>
 )
 
 //    ,TestParam<2, LayoutMode::AoSMapped, AllocatorMode::CPU>
@@ -256,8 +257,12 @@ TYPED_TEST(ParticlesDataTest, splitWorksForDomain)
 
     dst.data->domainParticles.check();
 
-    per_particle(dst.data->domainParticles,
-                 [&](auto const& p) { EXPECT_TRUE(isIn(p, dst.layout.AMRBox())); });
+    per_particle(dst.data->domainParticles, [&](auto const& p) {
+        EXPECT_TRUE(isIn(p, dst.layout.AMRBox()));
+        EXPECT_NE(p.v()[0], 0);
+        EXPECT_NE(p.v()[1], 0);
+        EXPECT_NE(p.v()[2], 0);
+    });
 
     // for (auto const& bix : dst.layout.AMRBox())
     // {
@@ -284,6 +289,12 @@ TYPED_TEST(ParticlesDataTest, splitWorksForLevelGhost)
     EXPECT_EQ(expected, dst.data->levelGhostParticles.size());
 
     dst.data->levelGhostParticles.check();
+
+    per_particle(dst.data->levelGhostParticles, [&](auto const& p) {
+        EXPECT_NE(p.v()[0], 0);
+        EXPECT_NE(p.v()[1], 0);
+        EXPECT_NE(p.v()[2], 0);
+    });
 }
 
 

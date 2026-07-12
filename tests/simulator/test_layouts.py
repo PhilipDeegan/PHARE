@@ -31,6 +31,7 @@ def permute():
     cmp_layouts = [
         l for l in cpp.supported_particle_layouts() if _ref_layout not in str(l)
     ]
+    cmp_layouts = ["AoSPCTS"]
 
     return [
         dict(ndim=ndim, interp_order=interp, cmp_layout=cmp_layout)

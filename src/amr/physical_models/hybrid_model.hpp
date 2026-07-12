@@ -204,7 +204,7 @@ void HybridModel<GridLayoutT, Electromag, Ions, Electrons, AMR_Types, Grid_t>::i
     // DEADLOCK with python functions IF NOT GIL-LESS!
     if (init_mode == 3) // round robin thread pools per patch, thread per tile
     {
-        if constexpr (any_in(particle_array_type::layout_mode, core::LayoutMode::AoSTS))
+        if constexpr (core::is_tiled(particle_array_type::layout_mode))
         {
             using TileParticleArray_t = particle_array_type::per_tile_particles;
             using TileParticleInitializerFactory_t
@@ -216,7 +216,7 @@ void HybridModel<GridLayoutT, Electromag, Ions, Electrons, AMR_Types, Grid_t>::i
                 auto& pool          = core::ThreadPool::INSTANCE().get_pool(pool_idx);
                 auto const& layout  = amr::layoutFromPatch<gridlayout_type>(*patch);
                 for (auto& pop : state.ions)
-                    for (auto& tyle : pop.domainParticles()())
+                    for (auto [tyle, particles] : enumerate_tiles(pop.domainParticles()))
                         pool.detach_task([layout = layout, tile = &tyle, pop = &pop]() {
                             TileParticleInitializerFactory_t::create(pop->particleInitializerInfo())
                                 ->loadParticles((*tile)(), layout.copy_as(**tile));

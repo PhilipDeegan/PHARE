@@ -3,6 +3,9 @@
 
 #include "core/def/phare_mpi.hpp" // IWYU pragma: keep
 #include "core/utilities/types.hpp"
+#include "core/vector.hpp"
+#include "core/data/particles/particle_array.hpp"
+#include "core/data/particles/particle_packer.hpp"
 
 #include <SAMRAI/tbox/RestartManager.h>
 #include <SAMRAI/hier/VariableDatabase.h>
@@ -111,6 +114,118 @@ void putVectorToRestart(auto& db, auto const& path, std::vector<T, A> const& vec
 {
     putToRestart(db, path, vec.data(), vec.size());
 };
+
+
+template<typename ParticleArray_t>
+void putParticlesToRestart(auto& db, std::string const& name, ParticleArray_t& particles)
+{
+    using Packer = core::ParticlePacker<ParticleArray_t>;
+    auto constexpr static is_host_mem
+        = ParticleArray_t::alloc_mode == AllocatorMode::CPU
+          || ParticleArray_t::alloc_mode == AllocatorMode::GPU_UNIFIED;
+    auto constexpr static dim = ParticleArray_t::dimension;
+
+    // SAMRAI errors on writing 0 size arrays
+    if (particles.size() == 0)
+        return;
+
+    if constexpr (any_in(ParticleArray_t::layout_mode, core::LayoutMode::AoSMapped))
+        particles.sortMapping();
+
+    Packer packer{particles};
+    [[maybe_unused]] core::SoAParticleArray<dim> soa_;
+
+    using enum core::LayoutMode;
+    auto& soa = [&]() -> auto& {
+        if constexpr (any_in(ParticleArray_t::layout_mode, AoS, AoSMapped)
+                     or is_tiled(ParticleArray_t::layout_mode))
+        {
+            soa_.resize(particles.size());
+            packer.pack(soa_);
+            return soa_;
+        }
+        else
+        {
+            return particles;
+        }
+    }();
+
+    std::size_t part_idx = 0;
+    core::apply(soa.as_tuple(), [&](auto const& v) {
+        using Vector = std::decay_t<decltype(v)>;
+        using T      = typename Vector::value_type;
+
+        auto const put_vec = [&](auto const& vec) {
+            putVectorToRestart(db, name + "_" + packer.keys()[part_idx++], vec);
+        };
+
+        if constexpr (is_host_mem)
+            put_vec(v);
+        else
+        {
+            static std::vector<T> put_host_vec;
+            put_host_vec.resize(v.size());
+            PHARE::Vector<T>::copy(put_host_vec, v);
+            put_vec(put_host_vec);
+        }
+    });
+}
+
+
+template<typename ParticleArray_t>
+void getParticlesFromRestart(auto& db, std::string const& name, ParticleArray_t& particles)
+{
+    using Packer = core::ParticlePacker<ParticleArray_t>;
+    auto constexpr static is_host_mem
+        = ParticleArray_t::alloc_mode == AllocatorMode::CPU
+          || ParticleArray_t::alloc_mode == AllocatorMode::GPU_UNIFIED;
+    auto constexpr static dim = ParticleArray_t::dimension;
+
+    std::array<bool, Packer::n_keys> const keys_exist = core::generate_from(
+        [&](auto const& key) { return db.keyExists(name + "_" + key); }, Packer::keys());
+
+    bool all  = core::all(keys_exist);
+    bool none = core::none(keys_exist);
+    if (!(all or none))
+        throw std::runtime_error("getParticlesFromRestart has been given an "
+                                 "invalid input file, inconsistent state detected");
+
+    if (none) // can't read what doesn't exist
+        return;
+
+    auto n_particles = db.getArraySize(name + "_" + Packer::arbitrarySingleValueKey());
+    core::SoAParticleArray<dim> soa{n_particles};
+
+    {
+        std::size_t part_idx = 0;
+        core::apply(soa.as_tuple(), [&](auto& arg) {
+            using Vector = std::decay_t<decltype(arg)>;
+            using T      = typename Vector::value_type;
+
+            auto& vec = [](auto& v) -> auto& {
+                if constexpr (is_host_mem)
+                    return v;
+                else
+                {
+                    static std::vector<T> get_host_vec;
+                    get_host_vec.clear();
+                    return get_host_vec;
+                }
+            }(arg);
+
+            getVectorFromRestart(db, name + "_" + Packer::keys()[part_idx++], vec);
+
+            if constexpr (not is_host_mem)
+                PHARE::Vector<T>::copy(arg, vec);
+        });
+    }
+
+    assert(particles.size() == 0);
+    for (std::size_t i = 0; i < n_particles; ++i)
+        particles.emplace_back(soa.copy(i));
+
+    particles.check();
+}
 
 
 } // namespace PHARE::amr

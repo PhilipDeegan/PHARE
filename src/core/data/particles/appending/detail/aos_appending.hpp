@@ -73,6 +73,18 @@ void ParticlesAppender<LM::AoSMapped, AM::CPU, LM::AoSPCTS, AM::CPU>::operator()
 
 template<>
 template<auto type, typename Src, typename Dst>
+void ParticlesAppender<LM::AoS, AM::CPU, LM::AoSPC, AM::CPU>::operator()( //
+    Src const& src, Dst& dst)
+{
+    for (auto const& p : src)
+        dst.emplace_back(p);
+
+    dst.template sync<2, type>();
+}
+
+
+template<>
+template<auto type, typename Src, typename Dst>
 void ParticlesAppender<LM::AoSMapped, AM::CPU, LM::AoSPC, AM::GPU_UNIFIED>::operator()( //
     Src const& src, Dst& dst)
 {

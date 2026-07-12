@@ -220,6 +220,11 @@ def compare_particles(part1, part2, atol=1e-12):
             msg = "bad size"
             np.testing.assert_equal(part1.size(), part2.size())
 
+            msg = "bad icells"
+            np.testing.assert_array_equal(
+                part1.iCells[idx1], part2.iCells[idx2], verbose=True
+            )
+
             msg = "bad v"
             np.testing.assert_allclose(
                 part1.v[idx1, 0], part2.v[idx2, 0], atol=atol, rtol=0
@@ -234,11 +239,6 @@ def compare_particles(part1, part2, atol=1e-12):
             msg = "bad delta"
             np.testing.assert_allclose(
                 part1.deltas[idx1], part2.deltas[idx2], atol=atol, rtol=0
-            )
-
-            msg = "bad icells"
-            np.testing.assert_array_equal(
-                part1.iCells[idx1], part2.iCells[idx2], verbose=True
             )
 
             return True

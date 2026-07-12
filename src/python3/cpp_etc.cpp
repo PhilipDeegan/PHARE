@@ -80,7 +80,10 @@ auto supported_layouts()
 {
     using enum core::LayoutMode;
     std::vector layouts{AoSMapped};
-    PHARE_WITH_MKN_GPU(layouts.emplace_back(AoSTS));
+    PHARE_WITH_MKN_GPU({
+        layouts.emplace_back(AoSTS);
+        layouts.emplace_back(AoSPCTS);
+    })
     return layouts;
 }
 

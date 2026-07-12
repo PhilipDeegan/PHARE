@@ -111,6 +111,40 @@ TYPED_TEST(ParticleArrayConstructionTest, test_move_swap_etc)
     EXPECT_EQ(levelGhostParticlesNew.size(), 0);
     EXPECT_EQ(levelGhostParticlesOld.size(), ppc * std::pow(cells, TestFixture::dim));
     EXPECT_EQ(levelGhostParticles.size(), ppc * std::pow(cells, TestFixture::dim));
+
+    // size matching isn't enough: assignment (unlike copy construction) must also
+    // leave levelGhostParticles' content/views correctly pointing at its own copied
+    // data, not stale/aliased to levelGhostParticlesOld's storage
+    per_particle(levelGhostParticles, [&](auto const& p) {
+        EXPECT_NE(p.v()[0], 0);
+        EXPECT_NE(p.v()[1], 0);
+        EXPECT_NE(p.v()[2], 0);
+    });
+
+    auto const eq = compare_particles(levelGhostParticles, levelGhostParticlesOld);
+    if (!eq)
+    {
+        PHARE_LOG_LINE_SS(eq.why());
+    }
+    EXPECT_TRUE(eq);
+
+    // the assignment's real risk is a stale view: for VECTOR storage, constructing a
+    // span-mode view reads through particles_views_ (rebuilt by sync()/reset_views(),
+    // not by operator=), so check the view itself, not just the vector-mode array
+    auto view = levelGhostParticles.view();
+
+    per_particle(view, [&](auto const& p) {
+        EXPECT_NE(p.v()[0], 0);
+        EXPECT_NE(p.v()[1], 0);
+        EXPECT_NE(p.v()[2], 0);
+    });
+
+    auto const view_eq = compare_particles(view, levelGhostParticlesOld);
+    if (!view_eq)
+    {
+        PHARE_LOG_LINE_SS(view_eq.why());
+    }
+    EXPECT_TRUE(view_eq);
 }
 
 

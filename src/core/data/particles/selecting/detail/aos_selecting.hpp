@@ -24,7 +24,7 @@ using enum AllocatorMode;
 // AoS, CPU
 
 template<>
-template<typename SrcParticles, typename DstParticles, typename box_t>
+template<ParticleType particle_type, typename SrcParticles, typename DstParticles, typename box_t>
 void ParticlesSelector<AoS, CPU>::select( //
     SrcParticles const& src, DstParticles& dst, box_t const& box)
 {
@@ -34,7 +34,8 @@ void ParticlesSelector<AoS, CPU>::select( //
 }
 
 template<>
-template<typename SrcParticles, typename DstParticles, typename box_t, typename Shift>
+template<ParticleType particle_type, typename SrcParticles, typename DstParticles, typename box_t,
+         typename Shift>
 void ParticlesSelector<AoS, CPU>::select( //
     SrcParticles const& src, DstParticles& dst, box_t const& box, Shift&& shifter)
 {
@@ -48,12 +49,25 @@ void ParticlesSelector<AoS, CPU>::select( //
 // AoSTS, CPU
 
 template<>
-template<typename SrcParticles, typename DstParticles, typename box_t>
+template<ParticleType particle_type, typename SrcParticles, typename DstParticles, typename box_t>
 void ParticlesSelector<AoSTS, CPU>::select( //
     SrcParticles const& src, DstParticles& dst, box_t const& box)
 {
+    // Domain particles live in a tile's own (domain) box; patch/level ghost particles
+    // live only in a tile's own (clamped, uniquely-owned) ghost cells -- see
+    // TileSetParticles::nbr_particles_in for the same grow()-based reasoning.
+    auto const tile_box = [&](auto& tile) {
+        if constexpr (particle_type == ParticleType::Domain)
+            return *tile;
+        else
+        {
+            auto const ghost_cells = (src.ghost_box().shape()[0] - src.box().shape()[0]) / 2;
+            return grow(tile, ghost_cells);
+        }
+    };
+
     for (auto& src_tile : const_cast<SrcParticles&>(src)())
-        if (auto const src_box_overlap = *src_tile * box)
+        if (auto const src_box_overlap = tile_box(src_tile) * box)
             for (auto const& p : src_tile())
                 if (isIn(p, *src_box_overlap))
                     dst.push_back(p);
@@ -63,7 +77,8 @@ void ParticlesSelector<AoSTS, CPU>::select( //
 }
 
 template<>
-template<typename SrcParticles, typename DstParticles, typename box_t, typename Shift>
+template<ParticleType particle_type, typename SrcParticles, typename DstParticles, typename box_t,
+         typename Shift>
 void ParticlesSelector<AoSTS, CPU>::select( // box is unshifted global AMR indexing
     SrcParticles const& src, DstParticles& dst, box_t const& box, Shift&& shifter)
 {
@@ -109,10 +124,66 @@ void ParticlesSelector<AoSTS, CPU>::select( // box is unshifted global AMR index
 
 //
 
+// AoSPCTS, CPU
+
+template<>
+template<ParticleType particle_type, typename SrcParticles, typename DstParticles, typename box_t>
+void ParticlesSelector<AoSPCTS, CPU>::select( //
+    SrcParticles const& src, DstParticles& dst, box_t const& box)
+{
+    // ghost_box(), not the tile's bare domain box, for ghost-layer selections: a
+    // tile's per-cell buckets extend into its own (clamped, uniquely-owned) ghost
+    // cells, which is where patchGhost/levelGhost particles actually live -- see
+    // TileSetParticles::nbr_particles_in
+    for (auto& src_tile : const_cast<SrcParticles&>(src)())
+    {
+        auto& src_pc = src_tile();
+        auto const tile_box
+            = particle_type == ParticleType::Domain ? src_pc.box() : src_pc.ghost_box();
+        if (auto const overlap = tile_box * box)
+        {
+            auto const lcl_src_box = src_pc.local_box(*overlap);
+            for (auto it = lcl_src_box.begin(); it != lcl_src_box.end(); ++it)
+                for (auto const& p : src_pc(*it))
+                    dst.push_back(p);
+        }
+    }
+
+    if constexpr (any_in(DstParticles::layout_mode, AoSTS, AoSPCTS))
+        dst.template sync<2>();
+}
+
+template<>
+template<ParticleType particle_type, typename SrcParticles, typename DstParticles, typename box_t,
+         typename Shift>
+void ParticlesSelector<AoSPCTS, CPU>::select( // box is unshifted global AMR indexing
+    SrcParticles const& src, DstParticles& dst, box_t const& box, Shift&& shifter)
+{
+    for (auto& src_tile : const_cast<SrcParticles&>(src)())
+    {
+        auto& src_pc = src_tile();
+        auto const tile_box
+            = particle_type == ParticleType::Domain ? src_pc.box() : src_pc.ghost_box();
+        if (auto const overlap = tile_box * box)
+        {
+            auto const lcl_src_box = src_pc.local_box(*overlap);
+            for (auto it = lcl_src_box.begin(); it != lcl_src_box.end(); ++it)
+                for (auto const& p : src_pc(*it))
+                    dst.push_back(shift_particle(p, shifter));
+        }
+    }
+
+    if constexpr (any_in(DstParticles::layout_mode, AoSTS, AoSPCTS))
+        dst.template sync<2>();
+}
+
+
+//
+
 // AoS, GPU_UNIFIED
 
 template<>
-template<typename SrcParticles, typename DstParticles, typename box_t>
+template<ParticleType particle_type, typename SrcParticles, typename DstParticles, typename box_t>
 void ParticlesSelector<AoS, GPU_UNIFIED>::select( //
     SrcParticles const& src, DstParticles& dst, box_t const& box)
 {
@@ -120,7 +191,8 @@ void ParticlesSelector<AoS, GPU_UNIFIED>::select( //
 }
 
 template<>
-template<typename SrcParticles, typename DstParticles, typename box_t, typename Shift>
+template<ParticleType particle_type, typename SrcParticles, typename DstParticles, typename box_t,
+         typename Shift>
 void ParticlesSelector<AoS, GPU_UNIFIED>::select( //
     SrcParticles const& src, DstParticles& dst, box_t const& box, Shift&& fn)
 {
@@ -132,7 +204,7 @@ void ParticlesSelector<AoS, GPU_UNIFIED>::select( //
 // AoSPC, CPU
 
 template<>
-template<typename SrcParticles, typename DstParticles, typename box_t>
+template<ParticleType particle_type, typename SrcParticles, typename DstParticles, typename box_t>
 void ParticlesSelector<AoSPC, CPU>::select( //
     SrcParticles const& src, DstParticles& dst, box_t const& box)
 {
@@ -152,7 +224,8 @@ void ParticlesSelector<AoSPC, CPU>::select( //
 }
 
 template<>
-template<typename SrcParticles, typename DstParticles, typename box_t, typename Shift>
+template<ParticleType particle_type, typename SrcParticles, typename DstParticles, typename box_t,
+         typename Shift>
 void ParticlesSelector<AoSPC, CPU>::select( //
     SrcParticles const& src, DstParticles& dst, box_t const& box, Shift&& fn)
 {
@@ -179,7 +252,7 @@ void ParticlesSelector<AoSPC, CPU>::select( //
 // AoSPC, GPU_UNIFIED
 
 template<>
-template<typename SrcParticles, typename DstParticles, typename box_t>
+template<ParticleType particle_type, typename SrcParticles, typename DstParticles, typename box_t>
 void ParticlesSelector<AoSPC, GPU_UNIFIED>::select( //
     SrcParticles const& src, DstParticles& dst, box_t const& box)
 {
@@ -199,7 +272,8 @@ void ParticlesSelector<AoSPC, GPU_UNIFIED>::select( //
 }
 
 template<>
-template<typename SrcParticles, typename DstParticles, typename box_t, typename Shift>
+template<ParticleType particle_type, typename SrcParticles, typename DstParticles, typename box_t,
+         typename Shift>
 void ParticlesSelector<AoSPC, GPU_UNIFIED>::select( //
     SrcParticles const& src, DstParticles& dst, box_t const& box, Shift&& shift)
 { // unoptimized
@@ -227,7 +301,7 @@ void ParticlesSelector<AoSPC, GPU_UNIFIED>::select( //
 // AoSMapped, CPU
 
 template<>
-template<typename SrcParticles, typename DstParticles, typename box_t>
+template<ParticleType particle_type, typename SrcParticles, typename DstParticles, typename box_t>
 void ParticlesSelector<AoSMapped, CPU>::select( //
     SrcParticles const& src, DstParticles& dst, box_t const& box)
 {
@@ -235,7 +309,8 @@ void ParticlesSelector<AoSMapped, CPU>::select( //
 }
 
 template<>
-template<typename SrcParticles, typename DstParticles, typename box_t, typename Shift>
+template<ParticleType particle_type, typename SrcParticles, typename DstParticles, typename box_t,
+         typename Shift>
 void ParticlesSelector<AoSMapped, CPU>::select( //
     SrcParticles const& src, DstParticles& dst, box_t const& box, Shift&& shifter)
 {
@@ -245,7 +320,7 @@ void ParticlesSelector<AoSMapped, CPU>::select( //
 }
 
 template<>
-template<typename SrcParticles, typename box_t>
+template<ParticleType particle_type, typename SrcParticles, typename box_t>
 std::size_t ParticlesSelector<AoSMapped, CPU>::count(SrcParticles const& src, box_t const& box)
 {
     return src.nbr_particles_in(box);
@@ -256,7 +331,7 @@ std::size_t ParticlesSelector<AoSMapped, CPU>::count(SrcParticles const& src, bo
 // AoS, CPU
 
 template<>
-template<typename SrcParticles, typename box_t>
+template<ParticleType particle_type, typename SrcParticles, typename box_t>
 std::size_t ParticlesSelector<AoS, CPU>::count(SrcParticles const& src, box_t const& box)
 {
     std::size_t n = 0;
@@ -269,7 +344,7 @@ std::size_t ParticlesSelector<AoS, CPU>::count(SrcParticles const& src, box_t co
 // AoS, GPU_UNIFIED
 
 template<>
-template<typename SrcParticles, typename box_t>
+template<ParticleType particle_type, typename SrcParticles, typename box_t>
 std::size_t ParticlesSelector<AoS, GPU_UNIFIED>::count(SrcParticles const& src, box_t const& box)
 {
     throw std::runtime_error("finish this");
@@ -279,22 +354,54 @@ std::size_t ParticlesSelector<AoS, GPU_UNIFIED>::count(SrcParticles const& src, 
 // AoSTS, CPU
 
 template<>
-template<typename SrcParticles, typename box_t>
+template<ParticleType particle_type, typename SrcParticles, typename box_t>
 std::size_t ParticlesSelector<AoSTS, CPU>::count(SrcParticles const& src, box_t const& box)
 {
     std::size_t n = 0;
     for (auto& tile : const_cast<SrcParticles&>(src)())
-        if (auto const overlap = *tile * box)
+    {
+        auto const box_for_overlap = [&]() {
+            if constexpr (particle_type == ParticleType::Domain)
+                return *tile;
+            else
+            {
+                auto const ghost_cells = (src.ghost_box().shape()[0] - src.box().shape()[0]) / 2;
+                return grow(tile, ghost_cells);
+            }
+        }();
+        if (auto const overlap = box_for_overlap * box)
             for (auto const& p : tile())
                 if (isIn(p, *overlap))
                     ++n;
+    }
+    return n;
+}
+
+// AoSPCTS, CPU
+
+template<>
+template<ParticleType particle_type, typename SrcParticles, typename box_t>
+std::size_t ParticlesSelector<AoSPCTS, CPU>::count(SrcParticles const& src, box_t const& box)
+{
+    std::size_t n = 0;
+    for (auto& tile : const_cast<SrcParticles&>(src)())
+    {
+        auto& pc = tile();
+        auto const tile_box = particle_type == ParticleType::Domain ? pc.box() : pc.ghost_box();
+        if (auto const overlap = tile_box * box)
+        {
+            auto const lcl_box = pc.local_box(*overlap);
+            for (auto it = lcl_box.begin(); it != lcl_box.end(); ++it)
+                n += pc(*it).size();
+        }
+    }
     return n;
 }
 
 // AoSPC, CPU
 
 template<>
-template<typename SrcParticles, typename box_t>
+template<ParticleType particle_type, typename SrcParticles, typename box_t>
 std::size_t ParticlesSelector<AoSPC, CPU>::count(SrcParticles const& src, box_t const& box)
 {
     auto const lcl_box = src.local_box(box);
@@ -307,7 +414,7 @@ std::size_t ParticlesSelector<AoSPC, CPU>::count(SrcParticles const& src, box_t 
 // AoSPC, GPU_UNIFIED
 
 template<>
-template<typename SrcParticles, typename box_t>
+template<ParticleType particle_type, typename SrcParticles, typename box_t>
 std::size_t ParticlesSelector<AoSPC, GPU_UNIFIED>::count(SrcParticles const& src, box_t const& box)
 {
     auto const lcl_box = src.local_box(box);

@@ -160,7 +160,7 @@ void IonUpdaterMultiTS<Ions, Electromag, GridLayout>::updateAndDepositAll_(
         for (std::size_t i = 0; i < accessor.size(); ++i)
             post_move_sync(i);
     else
-        in.streamer.host(post_move_sync);
+        in.streamer.host(std::move(post_move_sync));
 
     if constexpr (any_in(Particles::alloc_mode, AllocatorMode::GPU_UNIFIED))
     {
@@ -188,11 +188,11 @@ void IonUpdaterMultiTS<Ions, Electromag, GridLayout>::updateAndDepositAll_(
             }
         };
 
-        if (use_main_thread)
+        if constexpr (use_main_thread)
             for (std::size_t i = 0; i < accessor.size(); ++i)
                 deposit(i);
         else
-            in.streamer.host(deposit);
+            in.streamer.host(std::move(deposit));
     }
     else
     {
@@ -211,11 +211,11 @@ void IonUpdaterMultiTS<Ions, Electromag, GridLayout>::updateAndDepositAll_(
             }
         };
 
-        if (use_main_thread)
+        if constexpr (use_main_thread)
             for (std::size_t i = 0; i < accessor.size(); ++i)
                 deposit(i);
         else
-            in.streamer.host(deposit);
+            in.streamer.host(std::move(deposit));
     }
 
     if constexpr (not use_main_thread)
