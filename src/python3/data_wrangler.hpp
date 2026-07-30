@@ -32,6 +32,7 @@ public:
 
     using Simulator_t = PHARE::Simulator<opts>;
 
+
     DataWrangler(std::shared_ptr<Simulator_t> const& simulator,
                  std::shared_ptr<amr::Hierarchy> const& hierarchy)
         : simulator_{*simulator}

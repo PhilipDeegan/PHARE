@@ -1,4 +1,3 @@
-//
 
 #include "core/errors.hpp"
 
@@ -63,6 +62,7 @@ void log_error(std::string const key, std::string const val)
     core::Errors::instance().log(key, val);
 #endif
 }
+
 
 void barrier()
 {
