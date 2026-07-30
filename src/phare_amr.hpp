@@ -5,10 +5,10 @@
 #include "phare_mpi.hpp" // IWYU pragma: keep
 
 #include "phare_core.hpp"
+
 #include "amr/wrappers/hierarchy.hpp"
 #include "amr/data/particles/refine/splitter.hpp"
 #include "amr/data/particles/refine/particles_data_split.hpp"
-
 
 #include <SAMRAI/hier/Box.h>
 #include <SAMRAI/tbox/Database.h>
@@ -27,26 +27,26 @@
 
 
 
-
 namespace PHARE::amr
 {
-template<SimOpts opts>
+
+
+template<auto opts>
 struct PHARE_Types
 {
-    auto static constexpr dimension     = opts.dimension;
-    auto static constexpr interp_order  = opts.interp_order;
-    auto static constexpr nbRefinedPart = opts.nbRefinedPart;
+    auto static constexpr dimension      = opts.dimension;
+    auto static constexpr interp_order   = opts.interp_order;
+    auto static constexpr layout_mode    = opts.layout_mode;
+    auto static constexpr allocator_mode = opts.alloc_mode;
+    auto static constexpr nbRefinedPart  = opts.nbRefinedPart;
 
-    using core_types = PHARE::core::PHARE_Types<opts>;
+    using core_types  = core::PHARE_Types<opts>;
+    using hierarchy_t = Hierarchy;
 
-    using hierarchy_t = PHARE::amr::Hierarchy;
+    using Splitter_t = Splitter<core::DimConst<dimension>, core::InterpConst<interp_order>,
+                                core::RefinedParticlesConst<nbRefinedPart>>;
 
-    using Splitter_t = PHARE::amr::Splitter<PHARE::core::DimConst<dimension>,
-                                            PHARE::core::InterpConst<interp_order>,
-                                            PHARE::core::RefinedParticlesConst<nbRefinedPart>>;
-
-    using RefinementParams
-        = PHARE::amr::RefinementParams<typename core_types::ParticleArray_t, Splitter_t>;
+    using RefinementParams = amr::RefinementParams<typename core_types::Hybrid, Splitter_t>;
 };
 
 } // namespace PHARE::amr

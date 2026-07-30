@@ -61,7 +61,6 @@ def hierarchy_from_sim(simulator, qty, pop="", hier=None, sync=False):
 
             for patch_data in patch_datas:
                 layout = make_layout_for(simulator, patch_data, qty, lvl_cell_width)
-
                 patches[ilvl].append(
                     Patch({qty: FieldData(layout, field_qties[qty], patch_data.data)})
                 )

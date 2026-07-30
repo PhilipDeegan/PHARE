@@ -7,7 +7,6 @@
 
 #include "core/errors.hpp"
 #include "core/utilities/algorithm.hpp"
-#include "core/utilities/index/index.hpp"
 #include "core/models/quantities/mhd_quantities.hpp"
 #include "core/numerics/godunov_fluxes/godunov_utils.hpp"
 
@@ -395,23 +394,26 @@ void SolverMHD<MHDModel, AMR_Types, TimeIntegratorStrategy, Messenger>::mhdNaNCh
     auto& rm  = model.resourcesManager;
     auto& rho = model.state.rho;
 
-    auto check_nans = [&](auto const& field, auto const& origin,
-                          core::MeshIndex<MHDModel::dimension> const& index) {
-        if (std::isnan(field(index)))
-        {
-            std::stringstream ss;
-            ss << "NaN detected in MHD field at index " << index << " on patch of origin " << origin
-               << " on level " << level.getLevelNumber() << " at time " << time;
-            core::DictionaryException ex{"cause", ss.str()};
-            throw ex;
-        }
+    // no neighbor access here, so this can be a flat per-cell loop rather than box iteration
+    auto check_nans = [&](auto const& origin) {
+        core::operate_on_fields(
+            [&](auto const& v) {
+                if (std::isnan(v))
+                {
+                    std::stringstream ss;
+                    ss << "NaN detected in MHD field on patch of origin " << origin << " on level "
+                       << level.getLevelNumber() << " at time " << time;
+                    core::DictionaryException ex{"cause", ss.str()};
+                    throw ex;
+                }
+            },
+            rho);
     };
 
     for (auto const& patch : rm->enumerate(level, rho))
     {
         auto layout = amr::layoutFromPatch<GridLayout>(*patch);
-        layout.evalOnGhostBox(
-            rho, [&](auto const&... args) { check_nans(rho, layout.origin(), {args...}); });
+        check_nans(layout.origin());
     }
 }
 

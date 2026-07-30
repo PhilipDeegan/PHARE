@@ -1,4 +1,7 @@
 #include "phare_core.hpp"
+
+#include "simulator/simulator_def.hpp"
+
 #include <gtest/gtest.h>
 
 using namespace PHARE::core;
@@ -32,8 +35,10 @@ TEST(GridLayoutIntegration, UsesGhostWidthOrder3)
 TEST(GridLayoutIntegration, MHDConstantReconstruction)
 {
     static constexpr auto opts
-        = PHARE::SimOpts{1, 1, 2, PHARE::MHDOpts::TimeIntegratorType::Default,
-                         PHARE::MHDOpts::ReconstructionType::Constant};
+        = PHARE::SimOpts{.dimension           = 1,
+                         .interp_order        = 1,
+                         .nbRefinedPart       = 2,
+                         .reconstruction_type = PHARE::MHDOpts::ReconstructionType::Constant};
     using Layout = PHARE_Types<opts>::MHD::GridLayout_t;
 
     // Constant: nghosts=1, field_ghost_width = roundUpToEven(1+2) = 4
@@ -43,8 +48,10 @@ TEST(GridLayoutIntegration, MHDConstantReconstruction)
 TEST(GridLayoutIntegration, MHDLinearReconstruction)
 {
     static constexpr auto opts
-        = PHARE::SimOpts{1, 1, 2, PHARE::MHDOpts::TimeIntegratorType::Default,
-                         PHARE::MHDOpts::ReconstructionType::Linear};
+        = PHARE::SimOpts{.dimension           = 1,
+                         .interp_order        = 1,
+                         .nbRefinedPart       = 2,
+                         .reconstruction_type = PHARE::MHDOpts::ReconstructionType::Linear};
     using Layout = PHARE_Types<opts>::MHD::GridLayout_t;
 
     // Linear: nghosts=2, field_ghost_width = roundUpToEven(2+2) = 4
@@ -54,8 +61,10 @@ TEST(GridLayoutIntegration, MHDLinearReconstruction)
 TEST(GridLayoutIntegration, MHDWENOZReconstruction)
 {
     static constexpr auto opts
-        = PHARE::SimOpts{1, 1, 2, PHARE::MHDOpts::TimeIntegratorType::Default,
-                         PHARE::MHDOpts::ReconstructionType::WENOZ};
+        = PHARE::SimOpts{.dimension           = 1,
+                         .interp_order        = 1,
+                         .nbRefinedPart       = 2,
+                         .reconstruction_type = PHARE::MHDOpts::ReconstructionType::WENOZ};
     using Layout = PHARE_Types<opts>::MHD::GridLayout_t;
 
     // WENOZ: nghosts=3, field_ghost_width = roundUpToEven(3+2) = 6
@@ -92,14 +101,20 @@ TEST(GridLayoutIntegration, GhostAlwaysEven)
     static constexpr auto h2opts = PHARE::SimOpts{1, 2};
     static constexpr auto h3opts = PHARE::SimOpts{1, 3};
     static constexpr auto constOpts
-        = PHARE::SimOpts{1, 1, 2, PHARE::MHDOpts::TimeIntegratorType::Default,
-                         PHARE::MHDOpts::ReconstructionType::Constant};
+        = PHARE::SimOpts{.dimension           = 1,
+                         .interp_order        = 1,
+                         .nbRefinedPart       = 2,
+                         .reconstruction_type = PHARE::MHDOpts::ReconstructionType::Constant};
     static constexpr auto linOpts
-        = PHARE::SimOpts{1, 1, 2, PHARE::MHDOpts::TimeIntegratorType::Default,
-                         PHARE::MHDOpts::ReconstructionType::Linear};
+        = PHARE::SimOpts{.dimension           = 1,
+                         .interp_order        = 1,
+                         .nbRefinedPart       = 2,
+                         .reconstruction_type = PHARE::MHDOpts::ReconstructionType::Linear};
     static constexpr auto wenoOpts
-        = PHARE::SimOpts{1, 1, 2, PHARE::MHDOpts::TimeIntegratorType::Default,
-                         PHARE::MHDOpts::ReconstructionType::WENOZ};
+        = PHARE::SimOpts{.dimension           = 1,
+                         .interp_order        = 1,
+                         .nbRefinedPart       = 2,
+                         .reconstruction_type = PHARE::MHDOpts::ReconstructionType::WENOZ};
 
     using Layout1   = PHARE_Types<h1opts>::Hybrid::GridLayout_t;
     using Layout2   = PHARE_Types<h2opts>::Hybrid::GridLayout_t;

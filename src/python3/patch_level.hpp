@@ -1,6 +1,7 @@
 #ifndef PHARE_PYTHON_PATCH_LEVEL_HPP
 #define PHARE_PYTHON_PATCH_LEVEL_HPP
 
+
 #include "amr/wrappers/hierarchy.hpp"
 #include "amr/physical_models/mhd_model.hpp"
 #include "amr/physical_models/hybrid_model.hpp"
@@ -16,7 +17,7 @@ namespace PHARE::pydata
 {
 
 
-template<typename Model, typename Enable = void>
+template<typename Model>
 class PatchLevel;
 
 template<typename Model_t>
@@ -38,21 +39,12 @@ public:
 protected:
     auto getField(auto& field)
     {
-        std::vector<PatchData<py_array_t<double>, dimension>> patchDatas;
-        auto visit = [&](auto& grid, auto patchID, auto /*ilvl*/) {
-            setPyPatchDataFromField(patchDatas.emplace_back(), field, grid, patchID);
-        };
-        amr::visitLevel<GridLayout>(*hierarchy.getPatchLevel(lvl), rm, visit, field);
-        return patchDatas;
+        return getPatchDatasForLevel<GridLayout>(hierarchy, model, lvl, field);
     }
     auto getVecFieldComponent(auto& vecfield, auto const component)
     {
-        std::vector<PatchData<py_array_t<double>, dimension>> patchDatas;
-        auto visit = [&](auto& grid, auto patchID, auto /*ilvl*/) {
-            setPyPatchDataFromField(patchDatas.emplace_back(), vecfield(component), grid, patchID);
-        };
-        amr::visitLevel<GridLayout>(*hierarchy.getPatchLevel(lvl), rm, visit, vecfield);
-        return patchDatas;
+        return getPatchDatasForLevel<GridLayout>(hierarchy, model, lvl, vecfield,
+                                                 [=](auto& vf) -> auto& { return vf(component); });
     }
 
     auto static vecfield_component(std::string const& component)
@@ -69,8 +61,8 @@ protected:
 
 
 template<typename Model>
-class __attribute__((visibility("hidden")))
-PatchLevel<Model, std::enable_if_t<solver::is_hybrid_model_v<Model>>> : AnyPatchLevel<Model>
+    requires(solver::is_hybrid_model_v<Model>)
+class __attribute__((visibility("hidden"))) PatchLevel<Model> : AnyPatchLevel<Model>
 {
     using Super = AnyPatchLevel<Model>;
 
@@ -125,7 +117,8 @@ public:
 
     auto getParticles(std::string const& popName)
     {
-        std::vector<PatchData<core::ParticleArray<dimension>*, dimension>> patchDatas;
+        using ParticleArray_t = Model_t::particle_array_type;
+        std::vector<PatchData<ParticleArray_t*, dimension>> patchDatas;
 
         auto& pop = getIonPop(popName);
 
@@ -142,15 +135,14 @@ public:
 
 
 template<typename Model>
-class __attribute__((visibility("hidden")))
-PatchLevel<Model, std::enable_if_t<solver::is_mhd_model_v<Model>>> : AnyPatchLevel<Model>
+    requires(solver::is_mhd_model_v<Model>)
+class __attribute__((visibility("hidden"))) PatchLevel<Model> : AnyPatchLevel<Model>
 {
     using Super = AnyPatchLevel<Model>;
 
 public:
-    using Model_t                          = Model;
-    using GridLayout                       = Model_t::gridlayout_type;
-    static constexpr std::size_t dimension = GridLayout::dimension;
+    using Model_t    = Model;
+    using GridLayout = Model_t::gridlayout_type;
 
     PatchLevel(amr::Hierarchy& hierarchy, Model& model, std::size_t const lvl)
         : Super(hierarchy, model, lvl)
