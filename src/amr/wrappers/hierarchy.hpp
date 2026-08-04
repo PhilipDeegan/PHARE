@@ -57,7 +57,7 @@ public:
                 pdrm->registerPatchDataForRestart(id);
 
             int timeStepIdx = 0; // forced to zero as we wrap in our own timestamp directories
-            restart_manager->openRestartFile(*_restartFilePath, timeStepIdx, core::mpi::size());
+            restart_manager->openRestartFile(*_restartFilePath, timeStepIdx, mpi::size());
         }
     }
 
@@ -79,16 +79,18 @@ public:
         // there's a PR for this next line, but until then the code below is the same
         // return SAMRAI::tbox::RestartManager::getManager()->getRestartFileFullPath(path, idx);
 
-        return path                                                                   //
-               + "/restore." + SAMRAI::tbox::Utilities::intToString(idx, 6)           //
-               + "/nodes." + SAMRAI::tbox::Utilities::nodeToString(core::mpi::size()) //
-               + "/proc." + SAMRAI::tbox::Utilities::processorToString(core::mpi::rank());
+        return path                                                             //
+               + "/restore." + SAMRAI::tbox::Utilities::intToString(idx, 6)     //
+               + "/nodes." + SAMRAI::tbox::Utilities::nodeToString(mpi::size()) //
+               + "/proc." + SAMRAI::tbox::Utilities::processorToString(mpi::rank());
     }
 
     void closeRestartFile() { SamraiLifeCycle::getRestartManager()->closeRestartFile(); }
 
     NO_DISCARD bool isFromRestart() const
-    { return SamraiLifeCycle::getRestartManager()->isFromRestart(); }
+    {
+        return SamraiLifeCycle::getRestartManager()->isFromRestart();
+    }
 
 private:
     std::optional<std::string> static restartFilePath(auto const& dict)
@@ -130,6 +132,12 @@ public:
         return path + "/" + core::to_string_fixed_width(timestamp, precision, width);
     }
 
+    std::string modelForLevel(int const level) const
+    {
+        assert(level < static_cast<int>(modelPerLevel_.size()));
+        return modelPerLevel_[level];
+    }
+
 protected:
     template<std::size_t dimension>
     Hierarchy(initializer::PHAREDict const& dict,
@@ -143,6 +151,7 @@ private:
     std::vector<double> const cellWidth_;
     std::vector<int> const domainBox_;
     std::vector<std::string> boundaryConditions_;
+    std::vector<std::string> modelPerLevel_;
     std::size_t maxLevel_ = 0;
 };
 
@@ -251,6 +260,11 @@ Hierarchy::Hierarchy(initializer::PHAREDict const& dict,
     if (maxLevel_ > MAX_LEVEL_IDX)
         throw std::runtime_error("Invalid max_nbr_levels, must be <= "
                                  + std::to_string(MAX_LEVEL_IDX + 1));
+
+    auto const max_mhd_level = dict["simulation"]["AMR"]["max_mhd_level"].template to<int>();
+
+    for (int i = 0; i < getMaxNumberOfLevels(); ++i)
+        modelPerLevel_.emplace_back(i < max_mhd_level ? "MHDModel" : "HybridModel");
 }
 
 

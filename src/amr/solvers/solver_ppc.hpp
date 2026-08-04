@@ -559,19 +559,15 @@ void SolverPPC<HybridModel, AMR_Types>::moveIons_(level_t& level, HybridModel& m
     {
         PHARE_LOG_ERROR(ex());
     }
-    if (core::mpi::any_errors())
+    if (mpi::any_errors())
         throw core::DictionaryException{}("ID", "Updater::updatePopulations");
 
     // this needs to be done before calling the messenger
     setTime(ions);
 
     {
-        PHARE_LOG_SCOPE(1, "SolverPPC::moveIons::fillFluxBorders");
-        fromCoarser.fillFluxBorders(ions, level, newTime);
-    }
-    {
-        PHARE_LOG_SCOPE(1, "SolverPPC::moveIons::fillDensityBorders");
-        fromCoarser.fillDensityBorders(ions, level, newTime);
+        PHARE_LOG_SCOPE(1, "SolverPPC::moveIons::fillIonPopBorders");
+        fromCoarser.fillIonPopBorders(ions, level, newTime);
     }
     {
         PHARE_LOG_SCOPE(1, "SolverPPC::moveIons::fillIonPopMomentGhosts");
