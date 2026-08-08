@@ -2,7 +2,7 @@
 //
 //
 
-#define PHARE_SKIP_MPI_IN_CORE
+
 
 #include "core/def/phare_config.hpp"
 

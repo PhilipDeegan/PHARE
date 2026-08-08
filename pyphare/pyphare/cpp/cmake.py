@@ -2,7 +2,7 @@ def decode_bytes(input):
     return input.decode("ascii", errors="ignore")
 
 
-def run(cmd, shell=True, capture_output=True, check=False, print_cmd=True):
+def run(cmd, shell=True, capture_output=True, check=True, print_cmd=True):
     """
     https://docs.python.org/3/library/subprocess.html
     """
@@ -16,3 +16,8 @@ def run(cmd, shell=True, capture_output=True, check=False, print_cmd=True):
         )
     except subprocess.CalledProcessError as e:  # only triggers on failure if check=True
         raise RuntimeError(decode_bytes(e.stderr))
+
+
+def build(*args):
+    cmd = "cmake --build build -- " + " ".join(args)
+    run(cmd, capture_output=False)

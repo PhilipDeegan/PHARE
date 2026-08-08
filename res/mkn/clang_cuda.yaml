@@ -9,7 +9,7 @@ property:
     -x cuda --cuda-gpu-arch=sm_${cuda.arch} -DMKN_GPU_CUDA=1 -DMKN_GPU_ROCM=0
     -DPHARE_HAVE_MKN_GPU=1
 
-# -DPHARE_FORCE_LOG_LINE -DPHARE_SKIP_MPI_IN_CORE
+# -DPHARE_FORCE_LOG_LINE
   lnk.flags: -lcudart # -lineinfo # -rdynamic # -fuse-ld=gold
   # lnk.flags: -Wl,-z,defs -lcudart -lineinfo # -rdynamic # -fuse-ld=gold
 

@@ -25,7 +25,7 @@ def permute_hybrid():
         dict(
             super_class=HybridInitializationTest,
             interp_order=interp_order,
-            sim_setup_kwargs=dict(layout=layout),
+            particle_layout=layout,
         )
         for interp_order, layout in itertools.product(
             interp_orders, supported_particle_layouts()

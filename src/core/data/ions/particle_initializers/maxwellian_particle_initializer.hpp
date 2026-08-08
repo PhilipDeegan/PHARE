@@ -6,8 +6,8 @@
 #include "core/utilities/types.hpp"
 #include "core/data/particles/particle.hpp"
 #include "core/data/grid/gridlayoutdefs.hpp"
-#include "core/data/particles/particle_array_def.hpp"
-#include "core/data/particles/particle_array_service.hpp"
+#include "core/data/particles/particle_array.hpp"
+#include "core/data/particles/particle_array_appender.hpp"
 #include "core/data/ions/particle_initializers/particle_initializer.hpp"
 
 #include "initializer/data_provider.hpp"
@@ -171,8 +171,7 @@ void MaxwellianParticleInitializer<ParticleArray_t, GridLayout>::loadParticles(
     ParticleDeltaDistribution<double> deltaDistrib;
 
 
-    core::ParticleArrayService::reserve_ppc_in<ParticleType::Domain>(particles,
-                                                                     nbrParticlePerCell_);
+    core::reserve(particles, layout.AMRBox(), nbrParticlePerCell_);
 
 
     for (std::size_t flatCellIdx = 0; flatCellIdx < ndCellIndices.size(); ++flatCellIdx)
@@ -206,7 +205,7 @@ void MaxwellianParticleInitializer<ParticleArray_t, GridLayout>::loadParticles(
     }
 
     // out_particles = std::move(particles);
-    core::ParticleArrayService::sync<2, ParticleType::Domain>(particles);
+    particles.template on_appended<ParticleType::Domain>();
 }
 
 } // namespace PHARE::core

@@ -25,7 +25,7 @@ void write_raw_unsorted_particles_to_file(std::size_t const n_parts = 1e6)
     GridLayout_t layout{cells};
 
     ParticleArray_t domainParticles{layout.AMRBox()};
-    add_particles_in(domainParticles, layout.AMRBox(), n_parts / layout.AMRBox().size());
+    add_particles(domainParticles, layout.AMRBox(), n_parts / layout.AMRBox().size());
     shuffle(domainParticles, 13337);
 
     std::stringstream ss;

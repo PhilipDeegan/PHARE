@@ -6,7 +6,6 @@
 #include "core/utilities/kernels.hpp"
 #include "core/numerics/pusher/boris/basics.hpp"
 #include "core/data/particles/particle_array_def.hpp"
-#include "core/data/particles/particle_array_service.hpp"
 
 
 namespace PHARE::core
@@ -89,12 +88,12 @@ struct AnyBorisImpl<LayoutMode::AoSPC, AllocatorMode::CPU, dim, Interpolator, Gr
             PHARE_LOG_SCOPE(1, "boris::move_aos_pc_cpu::advance_0");
             per_particle();
         }
-        ParticleArrayService::sync<0, type>(particles);
+        particles.template on_moved<type>();
         {
             PHARE_LOG_SCOPE(1, "boris::move_aos_pc_cpu::advance_accelerate");
             per_particle.template operator()<true>();
         }
-        ParticleArrayService::sync<1, type>(particles);
+        particles.template on_moved<type>();
     }
 };
 
@@ -147,8 +146,8 @@ struct AnyBorisImpl<LayoutMode::AoSPC, AllocatorMode::GPU_UNIFIED, dim, Interpol
                 kernel::launch(particles.size(), per_particle);
             }
             if constexpr (any_in(Particles::impl_v, 1))
-                ParticleArrayService::sync<0, type>(view);
-            ParticleArrayService::sync<0, type>(particles);
+                view.template sync<0, type>();
+            particles.template on_moved<type>();
 
             {
                 PHARE_LOG_SCOPE(1, "boris::move_aos_pc_gpu::advance_accelerate_0/1");
@@ -157,8 +156,8 @@ struct AnyBorisImpl<LayoutMode::AoSPC, AllocatorMode::GPU_UNIFIED, dim, Interpol
                 });
             }
             if constexpr (any_in(Particles::impl_v, 1))
-                ParticleArrayService::sync<1, type>(view);
-            ParticleArrayService::sync<1, type>(particles);
+                view.template sync<1, type>();
+            particles.template on_moved<type>();
         })
     }
 
@@ -197,8 +196,8 @@ struct AnyBorisImpl<LayoutMode::AoSPC, AllocatorMode::GPU_UNIFIED, dim, Interpol
                 PHARE_LOG_SCOPE(1, "boris::move_aos_pc_gpu::advance_2");
                 kernel::launch(view.local_box(), particles.max_size(), per_particle);
             }
-            ParticleArrayService::sync<0, type>(view);
-            ParticleArrayService::sync<0, type>(particles);
+            view.template sync<0, type>();
+            particles.template on_moved<type>();
 
             {
                 PHARE_LOG_SCOPE(1, "boris::move_aos_pc_gpu::advance_accelerate_2");
@@ -206,8 +205,8 @@ struct AnyBorisImpl<LayoutMode::AoSPC, AllocatorMode::GPU_UNIFIED, dim, Interpol
                     view.local_box(), particles.max_size(),
                     [=] _PHARE_ALL_FN_() mutable { per_particle.template operator()<true>(); });
             }
-            ParticleArrayService::sync<1, type>(view);
-            ParticleArrayService::sync<1, type>(particles);
+            view.template sync<1, type>();
+            particles.template on_moved<type>();
         })
     }
 };

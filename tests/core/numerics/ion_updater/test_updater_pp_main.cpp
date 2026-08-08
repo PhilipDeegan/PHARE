@@ -8,7 +8,7 @@
 #include "core/data/particles/particle_array_sorter.hpp"
 #include "core/def/detail/mkn_avx.hpp"
 #include <memory>
-#define PHARE_SKIP_MPI_IN_CORE
+
 #define PHARE_UNDEF_ASSERT
 // #define PHARE_LOG_LEVEL 3
 // #define PHARE_LOG_SCOPE_PRINT 1
@@ -19,6 +19,7 @@
 #include "core/numerics/ion_updater/ion_updater_pc.hpp"
 #include "core/numerics/ion_updater/ion_updater_per_particle.hpp"
 
+#include "core/data/particles/particle_array_appender.hpp"
 #include "core/data/particles/particle_array_serializer.hpp"
 
 #include "simulator/simulator_def.hpp"
@@ -189,7 +190,7 @@ auto from_ions(GridLayout_t const& layout, Ions const& from)
     EXPECT_EQ(ions.populations[0].particles.domain_particles.size(), 0);
 
     auto _add_particles_from = [&]<auto type>(auto& src, auto& dst) {
-        ParticleArrayService::reserve_ppc_in<type>(dst, ppc);
+        reserve(dst, layout.AMRBox(), ppc);
         append_particles<type>(src, dst);
     };
 

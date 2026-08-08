@@ -204,7 +204,7 @@ def plot(diag_dir):
 
 def main():
     # Simulator(config()).run()
-    Simulator(config()).setup(layout=3).initialize().run()
+    Simulator(config()).run()
 
     if cpp.mpi_rank() == 0:
         plot(diag_outputs)

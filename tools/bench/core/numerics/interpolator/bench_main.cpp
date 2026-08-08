@@ -25,7 +25,7 @@ void interpolate(benchmark::State& state)
     GridLayout_t layout{cells};
     PHARE::core::Interpolator<dim, interp> interpolator;
     ParticleArray particles{layout.AMRBox()};
-    add_particles_in(particles, layout.AMRBox(), ppc);
+    add_particles(particles, layout.AMRBox(), ppc);
 
     PHARE::core::UsableElectromag<field_opts> em{layout};
     PHARE::core::UsableVecField<field_opts> flux{"F", layout,

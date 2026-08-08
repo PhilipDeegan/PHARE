@@ -58,7 +58,7 @@ void ParticlesAppender<LM::AoSMapped, AM::CPU, LM::AoSTS, AM::CPU>::operator()( 
     for (auto const& p : src)
         dst.emplace_back(p);
 
-    dst.template sync<2, type>();
+    dst.template on_appended<type>();
 }
 
 template<>
@@ -71,7 +71,7 @@ void ParticlesAppender<LM::AoSMapped, AM::CPU, LM::AoSCMTS, AM::CPU>::operator()
     for (auto const& p : src)
         dst.emplace_back(p);
 
-    dst.template sync<2, type>();
+    dst.template on_appended<type>();
 }
 
 
@@ -85,7 +85,7 @@ void ParticlesAppender<LM::AoSMapped, AM::CPU, LM::AoSPCTS, AM::CPU>::operator()
     for (auto const& p : src)
         dst.emplace_back(p);
 
-    dst.template sync<2, type>();
+    dst.template on_appended<type>();
 }
 
 
@@ -99,7 +99,7 @@ void ParticlesAppender<LM::AoS, AM::CPU, LM::AoSPC, AM::CPU>::operator()( //
     for (auto const& p : src)
         dst.emplace_back(p);
 
-    dst.template sync<2, type>();
+    dst.template on_appended<type>();
 }
 
 
@@ -125,7 +125,7 @@ void ParticlesAppender<LM::AoSMapped, AM::CPU, LM::AoSPC, AM::GPU_UNIFIED>::oper
         if (auto size = src.nbr_particles_in(bix))
             finish(dst.local_cell(bix), size);
 
-    dst.template sync<2, type>();
+    dst.template on_appended<type>();
 }
 
 
@@ -161,7 +161,7 @@ void ParticlesAppender<LM::AoSMapped, AM::CPU, LM::AoSTS, AM::GPU_UNIFIED>::oper
     //     if (auto const size = src.nbr_particles_in(bix))
     //         finish(dst.local_cell(bix), size);
 
-    dst.template sync<2, type>();
+    dst.template on_appended<type>();
 }
 
 

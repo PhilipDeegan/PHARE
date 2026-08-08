@@ -224,6 +224,24 @@ void IonUpdaterMultiTS<Ions, Electromag, GridLayout>::updateAndDepositAll_(
         in.streamer.dump_times(detail::timings_dir_str + "/updateAndDepositAll.txt");
     }
 
+    for (std::size_t i = 0; i < accessor.size(); ++i)
+    {
+        auto view                 = accessor[i];
+        auto [ions, _]            = view.args;
+        auto const patch_id       = view.patchID();
+        auto const& patch_boxings = boxings.at(patch_id);
+
+        for (std::size_t j = 0; j < ions.size(); ++j)
+        {
+            auto& pop = ions[j];
+            particle_array_domain_is_valid(pop.domainParticles(), patch_boxings.domainBox);
+            particle_array_ghost_is_valid(pop.patchGhostParticles(), patch_boxings.domainBox,
+                                          patch_boxings.ghostBox);
+            particle_array_ghost_is_valid(pop.levelGhostParticles(), patch_boxings.domainBox,
+                                          patch_boxings.ghostBox);
+        }
+    }
+
 #else
     throw std::runtime_error("No available implementation");
 #endif

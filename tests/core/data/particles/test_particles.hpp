@@ -86,70 +86,30 @@ void vary_velocity(Particles& particles, double const min, double const max,
         p.v() = core::ConstArrayFrom<3>([&] { return dist(gen); });
 }
 
-template<typename Particles, typename GridLayout, typename Box>
-void add_ghost_particles(Particles& particles, GridLayout const& layout, Box const& box,
-                         std::size_t const ppc)
+
+template<typename Particles, typename Box>
+void add_ghost_particles(Particles& particles, Box const& box, std::size_t const ppc)
 {
-    auto constexpr nghosts = GridLayout::options.particle_ghost_width;
-
-    // PHARE_LOG_LINE_SS(box);
-    if constexpr (is_tiled(Particles::layout_mode))
-    {
-        auto const amr_ghost_box = grow(layout.AMRBox(), nghosts);
-        auto const lcl_box       = as_unsigned(shift(box, amr_ghost_box.lower * -1));
-        std::size_t id           = particles.size();
-
-        auto tiles_per_cell = make_particle_nd_span_set_from(particles(), layout);
-        check_tile_span_set(tiles_per_cell);
-
-        for (auto const& bix : box)
-        {
-            auto& arr = (*tiles_per_cell.cells((bix - amr_ghost_box.lower).as_unsigned())[0])();
-            for (std::size_t i = 0; i < ppc; ++i)
-                arr.push_back(particle(*bix, id++));
-        }
-
-        particles.template sync<2, ParticleType::Ghost>();
-    }
-    else
-        add_particles_in<ParticleType::Ghost>(particles, box, ppc);
+    add_particles<ParticleType::Ghost>(particles, box, ppc);
 }
 
 template<typename Particles, typename Box>
 void add_ghost_particles(Particles& particles, Box const& box, std::size_t const ppc,
                          std::size_t const ghosts)
 {
-    auto constexpr type = ParticleType::Ghost;
-
-    using enum LayoutMode;
-    if constexpr (any_in(Particles::layout_mode, AoSPC, SoAPC))
-        particles.template reserve_ppc<ParticleType::Ghost>(ppc);
-
-    std::size_t id = particles.size();
-    for (auto const& bix : grow(box, ghosts))
-        if (not isIn(bix, box)) // order guaranteed this way
-            for (std::size_t i = 0; i < ppc; ++i)
-                particles.push_back(particle(*bix, id++));
-
-    if constexpr (any_in(Particles::layout_mode, AoSPC, SoAPC, AoSTS, AoSPCTS))
-        particles.template sync<2, type>();
+    // add_particles deals in one plain box at a time, so the ghost ring (which excludes
+    // the interior) is decomposed into disjoint fragments first, one call per fragment.
+    for (auto const& fragment : grow(box, ghosts).remove(box))
+        add_particles<ParticleType::Ghost>(particles, fragment, ppc);
 }
 
 
 template<auto type = ParticleType::Domain, typename Particles, typename Box>
-void add_particles_in(Particles& particles, Box const& box, std::size_t const ppc)
+void add_particles(Particles& particles, Box const& box, std::size_t const ppc = 100)
 {
     static_assert(std::is_same_v<decltype(type), ParticleType>);
-
-    ParticleArrayService::reserve_ppc_in<type>(particles, ppc, box);
-
-    std::size_t id = particles.size();
-    for (auto const& bix : box)
-        for (std::size_t i = 0; i < ppc; ++i)
-            particles.emplace_back(particle(*bix, id++));
-
-    if constexpr (any_in(Particles::layout_mode, AoSPC, SoAPC, AoSTS, AoSPCTS))
-        particles.template sync<2, type>();
+    core::add_particles<type>(particles, box, ppc,
+                              [](auto const& icell, auto const id) { return particle(icell, id); });
 }
 
 
@@ -161,9 +121,7 @@ void add_particles_from(Src const& src, Dst& dst)
     for (auto const& p : src)
         dst.emplace_back(p);
 
-    using enum LayoutMode;
-    if constexpr (any_in(Dst::layout_mode, AoSPC, SoAPC, AoSTS))
-        dst.template sync<2, type>();
+    dst.template on_appended<type>();
 }
 
 

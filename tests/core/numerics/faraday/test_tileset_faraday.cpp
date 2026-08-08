@@ -7,7 +7,6 @@
 
 // USE HIP_VISIBLE_DEVICES OR CUDA_VISIBLE_DEVICES env vars
 // #define PHARE_UNDEF_ASSERT
-#define PHARE_SKIP_MPI_IN_CORE
 
 #include "core/def/phare_config.hpp"
 

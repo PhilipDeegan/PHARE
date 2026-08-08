@@ -328,7 +328,7 @@ class Run:
         assert type in ["domain", "levelGhost"]
 
         def filename(name):
-            return f"ions_pop_{name}_domain.h5"
+            return f"ions_pop_{name}_{type}.h5"
 
         if isinstance(pop_name, (list, tuple)):
             for pop in pop_name:

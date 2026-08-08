@@ -5,7 +5,7 @@
 
 
 #include "core/logger.hpp"
-#include "core/def/phare_mpi.hpp" // IWYU pragma: keep
+#include "phare_mpi.hpp" // IWYU pragma: keep
 #include <core/utilities/types.hpp>
 #include "core/utilities/box/box.hpp"
 #include "core/data/grid/grid_tiles.hpp"

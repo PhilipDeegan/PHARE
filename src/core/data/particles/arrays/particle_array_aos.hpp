@@ -213,7 +213,22 @@ public:
         particles_.reserve(newSize);
     }
     void resize(std::size_t newSize) { return particles_.resize(newSize); }
-    void shrink_to_fit() { particles_.shrink_to_fit(); }
+    // void shrink_to_fit() { particles_.shrink_to_fit(); }
+
+
+    template<auto type>
+    void on_moved()
+    {
+        // noop
+    }
+
+    template<auto type>
+    void on_appended()
+    {
+        // noop
+    }
+
+
     auto& operator[](std::size_t i) const _PHARE_ALL_FN_ { return particles_.data()[i]; }
     auto& operator[](std::size_t i) _PHARE_ALL_FN_ { return particles_.data()[i]; }
     bool operator==(This const& that) const { return (this->particles_ == that.particles_); }

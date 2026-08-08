@@ -4,13 +4,13 @@
 #include "core/def.hpp"
 #include "core/data/particles/particle_array_def.hpp"
 #include "core/data/particles/particle_array_detail.hpp"
-#include "core/data/particles/particle_array_sorter.hpp"
-#include "core/data/particles/particle_array_selector.hpp"
-#include "core/data/particles/particle_array_partitioner.hpp"
+// #include "core/data/particles/particle_array_sorter.hpp"
+// #include "core/data/particles/particle_array_selector.hpp"
+// #include "core/data/particles/particle_array_partitioner.hpp"
 
+#include "core/utilities/span.hpp"
 #include "core/utilities/equality.hpp"
 #include "core/utilities/monitoring.hpp"
-#include "core/utilities/span.hpp"
 
 #include <tuple>
 #include <utility>

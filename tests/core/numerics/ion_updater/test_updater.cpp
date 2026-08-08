@@ -358,7 +358,7 @@ struct IonUpdaterTest : public ::testing::Test,
                     per_particles(domainPart);
                 }
 
-                ParticleArrayService::template sync<0, ParticleType::Ghost>(levelGhostPartOld);
+                levelGhostPartOld.template on_appended<ParticleType::Ghost>();
                 levelGhostPartNew = levelGhostPartOld;
                 levelGhostPart    = levelGhostPartOld;
 

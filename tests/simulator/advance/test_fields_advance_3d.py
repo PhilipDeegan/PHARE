@@ -29,7 +29,7 @@ def permute_hybrid(boxes={}):
             interp_order=interp_order,
             refinement_boxes=boxes,
             nbr_part_per_cell=ppc,
-            sim_setup_kwargs=dict(layout=layout),
+            particle_layout=layout,
         )
         for interp_order, layout in itertools.product(
             interp_orders, supported_particle_layouts()

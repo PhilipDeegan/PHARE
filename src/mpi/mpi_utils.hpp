@@ -1,8 +1,6 @@
 #ifndef PHARE_CORE_UTILITIES_MPI_HPP
 #define PHARE_CORE_UTILITIES_MPI_HPP
 
-#if !defined(PHARE_SKIP_MPI_IN_CORE) // sometimes we just don't need it in core
-
 #include "core/def.hpp"
 #include "phare_mpi.hpp" // IWYU pragma: keep
 #include "core/utilities/span.hpp"
@@ -262,8 +260,5 @@ NO_DISCARD std::vector<Data> collect(Data const& data, int mpi_size)
 }
 
 } // namespace PHARE::core::mpi
-
-
-#endif // !defined(PHARE_SKIP_MPI_IN_CORE)
 
 #endif /* PHARE_CORE_UTILITIES_MPI_H */

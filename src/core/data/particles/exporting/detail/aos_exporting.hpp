@@ -94,8 +94,8 @@ void ParticlesExporter<AoSTS, CPU>::move_particles(Src& src, Dst& dst, Box_t con
         src_tile().resize(start);
     }
 
-    src.sync();
-    dst.sync();
+    src.template on_appended<ParticleType::Domain>();
+    dst.template on_appended<ParticleType::Domain>();
 
     auto const new_size = src.size();
     if (old_size)
@@ -142,8 +142,8 @@ void ParticlesExporter<AoSTS, CPU>::move_in_domain(Dst& dst, Src& src, Box<int, 
         }
     }
 
-    src.sync();
-    dst.sync();
+    src.template on_appended<ParticleType::Domain>();
+    dst.template on_appended<ParticleType::Domain>();
 }
 
 template<>
@@ -181,8 +181,8 @@ void ParticlesExporter<AoSTS, CPU>::move_in_ghost_layer(Dst& dst, Src& src,
         }
     }
 
-    src.sync();
-    dst.sync();
+    src.template on_appended<ParticleType::Domain>();
+    dst.template on_appended<ParticleType::Domain>();
 }
 
 template<>
@@ -273,7 +273,7 @@ void ParticlesExporter<AoSTS, CPU>::delete_particles_not_in(Src& src, Box<int, d
         }
     }
 
-    src.sync();
+    src.template on_appended<ParticleType::Domain>();
 }
 
 template<>
@@ -297,7 +297,7 @@ void ParticlesExporter<AoSTS, CPU>::delete_particles_not_in(Src& src, Boxes cons
         }
     }
 
-    src.sync();
+    src.template on_appended<ParticleType::Domain>();
 }
 
 
@@ -327,7 +327,7 @@ void ParticlesExporter<AoSCMTS, CPU>::delete_particles_not_in(Src& src, Box<int,
         }
     }
 
-    src.sync();
+    src.template on_appended<ParticleType::Domain>();
 }
 
 
@@ -362,7 +362,7 @@ void ParticlesExporter<AoSCMTS, CPU>::delete_particles_not_in(Src& src, Boxes co
         }
     }
 
-    src.sync();
+    src.template on_appended<ParticleType::Domain>();
 }
 
 
@@ -401,9 +401,9 @@ void ParticlesExporter<AoSPCTS, CPU>::delete_particles_not_in(Src& src, Box<int,
             if (!isIn(gcell, box))
                 cell_parts.clear();
         }
-        cps.template sync<2, ParticleType::Ghost>();
+        cps.template on_appended<ParticleType::Ghost>();
     }
-    src.sync();
+    src.template on_appended<ParticleType::Domain>();
 }
 
 template<>
@@ -429,9 +429,9 @@ void ParticlesExporter<AoSPCTS, CPU>::delete_particles_not_in(Src& src, Boxes co
             if (!in_any)
                 cell_parts.clear();
         }
-        cps.template sync<2, ParticleType::Ghost>();
+        cps.template on_appended<ParticleType::Ghost>();
     }
-    src.sync();
+    src.template on_appended<ParticleType::Domain>();
 }
 
 
@@ -460,10 +460,10 @@ void ParticlesExporter<AoSPCTS, CPU>::move_in_domain(Dst& dst, Src& src,
                 }
             }
         }
-        cps.template sync<2, ParticleType::Ghost>();
+        cps.template on_appended<ParticleType::Ghost>();
     }
-    src.sync();
-    dst.sync();
+    src.template on_appended<ParticleType::Domain>();
+    dst.template on_appended<ParticleType::Domain>();
 }
 
 template<>
@@ -496,10 +496,10 @@ void ParticlesExporter<AoSPCTS, CPU>::move_in_ghost_layer(Dst& dst, Src& src,
                 }
             }
         }
-        cps.template sync<2, ParticleType::Ghost>();
+        cps.template on_appended<ParticleType::Ghost>();
     }
-    src.sync();
-    dst.sync();
+    src.template on_appended<ParticleType::Domain>();
+    dst.template on_appended<ParticleType::Domain>();
 }
 
 template<>

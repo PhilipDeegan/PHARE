@@ -245,7 +245,7 @@ struct ParticlesDataTest : public ::testing::Test,
             patches, [](auto const& patch) { return patch.layout.AMRBox(); }));
 
         for (auto& patch : patches)
-            PHARE::core::add_particles_in(patch.data->domainParticles, patch.layout.AMRBox(), ppc);
+            core::add_particles(patch.data->domainParticles, patch.layout.AMRBox(), ppc);
     }
 
     auto static overlap(Patch_t const& src, Patch_t& dst) { return Patch_t::overlap(src, dst); }

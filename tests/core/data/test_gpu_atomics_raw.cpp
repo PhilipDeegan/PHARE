@@ -62,13 +62,13 @@ auto make_ions(GridLayout_t const& layout)
         }
     };
 
-    auto add_particles = [&](auto& particles) {
-        add_particles_in(particles.domain_particles, layout.AMRBox(), ppc);
+    auto fill_particles = [&](auto& particles) {
+        add_particles(particles.domain_particles, layout.AMRBox(), ppc);
         add_ghost_particles(particles.patch_ghost_particles, layout.AMRBox(), ppc,
                             GridLayout_t::options.particle_ghost_width);
     };
 
-    add_particles(ions.populations[0].particles);
+    fill_particles(ions.populations[0].particles);
     disperse(ions.populations[0].particles);
 
     EXPECT_EQ(ions.populations[0].particles.domain_particles.size(), layout.AMRBox().size() * ppc);

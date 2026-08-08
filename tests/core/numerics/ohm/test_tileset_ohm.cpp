@@ -1,7 +1,7 @@
 //  tests/core/numerics/ohm/test_tileset_ohm.cpp
 //
 // #define PHARE_UNDEF_ASSERT
-#define PHARE_SKIP_MPI_IN_CORE
+
 
 #include "core/logger.hpp"    // scope timing
 #include "core/def/phlop.hpp" // scope timing

@@ -1,19 +1,13 @@
-// tests/core/data/particles/test_particle_partitionner.cpp
 
-#include "core/data/grid/gridlayout.hpp"
-#include "core/data/grid/gridlayoutimplyee.hpp"
+
+#include "core/utilities/point/point.hpp"
 #include "core/data/particles/particle.hpp"
 #include "core/data/particles/particle_array.hpp"
-#include "core/data/particles/particle_utilities.hpp"
-#include "core/data/particles/particle_array_partitionner.hpp"
-#include "core/utilities/point/point.hpp"
-
-#include "gmock/gmock.h"
-#include "gtest/gtest.h"
-
+#include "core/data/particles/partitioning/particles_partitioning.hpp"
 
 #include "tests/core/data/particles/test_particles.hpp"
 
+#include "gtest/gtest.h"
 
 using namespace PHARE::core;
 
@@ -303,7 +297,7 @@ TEST_F(ParticlePartitioner, partition_ghosts)
         using Partitioner = ParticleArrayPartitioner<ParticleArray_t::alloc_mode, ParticleArray_t>;
 
         std::size_t ppc = 10;
-        add_particles_in(particles, super_ghost_box, ppc);
+        add_particles(particles, super_ghost_box, ppc);
         assert(particles.size() == std::pow(11, 3) * ppc);
 
         auto iterators

@@ -1,4 +1,3 @@
-#if !defined(PHARE_SKIP_MPI_IN_CORE)
 
 #include "core/errors.hpp"
 
@@ -90,5 +89,3 @@ std::int64_t unix_timestamp_now()
 }
 
 } // namespace PHARE::core::mpi
-
-#endif

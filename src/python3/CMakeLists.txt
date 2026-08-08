@@ -40,6 +40,7 @@ while(THIS_FILE)
     pybind11_add_module(${MOD_STR} cpp_simulator.cpp)
     target_link_libraries(${MOD_STR} PUBLIC phare_simulator)
     target_compile_options(${MOD_STR} PRIVATE
+        ${PHARE_FLAGS}
         ${PHARE_WERROR_FLAGS}
         -DPHARE_HAS_HIGHFIVE=${PHARE_HAS_HIGHFIVE}
         -DPHARE_SIM_ID=${OUT}

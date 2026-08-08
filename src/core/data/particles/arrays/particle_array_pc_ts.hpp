@@ -314,7 +314,7 @@ public:
         , particles_{std::move(that.particles_)}
         , total_size{that.total_size}
     {
-        sync(); // without std::swap does not work well - mirrors TileSetVector
+        on_appended(); // without std::swap does not work well - mirrors TileSetVector
     }
 
     PCTileSetVector(PCTileSetVector const& that)
@@ -324,12 +324,12 @@ public:
         , particles_{that.particles_.copy(TileSetter<dim>{that.box_, that.ghost_cells_})}
         , total_size{that.total_size}
     {
-        sync();
+        on_appended();
     }
 
     // not = default: see TileSetVector::operator= (particle_array_ts.hpp) -- the
     // defaulted memberwise copy/move leaves particles_views_ stale, so reconstruct
-    // in place via the copy/move constructors instead, which call sync() themselves
+    // in place via the copy/move constructors instead, which call on_appended() themselves
     PCTileSetVector& operator=(PCTileSetVector&& that)
     {
         if (this == &that)
@@ -350,14 +350,6 @@ public:
     auto size() const { return total_size; }
     auto size(locell_t const& icell) const { return cell_size_(icell); }
     auto size(std::size_t const& idx) const { return cell_size_.data()[idx]; }
-
-    template<auto type = ParticleType::Domain>
-    auto& reserve_ppc(std::size_t const& ppc)
-    {
-        for (auto& tile : particles_)
-            tile().template reserve_ppc<type>(ppc);
-        return *this;
-    }
 
     void emplace_back(Particle_t const& p)
     {
@@ -392,15 +384,17 @@ public:
             ghost_box_.shape().template toArray<std::uint32_t>());
     }
 
-    template<std::uint8_t PHASE = 0, auto type = ParticleType::Domain>
-    void sync()
+    // refreshes recount/gap-sizing/views after particles were added without going through
+    // move_check (a raw append) - see on_moved() for the post-move_check pipeline.
+    template<auto type = ParticleType::Domain>
+    void on_appended()
     {
         MemoryMonitoring::LOG(__PRETTY_FUNCTION__);
 
         total_size = 0;
         for (auto& tile : particles_)
         {
-            tile().template sync<PHASE, type>(); // per-tile recount + gap sizing + views
+            tile().template on_appended<type>(); // per-tile recount + gap sizing + views
             total_size += tile().size();
         }
 
@@ -454,6 +448,24 @@ public:
         reset_views();
     }
 
+    // applies move_check-registered moves: realloc/resize, then the span-side within-tile
+    // adds + cross-tile copies + rm, then finalize (recount, size wall gaps, reset views).
+    template<auto type>
+    void on_moved(auto&&... args)
+    {
+        sync_moved<type>();
+        PCTileSetSpan<PSpan_t>{*this}.template sync<type>(args...);
+
+        PHARE_DEBUG_DO({
+            auto& vws = views();
+            for (std::size_t i = 0; i < particles_.size(); ++i)
+                for (auto const& bix : particles_[i]().local_box())
+                    assert(vws[i]()(bix).size() == particles_[i]()(bix).size());
+        })
+
+        on_appended<type>();
+    }
+
     template<auto type>
     void trim()
     { /* TODO */
@@ -469,8 +481,19 @@ public:
     void clear()
     {
         for (auto& tile : particles_)
-            tile().clear();
+            tile().clear(); // resets each tile's own per-cell bookkeeping too
         total_size = 0;
+
+        // this level's own cross-tile move_check bookkeeping (registered gaps/counts
+        // against tile-set cells) is separate from each tile's - reset it the same way
+        // the constructor does, or clear() leaves it stale just like the per-cell case.
+        cell_size_.zero();
+        gap_idx_.zero();
+        add_into_.zero();
+        left_.zero();
+        cap_.zero();
+
+        reset_views();
     }
 
     auto& views() { return particles_views_; }
@@ -818,22 +841,6 @@ void PCTileSetSpan<Particles>::sync_tile_rm_left(std::size_t const tidx) _PHARE_
 }
 
 
-template<auto type>
-void sync_pc_ts(auto& particles, auto&&... args)
-{
-    particles.template sync_moved<type>();     // realloc + resize
-    (*particles).template sync<type>(args...); // within-tile adds, cross-tile copies, rm
-
-    PHARE_DEBUG_DO({
-        auto& tiles = particles();
-        auto& views = particles.views();
-        for (std::size_t i = 0; i < particles().size(); ++i)
-            for (auto const& bix : tiles[i]().local_box())
-                assert(views[i]()(bix).size() == tiles[i]()(bix).size());
-    })
-
-    particles.template sync<0, type>(); // finalize: recount, size wall gaps, reset views
-}
 
 
 } // namespace PHARE::core

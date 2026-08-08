@@ -39,7 +39,7 @@ void push(benchmark::State& state)
     GridLayout_t layout{cells};
     Electromag_t em{layout};
     ParticleArray_t domainParticles{layout.AMRBox()};
-    add_particles_in(domainParticles, layout.AMRBox(), ppc);
+    add_particles(domainParticles, layout.AMRBox(), ppc);
     delta_disperse(domainParticles, 13337);
 
     ParticleArray_t tmpDomain = domainParticles;

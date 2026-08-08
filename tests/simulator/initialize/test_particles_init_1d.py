@@ -22,7 +22,7 @@ ppc = 25
 
 def permute(boxes={}):
     def f(interp, layout):
-        dic = dict(interp_order=interp, sim_setup_kwargs=dict(layout=layout))
+        dic = dict(interp_order=interp, particle_layout=layout)
         if boxes:
             return dict(refinement_boxes=boxes, **dic)
         return dic

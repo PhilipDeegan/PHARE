@@ -2,6 +2,7 @@
 #include "phare_core.hpp"
 
 #include "core/utilities/geom.hpp"
+#include "core/data/particles/partitioning/particles_partitioning.hpp"
 // #include "amr/utilities/box/amr_box.hpp"
 //  #include "amr/data/particles/particles_data.hpp"
 
@@ -48,7 +49,7 @@ struct StaticParticlesDataFixture
     StaticParticlesDataFixture()
         : box_tuple{get_some_boxes(box_size)}
     {
-        add_particles_in(particles, grow(middle(), ghost_cells), ppc);
+        add_particles(particles, grow(middle(), ghost_cells), ppc);
         // disperse(particles, 13337);
     }
 

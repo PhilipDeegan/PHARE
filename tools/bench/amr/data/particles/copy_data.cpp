@@ -34,7 +34,7 @@ public:
         assert(sourceBox == data->sourceDomain);
 
         // data->sourceData.domainParticles = PHARE::core::make_particles<dim>(ppc, sourceBox);
-        core::add_particles_in(data->sourceData.domainParticles, sourceBox, ppc);
+        core::add_particles(data->sourceData.domainParticles, sourceBox, ppc);
         assert(data->sourceData.domainParticles.size() == ppc * sourceBox.size());
         assert(data->destData.domainParticles.size() == 0);
     }

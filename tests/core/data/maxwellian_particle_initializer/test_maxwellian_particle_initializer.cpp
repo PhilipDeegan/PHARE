@@ -1,7 +1,5 @@
+
 #include "phare_core.hpp"
-
-#include <type_traits>
-
 
 #include "core/utilities/box/box.hpp"
 #include "core/utilities/point/point.hpp"

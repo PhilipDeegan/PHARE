@@ -3,7 +3,6 @@
 #include "phare_core.hpp"
 #include "core/utilities/types.hpp"
 #include "core/data/particles/particle_array.hpp"
-#include "core/data/particles/particle_array_service.hpp"
 #include "core/data/particles/particle_array_selector.hpp"
 
 #include "simulator/simulator_def.hpp"
@@ -82,7 +81,7 @@ struct AParticleArraySelectingTest : public ::testing::Test
         Patch(TestGridLayout_t const& _layout)
             : layout{_layout}
         {
-            add_particles_in(domain, layout.AMRBox(), ppc);
+            add_particles(domain, layout.AMRBox(), ppc);
             abort_if_not(domain.size() == ppc * layout.AMRBox().size());
         }
 
@@ -211,7 +210,7 @@ auto run(ParticleArraySelectingTest_t& self)
     auto const expected = pow(cells + 2, 3) - pow(cells, 3); // ghost box layer
 
     for (auto& patch : self.patches)
-        ParticleArrayService::template sync<2, ParticleType::Ghost>(patch.ghost);
+        patch.ghost.template on_appended<ParticleType::Ghost>();
 
     for (std::size_t pid = 0; pid < self.patches.size(); ++pid)
     {

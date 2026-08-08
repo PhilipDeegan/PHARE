@@ -246,6 +246,18 @@ struct SoAVector
             std::apply([&](auto&... container) { ((container.resize(size)), ...); }, as_tuple());
     }
 
+    template<auto type>
+    void on_moved()
+    {
+        // noop
+    }
+
+    template<auto type>
+    void on_appended()
+    {
+        // noop
+    }
+
 
     container_t<double> weight_, charge_;
     container_t<std::array<int, dim>> iCell_;
