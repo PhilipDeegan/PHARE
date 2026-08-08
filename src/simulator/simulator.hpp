@@ -4,7 +4,6 @@
 
 #include "phare_solver.hpp"
 
-
 #include "core/def.hpp"
 #include "core/errors.hpp"
 #include "core/logger.hpp"
@@ -24,60 +23,30 @@
 #include "diagnostic/diagnostics.hpp"
 
 #include "restarts/restarts.hpp"
+#include "simulator/simulator_def.hpp"
 
 #include <stdexcept>
 #include <vector>
 #include <string>
 
 
-
-
 namespace PHARE
 {
-
-
-class ISimulator
-{
-public:
-    virtual double startTime()   = 0;
-    virtual double endTime()     = 0;
-    virtual double currentTime() = 0;
-    virtual double timeStep()    = 0;
-
-    virtual void initialize()         = 0;
-    virtual double advance(double dt) = 0;
-
-    virtual std::vector<int> const& domainBox() const    = 0;
-    virtual std::vector<double> const& cellWidth() const = 0;
-    virtual std::size_t interporder() const              = 0;
-
-    virtual std::string to_str() = 0;
-
-    virtual ~ISimulator() {}
-
-
-    virtual bool dump_diagnostics(double timestamp, double timestep)
-    {
-        return false; // overriding optional
-    }
-    virtual bool dump_restarts(double timestamp, double timestep)
-    {
-        return false; // overriding optional
-    }
-};
 
 template<auto opts>
 class Simulator : public ISimulator
 {
 public:
-    std::size_t static constexpr dimension     = opts.dimension;
-    std::size_t static constexpr interp_order  = opts.interp_order;
-    std::size_t static constexpr nbRefinedPart = opts.nbRefinedPart;
+    auto static constexpr dimension      = opts.dimension;
+    auto static constexpr interp_order   = opts.interp_order;
+    auto static constexpr nbRefinedPart  = opts.nbRefinedPart;
+    auto static constexpr layout_mode    = opts.layout_mode;
+    auto static constexpr allocator_mode = opts.alloc_mode;
 
     using SAMRAITypes            = PHARE::amr::SAMRAI_Types;
     using PHARETypes             = solver::PHARE_Types<opts>;
     using IPhysicalModel         = PHARE::solver::IPhysicalModel<SAMRAITypes>;
-    using HybridModel            = PHARETypes::HybridModel_t;
+    using HybridModel            = PHARETypes::Hybrid::Model_t;
     using MHDModel               = PHARETypes::MHDModel_t;
     using SolverMHD              = PHARETypes::SolverMHD_t;
     using SolverPPC              = PHARETypes::SolverPPC_t;
@@ -93,12 +62,6 @@ public:
 
     Simulator(PHARE::initializer::PHAREDict const& dict,
               std::shared_ptr<PHARE::amr::Hierarchy> const& hierarchy);
-
-    ~Simulator()
-    {
-        if (coutbuf != nullptr)
-            std::cout.rdbuf(coutbuf);
-    }
 
 
     NO_DISCARD double startTime() override { return startTime_; }
@@ -131,6 +94,7 @@ public:
             return rMan->dump(timestamp, timestep);
         return false;
     }
+
 
 
 protected:
@@ -170,8 +134,7 @@ private:
         return nullptr;
     }
 
-    std::unique_ptr<std::ofstream> log_out{log_file()};
-    std::streambuf* coutbuf = nullptr;
+    CoutRedirect coutRedirect_{log_file()};
     std::shared_ptr<PHARE::amr::Hierarchy> hierarchy_;
     std::unique_ptr<Integrator> integrator_;
 
@@ -221,22 +184,6 @@ private:
 
     void handle_dictionary_exception(core::DictionaryException const& ex);
 };
-
-
-
-namespace
-{
-    inline auto logging(std::unique_ptr<std::ofstream>& log_out)
-    {
-        std::streambuf* buf = nullptr;
-        if (log_out)
-        {
-            buf = std::cout.rdbuf();
-            std::cout.rdbuf(log_out->rdbuf());
-        }
-        return buf;
-    }
-} // namespace
 
 
 
@@ -417,8 +364,7 @@ void Simulator<opts>::mhd_init(initializer::PHAREDict const& dict)
 template<auto opts>
 Simulator<opts>::Simulator(PHARE::initializer::PHAREDict const& dict,
                            std::shared_ptr<PHARE::amr::Hierarchy> const& hierarchy)
-    : coutbuf{logging(log_out)}
-    , hierarchy_{hierarchy}
+    : hierarchy_{hierarchy}
     , modelNames_{dict["simulation"]["models"].template to<std::vector<std::string>>()}
     , descriptors_{PHARE::amr::makeDescriptors(modelNames_)}
     , messengerFactory_{descriptors_}
@@ -576,6 +522,7 @@ double Simulator<opts>::advance(double dt)
 
 
 
+
     return dt;
 }
 
@@ -602,47 +549,12 @@ auto Simulator<opts>::find_model(std::string name)
 
 
 
-struct SimulatorMaker
-{
-    SimulatorMaker(std::shared_ptr<PHARE::amr::Hierarchy>& hierarchy)
-        : hierarchy_{hierarchy}
-    {
-    }
-
-    std::shared_ptr<PHARE::amr::Hierarchy>& hierarchy_;
-
-    template<typename Dimension, typename InterpOrder, typename NbRefinedPart>
-    std::unique_ptr<ISimulator> operator()(std::size_t userDim, std::size_t userInterpOrder,
-                                           std::size_t userNbRefinedPart, Dimension dimension,
-                                           InterpOrder interp_order, NbRefinedPart nbRefinedPart)
-    {
-        if (userDim == dimension() and userInterpOrder == interp_order()
-            and userNbRefinedPart == nbRefinedPart())
-        {
-            std::size_t constexpr d  = dimension();
-            std::size_t constexpr io = interp_order();
-            std::size_t constexpr nb = nbRefinedPart();
-
-            PHARE::initializer::PHAREDict& theDict
-                = PHARE::initializer::PHAREDictHandler::INSTANCE().dict();
-            SimOpts constexpr static opts{d, io, nb};
-            return std::make_unique<Simulator<opts>>(theDict, hierarchy_);
-        }
-        else
-        {
-            return nullptr;
-        }
-    }
-};
-
-
 
 template<typename Simulator>
 std::unique_ptr<Simulator> makeSimulator(std::shared_ptr<amr::Hierarchy> const& hierarchy)
 {
     return std::make_unique<Simulator>(initializer::PHAREDictHandler::INSTANCE().dict(), hierarchy);
 }
-
 
 
 } // namespace PHARE

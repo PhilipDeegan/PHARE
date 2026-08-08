@@ -13,25 +13,45 @@ _libs = {}
 
 
 def simulator_id(sim):
-    if not sim.mhd_timestepper:  # no MHD
-        return f"{sim.ndim}_{sim.interp_order}_{sim.refined_particle_nbr}"
+    layout = sim.particle_layout
+    allocator = sim.allocator
 
-    Hall = "true" if sim.hall else "false"
-    Res = "true" if sim.res else "false"
-    Hyper_Res = "true" if sim.hyper_res else "false"
-    return (
-        f"{sim.ndim}_{sim.interp_order}_{sim.refined_particle_nbr}_"
-        f"{sim.mhd_timestepper}_{sim.reconstruction}_{sim.limiter}_"
-        f"{sim.riemann}_{Hall}_{Res}_{Hyper_Res}"
+    if getattr(sim, "mhd_timestepper", None):
+        Hall = "true" if sim.hall else "false"
+        Res = "true" if sim.res else "false"
+        Hyper_Res = "true" if sim.hyper_res else "false"
+        return (
+            f"{sim.ndim}_{sim.interp_order}_{sim.refined_particle_nbr}_{layout}_{allocator}_"
+            f"{sim.mhd_timestepper}_{sim.reconstruction}_{sim.limiter}_"
+            f"{sim.riemann}_{Hall}_{Res}_{Hyper_Res}"
+        )
+
+    return "_".join(
+        str(s)
+        for s in [
+            sim.ndim,
+            sim.interp_order,
+            sim.refined_particle_nbr,
+            layout,
+            allocator,
+        ]
     )
 
 
 def cpp_lib(sim):
     global _libs
 
-    mod_str = f"pybindlibs.cpp_{simulator_id(sim)}"
+    mod_id = f"cpp_{simulator_id(sim)}"
+    mod_str = f"pybindlibs.{mod_id}"
     if mod_str not in _libs:
-        _libs[mod_str] = importlib.import_module(mod_str)
+        try:
+            _libs[mod_str] = importlib.import_module(mod_str)
+        except ModuleNotFoundError as e:
+            if not mpi_initialized() or mpi_size() == 1:
+                from .cmake import build
+
+                build(mod_id)
+                return cpp_lib(sim)
     return _libs[mod_str]
 
 
@@ -55,6 +75,10 @@ def split_pyarrays_fn(sim):
     return getattr(cpp_lib(sim), "split_pyarray_particles")
 
 
+def mpi_initialized():
+    return getattr(cpp_etc_lib(), "mpi_initialized")()
+
+
 def mpi_rank():
     return getattr(cpp_etc_lib(), "mpi_rank")()
 
@@ -65,10 +89,6 @@ def mpi_size():
 
 def mpi_barrier():
     return getattr(cpp_etc_lib(), "mpi_barrier")()
-
-
-def mpi_initialized():
-    return getattr(cpp_etc_lib(), "mpi_initialized")()
 
 
 def print_rank0(*args, **kwargs):
@@ -87,3 +107,32 @@ def print_rank0(*args, **kwargs):
 
     if should_print():
         print(*args, **kwargs)
+
+
+def layout_mode_enum():
+    return getattr(cpp_etc_lib(), "LayoutMode")()
+
+
+def supported_particle_layouts():
+    return getattr(cpp_etc_lib(), "supported_layouts")()
+
+
+def simulation_to_simopts(sim):
+    lib = cpp_etc_lib()
+    opts = lib.SimOpts()
+    opts.dimension = sim.ndim
+    opts.interp_order = sim.interp_order
+    opts.nbRefinedPart = sim.refined_particle_nbr
+    opts.layout_mode = getattr(lib.LayoutMode, sim.particle_layout)
+    opts.alloc_mode = getattr(lib.AllocatorMode, sim.allocator)
+
+    if getattr(sim, "mhd_timestepper", None):
+        opts.time_integrator_type = getattr(lib.TimeIntegratorType, sim.mhd_timestepper)
+        opts.reconstruction_type = getattr(lib.ReconstructionType, sim.reconstruction)
+        opts.slope_limiter_type = getattr(lib.SlopeLimiterType, sim.limiter)
+        opts.riemann_solver_type = getattr(lib.RiemannSolverType, sim.riemann)
+        opts.Hall = sim.hall
+        opts.Resistivity = sim.res
+        opts.HyperResistivity = sim.hyper_res
+
+    return opts
