@@ -62,7 +62,7 @@ namespace initializer
 
         void init() { phareDict = std::make_unique<PHAREDict>(); }
 
-        void stop() { phareDict.release(); }
+        void stop() { phareDict.reset(); }
 
         NO_DISCARD auto& dict()
         {
