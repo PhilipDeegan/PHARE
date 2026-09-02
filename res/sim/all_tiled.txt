@@ -26,4 +26,4 @@
 3,3,6,AoSTS,CPU
 3,3,6,AoSPCTS,CPU
 
-1,1,2,AoSMapped,CPU,TVDRK2,Linear,VanLeer,Rusanov,false,false,false
+1,0,0,AoSMapped,CPU,TVDRK2,Linear,VanLeer,Rusanov,false,false,false

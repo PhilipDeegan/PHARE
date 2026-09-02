@@ -62,7 +62,6 @@ static_assert(SimOpts{}.mhd_axes_consistent());
 using enum PHARE::core::LayoutMode;
 using enum PHARE::AllocatorMode;
 
-
 struct __attribute__((visibility("hidden"))) StaticIntepreter
 {
     static inline std::shared_ptr<PHARE::initializer::PythonDataProvider> input{nullptr};

@@ -238,8 +238,9 @@ NO_DISCARD auto collect(core::Span<T> const& sendBuff, int mpi_size = 0)
 template<core::Spannable Span>
 void collect(Span const& in, Span& out)
 {
-    _collect(in.data(), out, in.size(), in.size());
+    PHARE::mpi::_collect(in.data(), out, in.size(), in.size());
 }
+
 
 
 template<typename Data>
@@ -259,7 +260,8 @@ NO_DISCARD std::vector<Data> collect(Data const& data, int mpi_size)
         return values;
     }
 }
-} // namespace PHARE::mpi
 
+
+} // namespace PHARE::mpi
 
 #endif /* PHARE_CORE_UTILITIES_MPI_H */

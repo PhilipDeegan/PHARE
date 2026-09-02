@@ -25,7 +25,7 @@ def permute(boxes={}):
         dict(
             interp_order=interp_order,
             refinement_boxes=boxes,
-            sim_setup_kwargs=dict(layout=layout),
+            particle_layout=layout,
         )
         for interp_order, layout in itertools.product(
             interp_orders, supported_particle_layouts()
@@ -38,7 +38,9 @@ class AdvanceTest3D(HybridAdvanceTest):
     @data(*permute())
     @unpack
     def test_L0_particle_number_conservation(self, interp_order, **kwargs):
-        self._test_L0_particle_number_conservation(ndim, interp_order, ppc=ppc, cells=20, **kwargs)
+        self._test_L0_particle_number_conservation(
+            ndim, interp_order, ppc=ppc, cells=20, **kwargs
+        )
 
     @data(*permute({"L0": {"B0": Box3D(10, 14)}}))
     @unpack

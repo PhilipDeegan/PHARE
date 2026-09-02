@@ -142,7 +142,7 @@ struct TestParam
 
 
     using PhareTypes      = PHARE::core::PHARE_Types<SimOpts{dim, interp}>;
-    using GridLayout_t    = TestGridLayout<typename PhareTypes::GridLayout_t>;
+    using GridLayout_t    = TestGridLayout<typename PhareTypes::Hybrid::GridLayout_t>;
     using Box_t           = PHARE::core::Box<int, dim>;
     using ParticleArray_t = PHARE::core::ParticleArray<core::ParticleArrayOptions{dim}>;
 };
@@ -245,7 +245,7 @@ struct ParticlesDataTest : public ::testing::Test,
             patches, [](auto const& patch) { return patch.layout.AMRBox(); }));
 
         for (auto& patch : patches)
-            PHARE::core::add_particles_in(patch.data->domainParticles, patch.layout.AMRBox(), ppc);
+            core::add_particles(patch.data->domainParticles, patch.layout.AMRBox(), ppc);
     }
 
     auto static overlap(Patch_t const& src, Patch_t& dst) { return Patch_t::overlap(src, dst); }

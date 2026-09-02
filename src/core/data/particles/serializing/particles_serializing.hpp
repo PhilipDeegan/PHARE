@@ -4,6 +4,7 @@
 #include "core/data/particles/serializing/detail/def_serializing.hpp"
 #include "core/data/particles/serializing/detail/aos_serializing.hpp"
 #include "core/data/particles/serializing/detail/soa_serializing.hpp"
+#include "core/data/particles/serializing/detail/ts_serializing.hpp"
 
 namespace PHARE::core
 {

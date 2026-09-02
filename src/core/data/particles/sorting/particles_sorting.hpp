@@ -49,7 +49,7 @@ struct ParticleArraySorter
 
     bool constexpr static is_cell_sortable()
     {
-        return !any_in(ParticleArray::layout_mode, LM::AoSPC, LM::SoAPC);
+        return !any_in(ParticleArray::layout_mode, LM::AoSPC, LM::SoAPC, LM::AoSPCTS);
     }
 
     auto constexpr static sortable      = is_sortable();

@@ -15,17 +15,18 @@ void interpolate(benchmark::State& state)
     constexpr std::uint32_t ppc   = 100;
     auto static constexpr opts    = PHARE::SimOpts{dim, interp};
 
-    using PHARE_Types                = PHARE::core::PHARE_Types<opts>;
-    using Hybrid_t                   = PHARE_Types::Hybrid;
-    using GridLayout_t               = TestGridLayout<typename Hybrid_t::GridLayout_t>;
-    using ParticleArray              = Hybrid_t::ParticleArray_t;
-    using Grid_t                     = Hybrid_t::Grid_t;
+    using PHARE_Types   = PHARE::core::PHARE_Types<opts>;
+    using GridLayout_t  = TestGridLayout<typename PHARE_Types::Hybrid::GridLayout_t>;
+    using ParticleArray = PHARE_Types::Hybrid::ParticleArray_t;
+    using Grid_t        = PHARE_Types::Hybrid::Grid_t;
+    using Hybrid_t      = PHARE_Types::Hybrid;
+
     auto constexpr static field_opts = PHARE::core::TensorFieldOptions<Hybrid_t>{};
 
     GridLayout_t layout{cells};
     PHARE::core::Interpolator<dim, interp> interpolator;
     ParticleArray particles{layout.AMRBox()};
-    add_particles_in(particles, layout.AMRBox(), ppc);
+    add_particles(particles, layout.AMRBox(), ppc);
 
     PHARE::core::UsableElectromag<field_opts> em{layout};
     PHARE::core::UsableVecField<field_opts> flux{"F", layout,

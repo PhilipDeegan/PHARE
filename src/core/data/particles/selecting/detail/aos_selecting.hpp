@@ -73,7 +73,7 @@ void ParticlesSelector<AoSTS, CPU>::select( //
                     dst.push_back(p);
 
     if constexpr (DstParticles::layout_mode == LayoutMode::AoSTS)
-        dst.template sync<2>();
+        dst.template on_appended<particle_type>();
 }
 
 template<>
@@ -118,7 +118,7 @@ void ParticlesSelector<AoSTS, CPU>::select( // box is unshifted global AMR index
     }
 
     if constexpr (DstParticles::layout_mode == LayoutMode::AoSTS)
-        dst.template sync<2>();
+        dst.template on_appended<particle_type>();
 }
 
 
@@ -150,7 +150,7 @@ void ParticlesSelector<AoSPCTS, CPU>::select( //
     }
 
     if constexpr (any_in(DstParticles::layout_mode, AoSTS, AoSPCTS))
-        dst.template sync<2>();
+        dst.template on_appended<particle_type>();
 }
 
 template<>
@@ -174,7 +174,7 @@ void ParticlesSelector<AoSPCTS, CPU>::select( // box is unshifted global AMR ind
     }
 
     if constexpr (any_in(DstParticles::layout_mode, AoSTS, AoSPCTS))
-        dst.template sync<2>();
+        dst.template on_appended<particle_type>();
 }
 
 
@@ -386,7 +386,7 @@ std::size_t ParticlesSelector<AoSPCTS, CPU>::count(SrcParticles const& src, box_
     std::size_t n = 0;
     for (auto& tile : const_cast<SrcParticles&>(src)())
     {
-        auto& pc = tile();
+        auto& pc            = tile();
         auto const tile_box = particle_type == ParticleType::Domain ? pc.box() : pc.ghost_box();
         if (auto const overlap = tile_box * box)
         {

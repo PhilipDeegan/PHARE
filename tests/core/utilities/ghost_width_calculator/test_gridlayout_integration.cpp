@@ -37,13 +37,13 @@ TEST(GridLayoutIntegration, UsesGhostWidthOrder3)
 // SimOpts::mhd_axes_consistent() holds. Only reconstruction_type feeds the ghost width.
 constexpr SimOpts mhdOpts(MHDOpts::ReconstructionType reconstruction)
 {
-    return SimOpts{.dimension           = 1,
-                   .interp_order        = 0,
-                   .nbRefinedPart       = 0,
+    return SimOpts{.dimension            = 1,
+                   .interp_order         = 0,
+                   .nbRefinedPart        = 0,
                    .time_integrator_type = MHDOpts::TimeIntegratorType::TVDRK3,
-                   .reconstruction_type = reconstruction,
-                   .slope_limiter_type  = MHDOpts::SlopeLimiterType::None,
-                   .riemann_solver_type = MHDOpts::RiemannSolverType::Rusanov};
+                   .reconstruction_type  = reconstruction,
+                   .slope_limiter_type   = MHDOpts::SlopeLimiterType::None,
+                   .riemann_solver_type  = MHDOpts::RiemannSolverType::Rusanov};
 }
 
 static_assert(mhdOpts(MHDOpts::ReconstructionType::Constant).mhd_axes_consistent());

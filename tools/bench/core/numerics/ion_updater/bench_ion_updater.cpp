@@ -37,7 +37,7 @@ void updater_routine(benchmark::State& state)
                           {grow(layout.AMRBox(), GridLayout_t::options.particle_ghost_width)}};
 
     auto& patch_particles = ions.populations[0].particles;
-    add_particles_in(patch_particles.domain_particles, layout.AMRBox(), ppc);
+    add_particles(patch_particles.domain_particles, layout.AMRBox(), ppc);
 
     delta_disperse(patch_particles.domain_particles);
     // std::sort(patch_particles.domain_particles);

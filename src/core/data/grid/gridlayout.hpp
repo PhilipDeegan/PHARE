@@ -817,15 +817,16 @@ namespace core
         }
 
         NO_DISCARD constexpr static std::array<std::array<QtyCentering, dimension>, 6>
-        centering(Tensor quantity)
+        centering(Tensor quantity) _PHARE_ALL_FN_
         {
             return for_N_make_array<6>(
                 [](auto) { return ConstArray<QtyCentering, dimension>(QtyCentering::primal); });
         }
 
         template<typename HasQuantity>
-        _PHARE_ALL_FN_ NO_DISCARD constexpr static auto centering(HasQuantity const& hasQuantity)
+        NO_DISCARD constexpr static auto centering(HasQuantity const& hasQuantity)
             requires(has_physicalQuantity_v<HasQuantity>)
+        _PHARE_ALL_FN_
         {
             return centering(hasQuantity.physicalQuantity());
         }

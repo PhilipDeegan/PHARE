@@ -22,11 +22,15 @@ ppc, cells = 10, 30
 
 def permute(boxes={}):
     def f(interp, layout):
-        dic = dict(interp_order=interp, sim_setup_kwargs=dict(layout=layout))
+        dic = dict(interp_order=interp, particle_layout=layout)
         if boxes:
             return dict(refinement_boxes=boxes, **dic)
         return dic
-    return [f(*els) for els in itertools.product(interp_orders, supported_particle_layouts())]
+
+    return [
+        f(*els)
+        for els in itertools.product(interp_orders, supported_particle_layouts())
+    ]
 
 
 @ddt

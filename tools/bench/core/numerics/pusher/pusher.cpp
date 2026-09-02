@@ -21,14 +21,15 @@ void push(benchmark::State& state)
     constexpr std::uint32_t ppc   = 100;
     auto constexpr no_op          = [](auto& particleRange) { return particleRange; };
 
-    using PHARE_Types                = PHARE::core::PHARE_Types<opts>;
-    using Hybrid_t                   = PHARE_Types::Hybrid;
-    using GridLayout_t               = TestGridLayout<typename Hybrid_t::GridLayout_t>;
-    using Interpolator               = PHARE::core::Interpolator<dim, interp>;
-    using BoundaryCondition          = PHARE::core::BoundaryCondition<dim, interp>;
+    using PHARE_Types       = PHARE::core::PHARE_Types<opts>;
+    using GridLayout_t      = TestGridLayout<typename PHARE_Types::Hybrid::GridLayout_t>;
+    using Interpolator      = PHARE::core::Interpolator<dim, interp>;
+    using BoundaryCondition = PHARE::core::BoundaryCondition<dim, interp>;
+    using Hybrid_t          = PHARE_Types::Hybrid;
+
     auto constexpr static field_opts = PHARE::core::TensorFieldOptions<Hybrid_t>{};
     using Electromag_t               = PHARE::core::UsableElectromag<field_opts>;
-    using Ions_t                     = Hybrid_t::Ions_t;
+    using Ions_t                     = PHARE_Types::Hybrid::Ions_t;
     using ParticleArray_t            = Ions_t::particle_array_type;
     using ParticleRange              = PHARE::core::IndexRange<ParticleArray_t>;
 
@@ -39,7 +40,7 @@ void push(benchmark::State& state)
     GridLayout_t layout{cells};
     Electromag_t em{layout};
     ParticleArray_t domainParticles{layout.AMRBox()};
-    add_particles_in(domainParticles, layout.AMRBox(), ppc);
+    add_particles(domainParticles, layout.AMRBox(), ppc);
     delta_disperse(domainParticles, 13337);
 
     ParticleArray_t tmpDomain = domainParticles;

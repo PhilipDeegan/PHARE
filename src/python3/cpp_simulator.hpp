@@ -99,39 +99,60 @@ void declareSimulator(PyClass&& sim)
         .def("dump_restarts", &Simulator::dump_restarts, py::arg("timestamp"), py::arg("timestep"));
 }
 
+
 template<auto opts>
-void inline declare_etc_hybrid(py::module& m)
+void inline declare_etc(py::module& m)
 {
     using Sim = Simulator<opts>;
 
     using DW         = DataWrangler<opts>;
     std::string name = "DataWrangler";
 
-    py::class_<DW, py::smart_holder>(m, name.c_str(), py::module_local())
-        .def(py::init<std::shared_ptr<Sim> const&, std::shared_ptr<amr::Hierarchy> const&>())
-        .def("sync", &DW::sync)
-        .def("getMHDPatchLevel", &DW::getMHDPatchLevel)
-        .def("getHybridPatchLevel", &DW::getHybridPatchLevel)
-        .def("getNumberOfLevels", &DW::getNumberOfLevels);
+    auto dwCls
+        = py::class_<DW, py::smart_holder>(m, name.c_str(), py::module_local())
+              .def(py::init<std::shared_ptr<Sim> const&, std::shared_ptr<amr::Hierarchy> const&>())
+              .def("sync", &DW::sync)
+              .def("getNumberOfLevels", &DW::getNumberOfLevels);
+
+    if constexpr (has_hybrid_v<opts>)
+        dwCls.def("getHybridPatchLevel", &DW::getHybridPatchLevel);
+    if constexpr (has_mhd_v<opts>)
+        dwCls.def("getMHDPatchLevel", &DW::getMHDPatchLevel);
 
 
-    using HybPL = PatchLevel<typename Sim::HybridModel>;
-    name        = "HybridPatchLevel";
-    if constexpr (defaultNbrRefinedParts(opts.dimension, opts.interp_order)
-                  == opts.nbRefinedPart) // register once!
-        py::class_<HybPL, py::smart_holder>(m, name.c_str(), py::module_local())
-            .def("getB", &HybPL::getB, py::arg("component"))
-            .def("getE", &HybPL::getE, py::arg("component"))
-            .def("getVi", &HybPL::getVi, py::arg("component"))
-            .def("getN", &HybPL::getN, py::arg("pop_name"))
-            .def("getNi", &HybPL::getNi)
-            .def("getFlux", &HybPL::getFlux, py::arg("component"), py::arg("pop_name"))
-            .def("getParticles", &HybPL::getParticles, py::arg("pop_name"));
+    if constexpr (has_hybrid_v<opts>)
+    {
+        using HybPL = PatchLevel<typename solver::PHARE_Types<opts>::Hybrid::Model_t>;
+        name        = "HybridPatchLevel";
+        if constexpr (defaultNbrRefinedParts(opts.dimension, opts.interp_order)
+                      == opts.nbRefinedPart) // register once!
+            py::class_<HybPL, py::smart_holder>(m, name.c_str(), py::module_local())
+                .def("getB", &HybPL::getB, py::arg("component"))
+                .def("getE", &HybPL::getE, py::arg("component"))
+                .def("getVi", &HybPL::getVi, py::arg("component"))
+                .def("getN", &HybPL::getN, py::arg("pop_name"))
+                .def("getNi", &HybPL::getNi)
+                .def("getFlux", &HybPL::getFlux, py::arg("component"), py::arg("pop_name"))
+                .def("getParticles", &HybPL::getParticles, py::arg("pop_name"));
 
+        using _Splitter = PHARE::amr::Splitter<core::DimConst<opts.dimension>,
+                                               core::InterpConst<opts.interp_order>,
+                                               core::RefinedParticlesConst<opts.nbRefinedPart>>;
+        name            = "Splitter";
 
-    using MHDPL = PatchLevel<typename Sim::MHDModel>;
-    name        = "MHDPatchLevel";
-    if constexpr (defaultNbrRefinedParts(opts.dimension, opts.interp_order) == opts.nbRefinedPart)
+        py::class_<_Splitter, py::smart_holder>(m, name.c_str(), py::module_local())
+            .def(py::init<>())
+            .def_property_readonly_static("weight", [](py::object) { return _Splitter::weight; })
+            .def_property_readonly_static("delta", [](py::object) { return _Splitter::delta; });
+
+        name = "split_pyarray_particles";
+        m.def(name.c_str(), splitPyArrayParticles<_Splitter>);
+    }
+
+    if constexpr (has_mhd_v<opts>)
+    {
+        using MHDPL = PatchLevel<typename solver::PHARE_Types<opts>::MHD::Model_t>;
+        name        = "MHDPatchLevel";
         py::class_<MHDPL, py::smart_holder>(m, name.c_str(), py::module_local())
             .def("getRho", &MHDPL::getRho)
             .def("getP", &MHDPL::getP)
@@ -141,28 +162,7 @@ void inline declare_etc_hybrid(py::module& m)
             .def("getRhoV", &MHDPL::getRhoV, py::arg("component"))
             .def("getE", &MHDPL::getE, py::arg("component"))
             .def("getJ", &MHDPL::getJ, py::arg("component"));
-
-    using _Splitter
-        = PHARE::amr::Splitter<core::DimConst<opts.dimension>, core::InterpConst<opts.interp_order>,
-                               core::RefinedParticlesConst<opts.nbRefinedPart>>;
-    name = "Splitter";
-
-    py::class_<_Splitter, py::smart_holder>(m, name.c_str(), py::module_local())
-        .def(py::init<>())
-        .def_property_readonly_static("weight", [](py::object) { return _Splitter::weight; })
-        .def_property_readonly_static("delta", [](py::object) { return _Splitter::delta; });
-
-    name = "split_pyarray_particles";
-    m.def(name.c_str(), splitPyArrayParticles<_Splitter>);
-}
-
-// opts is a template parameter, so the discarded branch is never instantiated and an MHD-only
-// build never processes the hybrid-only bindings.
-template<auto opts>
-void inline declare_etc(py::module& m)
-{
-    if constexpr (has_hybrid_v<opts>)
-        declare_etc_hybrid<opts>(m);
+    }
 }
 
 
@@ -187,7 +187,7 @@ void inline declare_macro_sim(py::module& m)
     });
 
 
-    declare_etc<Sim::options>(m);
+    declare_etc<opts>(m);
     declareParticles<opts>(m);
 }
 

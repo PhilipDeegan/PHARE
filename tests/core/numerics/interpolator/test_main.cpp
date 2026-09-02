@@ -245,10 +245,11 @@ public:
     // arbitrary number of cells
     static constexpr std::uint32_t nx = 50;
 
-    using PHARE_TYPES                = PHARE_Types<opts>;
-    using GridLayout_t                = PHARE_TYPES::Hybrid::GridLayout_t;
-    using Electromag_t                = PHARE_TYPES::Hybrid::Electromag_t;
-    using HybridTypes                = PHARE_TYPES::Hybrid;
+    using PHARE_TYPES  = PHARE_Types<opts>;
+    using GridLayout_t = PHARE_TYPES::Hybrid::GridLayout_t;
+    using Electromag_t = PHARE_TYPES::Hybrid::Electromag_t;
+    using HybridTypes  = PHARE_TYPES::Hybrid;
+
     auto static constexpr field_opts = TensorFieldOptions<HybridTypes>{};
     using UsableVecFieldND           = UsableVecField<field_opts>;
 
@@ -337,10 +338,11 @@ public:
     static constexpr std::uint32_t nx = 50;
     static constexpr std::uint32_t ny = 50;
 
-    using PHARE_TYPES                = PHARE::core::PHARE_Types<opts>;
-    using GridLayout_t                = PHARE_TYPES::Hybrid::GridLayout_t;
-    using Electromag_t                = PHARE_TYPES::Hybrid::Electromag_t;
-    using HybridTypes                = PHARE_TYPES::Hybrid;
+    using PHARE_TYPES  = PHARE::core::PHARE_Types<opts>;
+    using GridLayout_t = PHARE_TYPES::Hybrid::GridLayout_t;
+    using Electromag_t = PHARE_TYPES::Hybrid::Electromag_t;
+    using HybridTypes  = PHARE_TYPES::Hybrid;
+
     auto static constexpr field_opts = TensorFieldOptions<HybridTypes>{};
     using UsableVecFieldND           = UsableVecField<field_opts>;
 
@@ -434,10 +436,11 @@ public:
     static constexpr std::uint32_t ny = 50;
     static constexpr std::uint32_t nz = 50;
 
-    using PHARE_TYPES                = PHARE_Types<opts>;
-    using GridLayout_t                = PHARE_TYPES::Hybrid::GridLayout_t;
-    using Electromag_t                = PHARE_TYPES::Hybrid::Electromag_t;
-    using HybridTypes                = PHARE_TYPES::Hybrid;
+    using PHARE_TYPES  = PHARE_Types<opts>;
+    using GridLayout_t = PHARE_TYPES::Hybrid::GridLayout_t;
+    using Electromag_t = PHARE_TYPES::Hybrid::Electromag_t;
+    using HybridTypes  = PHARE_TYPES::Hybrid;
+
     auto static constexpr field_opts = TensorFieldOptions<HybridTypes>{};
     using UsableVecFieldND           = UsableVecField<field_opts>;
 
@@ -533,12 +536,13 @@ class ACollectionOfParticles_1d : public ::testing::Test
     static constexpr auto interp_order = Interpolator::interp_order;
     constexpr static PHARE::SimOpts opts{dimension, interp_order};
 
-    using PHARE_TYPES                = PHARE::core::PHARE_Types<opts>;
-    using HybridTypes                = PHARE_TYPES::Hybrid;
-    using ParticleArray_t            = HybridTypes::ParticleArray_t;
-    using GridLayout_t                = HybridTypes::GridLayout_t;
-    using Grid_t                     = HybridTypes::Grid_t;
-    using Particle_t                 = ParticleArray_t::Particle_t;
+    using PHARE_TYPES     = PHARE::core::PHARE_Types<opts>;
+    using ParticleArray_t = PHARE_TYPES::Hybrid::ParticleArray_t;
+    using GridLayout_t    = PHARE_TYPES::Hybrid::GridLayout_t;
+    using Grid_t          = PHARE_TYPES::Hybrid::Grid_t;
+    using Particle_t      = ParticleArray_t::Particle_t;
+    using HybridTypes     = PHARE_TYPES::Hybrid;
+
     auto static constexpr field_opts = TensorFieldOptions<HybridTypes>{};
     using UsableVecFieldND           = UsableVecField<field_opts>;
 
@@ -731,11 +735,12 @@ struct ACollectionOfParticles_2d : public ::testing::Test
     static constexpr int start = 0, end = 5;
     static constexpr auto safeLayer = static_cast<int>(1 + ghostWidthForParticles<interp_order>());
 
-    using PHARE_TYPES                = PHARE_Types<opts>;
-    using HybridTypes                = PHARE_TYPES::Hybrid;
-    using ParticleArray_t            = HybridTypes::ParticleArray_t;
-    using GridLayout_t                = HybridTypes::GridLayout_t;
-    using Grid_t                     = HybridTypes::Grid_t;
+    using PHARE_TYPES     = PHARE_Types<opts>;
+    using ParticleArray_t = PHARE_TYPES::Hybrid::ParticleArray_t;
+    using GridLayout_t    = PHARE_TYPES::Hybrid::GridLayout_t;
+    using Grid_t          = PHARE_TYPES::Hybrid::Grid_t;
+    using HybridTypes     = PHARE_TYPES::Hybrid;
+
     auto static constexpr field_opts = TensorFieldOptions<HybridTypes>{};
     using UsableVecFieldND           = UsableVecField<field_opts>;
 
@@ -804,9 +809,9 @@ struct ACollectionOfParticles_3d : public ::testing::Test
     constexpr static auto safeLayer = static_cast<int>(1 + ghostWidthForParticles<interp_order>());
 
     using PHARE_TYPES                = PHARE::core::PHARE_Types<opts>;
-    using ParticleArray_t            = typename PHARE_TYPES::ParticleArray_t;
-    using GridLayout_t               = typename PHARE_TYPES::GridLayout_t;
-    using Grid_t                     = typename PHARE_TYPES::Grid_t;
+    using ParticleArray_t            = PHARE_TYPES::Hybrid::ParticleArray_t;
+    using GridLayout_t               = PHARE_TYPES::Hybrid::GridLayout_t;
+    using Grid_t                     = PHARE_TYPES::Hybrid::Grid_t;
     using HybridTypes                = PHARE_TYPES::Hybrid;
     auto static constexpr field_opts = TensorFieldOptions<HybridTypes>{};
     using UsableVecFieldND           = UsableVecField<field_opts>;

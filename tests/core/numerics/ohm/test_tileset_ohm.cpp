@@ -155,8 +155,8 @@ struct OhmTileTest : public ::testing::Test
                                                     .alloc_mode   = alloc_mode};
 
         using PhareTypes                 = PHARE_Types<opts>;
-        using GridLayout_t               = PhareTypes::GridLayout_t;
-        using Field_t                    = PhareTypes::Grid_t;
+        using GridLayout_t               = PhareTypes::Hybrid::GridLayout_t;
+        using Field_t                    = PhareTypes::Hybrid::Grid_t;
         using Hybrid_t                   = PhareTypes::Hybrid;
         auto constexpr static field_opts = TensorFieldOptions<Hybrid_t>{};
         using UsableElectromag_t         = UsableElectromag<field_opts>;
@@ -188,12 +188,12 @@ struct OhmTileTest : public ::testing::Test
         auto constexpr static opts   = SimOpts{.dimension = dim, .interp_order = interp};
 
         using PhareTypes                 = PHARE_Types<opts>;
-        using GridLayout_t               = PhareTypes::GridLayout_t;
+        using GridLayout_t               = PhareTypes::Hybrid::GridLayout_t;
         using Hybrid_t                   = PhareTypes::Hybrid;
         auto constexpr static field_opts = TensorFieldOptions<Hybrid_t>{};
         using UsableElectromag_t         = UsableElectromag<field_opts>;
         using Electromag_t               = UsableElectromag_t::Super;
-        using Grid_t                     = PhareTypes::Grid_t;
+        using Grid_t                     = PhareTypes::Hybrid::Grid_t;
         using UsableVecField_t           = UsableVecField<field_opts>;
 
         ContiguousPatch(GridLayout_t const& layout_)

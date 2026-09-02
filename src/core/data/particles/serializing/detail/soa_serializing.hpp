@@ -30,7 +30,8 @@ void ParticlesDeserializer<LayoutMode::SoA, CPU>::operator()(std::string const& 
     using enum LayoutMode;
 
     static_assert(Dst::alloc_mode == Src::alloc_mode);
-    static_assert(layout_mode == Src::layout_mode || any_in(Src::layout_mode, AoS, AoSMapped));
+    static_assert(layout_mode == Src::layout_mode
+                  || any_in(Src::layout_mode, AoS, AoSMapped, AoSTS, AoSPCTS));
 
     if constexpr (layout_mode == Src::layout_mode)
     {
@@ -61,7 +62,8 @@ void ParticlesDeserializer<LayoutMode::SoAVX, CPU>::operator()(std::string const
     using enum LayoutMode;
 
     static_assert(Dst::alloc_mode == Src::alloc_mode);
-    static_assert(layout_mode == Src::layout_mode || any_in(Src::layout_mode, AoS, AoSMapped));
+    static_assert(layout_mode == Src::layout_mode
+                  || any_in(Src::layout_mode, AoS, AoSMapped, AoSTS, AoSPCTS));
 
     ParticlesDeserializer<Src::layout_mode, CPU>{}.template readN<Src>(
         file_name, [&](auto const& particles) {

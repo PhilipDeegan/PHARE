@@ -26,8 +26,8 @@ TEST(FieldOverlapTest, syncInnerGhostsScan)
     std::size_t constexpr static cells = 100;
     using PhareTypes                   = PHARE_Types<SimOpts{
         .dimension = dim, .interp_order = 1, .layout_mode = LayoutMode::AoSTS}>;
-    using TiledGrid_t                  = PhareTypes::Grid_t;
-    using GridLayout_t                 = PhareTypes::GridLayout_t;
+    using TiledGrid_t                  = PhareTypes::Hybrid::Grid_t;
+    using GridLayout_t                 = PhareTypes::Hybrid::GridLayout_t;
     using TestGridLayout_t             = TestGridLayout<GridLayout_t>;
     auto constexpr static n_ghosts     = GridLayout_t::options.field_ghost_width;
 
@@ -66,8 +66,8 @@ TEST(FieldOverlapTest, syncInnerGhostsOverlaps)
     auto constexpr static field_opts = FieldOpts<HybridQuantity::Scalar, double>{dim};
 
     using PhareTypes               = PHARE_Types<opts>;
-    using TiledGrid_t              = PhareTypes::Grid_t;
-    using GridLayout_t             = PhareTypes::GridLayout_t;
+    using TiledGrid_t              = PhareTypes::Hybrid::Grid_t;
+    using GridLayout_t             = PhareTypes::Hybrid::GridLayout_t;
     using TestGridLayout_t         = TestGridLayout<GridLayout_t>;
     using FieldOverlaps            = FieldTileOverlaps<GridLayout_t, field_opts>;
     auto constexpr static n_ghosts = GridLayout_t::options.field_ghost_width;

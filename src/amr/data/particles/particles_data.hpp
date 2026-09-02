@@ -2,19 +2,17 @@
 #define PHARE_SRC_AMR_DATA_PARTICLES_PARTICLES_DATA_HPP
 
 
-
 #include "core/def.hpp" // IWYU pragma: keep
 #include "core/logger.hpp"
 #include "phare_mpi.hpp" // IWYU pragma: keep
 #include "core/utilities/types.hpp"
 #include "core/data/particles/particle_array.hpp"
-#include "core/data/particles/particle_array_service.hpp"
 #include "core/data/ions/ion_population/particle_pack.hpp"
+#include "core/data/particles/particle_array_selector.hpp"
 
 #include "amr/samrai.hpp" // IWYU pragma: keep
 #include "amr/utilities/box/amr_box.hpp"
 #include "amr/resources_manager/amr_utils.hpp"
-#include <SAMRAI/hier/BoxContainer.h>
 #include <amr/data/particles/particles_variable_fill_pattern.hpp>
 
 
@@ -22,6 +20,7 @@
 #include <SAMRAI/hier/PatchData.h>
 #include <SAMRAI/hier/BoxOverlap.h>
 #include <SAMRAI/pdat/CellOverlap.h>
+#include <SAMRAI/hier/BoxContainer.h>
 #include <SAMRAI/tbox/RestartManager.h>
 #include "SAMRAI/hier/Transformation.h"
 #include <SAMRAI/tbox/MemoryUtilities.h>
@@ -376,8 +375,7 @@ namespace amr
                     if (isInBox(intersect, particle))
                         domainParticles.push_back(particle);
             }
-            core::ParticleArrayService::template sync<0, core::ParticleType::Domain>(
-                domainParticles);
+            domainParticles.template on_appended<core::ParticleType::Domain>();
         }
 
 
@@ -591,7 +589,7 @@ void ParticlesData<ParticleArray_t>::unpack_from_ghost(SAMRAI::tbox::MessageStre
     for (auto const& p : particleArray)
         domainParticles.push_back(p);
 
-    core::ParticleArrayService::template sync<0, core::ParticleType::Domain>(domainParticles);
+    domainParticles.template on_appended<core::ParticleType::Domain>();
 }
 
 

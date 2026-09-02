@@ -62,6 +62,21 @@ struct SimOpts
     bool Resistivity                                 = false;
     bool HyperResistivity                            = false;
 
+    // derived — two independent axes, never one as the other's negation
+    bool hybrid_enabled = interp_order > 0;
+    bool mhd_enabled    = reconstruction_type != MHDOpts::ReconstructionType::Default;
+
+    // time_integrator_type/riemann_solver_type must agree with reconstruction_type on
+    // off-ness; a member fn keeps SimOpts an aggregate. slope_limiter_type is excluded:
+    // MHDOpts::SlopeLimiterType::None is both its off-sentinel and a legitimate active
+    // choice (e.g. Constant reconstruction pairs with limiter=None while mhd is enabled).
+    constexpr bool mhd_axes_consistent() const
+    {
+        bool const mhd_is_off = !mhd_enabled;
+        return mhd_is_off == (time_integrator_type == MHDOpts::TimeIntegratorType::Default)
+               && mhd_is_off == (riemann_solver_type == MHDOpts::RiemannSolverType::Default);
+    }
+
     static SimOpts FROM(initializer::PHAREDict const& dict);
 };
 
@@ -113,6 +128,12 @@ constexpr bool operator==(SimOpts const& lhs, SimOpts const& rhs)
            and lhs.Resistivity == rhs.Resistivity                   //
            and lhs.HyperResistivity == rhs.HyperResistivity;
 }
+
+template<SimOpts opts>
+inline constexpr bool has_hybrid_v = opts.hybrid_enabled;
+
+template<SimOpts opts>
+inline constexpr bool has_mhd_v = opts.mhd_enabled;
 
 constexpr auto inline possibleSimulators()
 {

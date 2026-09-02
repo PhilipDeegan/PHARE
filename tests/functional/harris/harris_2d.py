@@ -206,7 +206,7 @@ class HarrisTest(SimulatorTest):
     def test_run(self):
         self.register_diag_dir_for_cleanup(diag_dir)
         sim = config()
-        Simulator(sim).setup(layout=layout).initialize().run()
+        Simulator(sim).run()
         if not sim.dry_run and cpp.mpi_rank() == 0:
             plot_dir = Path(f"{diag_dir}_plots") / str(cpp.mpi_size())
             plot_dir.mkdir(parents=True, exist_ok=True)
@@ -221,4 +221,3 @@ if ph.PHARE_EXE:
 elif __name__ == "__main__":
     startMPI()
     HarrisTest().test_run().tearDown()
-    # Simulator(config()).setup(layout=layout).initialize().run()

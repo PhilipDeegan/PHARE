@@ -24,12 +24,11 @@ while(THIS_FILE)
     string(REPLACE "," ";" LINE_LIST ${LINE})
     list(LENGTH LINE_LIST LINE_LENGTH)
 
-    if(LINE_LENGTH EQUAL 8)
-        # MHD-only shape: dim,timeint,recon,slope,riemann,hall,res,hyper
-        # normalize to the 10-field SimOpts aggregate order: dim,0,0,timeint,...
-        list(INSERT LINE_LIST 1 "0" "0")
-        list(LENGTH LINE_LIST LINE_LENGTH)
-    elseif(NOT LINE_LENGTH EQUAL 3 AND NOT LINE_LENGTH EQUAL 10)
+    # dim,interp,refined,layout,allocator[,timeint,recon,slope,riemann,hall,res,hyper]
+    # layout/allocator are never omitted (even for MHD-only lines, where interp=refined=0
+    # disables hybrid compilation) so a compiled module name is unambiguous regardless of
+    # whether it came from all.txt or all_tiled.txt (withMkn).
+    if(NOT LINE_LENGTH EQUAL 5 AND NOT LINE_LENGTH EQUAL 12)
         message(FATAL_ERROR "PHARE permutation line has unsupported arity (${LINE_LENGTH}): ${LINE}")
     endif()
 
@@ -49,6 +48,7 @@ while(THIS_FILE)
     pybind11_add_module(${MOD_STR} cpp_simulator.cpp)
     target_link_libraries(${MOD_STR} PUBLIC phare_simulator)
     target_compile_options(${MOD_STR} PRIVATE
+        ${PHARE_FLAGS}
         ${PHARE_WERROR_FLAGS}
         -DPHARE_HAS_HIGHFIVE=${PHARE_HAS_HIGHFIVE}
         -DPHARE_SIM_ID=${OUT}

@@ -320,21 +320,18 @@ def remove(particles, idx):
 
 
 def _arg_sort(particles):
-    x1 = particles.iCells[:, 0] + particles.deltas[:, 0]
+    # mirrors the C++ sorter (particles_sorting_cpu.hpp): sort by the full icell tuple
+    # first (exact ints, axis 0 most significant), then only fall back to delta - as a
+    # tuple, same axis order - to order particles that land in the exact same cell. Float
+    # noise between layouts can then never flip the order of particles in different
+    # cells; it can only reorder particles that already share a cell, which doesn't
+    # matter here (sorts just need to be reproducible, not canonical).
+    if particles.ndim not in (1, 2, 3):
+        raise ValueError(f"Unsupported dimension: {particles.ndim}")
 
-    if particles.ndim == 1:
-        return np.argsort(x1)
-
-    y1 = particles.iCells[:, 1] + particles.deltas[:, 1]
-
-    if particles.ndim == 2:
-        return np.lexsort((y1, x1))
-
-    if particles.ndim == 3:
-        z1 = particles.iCells[:, 2] + particles.deltas[:, 2]
-        return np.lexsort((z1, y1, x1))
-
-    raise ValueError(f"Unsupported dimension: {particles.ndim}")
+    keys = [particles.deltas[:, axis] for axis in reversed(range(particles.ndim))]
+    keys += [particles.iCells[:, axis] for axis in reversed(range(particles.ndim))]
+    return np.lexsort(keys)
 
 
 def single_patch_per_level_per_pop_from(hier, only_keep_L0=True):  # dragons

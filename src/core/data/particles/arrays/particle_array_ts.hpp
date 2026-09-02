@@ -308,7 +308,7 @@ public:
         , particles_{std::move(that.particles_)}
         , total_size{that.total_size}
     {
-        sync(); // without std::swap does not work well
+        on_appended(); // without std::swap does not work well
     }
 
     TileSetVector(TileSetVector const& that)
@@ -318,12 +318,12 @@ public:
         , particles_{that.particles_.copy(TileSetter<dim>{that.box_, that.ghost_cells_})}
         , total_size{that.total_size}
     {
-        sync();
+        on_appended();
     }
 
 
     // not = default: the defaulted memberwise copy/move leaves particles_views_
-    // stale (it isn't rebuilt the way sync()/reset_views() does at the end of the
+    // stale (it isn't rebuilt the way on_appended()/reset_views() does at the end of the
     // copy/move constructors), so reconstruct in place via those constructors instead
     TileSetVector& operator=(TileSetVector&& that)
     {
@@ -341,9 +341,6 @@ public:
         new (this) TileSetVector(that);
         return *this;
     }
-
-    template<auto type = ParticleType::Domain>
-    auto& reserve_ppc(std::size_t const& ppc);
 
     auto size() const { return total_size; }
     auto size(std::array<std::uint32_t, dim> const& icell) const { return cell_size_(icell); }
@@ -444,13 +441,18 @@ public:
         return lobox_t{local_cell(from.lower), local_cell(from.upper)};
     }
 
-    // PHASE 0 == init
-    // PHASE 1 == post move sync
-    template<std::uint8_t PHASE = 0, auto type = ParticleType::Domain>
-    void sync();
+    // refreshes recount/gap-sizing/views after particles were added without going through
+    // move_check (a raw append) - see on_moved() for the post-move_check pipeline.
+    template<auto type = ParticleType::Domain>
+    void on_appended();
+
+    // applies move_check-registered moves: realloc/resize, span-side cross-tile copy, then
+    // on_appended() to finalize.
+    template<auto type>
+    void on_moved(auto&&... args);
 
     template<auto type>
-    void sync_moved();
+    void sync_moved(); // realloc ahead of the span-side copy (see sync_check_realloc)
 
     template<auto type>
     void trim();
@@ -462,6 +464,15 @@ public:
             tile().clear();
         for (auto& tile : particles_views_)
             tile().clear();
+
+        // cell_size_ here is cached per-tile (set in on_appended()), not read back from
+        // each tile's own size() - reset it and the rest of the move_check bookkeeping
+        // the same way the constructor does, or size(icell) stays stale after clear().
+        cell_size_.zero();
+        gap_idx_.zero();
+        add_into_.zero();
+        left_.zero();
+        cap_.zero();
 
         reset_views();
         total_size = 0;
@@ -555,36 +566,6 @@ protected:
 
 template<typename Particles>
 template<auto type>
-auto& TileSetVector<Particles>::reserve_ppc(std::size_t const& ppc)
-{
-    static_assert(std::is_same_v<decltype(type), ParticleType>);
-
-    std::size_t const additional = ppc < 50 ? 10 : ppc * .2; // 20% overallocate
-    std::size_t const buffered   = ppc + additional;
-
-    using enum LayoutMode;
-
-    if constexpr (type == ParticleType::Domain)
-        on_tiles([&](auto& tile) {
-            reserve(tile(), buffered * tile.size());
-            reserve(gaps_(local_cell(tile.lower)), additional * tile.size());
-        });
-
-    if constexpr (type == ParticleType::Ghost)
-        on_tiles([&](auto& tile) {
-            reserve(tile(), additional * tile.size());
-            reserve(gaps_(local_cell(tile.lower)), additional * tile.size());
-        });
-
-    sync<2>();
-
-    return *this;
-}
-
-
-
-template<typename Particles>
-template<auto type>
 void TileSetVector<Particles>::trim() // change to erase(box)
 {
     static_assert(std::is_same_v<decltype(type), ParticleType>);
@@ -634,15 +615,22 @@ void TileSetVector<Particles>::sync_moved()
 }
 
 template<typename Particles>
-template<std::uint8_t PHASE, auto type>
-void TileSetVector<Particles>::sync()
+template<auto type>
+void TileSetVector<Particles>::on_moved(auto&&... args)
+{
+    sync_moved<type>();                                        // realloc + resize
+    TileSetSpan<PSpan_t>{*this}.template sync<type>(args...); // cross-tile copy
+
+    on_appended<type>(); // finalize: recount, size gaps, reset views
+}
+
+template<typename Particles>
+template<auto type>
+void TileSetVector<Particles>::on_appended()
 {
     static_assert(all_are<ParticleType>(type));
     static_assert(type != ParticleType::All);
-    PHARE_LOG_SCOPE(3, "TileSetVector::sync");
-
-    if constexpr (PHASE == 1)
-        sync_check_realloc<type>();
+    PHARE_LOG_SCOPE(3, "TileSetVector::on_appended");
 
     total_size = 0;
     for (auto const& tile : particles_)
@@ -1139,25 +1127,6 @@ void TileSetSpan<Particles>::sync_tile_rm_left(std::size_t const tidx) _PHARE_AL
     CrossTileCopyDAO<std::decay_t<decltype(*this)>>{*this, tidx}.rm_left();
 }
 
-
-
-template<auto type>
-void sync_ts(auto& particles, auto&&... args)
-{
-    particles.template sync_moved<type>();     // realloc
-    (*particles).template sync<type>(args...); // cross-tile copy
-
-    PHARE_DEBUG_DO({
-        auto& tiles = particles();
-        auto& views = particles.views();
-        for (std::size_t i = 0; i < particles().size(); ++i)
-        {
-            assert(views[i]().size() == tiles[i]().size());
-        }
-    })
-
-    particles.template sync<0, type>(); // finalize
-}
 
 
 template<typename Super>

@@ -4,9 +4,11 @@
 
 #include "simulator/simulator_def.hpp"
 
+#include "tests/core/data/particles/test_particles.hpp"
 #include "tests/core/data/gridlayout/test_gridlayout.hpp"
 
 #include "gtest/gtest.h"
+
 #include <cmath>
 
 
@@ -24,14 +26,6 @@ PHARE::core::Particle<dim> particle(ICell const& icell)
             /*.iCell  = */ icell,
             /*.delta  = */ PHARE::core::ConstArray<double, dim>(.5),
             /*.v      = */ {{.00001, .00001, .00001}}};
-}
-
-template<typename ParticleArray_t, typename Box_t>
-void add_particles_in(ParticleArray_t& particles, Box_t const& box)
-{
-    for (auto const& amr_idx : box)
-        for (std::size_t i = 0; i < ppc; ++i)
-            particles.emplace_back(particle<ParticleArray_t::dimension>(*amr_idx));
 }
 
 
@@ -62,13 +56,13 @@ TYPED_TEST(ParticleArrayConsistencyTest, test_is_consistent_after_swap_copy)
     auto static constexpr dim = ParticleArray_t::dimension;
 
     auto levelGhostParticles = ParticleArray_t{this->layout.AMRBox()};
-    add_particles_in(levelGhostParticles, this->layout.AMRBox());
+    add_particles(levelGhostParticles, this->layout.AMRBox(), ppc);
 
     auto levelGhostParticlesNew = ParticleArray_t{this->layout.AMRBox()};
-    add_particles_in(levelGhostParticlesNew, this->layout.AMRBox());
+    add_particles(levelGhostParticlesNew, this->layout.AMRBox(), ppc);
 
     auto levelGhostParticlesOld = ParticleArray_t{this->layout.AMRBox()};
-    add_particles_in(levelGhostParticlesOld, this->layout.AMRBox());
+    add_particles(levelGhostParticlesOld, this->layout.AMRBox(), ppc);
 
     std::swap(levelGhostParticlesNew, levelGhostParticlesOld);
     levelGhostParticlesNew.clear();

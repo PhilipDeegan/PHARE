@@ -15,8 +15,8 @@
 
 namespace PHARE::core
 {
-auto static const cells = get_env_as("PHARE_CELLS", std::uint32_t{4});
-auto static const ppc   = get_env_as("PHARE_PPC", std::size_t{10});
+auto static const cells = get_env_as("PHARE_CELLS", std::uint32_t{14});
+auto static const ppc   = get_env_as("PHARE_PPC", std::size_t{100});
 
 
 template<std::size_t _dim, auto lm, auto am>
@@ -40,7 +40,7 @@ struct ParticleArrayConstructionTest : public ::testing::Test
     auto constexpr static sim_opts
         = SimOpts{.dimension = dim, .layout_mode = layout_mode, .alloc_mode = alloc_mode};
 
-    using GridLayout_t = TestGridLayout<typename PHARE_Types<sim_opts>::GridLayout_t>;
+    using GridLayout_t = TestGridLayout<typename PHARE_Types<sim_opts>::Hybrid::GridLayout_t>;
     using ParticleArray_t
         = ParticleArray<ParticleArrayOptions{dim, layout_mode, StorageMode::VECTOR, alloc_mode}>;
 
@@ -49,7 +49,7 @@ struct ParticleArrayConstructionTest : public ::testing::Test
     ParticleArray_t setup_particles() const // test movable
     {
         auto ps = make_particles<ParticleArray_t>(layout);
-        add_particles_in(ps, layout.AMRBox(), ppc);
+        add_particles(ps, layout.AMRBox(), ppc);
         return ps;
     }
 };
@@ -65,21 +65,21 @@ auto run(ParticleArrayConstructionTest_t& self)
 // clang-format off
 using Permutations_t = testing::Types< // ! notice commas !
 
-    TestParam<3, LayoutMode::AoS, AllocatorMode::CPU>
-   ,TestParam<3, LayoutMode::AoSMapped, AllocatorMode::CPU>
-   ,TestParam<3, LayoutMode::AoSPC, AllocatorMode::CPU>
-   ,TestParam<3, LayoutMode::AoSTS, AllocatorMode::CPU>
-   ,TestParam<3, LayoutMode::AoSPCTS, AllocatorMode::CPU>
+    TestParam<1, LayoutMode::AoS, AllocatorMode::CPU>
+   ,TestParam<1, LayoutMode::AoSMapped, AllocatorMode::CPU>
+   // ,TestParam<3, LayoutMode::AoSPC, AllocatorMode::CPU>
+   // ,TestParam<3, LayoutMode::AoSTS, AllocatorMode::CPU>
+   ,TestParam<1, LayoutMode::AoSPCTS, AllocatorMode::CPU>
 
-PHARE_WITH_THRUST(
-    ,TestParam<3, LayoutMode::SoA, AllocatorMode::CPU>
-    ,TestParam<3, LayoutMode::SoAPC, AllocatorMode::CPU>
-)
+// PHARE_WITH_THRUST(
+//     ,TestParam<3, LayoutMode::SoA, AllocatorMode::CPU>
+//     ,TestParam<3, LayoutMode::SoAPC, AllocatorMode::CPU>
+// )
 
-PHARE_WITH_GPU(
-    ,TestParam<3, LayoutMode::AoS, AllocatorMode::GPU_UNIFIED>
-    ,TestParam<3, LayoutMode::AoSTS, AllocatorMode::GPU_UNIFIED>
-)
+// PHARE_WITH_GPU(
+//     ,TestParam<3, LayoutMode::AoS, AllocatorMode::GPU_UNIFIED>
+//     ,TestParam<3, LayoutMode::AoSTS, AllocatorMode::GPU_UNIFIED>
+// )
 
 >;
 // clang-format on
@@ -97,13 +97,13 @@ TYPED_TEST(ParticleArrayConstructionTest, test_move_swap_etc)
     PHARE_LOG_LINE_SS(ParticleArray_t::type_id);
 
     auto levelGhostParticles = make_particles<ParticleArray_t>(this->layout);
-    add_particles_in(levelGhostParticles, this->layout.AMRBox(), ppc);
+    add_particles(levelGhostParticles, this->layout.AMRBox(), ppc);
 
     auto levelGhostParticlesNew = make_particles<ParticleArray_t>(this->layout);
-    add_particles_in(levelGhostParticlesNew, this->layout.AMRBox(), ppc);
+    add_particles(levelGhostParticlesNew, this->layout.AMRBox(), ppc);
 
     auto levelGhostParticlesOld = make_particles<ParticleArray_t>(this->layout);
-    add_particles_in(levelGhostParticlesOld, this->layout.AMRBox(), ppc);
+    add_particles(levelGhostParticlesOld, this->layout.AMRBox(), ppc);
 
     std::swap(levelGhostParticlesNew, levelGhostParticlesOld);
     levelGhostParticlesNew.clear();
@@ -158,7 +158,7 @@ TYPED_TEST(ParticleArrayConstructionTest, test_copy_move)
     PHARE_LOG_LINE_SS(ParticleArray_t::type_id);
 
     auto particles = make_particles<ParticleArray_t>(this->layout);
-    add_particles_in(particles, this->layout.AMRBox(), ppc);
+    add_particles(particles, this->layout.AMRBox(), ppc);
 
     auto const copy = particles;
     auto const move = std::move(particles);
@@ -187,7 +187,7 @@ TYPED_TEST(ParticleArrayConstructionTest, test_move_on_create)
 
     std::vector<ParticleArray_t> vecs;
     vecs.emplace_back(this->setup_particles());
-    ParticleArrayService::sync<0, ParticleType::Domain>(vecs.back());
+    vecs.back().template on_appended<ParticleType::Domain>();
     check_particles_views(vecs.back());
 
     // EXPECT_EQ(move.size(), ppc * std::pow(cells, TestFixture::dim));

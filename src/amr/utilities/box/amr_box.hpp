@@ -44,9 +44,9 @@ NO_DISCARD auto as_unsigned_phare_box(SAMRAI::hier::Box const& box)
 
 
 
-NO_DISCARD auto grow(SAMRAI::hier::Box box, std::size_t const by)
+NO_DISCARD auto inline grow(SAMRAI::hier::Box box, std::size_t const by)
 {
-    box.grow(SAMRAI::hier::IntVector{box.getDim(), by});
+    box.grow(SAMRAI::hier::IntVector{box.getDim(), static_cast<int>(by)});
     return box;
 }
 

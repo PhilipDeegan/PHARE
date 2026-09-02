@@ -6,7 +6,6 @@ from tests.simulator import basicSimulatorArgs, makeBasicModel
 
 from pyphare import cpp  # concurrent serial vs parallel tests
 
-
 if ph.PHARE_EXE:
     out = f"phare_outputs/diags_3d/{cpp.mpi_size()}"
     simInput = {

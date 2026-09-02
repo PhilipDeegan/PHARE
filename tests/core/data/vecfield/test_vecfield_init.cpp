@@ -37,7 +37,7 @@ struct TestParam
 
     using PhareTypes   = core::PHARE_Types<sim_opts>;
     using Box_t        = PHARE::core::Box<int, dim>;
-    using GridLayout_t = TestGridLayout<typename PhareTypes::GridLayout_t>;
+    using GridLayout_t = TestGridLayout<typename PhareTypes::Hybrid::GridLayout_t>;
 };
 
 struct InitFunctor
@@ -84,10 +84,10 @@ struct Patch
     using GridLayout_t = TestParam::GridLayout_t;
     using Box_t        = TestParam::Box_t;
 
-    using Field_t      = PhareTypes::Field_t;
-    using Grid_t       = PhareTypes::Grid_t;
-    using VecField_t   = PhareTypes::VecField_t;
-    using Electromag_t = PhareTypes::Electromag_t;
+    using Field_t      = PhareTypes::Hybrid::Field_t;
+    using Grid_t       = PhareTypes::Hybrid::Grid_t;
+    using VecField_t   = PhareTypes::Hybrid::VecField_t;
+    using Electromag_t = PhareTypes::Hybrid::Electromag_t;
 
     Patch(Box_t const& box)
         : layout{box}

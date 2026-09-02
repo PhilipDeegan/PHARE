@@ -4,6 +4,7 @@
 #define PHARE_AMR_DATA_PARTICLES_REFINING_DETAIL_AOS_REFINER
 
 
+#include "core/data/particles/particle_array_def.hpp"
 #include "core/def.hpp"
 
 #include "core/data/particles/particle_array.hpp"
@@ -49,6 +50,19 @@ constexpr std::size_t scale_by_density(std::size_t const count, double const fac
     return static_cast<std::size_t>(count * options.nbRefinedPart * factor);
 }
 
+// per-cell reserve factor for a coarse cell's 2**dim fine children - the naive 1/2**dim
+// average assumes an even spread, but the actual split pattern concentrates unevenly, so
+// each layout/type combo gets its own empirically tunable value here rather than the same
+// hardcoded average everywhere.
+template<auto options, auto type, typename Src>
+constexpr double per_cell_density_factor()
+{
+    if constexpr (Src::layout_mode == AoSPCTS)
+        return type == core::ParticleType::Domain ? .09 : .12; // to test
+    else
+        return 1. / (std::size_t{1} << Src::dimension);
+}
+
 template<auto type, auto options, typename Src, typename Box_t>
 std::size_t reserve_flat_count(Src const& src, Box_t const& dst_box, Box_t const& dst_amr_box,
                                double const factor)
@@ -74,20 +88,25 @@ template<auto type, auto options, typename Src, typename Dst, typename Box_t>
 void reserve_flat(Src const& src, Dst& dst, SAMRAI::hier::BoxContainer const& dst_boxes,
                   Box_t const& dst_amr_box)
 {
+    auto constexpr domain_fac_per_layout = std::array{0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+
     std::size_t n = 0;
     for (auto const& samrai_box : dst_boxes)
     {
         n += reserve_flat_count<type, options>(src, phare_box_from<Src::dimension>(samrai_box),
-                                               dst_amr_box, .9);
+                                               dst_amr_box, .66);
 
         // grow box by particle_ghost_width
         // remove samrai_box from new bigger box
         // operate across remainder at lower weight
-        SAMRAI::hier::BoxContainer ghost_boxes{grow(samrai_box, options.particle_ghost_width)};
-        ghost_boxes.removeIntersections(samrai_box);
-        for (auto const& border_box : ghost_boxes)
-            n += reserve_flat_count<type, options>(src, phare_box_from<Src::dimension>(border_box),
-                                                   dst_amr_box, .2);
+        if constexpr (type != core::ParticleType::Domain)
+        {
+            SAMRAI::hier::BoxContainer ghost_boxes{grow(samrai_box, options.particle_ghost_width)};
+            ghost_boxes.removeIntersections(samrai_box);
+            for (auto const& border_box : ghost_boxes)
+                n += reserve_flat_count<type, options>(
+                    src, phare_box_from<Src::dimension>(border_box), dst_amr_box, .1);
+        }
     }
 
     dst.reserve(dst.size() + n);
@@ -200,7 +219,7 @@ void ParticlesRefiner<AoSTS, CPU>::operator()(RefineArgs<Src, Dst>& args, auto f
                     if (auto const growbox = grow(dst_tile, ghost_nbr); splitBox * growbox)
                         if (auto const overlap = dst_box * dst_tile)
                             reserve_flat<type, options>(src_tile(), dst_tile(), *overlap,
-                                                        dst_amr_box);
+                                                        dst_amr_box, 1.);
 
                 // DOUBLE LOOP == LESS COSTLY LONG TERM
                 for (auto& dst_tile : dst())
@@ -227,7 +246,7 @@ void ParticlesRefiner<AoSTS, CPU>::operator()(RefineArgs<Src, Dst>& args, auto f
                         if (auto const overlap = dst_box * excl_box)
                         {
                             reserve_flat<type, options>(src_tile(), dst_tile(), *overlap,
-                                                        dst_amr_box);
+                                                        dst_amr_box, 1.);
                             stream_split_particles<type, options>(src_tile(), dst_tile(), *overlap,
                                                                   fn0, fn1);
                         }
@@ -293,29 +312,21 @@ void ParticlesRefiner<AoSPCTS, CPU>::operator()(RefineArgs<Src, Dst>& args, auto
             }
         };
 
-        // reserve pass: one .reserve() call per dst cell, summed across every overlapping
-        // src_tile first - the previous version called .reserve() once per (src_tile, cell)
-        // pair, multiplying the call count by however many src_tiles touched a cell.
+        // reserve pass: one .reserve() call per dst cell, via reserve_flat_count against the
+        // whole (tiled) src - count_particles<AoSPCTS> sums each tile's own domain box only
+        // (never ghost cells), so cells sitting in more than one neighbor tile's ghost halo
+        // don't get summed twice the way checking every src_tile's ghost_box used to.
         for (auto& dst_tile : dst())
             if (auto const overlap = dst_tile_overlap(dst_tile))
             {
                 auto& dst_pc = dst_tile();
                 for (auto const& bix : *overlap)
                 {
-                    auto const coarseCellPt
-                        = coarsen_box(core::Box<int, Src::dimension>{*bix, *bix}).lower;
-                    std::size_t coarse_count = 0;
-                    for (auto const& src_tile : src())
-                    {
-                        if (not(coarseDstBox * grow(src_tile, ghost_nbr)))
-                            continue;
-                        auto& src_pc = src_tile();
-                        if (isIn(coarseCellPt, src_pc.ghost_box()))
-                            coarse_count += src_pc.size(src_pc.local_cell(coarseCellPt));
-                    }
+                    core::Box<int, Src::dimension> const cell_box{*bix, *bix};
                     dst_pc(dst_pc.local_cell(*bix))
-                        .reserve(scale_by_density<options, Src>(
-                            coarse_count, 1. / (std::size_t{1} << Src::dimension)));
+                        .reserve(reserve_flat_count<type, options>(
+                            src, cell_box, dst_amr_box,
+                            per_cell_density_factor<options, type, Src>()));
                 }
             }
 
@@ -331,7 +342,7 @@ void ParticlesRefiner<AoSPCTS, CPU>::operator()(RefineArgs<Src, Dst>& args, auto
         }
     }
 
-    dst.sync();
+    dst.template on_appended<type>();
 }
 
 

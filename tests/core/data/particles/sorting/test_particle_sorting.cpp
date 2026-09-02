@@ -41,7 +41,7 @@ class ParticleArraySortingTest : public ::testing::Test
                                                .alloc_mode   = Param::alloc_mode};
     using Particle_t                 = Particle<dim>;
     using box_t                      = Box<int, dim>;
-    using GridLayout_t               = PHARE_Types<sim_opts>::GridLayout_t;
+    using GridLayout_t               = PHARE_Types<sim_opts>::Hybrid::GridLayout_t;
     using TestGridLayout_t           = TestGridLayout<GridLayout_t>;
 
 public:

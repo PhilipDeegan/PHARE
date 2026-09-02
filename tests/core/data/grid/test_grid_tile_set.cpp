@@ -33,7 +33,7 @@ struct TestParam
     using PhareTypes = core::PHARE_Types<opts>;
 
     using Box_t            = PHARE::core::Box<int, dim>;
-    using GridLayout_t     = PhareTypes::GridLayout_t;
+    using GridLayout_t     = PhareTypes::Hybrid::GridLayout_t;
     using TestGridLayout_t = TestGridLayout<GridLayout_t>;
 };
 
@@ -49,8 +49,8 @@ struct Patch
     using TestGridLayout_t = TestParam::TestGridLayout_t;
     using Box_t            = TestParam::Box_t;
 
-    using Field_t = PhareTypes::Field_t;
-    using Grid_t  = PhareTypes::Grid_t;
+    using Field_t = PhareTypes::Hybrid::Field_t;
+    using Grid_t  = PhareTypes::Hybrid::Grid_t;
 
     Patch(Box_t const& box)
         : layout{box}

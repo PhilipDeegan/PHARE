@@ -170,7 +170,8 @@ struct TestTagger : public ::testing::Test
     using Electromag  = phare_types::Hybrid::Electromag_t;
     using Ions        = phare_types::Hybrid::Ions_t;
     using Electrons   = phare_types::Hybrid::Electrons_t;
-    using HybridTypes = PHARE::core::PHARE_Types<PHARE::SimOpts{dim, interp_order}>::Hybrid;
+    using core_types  = PHARE::core::PHARE_Types<PHARE::SimOpts{dim, interp_order}>;
+    using HybridTypes = core_types::Hybrid;
     using GridLayoutT = HybridTypes::GridLayout_t;
 
     auto static constexpr field_opts = PHARE::core::TensorFieldOptions<HybridTypes>{};

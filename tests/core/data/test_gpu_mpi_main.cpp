@@ -17,11 +17,11 @@ TEST(MpiCommsTest, collect_gpu_mem)
     // using ManagedVector = std::vector<T, mkn::gpu::ManagedAllocator<T>>;
 
     std::size_t static constexpr SIZE = 10;
-    auto mpi_size                     = PHARE::core::mpi::size();
-    auto mpi_rank                     = PHARE::core::mpi::rank();
+    auto mpi_size                     = PHARE::mpi::size();
+    auto mpi_rank                     = PHARE::mpi::rank();
     std::size_t full_size             = SIZE * mpi_size;
     mkn::gpu::DeviceMem<int> devA{std::vector<int>(SIZE, mpi_rank + 1)}, datas{full_size};
-    PHARE::core::mpi::collect(devA, datas);
+    PHARE::mpi::collect(devA, datas);
     int expected = 0;
     for (std::int32_t i = 0; i < mpi_size; ++i)
         expected += (i + 1) * SIZE;
@@ -31,11 +31,11 @@ TEST(MpiCommsTest, collect_gpu_mem)
 TEST(MpiCommsTest, is_pure_gpu_mem_mpi_sendable)
 {
     std::size_t static constexpr SIZE = 10;
-    auto mpi_size                     = PHARE::core::mpi::size();
-    auto mpi_rank                     = PHARE::core::mpi::rank();
+    auto mpi_size                     = PHARE::mpi::size();
+    auto mpi_rank                     = PHARE::mpi::rank();
     std::size_t full_size             = SIZE * mpi_size;
     mkn::gpu::DeviceMem<int> devA{std::vector<int>(SIZE, mpi_rank + 1)}, datas{full_size};
-    PHARE::core::mpi::_collect(devA.data(), datas, devA.size(), devA.size());
+    PHARE::mpi::_collect(devA.data(), datas, devA.size(), devA.size());
     int expected = 0;
     for (std::int32_t i = 0; i < mpi_size; ++i)
         expected += (i + 1) * SIZE;
@@ -45,12 +45,12 @@ TEST(MpiCommsTest, is_pure_gpu_mem_mpi_sendable)
 TEST(MpiCommsTest, is_pure_gpu_mem_mpi_sendable_retrievable_on_cpu)
 {
     std::size_t static constexpr SIZE = 10;
-    auto mpi_size                     = PHARE::core::mpi::size();
-    auto mpi_rank                     = PHARE::core::mpi::rank();
+    auto mpi_size                     = PHARE::mpi::size();
+    auto mpi_rank                     = PHARE::mpi::rank();
     std::size_t full_size             = SIZE * mpi_size;
     mkn::gpu::DeviceMem<int> devA{std::vector<int>(SIZE, mpi_rank + 1)};
     std::vector<int> datas(full_size);
-    PHARE::core::mpi::_collect(devA.data(), datas, devA.size(), devA.size());
+    PHARE::mpi::_collect(devA.data(), datas, devA.size(), devA.size());
     int expected = 0;
     for (std::int32_t i = 0; i < mpi_size; ++i)
         expected += (i + 1) * SIZE;

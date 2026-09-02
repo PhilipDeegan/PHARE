@@ -20,7 +20,6 @@ def populate_simulation_mhd(dim, interp):
 
     ph.global_vars.sim = None
     sim = ph.Simulation(
-        interp_order=interp,
         smallest_patch_size=smallest_patch_size,
         largest_patch_size=[20] * dim,
         time_step_nbr=1,
@@ -28,7 +27,10 @@ def populate_simulation_mhd(dim, interp):
         boundary_types=["periodic"] * dim,
         cells=cells,
         dl=dl,
-        diag_options={},
+        diag_options={
+            "format": "phareh5",
+            "options": {"dir": "phare_outputs/data_wrangler_mhd", "mode": "overwrite"},
+        },
         nesting_buffer=0,
         strict=True,
         eta=0.0,
@@ -65,7 +67,19 @@ class DataWranglerTest(unittest.TestCase):
 
     def test_hybrid(self):
         ndim, interp = 2, 1
-        self.simulator = Simulator(populate_simulation(ndim, interp))
+        self.simulator = Simulator(
+            populate_simulation(
+                ndim,
+                interp,
+                diag_options={
+                    "format": "phareh5",
+                    "options": {
+                        "dir": "phare_outputs/data_wrangler_hybrid",
+                        "mode": "overwrite",
+                    },
+                },
+            )
+        )
         self.simulator.initialize()
 
         hier = None

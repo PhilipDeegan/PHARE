@@ -335,8 +335,7 @@ struct AfullHybridBasicHierarchy
     using Phare_core_Types   = PHARE::core::PHARE_Types<opts>;
     using Phare_amr_Types    = PHARE::amr::PHARE_Types<opts>;
     using Phare_solver_Types = PHARE::solver::PHARE_Types<opts>;
-    using HybridModelT       = Phare_solver_Types::HybridModel_t;
-    using MHDModelT          = Phare_solver_Types::MHDModel_t;
+    using HybridModelT       = Phare_solver_Types::Hybrid::Model_t;
     using ResourcesManagerT  = HybridModelT::resources_manager_type;
 
     int const firstHybLevel{0};
@@ -344,7 +343,7 @@ struct AfullHybridBasicHierarchy
 
     using HybridHybridT
         = HybridHybridMessengerStrategy<HybridModelT,
-                                        typename Phare_solver_Types::RefinementParams>;
+                                        typename Phare_solver_Types::Hybrid::RefinementParams_t>;
 
     AfullHybridBasicHierarchy(std::string const& inputConfigFile, int ppc = 100)
         : dict{{createDict<dim>(ppc)}}

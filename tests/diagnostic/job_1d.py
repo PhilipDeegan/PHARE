@@ -1,5 +1,3 @@
-#!/usr/bin/env python3
-
 import pyphare.pharein as ph
 from tests.diagnostic import dump_all_diags
 from tests.simulator import basicSimulatorArgs, makeBasicModel

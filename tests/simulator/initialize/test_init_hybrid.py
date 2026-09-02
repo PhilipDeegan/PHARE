@@ -8,6 +8,7 @@ import numpy as np
 import pyphare.pharein as ph
 from pyphare.core.box import nDBox
 from pyphare.simulator.simulator import Simulator
+from pyphare.pharesee.run import Run
 from pyphare.pharesee.hierarchy import hierarchy_from
 from pyphare.pharesee.geometry import level_ghost_boxes
 from pyphare.pharesee.hierarchy.hierarchy_utils import merge_particles
@@ -34,7 +35,6 @@ class HybridInitializationTest(InitializationTest):
         cells=120,
         dl=0.1,
         diag_outputs="",
-        sim_setup_kwargs={},
         **kwargs,
     ):
         if smallest_patch_size is None:
@@ -181,7 +181,10 @@ class HybridInitializationTest(InitializationTest):
                     population_name=pop,
                 )
 
-        Simulator(sim).setup(**sim_setup_kwargs).initialize().reset()
+        Simulator(sim).initialize().reset()
+
+        if qty == "run":
+            return Run(diag_outputs)
 
         eb_hier = None
         if qty in ["e", "eb"]:

@@ -2,8 +2,8 @@
 #define PHARE_AMR_SAMRAI_HPP
 
 #include "phare_mpi.hpp" // IWYU pragma: keep
-#include "core/utilities/types.hpp"
 #include "core/vector.hpp"
+#include "core/utilities/types.hpp"
 #include "core/data/particles/particle_array.hpp"
 #include "core/data/particles/particle_packer.hpp"
 
@@ -138,7 +138,7 @@ void putParticlesToRestart(auto& db, std::string const& name, ParticleArray_t& p
     using enum core::LayoutMode;
     auto& soa = [&]() -> auto& {
         if constexpr (any_in(ParticleArray_t::layout_mode, AoS, AoSMapped)
-                     or is_tiled(ParticleArray_t::layout_mode))
+                      or is_tiled(ParticleArray_t::layout_mode))
         {
             soa_.resize(particles.size());
             packer.pack(soa_);

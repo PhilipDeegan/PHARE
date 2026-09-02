@@ -58,7 +58,7 @@ private:
     Model& model_;
     level_t& level_;
     std::size_t n_patches;
-    std::tuple<Args...> args;
+    std::tuple<Args&...> args;
 };
 
 

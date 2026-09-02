@@ -254,24 +254,21 @@ public:
     PerCellVector& operator=(PerCellVector&& from)      = default;
     PerCellVector& operator=(PerCellVector const& from) = default;
 
-    template<auto type = ParticleType::Domain>
-    auto& reserve_ppc(std::size_t const& ppc);
-
-    void reserve(std::size_t const&) {} // per-cell storage pre-allocated; hint is a no-op
+    // void reserve(std::size_t const&) {} // per-cell storage pre-allocated; hint is a no-op
 
     // trims each cell in box back down to its actual size - for callers that would rather
     // let per-cell vectors grow via their own (e.g. doubling) strategy while filling, then
     // pay for one exact-size reallocation per touched cell at the end, than either
     // pre-guess a per-cell share that a skewed distribution can make worse than no guess
     // at all, or live with whatever the growth strategy happened to overshoot to.
-    void shrink_to_fit_in(Box<int, dim> const& box)
-    {
-        if constexpr (alloc_mode == AllocatorMode::GPU_UNIFIED)
-            return; // no equivalent wired up yet; leave GPU-allocated cells as they grew
-        auto const lcl = local_box(box);
-        for (auto it = lcl.begin(); it != lcl.end(); ++it)
-            particles_(*it).shrink_to_fit();
-    }
+    // void shrink_to_fit_in(Box<int, dim> const& box)
+    // {
+    //     if constexpr (alloc_mode == AllocatorMode::GPU_UNIFIED)
+    //         return; // no equivalent wired up yet; leave GPU-allocated cells as they grew
+    //     auto const lcl = local_box(box);
+    //     for (auto it = lcl.begin(); it != lcl.end(); ++it)
+    //         particles_(*it).shrink_to_fit();
+    // }
 
     auto size() const { return total_size; }
     auto size(std::array<std::uint32_t, dim> const& icell) const { return cell_size_(icell); }
@@ -358,8 +355,15 @@ public:
         return lobox_t{local_cell(from.lower), local_cell(from.upper)};
     }
 
-    template<std::uint8_t PHASE = 0, auto type = ParticleType::Domain>
-    void sync(); // after move
+    // refreshes recount/gap-sizing/views after particles were added without going through
+    // move_check (a raw append) - see on_moved() for the post-move_check pipeline.
+    template<auto type = ParticleType::Domain>
+    void on_appended();
+
+    // applies move_check-registered moves: realloc/resize, append movers, compact leavers,
+    // then on_appended() to finalize.
+    template<auto type>
+    void on_moved();
 
     template<auto type>
     void sync_moved(); // realloc for particles registered as incoming via add_into_
@@ -386,6 +390,17 @@ public:
         for (auto const& bix : local_box())
             particles_(bix).clear();
         total_size = 0;
+
+        // iteration/size() go through cell_size_, not each cell vector's own size(), so
+        // leaving it stale here makes clear() a no-op from any caller's perspective -
+        // reset every bit of per-cell bookkeeping the same way the constructor does.
+        cell_size_.zero();
+        gap_idx_.zero();
+        add_into_.zero();
+        left_.zero();
+        cap_.zero();
+
+        reset_views();
     }
 
 
@@ -502,35 +517,7 @@ auto& PerCellVector<Particles>::insert(PerCellVector const& src)
         std::copy(from.begin(), from.end(), std::back_inserter(to));
     }
     if (added)
-        sync<2>();
-
-    return *this;
-}
-
-template<typename Particles>
-template<auto type>
-auto& PerCellVector<Particles>::reserve_ppc(std::size_t const& ppc)
-{
-    static_assert(std::is_same_v<decltype(type), ParticleType>);
-
-    std::size_t const additional = ppc < 50 ? 10 : ppc * .2; // 20% overallocate
-    std::size_t const buffered   = ppc + additional;
-
-    if constexpr (type == ParticleType::Domain)
-    {
-        on_domain([&](auto const& bix) { particles_(bix).reserve(buffered); });
-        on_ghost_box([&](auto const& bix) { reserve(gaps_(bix), additional); });
-        on_ghost_layer([&](auto const& bix) { particles_(bix).reserve(additional); });
-    }
-
-    if constexpr (type == ParticleType::Ghost)
-    {
-        on_ghost_layer_plus_2_domain([&](auto const& bix) {
-            particles_(bix).reserve(additional);
-            reserve(gaps_(bix), additional);
-        });
-        on_ghost_layer([&](auto const& bix) { particles_(bix).reserve(buffered); });
-    }
+        on_appended();
 
     return *this;
 }
@@ -644,16 +631,14 @@ void PerCellVector<Particles>::sync_rm_left()
 }
 
 template<typename Particles>
-template<std::uint8_t PHASE, auto type>
-void PerCellVector<Particles>::sync()
+template<auto type>
+void PerCellVector<Particles>::on_appended()
 {
     static_assert(std::is_same_v<decltype(type), ParticleType>);
     static_assert(type != ParticleType::All);
 
     MemoryMonitoring::LOG(__PRETTY_FUNCTION__);
-    // PHARE_LOG_SCOPE(1, "PerCellVector::sync");
-    // PHARE_LOG_LINE_STR("sync " << static_cast<std::uint32_t>(PHASE) << " "
-    //                            << magic_enum::enum_name(type));
+    // PHARE_LOG_SCOPE(1, "PerCellVector::on_appended");
 
     auto const lbox = local_box();
 
@@ -1019,14 +1004,15 @@ void PerCellSpan<Particles>::sync_rm_left(locell_t const& bix, std::size_t const
 }
 
 
+template<typename Particles>
 template<auto type>
-void sync_moved_pc(auto& particles, auto&&... args)
+void PerCellVector<Particles>::on_moved()
 {
-    particles.template sync_moved<type>();   // realloc
-    particles.template sync_add_new<type>(); // movers appended to their new cells
-    particles.template sync_rm_left<type>(); // leavers compacted out of their old cells
+    sync_moved<type>();   // realloc
+    sync_add_new<type>(); // movers appended to their new cells
+    sync_rm_left<type>(); // leavers compacted out of their old cells
 
-    particles.template sync<0, type>(args...); // finalize
+    on_appended<type>(); // finalize
 }
 
 

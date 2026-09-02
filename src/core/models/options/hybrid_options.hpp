@@ -19,11 +19,13 @@ struct HybridFieldOptions
     using Vector   = Quantity::Vector;
     using Tensor   = Quantity::Tensor;
 
-    auto static constexpr opts                 = opts_;
-    auto static constexpr dimension            = opts.dimension;
-    auto static constexpr interp_order         = opts.interp_order;
-    auto static constexpr field_ghost_width    = std::array{2, 4, 4}[interp_order - 1];
-    auto static constexpr particle_ghost_width = std::array{1, 2, 2}[interp_order - 1];
+    auto static constexpr opts         = opts_;
+    auto static constexpr dimension    = opts.dimension;
+    auto static constexpr interp_order = opts.interp_order;
+    auto static constexpr field_ghost_width
+        = std::array{2, 4, 4}[interp_order == 0 ? 0 : interp_order - 1];
+    auto static constexpr particle_ghost_width
+        = std::array{1, 2, 2}[interp_order == 0 ? 0 : interp_order - 1];
 };
 
 template<HybridFieldOptions opts>

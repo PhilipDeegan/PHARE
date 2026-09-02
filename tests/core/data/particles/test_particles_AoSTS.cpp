@@ -39,7 +39,7 @@ struct ParticleArrayConsistencyTest : public ::testing::Test
     // auto constexpr static interp = 1;
 
     using PhareTypes       = PHARE_Types<TestParam::opts>;
-    using GridLayout_t     = PhareTypes ::GridLayout_t;
+    using GridLayout_t     = PhareTypes ::Hybrid::GridLayout_t;
     using TestGridLayout_t = TestGridLayout<GridLayout_t>;
     using ParticleArray_t  = TestParam::ParticleArray_t;
 
@@ -62,15 +62,15 @@ TYPED_TEST(ParticleArrayConsistencyTest, test_is_consistent_after_swap_copy)
     auto static constexpr dim = ParticleArray_t::dimension;
 
     auto levelGhostParticles = make_particles<ParticleArray_t>(this->layout);
-    add_particles_in(levelGhostParticles, this->layout.AMRBox(), ppc);
+    add_particles(levelGhostParticles, this->layout.AMRBox(), ppc);
     EXPECT_NO_THROW(levelGhostParticles.check());
 
     auto levelGhostParticlesNew = make_particles<ParticleArray_t>(this->layout);
-    add_particles_in(levelGhostParticlesNew, this->layout.AMRBox(), ppc);
+    add_particles(levelGhostParticlesNew, this->layout.AMRBox(), ppc);
     EXPECT_NO_THROW(levelGhostParticlesNew.check());
 
     auto levelGhostParticlesOld = make_particles<ParticleArray_t>(this->layout);
-    add_particles_in(levelGhostParticlesOld, this->layout.AMRBox(), ppc);
+    add_particles(levelGhostParticlesOld, this->layout.AMRBox(), ppc);
     EXPECT_NO_THROW(levelGhostParticlesOld.check());
 
     std::swap(levelGhostParticlesNew, levelGhostParticlesOld);

@@ -11,13 +11,7 @@ if(NOT CMAKE_BUILD_TYPE)
   set(CMAKE_BUILD_TYPE "Release" CACHE STRING "" FORCE)
 endif()
 
-# Enables -fPIC  typically required for shared libraries with dependencies. e.g. pybind modules
-set(CMAKE_POSITION_INDEPENDENT_CODE ON)
-
-find_program(Git git REQUIRED)
 find_package(Python 3.11 COMPONENTS Interpreter Development REQUIRED)
-
-set(CMAKE_EXPORT_COMPILE_COMMANDS 1)
 
 if(EXISTS "${PHARE_PROJECT_DIR}/release.ver.txt") # delete file to use newer deps
   include("${PHARE_PROJECT_DIR}/res/cmake/release.cmake")

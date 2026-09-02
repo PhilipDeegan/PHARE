@@ -484,7 +484,7 @@ public:
     template<auto type>
     static void sync_particles(auto& particles, auto& stream)
     {
-        sync_ts<type>(particles, stream);
+        particles.template on_moved<type>(stream);
     }
 
 
@@ -638,7 +638,7 @@ struct MultiBorisPusherImpl<LayoutMode::AoSPCTS, alloc, GridLayout, Particles, E
     template<auto type>
     static void sync_particles(auto& particles, auto& stream)
     {
-        sync_pc_ts<type>(particles, stream);
+        particles.template on_moved<type>(stream);
     }
 
     template<MultiBorisMode mode = MultiBorisMode::REF, typename ModelAccessor>

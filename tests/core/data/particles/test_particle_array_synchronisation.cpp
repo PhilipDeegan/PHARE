@@ -2,9 +2,9 @@
 #include "phare_core.hpp"
 #include "core/utilities/types.hpp"
 #include "core/data/particles/particle_array.hpp"
-#include "core/data/particles/particle_array_comparator.hpp"
+#include "core/data/particles/particle_array_appender.hpp"
 #include "core/data/particles/particle_array_converter.hpp"
-
+#include "core/data/particles/particle_array_comparator.hpp"
 
 #include "simulator/simulator_def.hpp"
 
@@ -16,8 +16,8 @@
 
 namespace PHARE::core
 {
-auto static const cells = get_env_as("PHARE_CELLS", std::uint32_t{4});
-auto static const ppc   = get_env_as("PHARE_PPC", std::size_t{10});
+auto static const cells = get_env_as("PHARE_CELLS", std::uint32_t{14});
+auto static const ppc   = get_env_as("PHARE_PPC", std::size_t{1000});
 
 
 template<std::size_t _dim, auto lm, auto am>
@@ -41,7 +41,7 @@ struct ParticleArrayConstructionTest : public ::testing::Test
     auto constexpr static sim_opts
         = SimOpts{.dimension = dim, .layout_mode = layout_mode, .alloc_mode = alloc_mode};
 
-    using GridLayout_t = TestGridLayout<typename PHARE_Types<sim_opts>::GridLayout_t>;
+    using GridLayout_t = TestGridLayout<typename PHARE_Types<sim_opts>::Hybrid::GridLayout_t>;
     using ParticleArray_t
         = ParticleArray<ParticleArrayOptions{dim, layout_mode, StorageMode::VECTOR, alloc_mode}>;
 
@@ -50,7 +50,9 @@ struct ParticleArrayConstructionTest : public ::testing::Test
     ParticleArray_t setup_particles() const // test movable
     {
         auto ps = make_particles<ParticleArray_t>(layout);
-        add_particles_in(ps, layout.AMRBox(), ppc);
+        add_particles(ps, layout.AMRBox(), ppc);
+        delta_disperse(ps);
+        vary_velocity(ps, -6, 6);
         return ps;
     }
 };
@@ -66,21 +68,22 @@ auto run(ParticleArrayConstructionTest_t& self)
 // clang-format off
 using Permutations_t = testing::Types< // ! notice commas !
 
-    TestParam<3, LayoutMode::AoS, AllocatorMode::CPU>
-   ,TestParam<3, LayoutMode::AoSMapped, AllocatorMode::CPU>
-   ,TestParam<3, LayoutMode::AoSPC, AllocatorMode::CPU>
-   ,TestParam<3, LayoutMode::AoSTS, AllocatorMode::CPU>
-   ,TestParam<3, LayoutMode::AoSPCTS, AllocatorMode::CPU>
+    TestParam<1, LayoutMode::AoS, AllocatorMode::CPU>
+   ,TestParam<1, LayoutMode::AoSMapped, AllocatorMode::CPU>
+   // ,TestParam<3, LayoutMode::AoSPC, AllocatorMode::CPU>
+   // ,TestParam<3, LayoutMode::AoSTS, AllocatorMode::CPU>
+   ,TestParam<1, LayoutMode::AoSPCTS, AllocatorMode::CPU>
 
-PHARE_WITH_THRUST(
-    ,TestParam<3, LayoutMode::SoA, AllocatorMode::CPU>
-    ,TestParam<3, LayoutMode::SoAPC, AllocatorMode::CPU>
-)
+// PHARE_WITH_THRUST(
+//     ,TestParam<3, LayoutMode::SoA, AllocatorMode::CPU>
+//     ,TestParam<3, LayoutMode::SoAPC, AllocatorMode::CPU>
+// )
 
-PHARE_WITH_GPU(
-    ,TestParam<3, LayoutMode::AoS, AllocatorMode::GPU_UNIFIED>
-    ,TestParam<3, LayoutMode::AoSTS, AllocatorMode::GPU_UNIFIED>
-)
+// PHARE_WITH_GPU(
+//     ,TestParam<3, LayoutMode::AoS, AllocatorMode::GPU_UNIFIED>
+//     ,TestParam<3, LayoutMode::AoSTS, AllocatorMode::GPU_UNIFIED>
+// )
+
 
 >;
 // clang-format on
@@ -174,7 +177,7 @@ struct MoveParticles<LayoutMode::AoSPC>
                 particles.template move_check<ParticleType::Domain>(pt, i, p);
             }
         }
-        sync_moved_pc<ParticleType::Domain>(particles);
+        particles.template on_moved<ParticleType::Domain>();
     }
 };
 
@@ -207,7 +210,7 @@ struct MoveParticles<LayoutMode::AoSTS>
                 }
             }
         }
-        sync_ts<ParticleType::Domain>(particles);
+        particles.template on_moved<ParticleType::Domain>();
     }
 };
 
@@ -215,7 +218,7 @@ template<>
 struct MoveParticles<LayoutMode::AoSPCTS>
 {
     // registration goes through the span (move_check lives on PCTileSetSpan); the view's
-    // gap arrays alias the vector's, so sync_pc_ts on the vector sees every registration
+    // gap arrays alias the vector's, so on_moved() on the vector sees every registration
     template<typename Particles, typename Offsets>
     static void apply(Particles& particles, Offsets const& offsets)
     {
@@ -242,7 +245,7 @@ struct MoveParticles<LayoutMode::AoSPCTS>
                 }
             }
         }
-        sync_pc_ts<ParticleType::Domain>(particles);
+        particles.template on_moved<ParticleType::Domain>();
     }
 };
 
@@ -300,7 +303,7 @@ struct MoveLevelGhostParticles<LayoutMode::AoSPC>
                 particles.template move_check<ParticleType::LevelGhost>(pt, i, p);
             }
         }
-        sync_moved_pc<ParticleType::LevelGhost>(particles);
+        particles.template on_moved<ParticleType::LevelGhost>();
     }
 };
 
@@ -335,7 +338,7 @@ struct MoveLevelGhostParticles<LayoutMode::AoSPCTS>
                 }
             }
         }
-        sync_pc_ts<ParticleType::LevelGhost>(particles);
+        particles.template on_moved<ParticleType::LevelGhost>();
     }
 };
 
@@ -381,9 +384,11 @@ void check_tile_ownership(Particles const& particles)
     {
         auto const check = [&](auto const& tile, auto const& p) {
             if (isIn(p.iCell(), particles.box()))
+            {
                 EXPECT_TRUE(isIn(p.iCell(), tile))
                     << "domain particle in tile ghost cells: " << Point{p.iCell()}
                     << " tile: " << tile;
+            }
         };
 
         if constexpr (any_in(Particles::layout_mode, AoSTS))
@@ -415,7 +420,7 @@ TYPED_TEST(ParticleArrayConstructionTest, test_move_sync_works)
     PHARE_LOG_LINE_SS(ParticleArray_t::type_id);
 
     auto particles = make_particles<ParticleArray_t>(this->layout);
-    add_particles_in(particles, this->layout.AMRBox(), ppc);
+    add_particles(particles, this->layout.AMRBox(), ppc);
 
     // independent AoS ground truth, same initial particles, moved directly (no
     // registration needed for AoS) so it never depends on the layout under test

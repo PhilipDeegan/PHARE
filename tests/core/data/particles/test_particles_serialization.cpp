@@ -51,7 +51,7 @@ struct ParticleArraySerializationTest : public AParticleArraySerializationTest
     template<auto lm>
     using Particles_t
         = ParticleArray<ParticleArrayOptions{dim, lm, StorageMode::VECTOR, alloc_mode}>;
-    using GridLayout_t     = PHARE_Types<sim_opts>::GridLayout_t;
+    using GridLayout_t     = PHARE_Types<sim_opts>::Hybrid::GridLayout_t;
     using TestGridLayout_t = TestGridLayout<GridLayout_t>;
     using ParticleArray_t  = Particles_t<layout_mode>;
 
@@ -66,6 +66,8 @@ using Permutations_t = testing::Types< // ! notice commas !
 
    TestParam<3, LayoutMode::AoS, AllocatorMode::CPU>
   ,TestParam<3, LayoutMode::AoSMapped, AllocatorMode::CPU>
+  ,TestParam<3, LayoutMode::AoSTS, AllocatorMode::CPU>
+  ,TestParam<3, LayoutMode::AoSPCTS, AllocatorMode::CPU>
 
 // PHARE_WITH_THRUST(
 //  ,TestParam<3, LayoutMode::SoAPC, AllocatorMode::CPU>
@@ -82,7 +84,7 @@ TYPED_TEST(ParticleArraySerializationTest, test_compare_from_disk)
     using ParticleArray_t = TestFixture::ParticleArray_t;
 
     auto particles = make_particles<ParticleArray_t>(this->layout);
-    add_particles_in(particles, this->layout.AMRBox(), ppc);
+    add_particles(particles, this->layout.AMRBox(), ppc);
 
     std::string const file_name = "particles.bin";
     serialize_particles(file_name, particles);
@@ -90,8 +92,12 @@ TYPED_TEST(ParticleArraySerializationTest, test_compare_from_disk)
     auto loaded = make_particles<ParticleArray_t>(this->layout);
     deserialize_particles<ParticleArray_t>(file_name, loaded);
 
-    EXPECT_EQ(loaded, particles);
+    EXPECT_TRUE(compare_particles(loaded, particles));
 }
+
+
+#if PHARE_HAVE_THRUST
+
 
 TYPED_TEST(ParticleArraySerializationTest, test_deserialize_to_soavx)
 {
@@ -99,7 +105,7 @@ TYPED_TEST(ParticleArraySerializationTest, test_deserialize_to_soavx)
     using SoAVXParticles_t = TestFixture::template Particles_t<LayoutMode::SoAVX>;
 
     auto particles = make_particles<ParticleArray_t>(this->layout);
-    add_particles_in(particles, this->layout.AMRBox(), ppc);
+    add_particles(particles, this->layout.AMRBox(), ppc);
 
     std::string const file_name = "particles.bin";
     serialize_particles(file_name, particles);
@@ -110,6 +116,7 @@ TYPED_TEST(ParticleArraySerializationTest, test_deserialize_to_soavx)
     EXPECT_TRUE(compare_particles(particles, loaded));
 }
 
+#endif // PHARE_HAVE_THRUST
 
 } // namespace PHARE::core
 

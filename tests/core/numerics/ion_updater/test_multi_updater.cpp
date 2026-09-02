@@ -21,6 +21,7 @@
 
 
 #include "tests/core/data/grid/test_grid_fixtures.hpp"
+#include "tests/core/data/particles/test_particles.hpp"
 #include "tests/core/data/electromag/test_electromag_fixtures.hpp"
 #include "tests/core/data/ion_population/test_ion_population_fixtures.hpp"
 #include "tests/amr/resources_manager/test_resources_manager_fixtures.hpp"
@@ -38,7 +39,7 @@ namespace PHARE::core
 // RUNTIME ENV VAR OVERRIDES
 auto static const bytes     = get_env_as("PHARE_GPU_BYTES", std::uint64_t{500000000}); // .5GB
 auto static const cells     = get_env_as("PHARE_CELLS", std::uint32_t{30});
-auto static const ppc       = get_env_as("PHARE_PPC", std::size_t{1000});
+auto static const ppc       = get_env_as("PHARE_PPC", std::size_t{100});
 auto static const seed      = get_env_as("PHARE_SEED", std::size_t{1067});
 auto static const n_patches = get_env_as("PHARE_PATCHES", std::size_t{1});
 auto static const dt        = get_env_as("PHARE_TIMESTEP", double{.001});
@@ -125,8 +126,7 @@ void ref_update(UpdaterMode mode, Patches& patches)
             using Boxing_t
                 = std::decay_t<decltype(*selection_boxing_impl<IonUpdater_t, GridLayout_t>())>;
 
-            Boxing_t const boxing{
-                layout, {grow(layout.AMRBox(), GridLayout_t::options.particle_ghost_width)}};
+            Boxing_t const boxing{layout, {layout.AMRBox()}};
             updater.updatePopulations(ions, electromag, boxing, dt, mode);
             ions.computeChargeDensity();
             ions.computeBulkVelocity();
@@ -146,9 +146,7 @@ void cmp_update(UpdaterMode mode, Patches& patches)
 
     auto const& layout = patches[0].layout;
     std::unordered_map<std::string, Boxing_t> boxings;
-    boxings.try_emplace(
-        "patch_id",
-        Boxing_t{layout, {grow(layout.AMRBox(), GridLayout_t::options.particle_ghost_width)}});
+    boxings.try_emplace("patch_id", Boxing_t{layout, {layout.AMRBox()}});
 
     auto const quantities = [&](int i) {
         return std::forward_as_tuple(patches[0].model.state.ions,
@@ -209,10 +207,9 @@ auto make_ref_ions(auto const& layout)
 
     auto add_particles = [&](auto& particles) {
         particles.domain_particles.reserve(particle_box.size() * ppc);
-        add_particles_in(particles.domain_particles, particle_box, ppc);
+        core::add_particles(particles.domain_particles, particle_box, ppc);
 
-        // add_ghost_particles(particles.level_ghost_particles, particle_box, ppc,
-        //                     GridLayout_t::options.particle_ghost_width);
+        add_ghost_particles(particles.level_ghost_particles, particle_box, ppc, 1);
     };
 
     add_particles(ions.populations[0].particles);
@@ -233,7 +230,7 @@ auto from_ions(auto const& layout, auto const& from)
     EXPECT_EQ(ions.populations[0].particles.domain_particles.size(), 0ull);
 
     auto _add_particles_from = [&]<auto type>(auto& src, auto& dst) {
-        ParticleArrayService::reserve_ppc_in<type>(dst, ppc);
+        reserve(dst, layout.AMRBox(), ppc);
         append_particles<type>(src, dst /*, layout*/);
     };
 
@@ -250,9 +247,9 @@ auto from_ions(auto const& layout, auto const& from)
 
     particle_array_domain_is_valid(ions.populations[0].particles.domain_particles, layout.AMRBox());
 
-    // _add_particles_from.template operator()<ParticleType::LevelGhost>(
-    //     from.populations[0].particles.level_ghost_particles,
-    //     ions.populations[0].particles.level_ghost_particles);
+    _add_particles_from.template operator()<ParticleType::LevelGhost>(
+        from.populations[0].particles.level_ghost_particles,
+        ions.populations[0].particles.level_ghost_particles);
 
     auto const particle_box = layout.AMRBox();
     EXPECT_EQ(ions.populations[0].particles.domain_particles.size(), particle_box.size() * ppc);
@@ -270,14 +267,21 @@ void check_particles(GridLayout_t const& layout, P0& ref, P1& cmp_, double const
                                                        StorageMode::VECTOR, AllocatorMode::CPU}>;
 
     auto const box = layout.AMRBox();
+    // level/patch ghost particles live outside the domain box entirely - the sorter's
+    // flat-index cell key isn't defined out there, so sorting with the plain domain box
+    // can scatter/misgroup ghost-region particles differently between ref and cmp even
+    // when the underlying data matches. Grow the box for non-domain comparisons so the
+    // flattener covers every cell these particles can actually occupy.
+    auto const sort_box = type == ParticleType::Domain
+                              ? box
+                              : grow(box, GridLayout_t::options.particle_ghost_width);
     try
     {
         if constexpr (type == ParticleType::Domain)
             particle_array_domain_is_valid(cmp_, box);
         else
-            particle_array_ghost_is_valid(cmp_, box,
-                                          grow(box, GridLayout_t::options.particle_ghost_width));
-        PHARE_LOG_LINE_SS(name << " post-push cmp_ valid");
+            particle_array_ghost_is_valid(cmp_, box, sort_box);
+        PHARE_LOG_LINE_SS(name << " post-push cmp_ valid size=" << cmp_.size());
     }
     catch (std::exception const& e)
     {
@@ -285,8 +289,9 @@ void check_particles(GridLayout_t const& layout, P0& ref, P1& cmp_, double const
         EXPECT_TRUE(0 == 1);
     }
 
-    auto const cmp = convert_particles_and_sort<CPU_ref>(cmp_, layout);
-    sort_particles(ref, box);
+    auto cmp = convert_particles<CPU_ref>(cmp_, layout);
+    sort_particles(cmp, sort_box);
+    sort_particles(ref, sort_box);
 
     EXPECT_EQ(ref.size(), cmp.size());
 
@@ -298,6 +303,10 @@ void check_particles(GridLayout_t const& layout, P0& ref, P1& cmp_, double const
     else
     {
         PHARE_LOG_LINE_STR("Comparing Particle Arrays FAIL: " << P0::id() << " vs " << P1::id());
+        // serialize_particles(name + "_ref.bin", ref);
+        // serialize_particles(name + "_cmp.bin", cmp);
+        // PHARE_LOG_LINE_STR("dumped " << name << "_ref.bin (" << ref.size() << ") and " << name
+        //                              << "_cmp.bin (" << cmp.size() << ")");
     }
     PHARE_LOG_LINE_STR("results: " << report.why());
     if (ref.size())
@@ -334,9 +343,9 @@ void compare(GridLayout_t const& layout, R& ref, C& cmp)
         layout, ref.populations[0].particles.patch_ghost_particles,
         cmp.populations[0].particles.patch_ghost_particles, diff, "patchghost");
 
-    // check_particles<ParticleType::LevelGhost>(layout,
-    //     ref.populations[0].particles.level_ghost_particles,
-    //     cmp.populations[0].particles.level_ghost_particles, diff, "levelghost");
+    check_particles<ParticleType::LevelGhost>(
+        layout, ref.populations[0].particles.level_ghost_particles,
+        cmp.populations[0].particles.level_ghost_particles, diff, "levelghost");
 
     {
         // zero_ghost_layer(layout, ref.rhoC, cmp.rhoC);
@@ -438,7 +447,7 @@ struct MultiPatchIonUpdaterTest : public ::testing::Test
 
         // if (do_cmp)
         //     for (auto& cmp : cmp_patches)
-        //         compare(*layout, ref_patches[0].model.state.ions, cmp.model.state.ions);
+        //         compare(cmp_layout, ref_patches[0].model.state.ions, cmp.model.state.ions);
 
         if (!cmp_only)
             ref_update(updater_mode, ref_patches);
@@ -473,7 +482,9 @@ using Permutations_t = testing::Types< // ! notice commas !
     // ,TestParam<3, LayoutMode::AoSTS, AllocatorMode::CPU, UpdaterMode::all>
 
     // ,TestParam<1, LayoutMode::AoSPCTS, AllocatorMode::CPU, UpdaterMode::domain_only>
-    ,TestParam<1, LayoutMode::AoSPCTS, AllocatorMode::CPU, UpdaterMode::all>
+    // ,TestParam<1, LayoutMode::AoSPCTS, AllocatorMode::CPU, UpdaterMode::all>
+    ,TestParam<2, LayoutMode::AoSPCTS, AllocatorMode::CPU, UpdaterMode::all>
+    // ,TestParam<3, LayoutMode::AoSPCTS, AllocatorMode::CPU, UpdaterMode::all>
     // ,TestParam<2, LayoutMode::AoSPCTS, AllocatorMode::CPU, UpdaterMode::all>
     // ,TestParam<3, LayoutMode::AoSPCTS, AllocatorMode::CPU, UpdaterMode::all>
 

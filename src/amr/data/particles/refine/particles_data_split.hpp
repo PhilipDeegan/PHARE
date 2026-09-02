@@ -7,7 +7,6 @@
 #include "core/data/grid/gridlayout.hpp"
 #include "core/data/particles/particle_array_def.hpp"
 #include "core/data/particles/particle_array_detail.hpp"
-#include "core/data/particles/particle_array_service.hpp"
 #include "core/data/particles/particle_array_type_options.hpp"
 
 #include "amr/amr_constants.hpp"
@@ -198,7 +197,7 @@ void ParticlesRefining<HybridTypes, splitType, Splitter>::forBoxes(
     export_refined_particles<hybrid_options, ParticleType_v>( //
         srcParticlesData.domainParticles, destParticles, boxes, refiner, per_particle, domainBox);
 
-    core::ParticleArrayService::sync<2, ParticleType_v>(destParticles);
+    destParticles.template on_appended<ParticleType_v>();
 }
 
 

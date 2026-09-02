@@ -29,11 +29,11 @@ struct TestParam
     auto constexpr static interp = opts.interp_order;
 
     using PhareTypes       = core::PHARE_Types<opts>;
-    using Field_t          = PhareTypes::Field_t;
-    using GridLayout_t     = PhareTypes::GridLayout_t;
+    using Field_t          = PhareTypes::Hybrid::Field_t;
+    using GridLayout_t     = PhareTypes::Hybrid::GridLayout_t;
     using TestGridLayout_t = TestGridLayout<GridLayout_t>;
     using Box_t            = core::Box<int, dim>;
-    using ParticleArray_t  = PhareTypes::ParticleArray_t;
+    using ParticleArray_t  = PhareTypes::Hybrid::ParticleArray_t;
 
     using Hierarchy_t = AfullHybridBasicHierarchy<opts>;
 };

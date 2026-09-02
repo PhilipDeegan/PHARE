@@ -6,8 +6,8 @@
 
 #include "core/utilities/types.hpp"
 #include "core/utilities/box/box.hpp"
-#include "core/models/quantities/hybrid_quantities.hpp"
 #include "core/data/tiles/tile_set_overlaps.hpp"
+#include "core/models/quantities/hybrid_quantities.hpp"
 
 #include "simulator/simulator_def.hpp"
 
@@ -43,7 +43,7 @@ struct TestParam
 
     using PhareTypes   = PHARE::core::PHARE_Types<opts>;
     using Box_t        = Box<int, dim>;
-    using GridLayout_t = TestGridLayout<typename PhareTypes::GridLayout_t>;
+    using GridLayout_t = TestGridLayout<typename PhareTypes::Hybrid::GridLayout_t>;
     using ParticleArray_t
         = ParticleArray<ParticleArrayOptions{dim, layout_mode, StorageMode::VECTOR, alloc_mode}>;
 };
@@ -174,8 +174,8 @@ auto patch_ghost_copy(TileSetTest_t& self)
     // add some ghosts - or particles that left domain
     for (auto const& box : p0gb.remove(p0b))
         for (auto const& bix : box) // pick first tile for ghost cell
-            add_particles_in((**unique_tiles_for(ss0, self.lcl_cell(p0gb, bix)).begin())(),
-                             asBox(bix), ppc);
+            add_particles((**unique_tiles_for(ss0, self.lcl_cell(p0gb, bix)).begin())(), asBox(bix),
+                          ppc);
 
     auto& pM           = self.patches[self.mid_pid()]; // middle patch
     auto const pMb     = pM.layout.AMRBox();

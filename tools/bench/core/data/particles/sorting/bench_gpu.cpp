@@ -20,7 +20,7 @@ struct Fixture_t : public benchmark::Fixture
     void SetUp(::benchmark::State& state)
     {
         particles = std::make_unique<ParticleArray>();
-        add_particles_in(*particles, layout.AMRBox(), ppc);
+        add_particles(*particles, layout.AMRBox(), ppc);
         PHARE::core::disperse(*particles, 1333337);
     }
 

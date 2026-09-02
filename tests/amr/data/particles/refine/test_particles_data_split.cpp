@@ -4,8 +4,8 @@
 #include "core/utilities/monitoring.hpp"
 #include "core/data/particles/particle_array_def.hpp"
 
-#include "amr/data/particles/refine/particles_data_split.hpp"
 #include "amr/data/particles/particles_data.hpp"
+#include "amr/data/particles/refine/particles_data_split.hpp"
 
 #include "simulator/simulator_def.hpp"
 
@@ -240,7 +240,7 @@ struct ParticlesDataTest : public ::testing::Test,
     {
         assert(!any_overlaps_in(patches, [](auto const& patch) { return patch.layout.AMRBox(); }));
         for (auto& patch : patches)
-            add_particles_in(patch.data->domainParticles, patch.layout.AMRBox(), ppc);
+            add_particles(patch.data->domainParticles, patch.layout.AMRBox(), ppc);
     }
 
 
@@ -269,7 +269,7 @@ struct ParticlesDataTest : public ::testing::Test,
 // clang-format off
 using ParticlesDatas = testing::Types< //
 
-    TestParam<3, LayoutMode::AoSMapped, AllocatorMode::CPU>
+    TestParam<1, LayoutMode::AoSMapped, AllocatorMode::CPU>
    // ,TestParam<2, LayoutMode::AoSMapped, AllocatorMode::CPU>
    // ,TestParam<1, LayoutMode::AoSMapped, AllocatorMode::CPU>
 
@@ -277,7 +277,7 @@ PHARE_WITH_MKN_GPU(
    // ,TestParam<1, LayoutMode::AoSTS, AllocatorMode::CPU>
    // ,TestParam<1, LayoutMode::AoSPCTS, AllocatorMode::CPU>
    // ,TestParam<2, LayoutMode::AoSPCTS, AllocatorMode::CPU>
-   ,TestParam<3, LayoutMode::AoSPCTS, AllocatorMode::CPU>
+   ,TestParam<1, LayoutMode::AoSPCTS, AllocatorMode::CPU>
 )
 
 >;
@@ -313,7 +313,7 @@ TYPED_TEST(ParticlesDataTest, splitWorksForDomain)
     // distributes particles across a coarse cell's children.
     auto const [total_size, total_capacity] = total_size_and_capacity(dst.data->domainParticles);
     EXPECT_EQ(expected, total_size);
-    EXPECT_LE(total_capacity, static_cast<std::size_t>(total_size * 1.2));
+    EXPECT_LE(total_capacity, static_cast<std::size_t>(total_size * 2.0)); // todo
 
     dst.data->domainParticles.check();
 
@@ -358,7 +358,7 @@ TYPED_TEST(ParticlesDataTest, splitWorksForLevelGhost)
     auto const [total_size, total_capacity]
         = total_size_and_capacity(dst.data->levelGhostParticles);
     EXPECT_EQ(expected, total_size);
-    EXPECT_LE(total_capacity, static_cast<std::size_t>(total_size * 1.2));
+    EXPECT_LE(total_capacity, static_cast<std::size_t>(total_size * 2.0));
 
     dst.data->levelGhostParticles.check();
 

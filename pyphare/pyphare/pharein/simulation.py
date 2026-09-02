@@ -264,6 +264,7 @@ valid_particle_layouts = ("AoSMapped", "AoSTS", "AoSPCTS")
 
 def check_particle_layout(**kwargs):
     particle_layout = kwargs.get("particle_layout", "AoSMapped")
+    particle_layout = str(particle_layout).split(".")[-1]  # support enum
     if particle_layout not in valid_particle_layouts:
         raise ValueError(
             "Error: invalid particle_layout ({}), valid={}".format(
@@ -278,6 +279,7 @@ valid_allocators = ("CPU", "GPU_UNIFIED")
 
 def check_allocator(**kwargs):
     allocator = kwargs.get("allocator", "CPU")
+    allocator = str(allocator).split(".")[-1]  # support enum
     if allocator not in valid_allocators:
         raise ValueError(
             "Error: invalid allocator ({}), valid={}".format(
@@ -342,7 +344,8 @@ valid_refined_particle_nbr = {
     },
 }  # Default refined_particle_nbr per dim/interp is considered index 0 of list
 
-no_refined_particle_nbr = 0  # internal, C++-facing counterpart of no_hybrid_interp_order
+# internal, C++-facing counterpart of no_hybrid_interp_order
+no_refined_particle_nbr = 0
 
 
 def check_refined_particle_nbr(ndim, **kwargs):

@@ -8,8 +8,8 @@
 
 #include "simulator/simulator_def.hpp"
 
+#include "tests/core/data/particles/test_particles.hpp"
 #include "tests/core/data/gridlayout/test_gridlayout.hpp"
-#include "tests/core/data/particles/test_particles_fixtures.hpp"
 
 #include "tests/amr/amr.hpp"
 #include "tests/amr/test_hierarchy_fixtures.hpp"
@@ -29,7 +29,7 @@ struct TestParam
 {
     auto constexpr static dim = opts.dimension;
     using PhareTypes          = PHARE::core::PHARE_Types<opts>;
-    using GridLayout_t        = TestGridLayout<typename PhareTypes::GridLayout_t>;
+    using GridLayout_t        = TestGridLayout<typename PhareTypes::Hybrid::GridLayout_t>;
     using Hierarchy_t         = AfullHybridBasicHierarchy<opts>;
 };
 
@@ -64,7 +64,7 @@ TYPED_TEST_SUITE(ParticleScheduleHierarchyTest, ParticlesDatas);
 
 TYPED_TEST(ParticleScheduleHierarchyTest, testing_inject_ghost_layer)
 {
-    using ParticleArray_t             = TypeParam::TestParam::PhareTypes::ParticleArray_t;
+    using ParticleArray_t             = TypeParam::TestParam::PhareTypes::Hybrid::ParticleArray_t;
     using GridLayout_t                = TypeParam::GridLayout_t;
     auto constexpr static dim         = TypeParam::dim;
     auto constexpr static ghost_cells = GridLayout_t::options.particle_ghost_width;
@@ -89,7 +89,7 @@ TYPED_TEST(ParticleScheduleHierarchyTest, testing_inject_ghost_layer)
             GridLayout_t const layout{phare_box_from<dim>(patch->getBox())};
             auto const ghostBox = grow(layout.AMRBox(), ghost_cells);
             for (auto const& box : ghostBox.remove(layout.AMRBox()))
-                core::add_ghost_particles(pop.patchGhostParticles(), layout, box, ppc);
+                core::add_ghost_particles(pop.patchGhostParticles(), box, ppc);
         }
         rm.setTime(ions, *patch, 1);
     }

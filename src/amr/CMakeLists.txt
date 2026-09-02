@@ -79,6 +79,7 @@ set( SOURCES_INC
      load_balancing/concrete_load_balancer_strategy_homogeneous.hpp
      load_balancing/concrete_load_balancer_strategy_nppc.hpp
      samrai.hpp
+     utilities/box/amr_box.hpp
    )
 set( SOURCES_CPP
      data/field/refine/linear_weighter.cpp

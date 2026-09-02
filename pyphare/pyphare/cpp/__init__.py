@@ -39,9 +39,17 @@ def simulator_id(sim):
 def cpp_lib(sim):
     global _libs
 
-    mod_str = f"pybindlibs.cpp_{simulator_id(sim)}"
+    mod_id = f"cpp_{simulator_id(sim)}"
+    mod_str = f"pybindlibs.{mod_id}"
     if mod_str not in _libs:
-        _libs[mod_str] = importlib.import_module(mod_str)
+        try:
+            _libs[mod_str] = importlib.import_module(mod_str)
+        except ModuleNotFoundError as e:
+            if not mpi_initialized() or mpi_size() == 1:
+                from .cmake import build
+
+                build(mod_id)
+                return cpp_lib(sim)
     return _libs[mod_str]
 
 

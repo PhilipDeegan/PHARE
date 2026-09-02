@@ -37,8 +37,6 @@ class HybridAdvanceTest(AdvanceTestBase):
         timestamps=None,
         block_merging_particles=False,
         diag_outputs="",
-        sim_setup_kwargs={},
-        as_run=False,
         **kwargs
     ):
         if smallest_patch_size is None:
@@ -167,9 +165,9 @@ class HybridAdvanceTest(AdvanceTestBase):
                     quantity=quantity, write_timestamps=timestamps, population_name=pop
                 )
 
-        Simulator(sim).setup(**sim_setup_kwargs).run().reset()
+        Simulator(sim).run().reset()
 
-        if as_run:
+        if qty == "run":
             return Run(diag_outputs)
 
         eb_hier = None
