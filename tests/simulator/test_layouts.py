@@ -17,7 +17,7 @@ from tests.simulator.initialize.test_init_hybrid import HybridInitializationTest
 from tests.simulator.advance.test_advance_hybrid import HybridAdvanceTest
 
 
-ndim_list = [1, 2]
+ndim_list = [1, 2, 3]
 interp_orders = [1]
 _ref_layout = "AoSMapped"
 cells = 14
@@ -208,11 +208,11 @@ class LayoutAdvanceL0Test(ALayoutAdvanceTest):
 
 
 _L1_advance_atol_per_dim = {
-    # 1 and 2 deliberately at zero for now - want these to fail so the assertion
+    # deliberately at zero for now - want these to fail so the assertion
     # message's actual max diff tells us what atol they really need.
     1: dict(b=1e-15, e=1e-14, moments=1e-14, particles=1e-15),
     2: dict(b=1e-15, e=1e-14, moments=1e-14, particles=1e-15),
-    3: dict(b=1e-4, e=1e-4, moments=1e-4, particles=1e-5),
+    3: dict(b=1e-15, e=1e-14, moments=1e-14, particles=1e-15),
 }
 
 

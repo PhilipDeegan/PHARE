@@ -239,6 +239,22 @@ void per_particle(ParticleArray<o> const& particles, auto const fn)
             fn(p);
 }
 
+// mutating counterpart - tiled layouts only expose their particles per (tile, cell), so
+// mutation has to walk the same tile-then-cell path as the const overload above rather
+// than the array's own top-level begin()/end(), which tiled layouts don't support.
+template<auto o>
+void per_particle(ParticleArray<o>& particles, auto const fn)
+{
+    using enum LayoutMode;
+    if constexpr (is_tiled(o.layout_mode))
+        for (auto& tile : particles())
+            for (auto& p : tile())
+                fn(p);
+    else
+        for (auto& p : particles)
+            fn(p);
+}
+
 template<auto o>
 void check_particles(ParticleArray<o> const& particles, [[maybe_unused]] bool const print = false)
 {

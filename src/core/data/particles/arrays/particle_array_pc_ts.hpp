@@ -499,6 +499,21 @@ public:
     auto& views() { return particles_views_; }
     auto& views() const { return particles_views_; }
 
+    NO_DISCARD bool is_consistent() const
+    {
+        std::size_t n = 0;
+        for (auto const& tile : particles_)
+        {
+            auto const& pc = tile();
+            for (auto const& cell : pc.local_box())
+                for (auto const& p : pc(cell.toArray()))
+                    if (pc.local_cell(p.iCell()) != cell.toArray())
+                        return false;
+            n += pc.size();
+        }
+        return n == total_size;
+    }
+
 protected:
     // visit the AMR cells of a tile that sit within ghost_cells_ of its wall — the only
     // cells a particle can enter or leave the tile from in one step
