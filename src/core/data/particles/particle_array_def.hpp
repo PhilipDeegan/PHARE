@@ -9,7 +9,9 @@
 
 
 #include <array>
+#include <tuple>
 #include <cstdint>
+#include <type_traits>
 
 namespace PHARE::core
 {
@@ -33,6 +35,26 @@ bool constexpr is_tiled(LayoutMode lm)
 {
     using enum LayoutMode;
     return any_in(lm, AoSTS, AoSCMTS, SoATS, SoAVXTS, AoSPCTS);
+}
+
+// guards a forwarding constructor `template<typename... Args> This(Args&&...)` so that a
+// single self-type argument (e.g. a non-const `This&`) is excluded and falls through to the
+// real copy/move constructor instead - otherwise the forwarding ctor is an exact match that
+// beats the copy ctor's `This const&` in overload resolution.
+template<typename This, typename Super, typename... Args>
+bool consteval self_excluding_constructible()
+{
+    using Tup = std::tuple<Args...>;
+
+    bool constexpr base = std::is_constructible_v<Super, Args&&...>;
+    if constexpr (std::tuple_size_v<Tup> > 0)
+    {
+        bool constexpr isself
+            = std::is_same_v<std::decay_t<std::tuple_element_t<0, Tup>>, This>;
+        return !isself and base;
+    }
+    else
+        return base;
 }
 
 enum class StorageMode : std::uint16_t { ARRAY = 0, VECTOR, SPAN };

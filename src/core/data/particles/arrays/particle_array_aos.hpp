@@ -388,7 +388,7 @@ struct AoSParticles : public Super_<opts>
 
     template<typename... Args>
     AoSParticles(Args&&... args)
-        requires std::is_constructible_v<Super, Args&&...>
+        requires(self_excluding_constructible<This, Super, Args...>())
     _PHARE_ALL_FN_ : Super{std::forward<Args>(args)...}
     {
     }
@@ -578,7 +578,7 @@ public:
 
     template<typename... Args>
     AoSMappedParticles(Args&&... args)
-        requires std::is_constructible_v<Super, Args&&...>
+        requires(self_excluding_constructible<This, Super, Args...>())
     _PHARE_ALL_FN_ : Super{std::forward<Args>(args)...}
     {
     }

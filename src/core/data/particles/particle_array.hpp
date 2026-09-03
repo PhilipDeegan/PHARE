@@ -12,7 +12,6 @@
 #include "core/utilities/equality.hpp"
 #include "core/utilities/monitoring.hpp"
 
-#include <tuple>
 #include <utility>
 #include <sstream>
 #include <type_traits>
@@ -25,24 +24,6 @@ class ParticleArray : public ResolvedParticleArray_t<opts>
 {
     using This      = ParticleArray<opts>;
     using internals = ParticleArrayResolver<opts>;
-
-
-    template<typename... Args>
-    bool consteval static require()
-    {
-        using Tup = std::tuple<Args...>;
-
-        bool constexpr base = std::is_constructible_v<Super, Args&&...>;
-        if constexpr (std::tuple_size_v<Tup> > 0)
-        {
-            bool constexpr isself
-                = std::is_same_v<std::decay_t<std::tuple_element_t<0, Tup>>, This>;
-            // static_assert(!isself);
-            return !isself and base;
-        }
-        else
-            return base;
-    }
 
 public:
     using Super      = ResolvedParticleArray_t<opts>;
@@ -86,7 +67,7 @@ public:
 
     template<typename... Args>
     ParticleArray(Args&&... args)
-        requires(require<Args...>())
+        requires(self_excluding_constructible<This, Super, Args...>())
     _PHARE_ALL_FN_ : Super{std::forward<Args>(args)...}
     {
         mon.create();
