@@ -45,7 +45,8 @@ def populate_amr(dp, sim):
         dp.add_vector_int("simulation/AMR/largest_patch_size", sim.largest_patch_size)
 
     dp.add_string("simulation/AMR/clustering", sim.clustering)
-    dp.add_vector_int("simulation/AMR/nesting_buffer", sim.nesting_buffer)
+    if sim.nesting_buffer is not None:
+        dp.add_vector_int("simulation/AMR/nesting_buffer", sim.nesting_buffer)
     dp.add_int("simulation/AMR/tag_buffer", sim.tag_buffer)
 
     dp.add_int("simulation/AMR/max_nbr_levels", sim.max_nbr_levels)
