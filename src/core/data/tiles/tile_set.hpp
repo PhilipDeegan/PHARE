@@ -12,8 +12,6 @@
 #include "tile_set_mapper.hpp"
 
 #include <array>
-#include <stdexcept>
-#include <string>
 #include <tuple>
 
 
@@ -75,16 +73,6 @@ public:
     NO_DISCARD auto at(Index... indexes) const _PHARE_ALL_FN_
     {
         auto const& idx = cell_idx(indexes...);
-#if PHARE_DEBUG
-        if (idx >= cells_.size())
-        {
-            PHARE_LOG_LINE_SS("out of bounds idx for size " << std::to_string(idx) << " : "
-                                                            << std::to_string(cells_.size()));
-            throw std::runtime_error("out of bounds idx for size " + std::to_string(idx) + " : "
-                                     + std::to_string(cells_.size()));
-        }
-#endif
-
         return cells_[idx];
     }
 

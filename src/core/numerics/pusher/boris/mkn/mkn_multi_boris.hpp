@@ -3,10 +3,10 @@
 #ifndef PHARE_CORE_PUSHER_BORIS_MKN_MULTI_BORIS_HPP
 #define PHARE_CORE_PUSHER_BORIS_MKN_MULTI_BORIS_HPP
 
-#include "core/data/electromag/electromag.hpp"
-#include "core/data/particles/particle_array_def.hpp"
-#include "core/numerics/pusher/boris/basics.hpp"
 #include "core/utilities/span.hpp"
+#include "core/data/electromag/electromag.hpp"
+#include "core/numerics/pusher/boris/basics.hpp"
+#include "core/data/particles/particle_array_def.hpp"
 
 
 namespace PHARE::core
@@ -166,7 +166,7 @@ struct MultiBorisFunctors
         auto& parts          = tile();
         auto const tile_cell = pps.local_cell(tile.lower);
 
-        auto constexpr static tracker = [](auto&&... args) _PHARE_ALL_FN_ {
+        auto constexpr static tracker = [] _PHARE_ALL_FN_(auto&&... args) {
             return make_particle_tracker<Particles_t::layout_mode, particle_type, dim>(args...);
         };
 
@@ -188,7 +188,7 @@ struct MultiBorisFunctors
         {
             auto const each = pps()[tile_idx]().size() / ws;
 
-            auto const one = [&](std::size_t const pidx) _PHARE_ALL_FN_ {
+            auto const one = [&] _PHARE_ALL_FN_(std::size_t const pidx) {
                 per_any_particle(parts, layout, tracker(parts.iCell(pidx), tile_cell), pidx, em);
             };
 
@@ -524,7 +524,7 @@ public:
                 Super::sync_ref(in, i);
         };
 
-        if constexpr (in.opts.use_main_thread)
+        if constexpr (MultiBorisOptions{}.use_main_thread)
         {
             for (std::size_t i = 0; i < in.accessor.size(); ++i)
             {
@@ -549,7 +549,7 @@ public:
 #if PHARE_HAVE_GPU
         using Tile_vt_ = Electromag_t::vecfield_type::field_type::value_type;
         using Interpolating_
-            = Interpolating<Particles_t, GridLayout_t::interp_order,
+            = Interpolating<Particles_t, GridLayout_t::options.interp_order,
                             (Particles_t::alloc_mode == AllocatorMode::GPU_UNIFIED)>;
 
         auto view       = in.accessor[i];
@@ -658,7 +658,7 @@ struct MultiBorisPusherImpl<LayoutMode::AoSPCTS, alloc, GridLayout, Particles, E
                 Super::sync_ref(in, i);
         };
 
-        if constexpr (in.opts.use_main_thread)
+        if constexpr (MultiBorisOptions{}.use_main_thread)
         {
             for (std::size_t i = 0; i < in.accessor.size(); ++i)
             {

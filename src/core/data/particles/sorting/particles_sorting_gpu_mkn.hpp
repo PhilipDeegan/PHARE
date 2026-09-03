@@ -3,6 +3,7 @@
 
 #if PHARE_HAVE_THRUST
 
+#include "core/def.hpp"
 #include "core/utilities/box/box.hpp"
 #include "core/data/particles/particle_array_def.hpp"
 
@@ -130,11 +131,11 @@ public:
     void sort_by_key(std::uint64_t l, std::uint64_t r) // unused but for reference
     {
         auto ps = particles.view();
-        std::vector<int, mkn::gpu::ManagedAllocator<int>> flats(r - l);
+        std::vector<int, ::mkn::gpu::ManagedAllocator<int>> flats(r - l);
         auto fv = flats.data();
-        mkn::gpu::GDLauncher{flats.size()}([=, cf = cell_flattener] _PHARE_ALL_FN_() {
-            auto idx            = mkn::gpu::idx() + l;
-            fv[mkn::gpu::idx()] = cf(ps.iCell(idx));
+        ::mkn::gpu::GDLauncher{flats.size()}([=, cf = cell_flattener] _PHARE_ALL_FN_() {
+            auto idx              = ::mkn::gpu::idx() + l;
+            fv[::mkn::gpu::idx()] = cf(ps.iCell(idx));
         });
         thrust::device_vector<int> indices(flats.size());
         thrust::sequence(indices.begin(), indices.end());

@@ -539,7 +539,7 @@ int main(int argc, char** argv)
     try
     {
         auto r = RUN_ALL_TESTS();
-        PHARE_WITH_PHLOP(phlop::threaded::ScopeTimerMan::reset());
+        PHARE_WITH_PHLOP(phlop::scope_timer().shutdown());
         PHARE::core::MemoryMonitoring::PRINT();
         return r;
     }
