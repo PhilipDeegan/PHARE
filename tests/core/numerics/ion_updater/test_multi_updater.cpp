@@ -167,14 +167,17 @@ void cmp_update(UpdaterMode mode, Patches& patches)
 
     try
     {
-        get_updater_for(patches[0].model.state.ions, patches[0].model.state.electromag, layout)
-            .updatePopulations(accessor, boxings, dt, mode);
-
-        for (auto& patch : patches)
+        for (std::size_t i = 0; i < n_push; ++i)
         {
-            auto& [layout, ions, em, electromag] = patch.model.state;
-            ions.computeChargeDensity();
-            ions.computeBulkVelocity();
+            get_updater_for(patches[0].model.state.ions, patches[0].model.state.electromag, layout)
+                .updatePopulations(accessor, boxings, dt, mode);
+
+            for (auto& patch : patches)
+            {
+                auto& [layout, ions, em, electromag] = patch.model.state;
+                ions.computeChargeDensity();
+                ions.computeBulkVelocity();
+            }
         }
     }
     catch (std::exception const& e)
@@ -482,9 +485,10 @@ using Permutations_t = testing::Types< // ! notice commas !
     // ,TestParam<3, LayoutMode::AoSTS, AllocatorMode::CPU, UpdaterMode::all>
 
     // ,TestParam<1, LayoutMode::AoSPCTS, AllocatorMode::CPU, UpdaterMode::domain_only>
-    // ,TestParam<1, LayoutMode::AoSPCTS, AllocatorMode::CPU, UpdaterMode::all>
+    ,TestParam<1, LayoutMode::AoSPCTS, AllocatorMode::CPU, UpdaterMode::all>
     ,TestParam<2, LayoutMode::AoSPCTS, AllocatorMode::CPU, UpdaterMode::all>
-    // ,TestParam<3, LayoutMode::AoSPCTS, AllocatorMode::CPU, UpdaterMode::all>
+    ,TestParam<3, LayoutMode::AoSPCTS, AllocatorMode::CPU, UpdaterMode::domain_only>
+    ,TestParam<3, LayoutMode::AoSPCTS, AllocatorMode::CPU, UpdaterMode::all>
     // ,TestParam<2, LayoutMode::AoSPCTS, AllocatorMode::CPU, UpdaterMode::all>
     // ,TestParam<3, LayoutMode::AoSPCTS, AllocatorMode::CPU, UpdaterMode::all>
 

@@ -1,13 +1,18 @@
-#!/usr/bin/env python3
 """
+Shared base classes/helpers for the per-dimension test_layouts_{1,2,3}d.py files.
+
 Tests that tile-based particle layouts produce identical initialization
 and time-advance results to the reference (AoSMapped) layout.
+
+This module holds everything that does NOT vary per dimension: the atol/
+refinement_boxes selection for each level (L0/L1/L2), and the comparison
+machinery. `@ddt`/`@data(*permute(...))` bake their parametrization in at
+class-definition time, so the concrete, test-method-bearing classes must be
+(re)defined per dimension file with that file's own `ndim_list` - see
+test_layouts_1d.py/2d.py/3d.py.
 """
 
-import os
-import unittest
 import itertools
-from ddt import data, ddt, unpack
 
 from pyphare import cpp
 from pyphare.core.box import nDBox
@@ -17,15 +22,13 @@ from tests.simulator.initialize.test_init_hybrid import HybridInitializationTest
 from tests.simulator.advance.test_advance_hybrid import HybridAdvanceTest
 
 
-ndim_list = [1, 2, 3]
-interp_orders = [1]
 _ref_layout = "AoSMapped"
 cells = 14
 ppc_per_dim = [100, 33, 15]
 # os.environ["PHARE_TILING_MIN_BEFORE_SPLIT"] = "1000"
 
 
-def permute():
+def permute(ndim_list, interp_orders=[1]):
     cmp_layouts = [
         l for l in cpp.supported_particle_layouts() if _ref_layout not in str(l)
     ]
@@ -113,10 +116,9 @@ class ALayoutInitTest(HybridInitializationTest):
             compare_hierarchies(self, run0, run1, atol)
 
 
-@ddt
 class LayoutInitL0Test(ALayoutInitTest):
     def _compare_init(self, ndim, interp_order, cmp_layout):
-        super().compare_init(
+        self.compare_init(
             ndim,
             interp_order,
             cmp_layout,
@@ -124,33 +126,16 @@ class LayoutInitL0Test(ALayoutInitTest):
             refinement_boxes=None,
         )
 
-    @data(*permute())
-    @unpack
-    def test_init_matches_reference_layout(self, ndim, interp_order, cmp_layout):
-        print(
-            f"{self._testMethodName} ndim={ndim} interp={interp_order} layout={cmp_layout}"
-        )
-        self._compare_init(ndim, interp_order, cmp_layout)
 
-
-@ddt
 class LayoutInitL1Test(ALayoutInitTest):
     def _compare_init(self, ndim, interp_order, cmp_layout):
-        super().compare_init(
+        self.compare_init(
             ndim,
             interp_order,
             cmp_layout,
             atol=dict(b=0, e=1e-14, moments=1e-14, particles=0),
             refinement_boxes={"L0": {"B0": nDBox(ndim, 1, 12)}},
         )
-
-    @data(*permute())
-    @unpack
-    def test_init_matches_reference_layout(self, ndim, interp_order, cmp_layout):
-        print(
-            f"{self._testMethodName} ndim={ndim} interp={interp_order} layout={cmp_layout}"
-        )
-        self._compare_init(ndim, interp_order, cmp_layout)
 
 
 class ALayoutAdvanceTest(HybridAdvanceTest):
@@ -187,24 +172,15 @@ class ALayoutAdvanceTest(HybridAdvanceTest):
             compare_hierarchies(self, run0, run1, atol)
 
 
-@ddt
 class LayoutAdvanceL0Test(ALayoutAdvanceTest):
     def _compare_advance(self, ndim, interp_order, cmp_layout):
-        super().compare_advance(
+        self.compare_advance(
             ndim,
             interp_order,
             cmp_layout,
             atol=dict(b=1e-14, e=1e-12, moments=1e-14, particles=1e-14),
             refinement_boxes=None,
         )
-
-    @data(*permute())
-    @unpack
-    def test_advance_matches_reference_layout(self, ndim, interp_order, cmp_layout):
-        print(
-            f"{self._testMethodName} ndim={ndim} interp={interp_order} layout={cmp_layout}"
-        )
-        self._compare_advance(ndim, interp_order, cmp_layout)
 
 
 _L1_advance_atol_per_dim = {
@@ -216,10 +192,9 @@ _L1_advance_atol_per_dim = {
 }
 
 
-@ddt
 class LayoutAdvanceL1Test(ALayoutAdvanceTest):
     def _compare_advance(self, ndim, interp_order, cmp_layout):
-        super().compare_advance(
+        self.compare_advance(
             ndim,
             interp_order,
             cmp_layout,
@@ -227,42 +202,32 @@ class LayoutAdvanceL1Test(ALayoutAdvanceTest):
             refinement_boxes={"L0": {"B0": nDBox(ndim, 1, 12)}},
         )
 
-    @data(*permute())
-    @unpack
-    def test_advance_matches_reference_layout(self, ndim, interp_order, cmp_layout):
-        print(
-            f"{self._testMethodName} ndim={ndim} interp={interp_order} layout={cmp_layout}"
+
+_L2_advance_atol_per_dim = {
+    # moments/particles pass clean at 1e-15; b and e are loosened to a small
+    # multiple of the worst observed diff - both are double-precision noise
+    # floor on O(1) values (b: ~5 ULP, non-associative summation order from
+    # the multithreaded push/deposit - reproduced as an intermittent single-
+    # element failure at b=1e-15; e: see LayoutAdvanceL2Test logs), not a
+    # growing/systematic error. b is loosened for all dims since the
+    # underlying thread-order nondeterminism isn't dimension-specific, even
+    # though it was only caught so far at ndim=3.
+    1: dict(b=5e-15, e=1e-14, moments=1e-14, particles=1e-15),
+    2: dict(b=5e-15, e=5e-14, moments=1e-14, particles=1e-15),
+    3: dict(b=5e-15, e=5e-14, moments=1e-14, particles=1e-15),
+}
+
+
+class LayoutAdvanceL2Test(ALayoutAdvanceTest):
+    def _compare_advance(self, ndim, interp_order, cmp_layout):
+        self.compare_advance(
+            ndim,
+            interp_order,
+            cmp_layout,
+            atol=_L2_advance_atol_per_dim[ndim],
+            refinement_boxes={
+                "L0": {"B0": nDBox(ndim, 1, 12)},
+                "L1": {"B0": nDBox(ndim, 4, 21)},
+            },
+            time_step_nbr=4,
         )
-        self._compare_advance(ndim, interp_order, cmp_layout)
-
-
-# @ddt # having an L2 == regridding with refinement_boxes?
-# class LayoutAdvanceL2Test(ALayoutAdvanceTest):
-#     def _compare_advance(self, ndim, interp_order, cmp_layout):
-#         super().compare_advance(
-#             ndim,
-#             interp_order,
-#             cmp_layout,
-#             atol=dict(b=1e-5, e=1e-5, moments=1e-5, particles=1e-5),
-#             refinement_boxes={
-#                 "L0": {"B0": nDBox(ndim, 1, 12)},
-#                 "L1": {"B0": nDBox(ndim, 4, 21)},
-#             },
-#             time_step_nbr=1,
-#         )
-
-#     @data(*permute())
-#     @unpack
-#     def test_advance_matches_reference_layout(self, ndim, interp_order, cmp_layout):
-#         print(
-#             f"{self._testMethodName} ndim={ndim} interp={interp_order} layout={cmp_layout}"
-#         )
-#         self._compare_advance(ndim, interp_order, cmp_layout)
-
-
-if __name__ == "__main__":
-    from pyphare.simulator.simulator import startMPI
-
-    # raise "?"
-    startMPI()
-    unittest.main()

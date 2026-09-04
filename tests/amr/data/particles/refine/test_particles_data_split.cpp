@@ -278,6 +278,7 @@ PHARE_WITH_MKN_GPU(
    // ,TestParam<1, LayoutMode::AoSPCTS, AllocatorMode::CPU>
    // ,TestParam<2, LayoutMode::AoSPCTS, AllocatorMode::CPU>
    ,TestParam<1, LayoutMode::AoSPCTS, AllocatorMode::CPU>
+   ,TestParam<3, LayoutMode::AoSPCTS, AllocatorMode::CPU>
 )
 
 >;
@@ -367,6 +368,25 @@ TYPED_TEST(ParticlesDataTest, splitWorksForLevelGhost)
         EXPECT_NE(p.v()[1], 0);
         EXPECT_NE(p.v()[2], 0);
     });
+
+    if constexpr (TestFixture::ParticleArray_t::layout_mode == LayoutMode::AoSPCTS)
+    {
+        for (auto const& tile : dst.data->levelGhostParticles())
+        {
+            auto const& pc = tile();
+            for (auto const& bix : pc.ghost_box())
+            {
+                auto const local = pc.local_cell(bix);
+                for (auto const& p : pc(local))
+                    EXPECT_TRUE(array_equals(pc.local_cell(p.iCell()), local))
+                        << "levelGhost particle in wrong cell bucket: iCell=" << Point{p.iCell()}
+                        << " bucket=" << Point{local} << " tile="
+                        << static_cast<
+                               core::Box<int, TestFixture::ParticleArray_t::dimension> const&>(
+                               tile);
+            }
+        }
+    }
 
     PHARE::core::MemoryMonitoring::MOVE().print();
 }

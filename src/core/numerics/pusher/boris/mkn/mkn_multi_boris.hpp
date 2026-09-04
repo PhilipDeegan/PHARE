@@ -299,9 +299,9 @@ struct MultiBorisFunctors
             auto F = pop.flux().template as<VecField_vt>([&](auto& c) { return c()[tile_idx](); });
             Interpolator_t interp;
 
-            for (auto const& bix : cell_particles.local_box(cell_particles.box()))
+            for (auto& cell : cell_particles()) // all cells, for levelghosts
             {
-                for (auto p : cell_particles(bix))
+                for (auto p : cell)
                 {
                     if constexpr (particle_type == ParticleType::LevelGhost)
                         if (!isIn(p, parts.ghost_box()))

@@ -59,31 +59,14 @@ struct ParticleArrayConstructionTest : public ::testing::Test
 
 
 
-template<typename ParticleArrayConstructionTest_t>
-auto run(ParticleArrayConstructionTest_t& self)
-{
-    // abort_if(self.periodic_neighbours_for(13).size());
-}
-
 // clang-format off
 using Permutations_t = testing::Types< // ! notice commas !
 
     TestParam<1, LayoutMode::AoS, AllocatorMode::CPU>
    ,TestParam<1, LayoutMode::AoSMapped, AllocatorMode::CPU>
-   // ,TestParam<3, LayoutMode::AoSPC, AllocatorMode::CPU>
-   // ,TestParam<3, LayoutMode::AoSTS, AllocatorMode::CPU>
    ,TestParam<1, LayoutMode::AoSPCTS, AllocatorMode::CPU>
-
-// PHARE_WITH_THRUST(
-//     ,TestParam<3, LayoutMode::SoA, AllocatorMode::CPU>
-//     ,TestParam<3, LayoutMode::SoAPC, AllocatorMode::CPU>
-// )
-
-// PHARE_WITH_GPU(
-//     ,TestParam<3, LayoutMode::AoS, AllocatorMode::GPU_UNIFIED>
-//     ,TestParam<3, LayoutMode::AoSTS, AllocatorMode::GPU_UNIFIED>
-// )
-
+   ,TestParam<2, LayoutMode::AoSPCTS, AllocatorMode::CPU>
+   ,TestParam<3, LayoutMode::AoSPCTS, AllocatorMode::CPU>
 
 >;
 // clang-format on
