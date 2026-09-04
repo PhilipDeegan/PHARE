@@ -368,6 +368,7 @@ class FluidDiagnostics:
 
 class ParticleDiagnostics(Diagnostics):
     particle_quantities = ["space_box", "domain", "levelGhost"]
+
     type = "particle"
 
     def __init__(self, **kwargs):

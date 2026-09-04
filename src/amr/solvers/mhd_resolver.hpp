@@ -1,7 +1,7 @@
 #ifndef PHARE_AMR_SOLVERS_MHD_RESOLVER_HPP
 #define PHARE_AMR_SOLVERS_MHD_RESOLVER_HPP
 
-#include "phare_simulator_options.hpp"
+#include "core/models/options/mhd_options_def.hpp"
 
 #include "core/numerics/godunov_fluxes/godunov_fluxes.hpp"
 
