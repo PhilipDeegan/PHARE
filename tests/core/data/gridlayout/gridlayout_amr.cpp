@@ -4,6 +4,8 @@
 
 #include "core/utilities/box/box.hpp"
 
+#include "simulator/simulator_def.hpp"
+
 #include "gtest/gtest.h"
 
 using namespace PHARE::core;
