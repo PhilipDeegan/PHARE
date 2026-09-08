@@ -1,15 +1,19 @@
 #ifndef HIGHFIVEDIAGNOSTICWRITER_HPP
 #define HIGHFIVEDIAGNOSTICWRITER_HPP
 
-#include <string>
-#include <algorithm>
-#include <unordered_map>
 
+#include "core/data/tensorfield/tensorfield.hpp"
 #include "mpi/mpi_utils.hpp"
+#include "core/data/field/field_box.hpp"
+#include "core/data/grid/grid_tiles.hpp"
 
 #include "diagnostic/diagnostic_writer.hpp"
 
 #include "hdf5/detail/h5/h5_file.hpp"
+
+
+#include <string>
+#include <unordered_map>
 
 
 namespace PHARE::diagnostic::h5
@@ -74,6 +78,7 @@ protected:
     {
         for (std::size_t lvl = h5Writer_.minLevel; lvl <= maxLevel; lvl++)
         {
+            assert(patchIDs.count(lvl));
             auto& lvlPatches       = patchIDs.at(lvl);
             std::size_t patchNbr   = lvlPatches.size();
             std::size_t maxPatches = mpi::max(patchNbr);
@@ -93,6 +98,7 @@ protected:
     {
         for (std::size_t lvl = h5Writer_.minLevel; lvl <= maxLevel; lvl++)
         {
+            assert(patchAttributes.count(lvl));
             auto& lvlPatches       = patchAttributes.at(lvl);
             std::size_t patchNbr   = lvlPatches.size();
             std::size_t maxPatches = mpi::max(patchNbr);
@@ -137,6 +143,7 @@ protected:
                 fileData.emplace(diagnostic.quantity, this->h5Writer_.makeFile(diagnostic));
         });
     }
+
 
 
     auto& h5FileForQuantity(DiagnosticProperties& diagnostic)

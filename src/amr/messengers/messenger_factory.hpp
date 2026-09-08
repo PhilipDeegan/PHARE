@@ -1,6 +1,7 @@
 #ifndef PHARE_MESSENGER_MANAGER_HPP
 #define PHARE_MESSENGER_MANAGER_HPP
 
+#include "core/def.hpp"
 
 
 #include "amr/messengers/hybrid_hybrid_messenger_strategy.hpp"
@@ -8,7 +9,6 @@
 #include "amr/messengers/messenger.hpp"
 #include "amr/messengers/mhd_hybrid_messenger_strategy.hpp"
 #include "amr/messengers/mhd_messenger.hpp"
-#include "core/def.hpp"
 
 #include <algorithm>
 #include <memory>

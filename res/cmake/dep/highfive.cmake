@@ -14,7 +14,7 @@ if(HighFive)
   message(STATUS "HDF5_LIBRARIES " ${HDF5_LIBRARIES})
   message(STATUS "HDF5_INCLUDE_DIRS " ${HDF5_INCLUDE_DIRS})
   message(STATUS "HDF5_LIBRARY_PATH " ${HDF5_LIBRARY_PATH})
-  include_directories(${HDF5_INCLUDE_DIRS})  # clangd mostly
+  # include_directories(${HDF5_INCLUDE_DIRS})  # clangd mostly
 
   if(NOT DEFINED PHARE_HIGHFIVE_VERSION)
     SET(PHARE_HIGHFIVE_VERSION "main")
@@ -28,7 +28,7 @@ if(HighFive)
   set(HIGHFIVE_USE_BOOST OFF)
   set(HIGHFIVE_BUILD_DOCS OFF) # conflicts with phare doc target
   set(HIGHFIVE_EXAMPLES OFF)
-  include_directories(${HIGHFIVE_SRC}/include)
+  # include_directories(${HIGHFIVE_SRC}/include)
   add_subdirectory(${HIGHFIVE_SRC})
 
   if(DEFINED HDF5_ENABLE_PARALLEL AND "${HDF5_ENABLE_PARALLEL}" STREQUAL "ON")
@@ -37,7 +37,7 @@ if(HighFive)
 
   if(${HDF5_IS_PARALLEL})
       message("HDF5 PARALLEL detected")
-      add_definitions(-DH5_HAVE_PARALLEL)
+      target_compile_definitions(HighFive INTERFACE H5_HAVE_PARALLEL)
   else()
       message(WARNING "HDF5 NOT PARALLEL")
   endif()

@@ -79,6 +79,7 @@ set( SOURCES_INC
      load_balancing/concrete_load_balancer_strategy_homogeneous.hpp
      load_balancing/concrete_load_balancer_strategy_nppc.hpp
      samrai.hpp
+     utilities/box/amr_box.hpp
    )
 set( SOURCES_CPP
      data/field/refine/linear_weighter.cpp
@@ -88,9 +89,9 @@ set( SOURCES_CPP
      samrai.cpp
    )
 
-# single source of entry for static SAMRAI things
+
 add_library(${PROJECT_NAME} SHARED ${SOURCES_INC} ${SOURCES_CPP})
-target_compile_options(${PROJECT_NAME} PRIVATE ${PHARE_WERROR_FLAGS})
+target_compile_options(${PROJECT_NAME} PRIVATE ${PHARE_FLAGS} ${PHARE_WERROR_FLAGS})
 set_property(TARGET ${PROJECT_NAME} PROPERTY INTERPROCEDURAL_OPTIMIZATION ${PHARE_INTERPROCEDURAL_OPTIMIZATION})
 
 target_link_directories(${PROJECT_NAME} PUBLIC ${MPI_LIBRARY_PATH})
@@ -110,6 +111,8 @@ target_link_libraries(${PROJECT_NAME} PUBLIC
   SAMRAI_xfer
   MPI::MPI_C
   cppdict
+  magic_enum
+  ${PHARE_BASE_LIBS}
 )
 
 if (HighFive) # SAMRAI USES HDF5 so we need this here

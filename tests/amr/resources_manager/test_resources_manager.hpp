@@ -4,28 +4,25 @@
 
 #include "phare_core.hpp"
 
-#include <memory>
+#include "core/data/grid/grid.hpp"
+#include "core/data/ndarray/ndarray_vector.hpp"
+
+#include "amr/resources_manager/resources_manager.hpp"
+
+#include "simulator/simulator_def.hpp"
 
 
 #include "test_resources_manager_basic_hierarchy.hpp"
-#include "core/data/grid/grid.hpp"
-#include "core/data/grid/gridlayout.hpp"
-#include "core/data/grid/gridlayout_impl.hpp"
-#include "core/data/ions/ion_population/ion_population.hpp"
-#include "core/data/ions/ions.hpp"
-#include "core/data/ndarray/ndarray_vector.hpp"
-#include "core/data/particles/particle_array.hpp"
-#include "core/data/vecfield/vecfield.hpp"
-#include "input_config.h"
-#include "amr/resources_manager/resources_manager.hpp"
 
-#include "gmock/gmock.h"
+#include "input_config.h"
+
 #include "gtest/gtest.h"
+
+#include <memory>
+
 
 using namespace PHARE::core;
 using namespace PHARE::amr;
-
-
 
 
 template<typename ResourcesUsers>
