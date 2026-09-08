@@ -1,6 +1,4 @@
-#
-#
-#
+# pyphare/pyphare/cpp/__init__.py
 
 import os
 import json
@@ -14,6 +12,9 @@ _libs = {}
 
 def _simulator_id_parts(sim):
     """The build permutation fields, in the order the res/sim files list them."""
+    # dim,interp,refined,layout,allocator are always explicit so that a compiled module
+    # name is unambiguous regardless of whether the build used res/sim/all.txt or
+    # all_tiled.txt (withMkn) -- only the trailing MHD fields are ever omitted.
     parts = [str(sim.ndim), str(sim.interp_order), str(sim.refined_particle_nbr)]
     parts += [sim.particle_layout, sim.allocator]
 

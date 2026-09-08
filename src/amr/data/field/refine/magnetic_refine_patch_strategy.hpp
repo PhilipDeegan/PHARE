@@ -1,8 +1,11 @@
 #ifndef PHARE_AMR_MAGNETIC_REFINE_PATCH_STRATEGY_HPP
 #define PHARE_AMR_MAGNETIC_REFINE_PATCH_STRATEGY_HPP
 
+
 #include "core/utilities/types.hpp"
 #include "core/utilities/constants.hpp"
+#include "core/data/grid/grid_tiles.hpp"
+
 
 #include "amr/utilities/box/amr_box.hpp"
 #include "amr/data/field/field_geometry.hpp"

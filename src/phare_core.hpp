@@ -45,7 +45,7 @@ struct UsingResolver
 };
 
 template<typename GridLayout_t, auto A_>
-struct UsingResolver<GridLayout_t, LayoutMode::AoSPCTS, A_>
+struct UsingResolver<GridLayout_t, LayoutMode::AoSTS, A_>
 {
     bool static constexpr c_ordering = true;
     auto static constexpr dimension  = GridLayout_t::dimension;
@@ -56,6 +56,19 @@ struct UsingResolver<GridLayout_t, LayoutMode::AoSPCTS, A_>
     using Field_base_type = basic::Field<FieldOpts<Scalar, field_value_type>{dimension, A_}>;
     using Grid_t          = GridTileSet<GridLayout_t, Grid_base_type, Field_base_type>;
     using Field_t         = FieldTileSet<GridLayout_t, Grid_base_type, Field_base_type>;
+};
+
+// AoSCMTS deprioritised
+// template<typename GridLayout_t, auto A_>
+// struct UsingResolver<GridLayout_t, LayoutMode::AoSCMTS, A_>
+//     : UsingResolver<GridLayout_t, LayoutMode::AoSTS, A_>
+// {
+// };
+
+template<typename GridLayout_t, auto A_>
+struct UsingResolver<GridLayout_t, LayoutMode::AoSPCTS, A_>
+    : UsingResolver<GridLayout_t, LayoutMode::AoSTS, A_>
+{
 };
 
 
