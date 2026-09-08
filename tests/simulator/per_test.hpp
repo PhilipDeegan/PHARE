@@ -8,6 +8,8 @@
 #include "core/def/phare_config.hpp"
 #include "core/data/particles/particle_array_def.hpp"
 
+#include "core/vector.hpp"
+
 #include "amr/samrai.hpp"
 #include "initializer/python_data_provider.hpp"
 
@@ -30,7 +32,7 @@ static_assert(
                          .interp_order        = 1,
                          .nbRefinedPart       = 4,
                          .layout_mode         = PHARE::core::LayoutMode::AoSMapped,
-                         .alloc_mode          = PHARE::core::AllocatorMode::CPU,
+                         .alloc_mode          = PHARE::AllocatorMode::CPU,
                          .reconstruction_type = MHDOpts::ReconstructionType::WENOZ,
                          .slope_limiter_type  = MHDOpts::SlopeLimiterType::None,
                          .riemann_solver_type = MHDOpts::RiemannSolverType::Rusanov}>); // coupled
@@ -38,7 +40,7 @@ static_assert(has_mhd_v<SimOpts{.dimension           = 2,
                                 .interp_order        = 1,
                                 .nbRefinedPart       = 4,
                                 .layout_mode         = PHARE::core::LayoutMode::AoSMapped,
-                                .alloc_mode          = PHARE::core::AllocatorMode::CPU,
+                                .alloc_mode          = PHARE::AllocatorMode::CPU,
                                 .reconstruction_type = MHDOpts::ReconstructionType::WENOZ,
                                 .slope_limiter_type  = MHDOpts::SlopeLimiterType::None,
                                 .riemann_solver_type = MHDOpts::RiemannSolverType::Rusanov}>);
@@ -47,7 +49,7 @@ static_assert(!has_hybrid_v<SimOpts{.dimension           = 2,
                                     .interp_order        = 0,
                                     .nbRefinedPart       = 0,
                                     .layout_mode         = PHARE::core::LayoutMode::AoSMapped,
-                                    .alloc_mode          = PHARE::core::AllocatorMode::CPU,
+                                    .alloc_mode          = PHARE::AllocatorMode::CPU,
                                     .reconstruction_type = MHDOpts::ReconstructionType::WENOZ,
                                     .slope_limiter_type  = MHDOpts::SlopeLimiterType::None,
                                     .riemann_solver_type
@@ -56,7 +58,7 @@ static_assert(has_mhd_v<SimOpts{.dimension           = 2,
                                 .interp_order        = 0,
                                 .nbRefinedPart       = 0,
                                 .layout_mode         = PHARE::core::LayoutMode::AoSMapped,
-                                .alloc_mode          = PHARE::core::AllocatorMode::CPU,
+                                .alloc_mode          = PHARE::AllocatorMode::CPU,
                                 .reconstruction_type = MHDOpts::ReconstructionType::WENOZ,
                                 .slope_limiter_type  = MHDOpts::SlopeLimiterType::None,
                                 .riemann_solver_type = MHDOpts::RiemannSolverType::Rusanov}>);
@@ -65,7 +67,7 @@ static_assert(SimOpts{}.mhd_axes_consistent());
 } // namespace
 
 using enum PHARE::core::LayoutMode;
-using enum PHARE::core::AllocatorMode;
+using enum PHARE::AllocatorMode;
 
 struct __attribute__((visibility("hidden"))) StaticIntepreter
 {
@@ -167,11 +169,16 @@ struct Simulator1dTest : public ::testing::Test
 
 // clang-format off
 using Simulators1d = testing::Types<
+
     SimulatorTestParam<SimOpts{1, 1, 2}>, SimulatorTestParam<SimOpts{1, 1, 3}>,
     SimulatorTestParam<SimOpts{1, 2, 2}>, SimulatorTestParam<SimOpts{1, 2, 3}>,
     SimulatorTestParam<SimOpts{1, 2, 4}>, SimulatorTestParam<SimOpts{1, 3, 2}>,
     SimulatorTestParam<SimOpts{1, 3, 3}>, SimulatorTestParam<SimOpts{1, 3, 4}>,
     SimulatorTestParam<SimOpts{1, 3, 5}>
+
+PHARE_WITH_MKN_GPU(
+   // ,SimulatorTestParam<SimOpts{1, 1, AoSTS, PHARE::AllocatorMode::CPU}>
+)
 >;
 
 TYPED_TEST_SUITE(Simulator1dTest, Simulators1d);
@@ -184,6 +191,7 @@ struct Simulator2dTest : public ::testing::Test
 
 
 using Simulators2d = testing::Types<
+
     SimulatorTestParam<SimOpts{2, 1, 4}>, SimulatorTestParam<SimOpts{2, 1, 5}>,
     SimulatorTestParam<SimOpts{2, 1, 8}>, SimulatorTestParam<SimOpts{2, 1, 9}>,
     SimulatorTestParam<SimOpts{2, 2, 4}>, SimulatorTestParam<SimOpts{2, 2, 5}>,

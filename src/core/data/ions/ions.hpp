@@ -91,6 +91,7 @@ namespace core
 
         void computeMassDensity()
         {
+            check();
             massDensity_.zero();
 
             for (auto const& pop : populations_)
@@ -109,6 +110,7 @@ namespace core
 
         void computeBulkVelocity()
         {
+            check();
             computeMassDensity();
 
             bulkVelocity_.zero();
@@ -239,10 +241,21 @@ namespace core
         }
 
 
-        auto& operator[](std::size_t const i) const { return populations_[i]; }
         auto& operator[](std::size_t const i) { return populations_[i]; }
+        auto& operator[](std::size_t const i) const { return populations_[i]; }
+
 
     private:
+        void check() const
+        {
+            // assert(no_nans(massDensity_));
+            // assert(no_nans(chargeDensity_));
+            // assert(no_nans(bulkVelocity_[0]));
+            // assert(no_nans(bulkVelocity_[1]));
+            // assert(no_nans(bulkVelocity_[2]));
+        }
+
+
         field_type massDensity_;
         field_type chargeDensity_;
         vecfield_type bulkVelocity_;

@@ -5,9 +5,12 @@
 #include "core/data/field/field_tiles.hpp"
 #include "core/numerics/ampere/ampere.hpp"
 #include "core/numerics/faraday/faraday.hpp"
+// #include "core/data/grid/grid_tiles.hpp"
+// #include "core/data/tensorfield/tensorfield.hpp"
 
 #include "amr/physical_models/models.hpp"
 #include "amr/resources_manager/amr_utils.hpp"
+// #include "core/numerics/ohm/ohm.hpp"
 
 #include <memory>
 #include <vector>

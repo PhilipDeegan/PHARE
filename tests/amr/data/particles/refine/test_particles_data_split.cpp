@@ -1,7 +1,7 @@
 
 #include "core/utilities/box/box.hpp"
 #include "core/utilities/types.hpp"
-
+#include "core/utilities/monitoring.hpp"
 #include "core/data/particles/particle_array_def.hpp"
 
 #include "amr/data/particles/particles_data.hpp"
@@ -317,6 +317,8 @@ TYPED_TEST(ParticlesDataTest, splitWorksForDomain)
         EXPECT_NE(p.v()[2], 0);
     });
 
+    PHARE::core::MemoryMonitoring::MOVE().print();
+
     // for (auto const& bix : dst.layout.AMRBox())
     // {
     //     EXPECT_TRUE(sum_from(dst.data->domainParticles,
@@ -377,6 +379,8 @@ TYPED_TEST(ParticlesDataTest, splitWorksForLevelGhost)
             }
         }
     }
+
+    PHARE::core::MemoryMonitoring::MOVE().print();
 }
 
 
@@ -388,5 +392,6 @@ int main(int argc, char** argv)
     PHARE::test::amr::SamraiLifeCycle samsam{argc, argv};
     ::testing::InitGoogleTest(&argc, argv);
     auto const r = RUN_ALL_TESTS();
+    PHARE::core::MemoryMonitoring::PRINT();
     return r;
 }

@@ -7,10 +7,13 @@
 #include "core/data/particles/particle_array_def.hpp"
 #include "core/numerics/interpolator/interpolating.hpp"
 #include "core/numerics/interpolator/interpolating.hpp"
+#include "core/data/particles/particle_array_appender.hpp"
 #include "core/data/particles/particle_array_converter.hpp"
 
 #include "simulator/simulator_def.hpp"
 
+
+#include "tests/core/data/vecfield/test_vecfield_fixtures.hpp"
 #include "tests/core/data/electromag/test_electromag_fixtures.hpp"
 #include "tests/core/data/tensorfield/test_tensorfield_fixtures.hpp"
 #include "tests/core/data/ion_population/test_ion_population_fixtures.hpp"
@@ -174,6 +177,8 @@ struct TestParam
     static constexpr auto interp_order = opts.interp_order;
 };
 
+template<auto layout_mode, auto opts>
+struct updater_test_bits;
 
 template<typename TestParam_t>
 struct IonUpdaterTest : public ::testing::Test
@@ -220,6 +225,7 @@ struct IonUpdaterTest : public ::testing::Test
         // now let's initialize Electromag fields to user input functions
         // and ion population particles to user supplied moments
 
+        assert(no_nans(ions.velocity()(Component::X)));
         EM.initialize(layout);
         for (auto& pop : ions)
         {
@@ -227,7 +233,9 @@ struct IonUpdaterTest : public ::testing::Test
             auto particleInitializer = ParticleInitializerFactory::create(info);
             particleInitializer->loadParticles(pop.domainParticles(), layout);
             EXPECT_GT(pop.domainParticles().size(), 0ull);
+            // particle_array_domain_is_valid(pop.domainParticles(), layout.AMRBox());
         }
+        assert(no_nans(ions.velocity()(Component::X)));
 
         // now all domain particles are loaded we need to manually insert
         // ghost particles (this is in reality SAMRAI's job)
@@ -321,11 +329,15 @@ struct IonUpdaterTest : public ::testing::Test
             } // end 1D
         } // end pop loop
 
+        assert(no_nans(ions.velocity()(Component::X)));
         PHARE::core::depositParticles(ions, layout, interpolator, PHARE::core::DomainDeposit{});
         PHARE::core::depositParticles(ions, layout, interpolator, PHARE::core::LevelGhostDeposit{});
+        assert(no_nans(ions.velocity()(Component::X)));
 
         ions.computeChargeDensity();
+        assert(no_nans(ions.velocity()(Component::X)));
         ions.computeBulkVelocity();
+        assert(no_nans(ions.velocity()(Component::X)));
     } // end Ctor
 
 
@@ -336,6 +348,7 @@ struct IonUpdaterTest : public ::testing::Test
 
     auto update(auto const mode)
     {
+        assert(no_nans(ions.velocity()(Component::X)));
         IonUpdater_t ionUpdater{};
 
         if constexpr (ParticleArray::layout_mode == LayoutMode::AoSMapped)
@@ -353,6 +366,7 @@ struct IonUpdaterTest : public ::testing::Test
             auto accessor = test::make_model_level_accessor(patches, quantities);
             ionUpdater.updatePopulations(accessor, levelBoxing, dt, mode);
         }
+        assert(no_nans(ions.velocity()(Component::X)));
     }
 
     void fillIonsMomentsGhosts()
@@ -406,6 +420,8 @@ struct IonUpdaterTest : public ::testing::Test
         };
 
         auto check = [&](auto const& newField, auto const& og) {
+            // assert(no_nans(newField));
+            assert(no_nans(og));
             auto const& originalField = reduce(og);
             nonZero(newField, newField.name() + ":new");
             // nonZero(originalField, "originalField");
@@ -434,6 +450,7 @@ struct IonUpdaterTest : public ::testing::Test
         check(alphaFy, ionsBufferCpy[1].flux()(Component::Y));
         check(alphaFz, ionsBufferCpy[1].flux()(Component::Z));
 
+        assert(no_nans(ionsBufferCpy.velocity()(Component::X)));
         check(reduce(ions.velocity()(Component::X)), ionsBufferCpy.velocity()(Component::X));
         check(reduce(ions.velocity()(Component::Y)), ionsBufferCpy.velocity()(Component::Y));
         check(reduce(ions.velocity()(Component::Z)), ionsBufferCpy.velocity()(Component::Z));
@@ -658,11 +675,16 @@ TYPED_TEST(IonUpdaterTest, momentsAreChangedInParticlesAndMomentsMode)
 
     assert(ionsBufferCpy.massDensity().data() != this->ions.massDensity().data());
 
+    assert(no_nans(this->ions.velocity()(Component::X)));
     this->update(UpdaterMode::all);
+    assert(no_nans(this->ions.velocity()(Component::X)));
 
     this->fillIonsMomentsGhosts();
+    assert(no_nans(this->ions.velocity()(Component::X)));
 
     this->ions.update();
+
+    // assert(no_nans(this->ions.velocity()(Component::X)));
 
     this->checkMomentsHaveEvolved(ionsBufferCpy);
     this->checkDensityIsAsPrescribed();
@@ -783,6 +805,101 @@ void populate_particles(auto& ions, GridLayout& layout)
         pop.levelGhostParticles().check();
     }
 }
+
+
+
+
+// TYPED_TEST(IonUpdaterTest, hardCodedRegressionTest0)
+// {
+//     using IonUpdater      = TestFixture::IonUpdater;
+//     auto constexpr dim    = TestFixture::dim;
+//     auto constexpr interp = TestFixture::interp_order;
+
+//     std::array<double, 3> expectations
+//         = {199.99999999999889, 199.99999999999659, 199.99999999999673};
+
+//     populate_particles(this->ions, this->layout);
+
+//     for (auto& pop : this->ions)
+//     {
+//         EXPECT_EQ(pop.domainParticles().size(), 100 * nbrPartPerCell);
+//         EXPECT_EQ(pop.levelGhostParticles().size(), 2 * nbrPartPerCell);
+//         EXPECT_EQ(pop.patchGhostParticles().size(), 0);
+//     }
+
+//     IonUpdater ionUpdater{};
+//     this->update(ionUpdater, UpdaterMode::domain_only);
+
+//     std::int64_t icellSum = 0;
+//     double densitySum = 0, fluxXSum = 0, fluxYSum = 0, fluxZSum = 0;
+//     for (auto& pop : this->ions)
+//     {
+//         densitySum += PHARE::core::sum(reduce(pop.density()));
+//         fluxXSum += PHARE::core::sum(reduce(pop.flux()[0]));
+//         fluxYSum += PHARE::core::sum(reduce(pop.flux()[1]));
+//         fluxZSum += PHARE::core::sum(reduce(pop.flux()[2]));
+//         per_particle(pop.domainParticles(),
+//                      [&](Particle<dim>& p) { icellSum += PHARE::core::sum(p.iCell()); });
+//     }
+
+//     EXPECT_EQ(icellSum, 9900000);
+//     EXPECT_DOUBLE_EQ(densitySum, expectations[interp - 1]);
+//     EXPECT_DOUBLE_EQ(fluxXSum, expectations[interp - 1]);
+//     EXPECT_DOUBLE_EQ(fluxYSum, expectations[interp - 1]);
+//     EXPECT_DOUBLE_EQ(fluxZSum, expectations[interp - 1]);
+// }
+
+
+
+// TYPED_TEST(IonUpdaterTest, hardCodedRegressionTest1)
+// {
+//     using IonUpdater      = TestFixture::IonUpdater;
+//     auto constexpr dim    = TestFixture::dim;
+//     auto constexpr interp = TestFixture::interp_order;
+
+//     std::array<double, 3> expectations
+//         = {199.99999999999889, 199.99999999999659, 199.99999999999673};
+
+//     populate_particles(this->ions, this->layout);
+
+//     double deltaSum = 0;
+//     for (auto& pop : this->ions)
+//     {
+//         EXPECT_EQ(pop.domainParticles().size(), 100 * nbrPartPerCell);
+//         EXPECT_EQ(pop.levelGhostParticles().size(), 2 * nbrPartPerCell);
+//         EXPECT_EQ(pop.patchGhostParticles().size(), 0);
+//         per_particle(pop.domainParticles(),
+//                      [&](Particle<dim>& p) { deltaSum += PHARE::core::sum(p.delta()); });
+//     }
+//     EXPECT_DOUBLE_EQ(deltaSum, 103333.29999993632);
+
+//     IonUpdater ionUpdater{};
+//     this->update(ionUpdater, UpdaterMode::all);
+
+//     std::size_t icellSum = 0, pCount = 0;
+//     deltaSum          = 0;
+//     double densitySum = 0, fluxXSum = 0, fluxYSum = 0, fluxZSum = 0;
+//     for (auto& pop : this->ions)
+//     {
+//         densitySum += PHARE::core::sum(reduce(pop.density()));
+//         fluxXSum += PHARE::core::sum(reduce(pop.flux()[0]));
+//         fluxYSum += PHARE::core::sum(reduce(pop.flux()[1]));
+//         fluxZSum += PHARE::core::sum(reduce(pop.flux()[2]));
+//         per_particle(pop.domainParticles(),
+//                      [&](Particle<dim>& p) { deltaSum += PHARE::core::sum(p.delta()); });
+//         per_particle(pop.domainParticles(),
+//                      [&](Particle<dim>& p) { icellSum += PHARE::core::sum(p.iCell()); });
+//         pCount += pop.domainParticles().size();
+//     }
+
+//     EXPECT_EQ(pCount, 200000);
+//     EXPECT_EQ(icellSum, 9900000);
+//     EXPECT_DOUBLE_EQ(deltaSum, 123333.30000002828);
+//     EXPECT_DOUBLE_EQ(densitySum, expectations[interp - 1]);
+//     EXPECT_DOUBLE_EQ(fluxXSum, expectations[interp - 1]);
+//     EXPECT_DOUBLE_EQ(fluxYSum, expectations[interp - 1]);
+//     EXPECT_DOUBLE_EQ(fluxZSum, expectations[interp - 1]);
+// }
 
 
 

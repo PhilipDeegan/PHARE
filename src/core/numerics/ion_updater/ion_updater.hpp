@@ -215,7 +215,7 @@ class ParallelIonUpdater
     static constexpr auto dimension    = GridLayout::dimension;
     static constexpr auto interp_order = GridLayout::options.interp_order;
     using Interpolator_t               = Interpolator<dimension, interp_order, /*atomic=*/false>;
-    using Interpolating_t              = Interpolating<dimension, interp_order, /*atomic=*/false>;
+    using Interpolating_t = Interpolating<dimension, interp_order, /*atomic=*/false>;
 
 public:
     using Boxing_t = UpdaterSelectionBoxing<GridLayout>;
@@ -227,14 +227,76 @@ public:
 
     void reset() {}
 
+protected:
+    // per patch steps, shared with mkn::ParallelIonUpdater (different dispatch)
+    static void reset_moments(auto& accessor);
+    static void post_move_sync(auto& accessor, auto const& boxings, std::size_t const i);
+    static void deposit(auto& accessor, auto const& boxings, std::size_t const i);
+
+    double dt_ = 0;
+
 private:
     void updateAndDepositDomain_(auto& accessor,
                                  std::unordered_map<std::string, Boxing_t> const& boxings);
     void updateAndDepositAll_(auto& accessor,
                               std::unordered_map<std::string, Boxing_t> const& boxings);
-
-    double dt_ = 0;
 };
+
+
+template<typename ParticleArray_t, typename GridLayout>
+void ParallelIonUpdater<ParticleArray_t, GridLayout>::reset_moments(auto& accessor)
+{
+    for (std::size_t i = 0; i < accessor.size(); ++i)
+    {
+        auto view      = accessor[i];
+        auto [ions, _] = view.args;
+        resetMoments(ions);
+    }
+}
+
+
+template<typename ParticleArray_t, typename GridLayout>
+void ParallelIonUpdater<ParticleArray_t, GridLayout>::post_move_sync(auto& accessor,
+                                                                     auto const& boxings,
+                                                                     std::size_t const i)
+{
+    auto view                 = accessor[i];
+    auto [ions, _]            = view.args;
+    auto const patch_id       = view.patchID();
+    auto const& patch_boxings = boxings.at(patch_id);
+
+    auto const per_pop = [&](auto& pop) {
+        auto& domain = pop.domainParticles();
+        delete_particles_not_in(domain, patch_boxings.nonLevelGhostBox);
+        move_in_ghost_layer(pop.patchGhostParticles(), domain, patch_boxings.domainBox,
+                            patch_boxings.nonLevelGhostBox);
+        move_in_domain(domain, pop.levelGhostParticles(), patch_boxings.domainBox);
+        delete_particles_not_in(pop.levelGhostParticles(), patch_boxings.ghostBox);
+        delete_particles_not_in(domain, patch_boxings.domainBox);
+    };
+
+    for (auto& pop : ions)
+        per_pop(pop);
+}
+
+
+template<typename ParticleArray_t, typename GridLayout>
+void ParallelIonUpdater<ParticleArray_t, GridLayout>::deposit(auto& accessor, auto const& boxings,
+                                                              std::size_t const i)
+{
+    auto view            = accessor[i];
+    auto [ions, _]       = view.args;
+    auto const patch_id  = view.patchID();
+    auto const& boxing_i = boxings.at(patch_id);
+    Interpolating_t interp;
+    for (auto& pop : ions)
+    {
+        interp.particleToMesh(pop.domainParticles(), boxing_i.layout, pop.particleDensity(),
+                              pop.chargeDensity(), pop.flux());
+        interp.particleToMesh(pop.patchGhostParticles(), boxing_i.layout, pop.particleDensity(),
+                              pop.chargeDensity(), pop.flux());
+    }
+}
 
 
 template<typename ParticleArray_t, typename GridLayout>
@@ -244,12 +306,7 @@ void ParallelIonUpdater<ParticleArray_t, GridLayout>::updatePopulations(
 {
     PHARE_LOG_SCOPE(2, "IonUpdater::updatePopulations");
 
-    for (std::size_t i = 0; i < accessor.size(); ++i)
-    {
-        auto view      = accessor[i];
-        auto [ions, _] = view.args;
-        resetMoments(ions);
-    }
+    reset_moments(accessor);
     dt_ = dt;
     if (mode == UpdaterMode::domain_only)
         updateAndDepositDomain_(accessor, boxings);
@@ -285,62 +342,199 @@ void ParallelIonUpdater<ParticleArray_t, GridLayout>::updateAndDepositAll_(
     using Accessor_t = std::remove_reference_t<decltype(accessor)>;
     MultiBoris<Accessor_t, Interpolator_t>{dt_, accessor}.move(boxings);
 
-    auto post_move_sync = [&](auto const i) mutable {
-        auto view                 = accessor[i];
-        auto [ions, _]            = view.args;
-        auto const patch_id       = view.patchID();
-        auto const& patch_boxings = boxings.at(patch_id);
-
-        auto const per_pop = [&](auto& pop) {
-            auto& domain = pop.domainParticles();
-            delete_particles_not_in(domain, patch_boxings.nonLevelGhostBox);
-            move_in_ghost_layer(pop.patchGhostParticles(), domain, patch_boxings.domainBox,
-                                patch_boxings.nonLevelGhostBox);
-            move_in_domain(domain, pop.levelGhostParticles(), patch_boxings.domainBox);
-            delete_particles_not_in(pop.levelGhostParticles(), patch_boxings.ghostBox);
-            delete_particles_not_in(domain, patch_boxings.domainBox);
-        };
-
-        for (auto& pop : ions)
-            per_pop(pop);
-    };
-
-    auto deposit = [&](auto const i) mutable {
-        auto view            = accessor[i];
-        auto [ions, _]       = view.args;
-        auto const patch_id  = view.patchID();
-        auto const& boxing_i = boxings.at(patch_id);
-        Interpolating_t interp;
-        for (auto& pop : ions)
-        {
-            interp.particleToMesh(pop.domainParticles(), boxing_i.layout, pop.particleDensity(),
-                                  pop.chargeDensity(), pop.flux());
-            interp.particleToMesh(pop.patchGhostParticles(), boxing_i.layout, pop.particleDensity(),
-                                  pop.chargeDensity(), pop.flux());
-        }
-    };
-
     if constexpr (use_main_thread)
     {
         for (std::size_t i = 0; i < accessor.size(); ++i)
-            post_move_sync(i);
+            post_move_sync(accessor, boxings, i);
         for (std::size_t i = 0; i < accessor.size(); ++i)
-            deposit(i);
+            deposit(accessor, boxings, i);
     }
     else
     {
         auto& tp = ThreadPool::INSTANCE();
         for (std::size_t i = 0; i < accessor.size(); ++i)
-            tp.async([&post_move_sync, i] { post_move_sync(i); });
+            tp.async([&, i] { post_move_sync(accessor, boxings, i); });
         tp.sync();
         for (std::size_t i = 0; i < accessor.size(); ++i)
-            tp.async([&deposit, i] { deposit(i); });
+            tp.async([&, i] { deposit(accessor, boxings, i); });
         tp.sync();
     }
 }
 
 
 } // namespace PHARE::core
+
+
+#if PHARE_HAVE_MKN_GPU
+
+namespace PHARE::core::mkn
+{
+
+/**
+ * @brief mkn::ParallelIonUpdater: core::ParallelIonUpdater steps dispatched with mkn.gpu
+ * ThreadedStreamLauncher (one host thread + stream per patch), and GPU deposit kernels
+ */
+template<typename ParticleArray_t, typename GridLayout>
+class ParallelIonUpdater : public core::ParallelIonUpdater<ParticleArray_t, GridLayout>
+{
+    using Super = core::ParallelIonUpdater<ParticleArray_t, GridLayout>;
+
+    static constexpr auto dimension     = GridLayout::dimension;
+    static constexpr auto interp_order  = GridLayout::options.interp_order;
+    static constexpr bool atomic_interp = ParticleArray_t::alloc_mode == AllocatorMode::GPU_UNIFIED;
+    using Interpolator_t                = Interpolator<dimension, interp_order, atomic_interp>;
+    using Interpolating_t               = Interpolating<dimension, interp_order, atomic_interp>;
+
+public:
+    using Boxing_t = Super::Boxing_t;
+
+    auto constexpr static use_main_thread = Super::use_main_thread;
+
+    void updatePopulations(auto& accessor, std::unordered_map<std::string, Boxing_t> const& boxings,
+                           double const& dt, UpdaterMode mode = UpdaterMode::all);
+
+private:
+    void updateAndDepositDomain_(auto& accessor,
+                                 std::unordered_map<std::string, Boxing_t> const& boxings);
+    void updateAndDepositAll_(auto& accessor,
+                              std::unordered_map<std::string, Boxing_t> const& boxings);
+};
+
+
+template<typename ParticleArray_t, typename GridLayout>
+void ParallelIonUpdater<ParticleArray_t, GridLayout>::updatePopulations(
+    auto& accessor, std::unordered_map<std::string, Boxing_t> const& boxings, double const& dt,
+    UpdaterMode mode)
+{
+    PHARE_LOG_SCOPE(2, "mkn::IonUpdater::updatePopulations");
+
+    Super::reset_moments(accessor);
+    this->dt_ = dt;
+    if (mode == UpdaterMode::domain_only)
+        updateAndDepositDomain_(accessor, boxings);
+    else
+        updateAndDepositAll_(accessor, boxings);
+}
+
+
+template<typename ParticleArray_t, typename GridLayout>
+void ParallelIonUpdater<ParticleArray_t, GridLayout>::updateAndDepositDomain_(
+    auto& accessor, std::unordered_map<std::string, Boxing_t> const& boxings)
+{
+    PHARE_LOG_SCOPE(1, "mkn::IonUpdater::updateAndDepositDomain_");
+
+    if (accessor.size() == 0)
+        return;
+
+    using Accessor_t = std::remove_reference_t<decltype(accessor)>;
+    MultiBoris<Accessor_t, Interpolator_t> in{this->dt_, accessor};
+    in.template move<MultiBorisMode::COPY>(boxings);
+
+    if constexpr (not use_main_thread)
+    {
+        in.streamer.join();
+        in.streamer.dump_times(detail::timings_dir_str + "/updateAndDepositDomain.txt");
+    }
+}
+
+
+template<typename ParticleArray_t, typename GridLayout>
+void ParallelIonUpdater<ParticleArray_t, GridLayout>::updateAndDepositAll_(
+    auto& accessor, std::unordered_map<std::string, Boxing_t> const& boxings)
+{
+    PHARE_LOG_SCOPE(1, "mkn::IonUpdater::updateAndDepositAll_");
+
+    if (accessor.size() == 0)
+        return;
+
+    using Accessor_t = std::remove_reference_t<decltype(accessor)>;
+    using Tile_vt    = Accessor_t::Model_t::electromag_type::vecfield_type::field_type::value_type;
+
+    MultiBoris<Accessor_t, Interpolator_t> in{this->dt_, accessor};
+    in.move(boxings);
+
+    auto post_move_sync = [&](auto const i) mutable { Super::post_move_sync(accessor, boxings, i); };
+
+    if constexpr (use_main_thread)
+        for (std::size_t i = 0; i < accessor.size(); ++i)
+            post_move_sync(i);
+    else
+        in.streamer.host(std::move(post_move_sync));
+
+    if constexpr (ParticleArray_t::alloc_mode == AllocatorMode::GPU_UNIFIED)
+    {
+        auto deposit = [&](auto const i) mutable {
+            auto view      = accessor[i];
+            auto [ions, _] = view.args;
+            for (std::size_t j = 0; j < ions.size(); ++j)
+            {
+                auto& pop              = ions[j];
+                std::uint32_t const ds = ions.chargeDensity().max_tile_size();
+                auto const domain      = *pop.domainParticles();
+                using Launcher         = gpu::ChunkLauncher<false>;
+                Launcher launcher{1, 0};
+                launcher.b.x = kernel::warp_size();
+                launcher.g.x = domain().size();
+                launcher.ds  = ds * 5 * 8;
+                assert(launcher.ds < 65000);
+                auto pdensity = pop.particleDensity();
+                auto cdensity = pop.chargeDensity();
+                auto flux     = *pop.flux();
+                launcher.stream(in.streamer.streams[i], [=] __device__() mutable {
+                    Interpolating_t::template on_tiles<Tile_vt>(domain, flux, pdensity, cdensity);
+                });
+            }
+        };
+
+        if constexpr (use_main_thread)
+            for (std::size_t i = 0; i < accessor.size(); ++i)
+                deposit(i);
+        else
+            in.streamer.host(std::move(deposit));
+    }
+    else
+    {
+        auto deposit = [&](auto const i) mutable { Super::deposit(accessor, boxings, i); };
+
+        if constexpr (use_main_thread)
+            for (std::size_t i = 0; i < accessor.size(); ++i)
+                deposit(i);
+        else
+            in.streamer.host(std::move(deposit));
+    }
+
+    if constexpr (not use_main_thread)
+    {
+        in.streamer.join();
+        in.streamer.dump_times(detail::timings_dir_str + "/updateAndDepositAll.txt");
+    }
+
+
+#if PHARE_DEBUG
+    for (std::size_t i = 0; i < accessor.size(); ++i)
+    {
+        auto view                 = accessor[i];
+        auto [ions, _]            = view.args;
+        auto const patch_id       = view.patchID();
+        auto const& patch_boxings = boxings.at(patch_id);
+
+        for (std::size_t j = 0; j < ions.size(); ++j)
+        {
+            auto& pop = ions[j];
+            particle_array_domain_is_valid(pop.domainParticles(), patch_boxings.domainBox);
+            particle_array_ghost_is_valid(pop.patchGhostParticles(), patch_boxings.domainBox,
+                                          patch_boxings.ghostBox);
+            particle_array_ghost_is_valid(pop.levelGhostParticles(), patch_boxings.domainBox,
+                                          patch_boxings.ghostBox);
+        }
+    }
+#endif /* PHARE_DEBUG */
+}
+
+
+} // namespace PHARE::core::mkn
+
+#endif // PHARE_HAVE_MKN_GPU
 
 
 #endif // ION_UPDATER_HPP

@@ -3,7 +3,11 @@ cmake_minimum_required (VERSION 3.20.1)
 project(phare_python3)
 
 if(NOT PHARE_PERMUTATIONS)
-  set(PHARE_PERMUTATIONS "${PHARE_PROJECT_DIR}/res/sim/all.txt")
+  if(withMkn)
+    set(PHARE_PERMUTATIONS "${PHARE_PROJECT_DIR}/res/sim/all_tiled.txt")
+  else()
+    set(PHARE_PERMUTATIONS "${PHARE_PROJECT_DIR}/res/sim/all.txt")
+  endif()
 endif()
 
 file(STRINGS ${PHARE_PERMUTATIONS} THIS_FILE)
@@ -21,6 +25,9 @@ while(THIS_FILE)
     list(LENGTH LINE_LIST LINE_LENGTH)
 
     # dim,interp,refined,layout,allocator[,recon,slope,riemann,hall]
+    # layout/allocator are never omitted (even for MHD-only lines, where interp=refined=0
+    # disables hybrid compilation) so a compiled module name is unambiguous regardless of
+    # whether it came from all.txt or all_tiled.txt (withMkn).
     if(NOT LINE_LENGTH EQUAL 5 AND NOT LINE_LENGTH EQUAL 9)
         message(FATAL_ERROR "PHARE permutation line has unsupported arity (${LINE_LENGTH}): ${LINE}")
     endif()

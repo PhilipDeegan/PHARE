@@ -29,3 +29,7 @@ function(_add_amr_fields_test src_name)
 
 endfunction(_add_amr_fields_test)
 
+file(COPY "test_fields_schedules_inputs" DESTINATION ${CMAKE_CURRENT_BINARY_DIR})
+
+_add_amr_fields_test(test_fields_schedules)
+

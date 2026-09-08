@@ -6,8 +6,6 @@
 
 #include "phare_core.hpp"
 #include "phare_mpi.hpp"
-#include "simulator/simulator_def.hpp"
-
 #include "core/data/grid/grid.hpp"
 #include "core/data/ndarray/ndarray_vector.hpp"
 
