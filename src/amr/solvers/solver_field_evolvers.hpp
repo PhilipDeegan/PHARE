@@ -3,8 +3,11 @@
 
 #include "core/numerics/ampere/ampere.hpp"
 #include "core/numerics/faraday/faraday.hpp"
+#include "core/data/grid/grid_tiles.hpp"
+#include "core/data/tensorfield/tensorfield.hpp"
 
 #include "amr/resources_manager/amr_utils.hpp"
+#include "core/numerics/ohm/ohm.hpp"
 
 
 namespace PHARE::solver
@@ -17,7 +20,6 @@ class FaradayLevelTransformer
 {
     using GridLayout = Model::gridlayout_type;
     using level_t    = Model::amr_types::level_t;
-    using core_type  = core::Faraday<GridLayout>;
 
 public:
     explicit FaradayLevelTransformer(level_t& level, auto& model)
@@ -26,7 +28,12 @@ public:
     {
     }
 
-    void operator()(GridLayout& layout, auto&&... args) { core_type{layout}(args...); }
+    template<typename VecField>
+    void operator()(GridLayout const& layout, VecField const& B, VecField const& E, VecField& Bnew,
+                    double dt)
+    {
+        core::FaradaySingleTransformer{}(layout, B, E, Bnew, dt);
+    }
 
     void operator()(auto& B, auto& E, auto& Bnew, auto& dt)
     {
@@ -53,7 +60,6 @@ class AmpereLevelTransformer
 {
     using GridLayout = Model::gridlayout_type;
     using level_t    = Model::amr_types::level_t;
-    using core_type  = core::Ampere<GridLayout>;
 
 public:
     explicit AmpereLevelTransformer(level_t& level, auto& model)
@@ -62,7 +68,11 @@ public:
     {
     }
 
-    void operator()(GridLayout& layout, auto&&... args) { core_type{layout}(args...); }
+    template<typename VecField>
+    void operator()(GridLayout const& layout, VecField const& B, VecField& J)
+    {
+        core::AmpereSingleTransformer{}(layout, B, J);
+    }
 
     void operator()(auto& B, auto& J)
     {
@@ -78,12 +88,9 @@ public:
     Model& model_;
 };
 
-
 template<typename Model>
 AmpereLevelTransformer(typename Model::amr_types::level_t&, Model&)
     -> AmpereLevelTransformer<Model>;
-
-
 
 
 

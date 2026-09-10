@@ -1,12 +1,15 @@
 #ifndef PHARE_PYTHON_CPP_SIMULATOR_HPP
 #define PHARE_PYTHON_CPP_SIMULATOR_HPP
 
-
+#include "phare_core.hpp"
 #ifndef PHARE_SIM_STR
-#define PHARE_SIM_STR 1, 1, 2 // mostly for clangformat - errors in cpp file if define is missing
+// mostly for clangformat - errors in cpp file if define is missing
+#define PHARE_SIM_STR 1ull, 1ull, 2ull
 #endif
 
-#include "phare_mpi.hpp" // IWYU pragma: keep
+#include "phare_mpi.hpp"             // IWYU pragma: keep
+#include "core/def/phare_config.hpp" // IWYU pragma: keep
+#include "core/utilities/types.hpp"
 
 #include "amr/samrai.hpp" // IWYU pragma: keep
 #include "amr/wrappers/hierarchy.hpp"
@@ -14,29 +17,62 @@
 #include "simulator/simulator.hpp" // IWYU pragma: keep
 
 #include "python3/pybind_def.hpp" // IWYU pragma: keep
-#include "pybind11/stl.h"         // IWYU pragma: keep
-#include "pybind11/numpy.h"       // IWYU pragma: keep
-#include "pybind11/chrono.h"      // IWYU pragma: keep
-#include "pybind11/complex.h"     // IWYU pragma: keep
-#include "pybind11/functional.h"  // IWYU pragma: keep
+#include "simulator/simulator.hpp"
+
+#include "pybind11/stl.h"        // IWYU pragma: keep
+#include "pybind11/numpy.h"      // IWYU pragma: keep
+#include "pybind11/chrono.h"     // IWYU pragma: keep
+#include "pybind11/complex.h"    // IWYU pragma: keep
+#include "pybind11/functional.h" // IWYU pragma: keep
 
 #include "python3/particles.hpp"     // IWYU pragma: keep
 #include "python3/patch_level.hpp"   // IWYU pragma: keep
 #include "python3/data_wrangler.hpp" // IWYU pragma: keep
+#include "python3/pybind_def.hpp"    // IWYU pragma: keep
 
+#include "python3/patch_data.hpp"
+
+#include <cstddef>
 
 namespace py = pybind11;
 
 namespace PHARE::pydata
 {
-
-
 auto static constexpr resolve_simulator_options()
 {
+    using namespace PHARE;
+    using namespace PHARE::core;
     using namespace PHARE::MHDOpts;
     return SimOpts{PHARE_SIM_STR};
 }
 
+
+template<typename Type, std::size_t dimension>
+void declarePatchData(py::module& m, std::string key)
+{
+    using PatchDataType = PatchData<Type, dimension>;
+    py::class_<PatchDataType>(m, key.c_str(), py::module_local())
+        .def_readonly("patchID", &PatchDataType::patchID)
+        .def_readonly("origin", &PatchDataType::origin)
+        .def_readonly("lower", &PatchDataType::lower)
+        .def_readonly("upper", &PatchDataType::upper)
+        .def_readonly("nGhosts", &PatchDataType::nGhosts)
+        .def_readonly("data", &PatchDataType::data);
+}
+
+template<SimOpts opts>
+void declareParticles(py::module& m)
+{
+    using core_types    = core::PHARE_Types<opts>;
+    using ParticleArray = core_types::Hybrid::ParticleArray_t;
+    std::string name    = "ParticleArray";
+    py::class_<ParticleArray, std::shared_ptr<ParticleArray>>(m, name.c_str(), py::module_local());
+
+    declarePatchData<ParticleArray, opts.dimension>(m, "PatchDataParticleArray");
+    declarePatchData<ParticleArray*, opts.dimension>(m, "PatchDataParticleArrayPtr");
+
+    declarePatchData<py_array_t<double>, opts.dimension>(m, "PatchPyArrayDouble");
+}
 
 template<typename Simulator, typename PyClass>
 void declareSimulator(PyClass&& sim)
@@ -55,6 +91,7 @@ void declareSimulator(PyClass&& sim)
         .def("dump_restarts", &Simulator::dump_restarts, py::arg("timestamp"), py::arg("timestep"));
 }
 
+
 template<auto opts>
 void inline declare_etc_hybrid(py::module& m)
 {
@@ -65,7 +102,6 @@ void inline declare_etc_hybrid(py::module& m)
 
     py::class_<DW, py::smart_holder>(m, name.c_str(), py::module_local())
         .def(py::init<std::shared_ptr<Sim> const&, std::shared_ptr<amr::Hierarchy> const&>())
-        .def(py::init<std::shared_ptr<ISimulator> const&, std::shared_ptr<amr::Hierarchy> const&>())
         .def("sync_merge", &DW::sync_merge)
         .def("getPatchLevel", &DW::getPatchLevel)
         .def("getNumberOfLevels", &DW::getNumberOfLevels);
@@ -92,7 +128,7 @@ void inline declare_etc_hybrid(py::module& m)
         .def("getFx", &PL::getFx)
         .def("getFy", &PL::getFy)
         .def("getFz", &PL::getFz)
-        .def("getParticles", &PL::getParticles, py::arg("userPopName") = "all");
+        .def("getParticles", &PL::getParticles, py::arg("popName"));
 
     using _Splitter
         = PHARE::amr::Splitter<core::DimConst<opts.dimension>, core::InterpConst<opts.interp_order>,
@@ -120,11 +156,13 @@ void inline declare_etc(py::module& m)
 
 void inline declare_macro_sim(py::module& m)
 {
-    using Sim = Simulator<resolve_simulator_options()>;
+    constexpr auto opts = resolve_simulator_options();
+    using Sim           = Simulator<opts>;
 
     std::string name = "Simulator";
+
     declareSimulator<Sim>(
-        py::class_<Sim, py::smart_holder>(m, name.c_str())
+        py::class_<Sim, py::smart_holder>(m, name.c_str(), py::module_local())
             .def_property_readonly_static("dims", [](py::object) { return Sim::dimension; })
             .def_property_readonly_static("interp_order",
                                           [](py::object) { return Sim::interp_order; })
@@ -137,7 +175,8 @@ void inline declare_macro_sim(py::module& m)
     });
 
 
-    declare_etc<Sim::options>(m);
+    declare_etc<opts>(m);
+    declareParticles<opts>(m);
 }
 
 

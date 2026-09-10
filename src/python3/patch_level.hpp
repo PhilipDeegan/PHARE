@@ -7,8 +7,7 @@
 #include <string>
 #include <cstring>
 #include <cstddef>
-
-#include "python3/patch_data.hpp"
+#include <algorithm>
 
 
 namespace PHARE::pydata
@@ -252,48 +251,29 @@ public:
 
 
 
-    auto getParticles(std::string userPopName)
+    // core::ContiguousParticles/ParticlePacker<dimension> no longer exist (tiled particle
+    // arrays can't be packed that way) -- hand back a raw pointer to the real (possibly
+    // tiled) domain particle array per patch instead of packing into a contiguous buffer.
+    auto getParticles(std::string const& popName)
     {
-        using Nested = std::vector<PatchData<core::ContiguousParticles<dimension>, dimension>>;
-        using Inner  = std::unordered_map<std::string, Nested>;
+        using ParticleArray_t = HybridModel::particle_array_type;
+        std::vector<PatchData<ParticleArray_t*, dimension>> patchDatas;
 
-        std::unordered_map<std::string, Inner> pop_particles;
-
-        auto getParticleData = [&](Inner& inner, GridLayout& grid, std::string patchID,
-                                   std::string key, auto& particles) {
-            if (particles.size() == 0)
-                return;
-
-            if (!inner.count(key))
-                inner.emplace(key, Nested());
-
-            auto& patch_data = inner[key].emplace_back(particles.size());
-            setPatchDataFromGrid(patch_data, grid, patchID);
-            core::ParticlePacker<dimension>{particles}.pack(patch_data.data);
-        };
-
-        auto& ions = model_.state.ions;
+        auto& ions   = model_.state.ions;
+        auto pop_it  = std::find_if(ions.begin(), ions.end(),
+                                    [&](auto const& pop) { return pop.name() == popName; });
+        if (pop_it == ions.end())
+            throw std::runtime_error("no population found named: " + popName);
+        auto& pop = *pop_it;
 
         auto visit = [&](GridLayout& grid, std::string patchID, std::size_t /*iLevel*/) {
-            for (auto& pop : ions)
-            {
-                if ((userPopName != "" and userPopName == pop.name()) or userPopName == "all")
-                {
-                    if (!pop_particles.count(pop.name()))
-                        pop_particles.emplace(pop.name(), Inner());
-
-                    auto& inner = pop_particles.at(pop.name());
-
-                    getParticleData(inner, grid, patchID, "domain", pop.domainParticles());
-                    getParticleData(inner, grid, patchID, "levelGhost", pop.levelGhostParticles());
-                }
-            }
+            setPatchDataFromGrid(patchDatas.emplace_back(&pop.domainParticles()), grid, patchID);
         };
 
         PHARE::amr::visitLevel<GridLayout>(*hierarchy_.getPatchLevel(lvl_),
-                                           *model_.resourcesManager, visit, ions);
+                                           *model_.resourcesManager, visit, pop);
 
-        return pop_particles;
+        return patchDatas;
     }
 
 private:
