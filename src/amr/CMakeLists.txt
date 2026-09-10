@@ -116,6 +116,9 @@ target_link_libraries(${PROJECT_NAME} PUBLIC
 
 if (HighFive) # SAMRAI USES HDF5 so we need this here
   target_link_libraries(${PROJECT_NAME} PUBLIC HDF5::HDF5)
+  if (HDF5_IS_PARALLEL)
+    target_compile_definitions(${PROJECT_NAME} PUBLIC H5_HAVE_PARALLEL)
+  endif()
 endif()
 
 set_property(TARGET ${PROJECT_NAME} APPEND_STRING PROPERTY LINK_FLAGS " ${PHARE_LINK_FLAGS}")

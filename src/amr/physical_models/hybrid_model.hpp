@@ -215,11 +215,14 @@ void HybridModel<GridLayoutT, Electromag, Ions, Electrons, AMR_Types, Grid_t>::i
                 auto& pool          = core::ThreadPool::INSTANCE().get_pool(pool_idx);
                 auto const& layout  = amr::layoutFromPatch<gridlayout_type>(*patch);
                 for (auto& pop : state.ions)
-                    for (auto [tyle, particles] : enumerate_tiles(pop.domainParticles()))
-                        pool.detach_task([layout = layout, tile = &tyle, pop = &pop]() {
+                    for (auto& tile : pop.domainParticles()())
+                    {
+                        auto& particles = tile();
+                        pool.detach_task([layout = layout, tile = &tile, &particles, pop = &pop]() {
                             TileParticleInitializerFactory_t::create(pop->particleInitializerInfo())
-                                ->loadParticles((*tile)(), layout.copy_as(**tile));
+                                ->loadParticles(particles, layout.copy_as(**tile));
                         });
+                    }
             }
 
             for (auto& patch : resourcesManager->enumerate(level, state.electromag))
