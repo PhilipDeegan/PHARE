@@ -1,6 +1,7 @@
 #ifndef PHARE_MESSENGER_MANAGER_HPP
 #define PHARE_MESSENGER_MANAGER_HPP
 
+#include "core/def.hpp"
 
 
 #include "amr/messengers/hybrid_hybrid_messenger_strategy.hpp"
@@ -8,7 +9,6 @@
 #include "amr/messengers/messenger.hpp"
 #include "amr/messengers/mhd_hybrid_messenger_strategy.hpp"
 #include "amr/messengers/mhd_messenger.hpp"
-#include "core/def.hpp"
 
 #include <algorithm>
 #include <memory>
@@ -35,7 +35,8 @@ NO_DISCARD std::vector<MessengerDescriptor> makeDescriptors(std::vector<std::str
 
 // Variadic MessengerFactory — only instantiates messenger code for the provided strategies.
 // This is what achieves model decoupling: an MHD-only build's Strategies pack never names a
-// hybrid type, so no hybrid messenger code is ever instantiated (and symmetrically for hybrid-only).
+// hybrid type, so no hybrid messenger code is ever instantiated (and symmetrically for
+// hybrid-only).
 template<typename MHDModel, typename HybridModel, typename... Strategies>
 class MessengerFactory
 {
@@ -87,7 +88,8 @@ public:
         std::unique_ptr<IMessenger<IPhysicalModel>> result;
 
         // fold over the strategy pack; `||` short-circuits once a strategy has set result
-        ((result = tryCreate<Strategies>(messengerName, coarseModel, fineModel, firstLevel)) || ...);
+        ((result = tryCreate<Strategies>(messengerName, coarseModel, fineModel, firstLevel))
+         || ...);
 
         return result;
     }
