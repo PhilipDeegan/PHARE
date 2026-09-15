@@ -13,36 +13,43 @@ from pyphare.simulator.simulator import Simulator
 from pyphare.simulator.simulator import startMPI
 
 from tests.simulator import SimulatorTest
+from tests.diagnostic import dump_all_diags
 
 
 ph.NO_GUI()
 
-
+# PHARE_TILING_MIN_BEFORE_SPLIT
 cells = (200, 100)
 time_step = 0.005
-final_time = 50
-timestamps = np.arange(0, final_time + time_step, final_time / 5)
-diag_dir = "phare_outputs/harris"
+layout = "AoSPCTS"  # "AoSPCTS"  # "AoSMapped"
+final_time = time_step
+# timestamps = np.arange(0, final_time + time_step, final_time / 5)
+timestamps = [0, final_time]
+max_nbr_levels = 2
+diag_dir = f"phare_outputs/harris_2_{layout}_L{max_nbr_levels-1}"
 
 
 def config():
     L = 0.5
 
     sim = ph.Simulation(
+        interp_order=1,
         time_step=time_step,
         final_time=final_time,
         cells=cells,
         dl=(0.40, 0.40),
         refinement="tagging",
-        max_nbr_levels=2,
+        max_nbr_levels=max_nbr_levels,
         hyper_resistivity=0.002,
         resistivity=0.001,
         diag_options={
             "format": "phareh5",
-            "options": {"dir": diag_dir, "mode": "overwrite"},
+            "options": {"dir": diag_dir, "mode": "overwrite", "fine_dump_lvl_max": 10},
         },
         strict=True,
         nesting_buffer=1,
+        tag_buffer=3,
+        particle_layout=layout,
     )
 
     def density(x, y):
@@ -128,7 +135,7 @@ def config():
         "nbr_part_per_cell": 100,
     }
 
-    ph.MaxwellianFluidModel(
+    model = ph.MaxwellianFluidModel(
         bx=bx,
         by=by,
         bz=bz,
@@ -136,15 +143,17 @@ def config():
     )
     ph.ElectronModel(closure="isothermal", Te=0.0)
 
-    for quantity in ["E", "B"]:
-        ph.ElectromagDiagnostics(quantity=quantity, write_timestamps=timestamps)
-    for quantity in ["mass_density", "bulkVelocity"]:
-        ph.FluidDiagnostics(quantity=quantity, write_timestamps=timestamps)
+    dump_all_diags(model.populations)
 
-    for quantity in ["density", "pressure_tensor"]:
-        ph.FluidDiagnostics(
-            quantity=quantity, write_timestamps=timestamps, population_name="protons"
-        )
+    # for quantity in ["E", "B"]:
+    #     ph.ElectromagDiagnostics(quantity=quantity, write_timestamps=timestamps)
+    # for quantity in ["mass_density", "bulkVelocity"]:
+    #     ph.FluidDiagnostics(quantity=quantity, write_timestamps=timestamps)
+
+    # for quantity in ["density", "pressure_tensor"]:
+    #     ph.FluidDiagnostics(
+    #         quantity=quantity, write_timestamps=timestamps, population_name="protons"
+    #     )
 
     ph.InfoDiagnostics(quantity="particle_count")
 
@@ -215,14 +224,14 @@ class HarrisTest(SimulatorTest):
         ph.global_vars.sim = None
 
     def test_run(self):
-        self.register_diag_dir_for_cleanup(diag_dir)
+        # self. (diag_dir)
         sim = config()
-        Simulator(sim).run().reset()
-        if not sim.dry_run and cpp.mpi_rank() == 0:
-            plot_dir = Path(f"{diag_dir}_plots") / str(cpp.mpi_size())
-            plot_dir.mkdir(parents=True, exist_ok=True)
-            plot(diag_dir, plot_dir)
-        cpp.mpi_barrier()
+        Simulator(sim).initialize().reset()
+        # if not sim.dry_run and cpp.mpi_rank() == 0:
+        #     plot_dir = Path(f"{diag_dir}_plots") / str(cpp.mpi_size())
+        #     plot_dir.mkdir(parents=True, exist_ok=True)
+        #     plot(diag_dir, plot_dir)
+        # cpp.mpi_barrier()
         return self
 
 
@@ -231,4 +240,5 @@ if ph.PHARE_EXE:
 
 elif __name__ == "__main__":
     startMPI()
-    HarrisTest().test_run().tearDown()
+    Simulator(config()).run().reset()
+    # HarrisTest().test_run().tearDown()

@@ -10,42 +10,44 @@ from pyphare.simulator.simulator import Simulator
 from pyphare.simulator.simulator import startMPI
 
 from tests.simulator import SimulatorTest
+from tests.diagnostic import dump_all_diags
 
 
 ph.NO_GUI()
 
 
 start_time = 0
-cells = (40, 80, 20)
+cells = (20, 40, 20)
 dl = (0.4, 0.4, 0.4)
-diag_dir = "phare_outputs/harris_3d"
+layout = "AoSMapped"  # "AoSPCTS"  # "AoSMapped"
+diag_dir = f"phare_outputs/harris_3d_{layout}"
 time_step = 0.001
-final_time = 0.005
-timestamps = []
-
+final_time = time_step
+timestamps = [0, final_time]
 hs = hour_seconds = 3600.0
 elapsed_restart_timestamps = [hs * 1, hs * 3, hs * 6]
-ppc = 100
+ppc = 33
 
 
 def config():
     L = 0.5
 
     sim = ph.Simulation(
+        interp_order=1,
         time_step=time_step,
         final_time=final_time,
         dl=dl,
         cells=cells,
         refinement="tagging",
-        max_nbr_levels=1,
+        max_nbr_levels=3,
         nesting_buffer=1,
         tagging_threshold=0.5,
         hyper_resistivity=0.008,
         hyper_mode="spatial",
         resistivity=0.001,
         diag_options={
-            "format": "pharevtkhdf",
-            "options": {"dir": diag_dir, "mode": "overwrite"},
+            "format": "phareh5",
+            "options": {"dir": diag_dir, "mode": "overwrite", "fine_dump_lvl_max": 10},
         },
         restart_options={
             "dir": "checkpoints",
@@ -56,6 +58,7 @@ def config():
         write_reports=False,
         strict=False,
         tag_buffer=3,
+        particle_layout=layout,
     )
 
     def density(x, y, z):
@@ -135,7 +138,7 @@ def config():
         "nbr_part_per_cell": ppc,
     }
 
-    ph.MaxwellianFluidModel(
+    model = ph.MaxwellianFluidModel(
         bx=bx,
         by=by,
         bz=bz,
@@ -146,20 +149,21 @@ def config():
             "init": {"seed": cpp.mpi_rank() + 12},
         },
     )
+    dump_all_diags(model.populations)
 
     ph.ElectronModel(closure="isothermal", Te=0.0)
     ph.LoadBalancer(active=True, mode="nppc", tol=0.05, every=1000)
 
-    pop = "protons"
-    ph.FluidDiagnostics(quantity="bulkVelocity", write_timestamps=timestamps)
-    ph.FluidDiagnostics(
-        quantity="density", write_timestamps=timestamps, population_name=pop
-    )
+    # pop = "protons"
+    # ph.FluidDiagnostics(quantity="bulkVelocity", write_timestamps=timestamps)
+    # ph.FluidDiagnostics(
+    #     quantity="density", write_timestamps=timestamps, population_name=pop
+    # )
 
-    for quantity in ["E", "B"]:
-        ph.ElectromagDiagnostics(quantity=quantity, write_timestamps=timestamps)
+    # for quantity in ["E", "B"]:
+    #     ph.ElectromagDiagnostics(quantity=quantity, write_timestamps=timestamps)
 
-    ph.InfoDiagnostics(quantity="particle_count", write_timestamps=timestamps)
+    # ph.InfoDiagnostics(quantity="particle_count", write_timestamps=timestamps)
 
     return sim
 
