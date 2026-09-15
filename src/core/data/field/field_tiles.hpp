@@ -15,7 +15,7 @@
 namespace PHARE::core::basic
 {
 template<typename Field_t, std::size_t rank>
-class TensorField;
+struct TensorField;
 }
 
 namespace PHARE::core

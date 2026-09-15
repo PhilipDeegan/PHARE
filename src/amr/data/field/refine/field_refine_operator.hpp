@@ -15,6 +15,13 @@
 namespace PHARE::amr
 {
 
+template<typename Dst>
+void refine_field(Dst& destinationField, auto& sourceField, auto& intersectionBox, auto& refiner)
+{
+    for (auto const bix : phare_box_from<Dst::dimension>(intersectionBox))
+        refiner(sourceField, destinationField, bix);
+}
+
 template<typename Refiner, typename FieldT>
 void refine_field(FieldT& dst, auto const& dstBox, auto const& dstLayout, FieldT const& src,
                   auto const& srcBox, auto& overlap, auto ratio)
