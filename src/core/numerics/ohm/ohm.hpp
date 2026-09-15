@@ -1,16 +1,11 @@
 #ifndef PHARE_OHM_HPP
 #define PHARE_OHM_HPP
 
-
-#include "core/data/grid/grid_tiles.hpp"
-#include "core/data/tensorfield/tensorfield.hpp"
-#include "core/def.hpp"
 #include "core/utilities/index/index.cpp"
 #include "core/data/grid/gridlayoutdefs.hpp"
 #include "core/data/vecfield/vecfield_component.hpp"
 
 #include "initializer/data_provider.hpp"
-
 
 namespace PHARE::core
 {

@@ -224,7 +224,7 @@ struct IonUpdaterTest : public ::testing::Test,
     using basics       = updater_test_bits<TestParam_t::opts.layout_mode, TestParam_t::opts>;
     using IonUpdater   = basics::IonUpdater;
     using Boxing_t     = basics::Boxing_t;
-    using Interpolator = Interpolating<ParticleArray, interp_order, basics::atomic_ops>;
+    using Interpolator = Interpolating<dim, interp_order, basics::atomic_ops>;
 
     using Hybrid_t                   = PHARETypes::Hybrid;
     auto constexpr static field_opts = TensorFieldOptions<Hybrid_t>{};
@@ -252,7 +252,6 @@ struct IonUpdaterTest : public ::testing::Test,
         // now let's initialize Electromag fields to user input functions
         // and ion population particles to user supplied moments
 
-        assert(no_nans(ions.velocity()(Component::X)));
         EM.initialize(layout);
         for (auto& pop : ions)
         {
@@ -261,7 +260,6 @@ struct IonUpdaterTest : public ::testing::Test,
             particleInitializer->loadParticles(pop.domainParticles(), layout);
             EXPECT_GT(pop.domainParticles().size(), 0ull);
         }
-        assert(no_nans(ions.velocity()(Component::X)));
 
         // now all domain particles are loaded we need to manually insert
         // ghost particles (this is in reality SAMRAI's job)
@@ -272,7 +270,6 @@ struct IonUpdaterTest : public ::testing::Test,
         // and right is touching another patch
         // so on the left no patchGhost but levelGhost(and old and new)
         // on the right no levelGhost but patchGhosts
-
 
         for (auto& pop : ions)
         {

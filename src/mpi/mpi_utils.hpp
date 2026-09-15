@@ -1,11 +1,11 @@
 #ifndef PHARE_CORE_UTILITIES_MPI_HPP
 #define PHARE_CORE_UTILITIES_MPI_HPP
 
-#include "core/def.hpp"
 #include "phare_mpi.hpp" // IWYU pragma: keep
+
+#include "core/def.hpp"
 #include "core/utilities/span.hpp"
 #include "core/utilities/types.hpp"
-
 
 #include <vector>
 #include <string>

@@ -1,10 +1,8 @@
 #ifndef PHARE_CORE_DATA_GRID_GRID_BASE_HPP
 #define PHARE_CORE_DATA_GRID_GRID_BASE_HPP
 
-
 #include "core/def.hpp"
 #include "core/data/field/field.hpp"
-#include "core/def/phare_config.hpp" // IWYU pragma: keep
 
 #include <array>
 #include <string>
@@ -12,10 +10,8 @@
 #include <optional>
 #include <algorithm>
 
-
 namespace PHARE::core
 {
-
 
 /* Grid is the structure owning the field type memory via its inheritance from NdArrayImpl
 Grid exists to decouple the usage of memory by computing routines from the allocation of
@@ -28,14 +24,12 @@ template<typename NdArrayImpl, typename PhysicalQuantity>
 class Grid : public NdArrayImpl
 {
 public:
-    using Super                      = NdArrayImpl;
     auto constexpr static dimension  = NdArrayImpl::dimension;
     auto constexpr static alloc_mode = NdArrayImpl::allocator_mode;
-
-    using value_type             = typename NdArrayImpl::type;
-    using physical_quantity_type = PhysicalQuantity;
-    using field_type             = Field<dimension, PhysicalQuantity, value_type, alloc_mode>;
-
+    using Super                      = NdArrayImpl;
+    using value_type                 = NdArrayImpl::type;
+    using physical_quantity_type     = PhysicalQuantity;
+    using field_type                 = Field<dimension, PhysicalQuantity, value_type, alloc_mode>;
 
     Grid()                              = delete;
     Grid(Grid&& source)                 = default;
@@ -66,7 +60,6 @@ public:
         static_assert(sizeof...(Dims) == dimension, "Invalid dimension");
     }
 
-
     Grid(Grid const& source) // let field_ default
         : Super{source}
         , name_{source.name()}
@@ -74,9 +67,7 @@ public:
     {
     }
 
-
     NO_DISCARD std::string name() const { return name_; }
-
     NO_DISCARD constexpr PhysicalQuantity physicalQuantity() const { return qty_; }
 
     template<typename That>
@@ -98,8 +89,6 @@ public:
     NO_DISCARD auto& operator*() { return field_; }
     NO_DISCARD auto& operator*() const { return field_; }
 
-    template<typename, typename>
-    friend std::ostream& operator<<(std::ostream& out, Grid const&);
 
 private:
     std::string name_{"No Name"};
@@ -107,20 +96,8 @@ private:
     field_type field_{name_, qty_, Super::data(), Super::shape()};
 };
 
-
 template<typename Arr, typename PQ>
-struct is_field<Grid<Arr, PQ>> : std::true_type
-{
-};
-
-
-template<typename Arr, typename PQ>
-inline std::ostream& operator<<(std::ostream& out, Grid<Arr, PQ> const& f)
-{
-    out << *f;
-    return out;
-}
-
+inline constexpr bool is_field_v<Grid<Arr, PQ>> = true;
 
 } // namespace PHARE::core
 

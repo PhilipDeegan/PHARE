@@ -1,13 +1,11 @@
 #ifndef PHARE_CORE_DATA_FIELD_FIELD_BOX_HPP
 #define PHARE_CORE_DATA_FIELD_FIELD_BOX_HPP
 
-// #include "core/def.hpp"
 #include "core/data/grid/grid.hpp"
 #include "core/utilities/types.hpp"
 #include "core/data/field/field.hpp"
 #include "core/utilities/box/box.hpp"
 #include "core/data/grid/grid_tiles.hpp"
-
 
 #include <vector>
 #include <cstddef>
@@ -36,7 +34,6 @@ bool constexpr is_border_op()
 template<typename Op>
 auto constexpr static is_border_op_v = is_border_op<Op>();
 
-
 template<typename Field_t>
 class FieldBox
 {
@@ -45,7 +42,6 @@ class FieldBox
 
 public:
     auto constexpr static dimension = Field_t::dimension;
-
 
     FieldBox(Field_t& field_, Box<int, dimension> const& amr_box_,
              Box<std::uint32_t, dimension> const& lcl_box_)
@@ -74,15 +70,11 @@ public:
     {
     }
 
-
     template<typename Operator = SetEqualOp, typename Field_t0>
     void op(FieldBox<Field_t0> const& that);
 
-
-
     template<typename Operator = SetEqualOp>
     void op(value_type const val);
-
 
     template<typename Operator = SetEqualOp>
     void append_to(std::vector<value_type>& vec) const;
@@ -105,10 +97,8 @@ template<typename Field_t>
 FieldBox(Field_t&, auto const&, auto const&) -> FieldBox<Field_t>;
 
 template<typename Box_t>
-struct BoxExpander
+struct BoxExpander // expands border tiles to cover the patch ghost box
 {
-    // expands border tiles to cover the patch ghost box
-
     auto constexpr static dimension = Box_t::dimension;
 
     auto operator()(auto const& inbox) const
@@ -323,10 +313,6 @@ void operate_on_fields(FieldBox<Grid<T0s...>>& dst, FieldBox<FieldTileSet<T1s...
 template<typename Operator, typename... T0s, typename... T1s>
 void operate_on_fields(FieldBox<T0s...>& dst, FieldBox<T1s...> const& src)
 {
-    // using Src = std::decay_t<decltype(src.field)>;
-    // using Dst = std::decay_t<decltype(dst.field)>;
-    // static_assert(is_field_v<Src> and is_field_v<Dst>);
-
     auto src_it = src.lcl_box.begin();
     auto dst_it = dst.lcl_box.begin();
     for (; dst_it != dst.lcl_box.end(); ++src_it, ++dst_it)
@@ -337,8 +323,6 @@ void operate_on_fields(FieldBox<T0s...>&& dst, FieldBox<T1s...> const& src)
 {
     operate_on_fields<Operator>(dst, src);
 }
-
-
 
 template<typename Operator, typename... Args>
 void set_on_fields(FieldBox<FieldTileSet<Args...>>& dst, auto const val)
@@ -362,7 +346,6 @@ void set_on_fields(FieldBox<FieldTileSet<Args...>>& dst, auto const val)
     }
 }
 
-
 template<typename Operator, typename... Args>
 void set_on_fields(FieldBox<Args...>& dst, auto const val)
 {
@@ -371,15 +354,12 @@ void set_on_fields(FieldBox<Args...>& dst, auto const val)
         Operator{dst.field(*dst_it)}(val);
 }
 
-
-
 template<typename Field_t>
 template<typename Operator>
 void FieldBox<Field_t>::op(value_type const val)
 {
     set_on_fields<Operator>(*this, val);
 }
-
 
 template<typename Operator, typename... Args>
 void append_from_fields(FieldBox<FieldTileSet<Args...> const> const& src, auto& vec)
@@ -425,7 +405,6 @@ void append_from_fields(FieldBox<GridTileSet<Args...> const> const& src, auto& v
         FieldBox<FieldTileSet<Args...> const>{src.field, src.amr_box, src.lcl_box}, vec);
 }
 
-
 template<typename Operator, typename... Args>
 void append_from_fields(FieldBox<Args...> const& src, auto& vec)
 {
@@ -436,7 +415,6 @@ void append_from_fields(FieldBox<Args...> const& src, auto& vec)
         vec.push_back(src.field(*src_it));
 }
 
-
 template<typename Field_t>
 template<typename Operator>
 void FieldBox<Field_t>::append_to(std::vector<value_type>& vec) const
@@ -444,14 +422,12 @@ void FieldBox<Field_t>::append_to(std::vector<value_type>& vec) const
     append_from_fields<Operator>(*this, vec);
 }
 
-
 template<typename... T0s, typename... T1s>
 void copy_fields(FieldTileSet<T0s...>& dst, FieldTileSet<T1s...> const& src)
 {
     for (std::size_t idx = 0; idx < src().size(); ++idx)
         copy_fields(dst[idx](), src[idx]());
 }
-
 
 template<typename... T0s, auto opts>
 void copy_fields(FieldTileSet<T0s...>& dst, basic::Field<opts> const& src)
@@ -466,22 +442,11 @@ void copy_fields(FieldTileSet<T0s...>& dst, basic::Field<opts> const& src)
             FieldBox{src, patch_layout, tile.ghost_box()});
 }
 
-
 template<typename... T0s, auto opts>
 void copy_fields(basic::Field<opts>& dst, FieldTileSet<T0s...> const& src)
 {
-    assert(src().size());
-
-    // per-tile ghost boxes legitimately overlap at shared tile-to-tile borders (and a
-    // tile's own ghost box can fall inside another tile's domain) - a naive per-tile
-    // overwrite (whichever tile is iterated last wins) is order-dependent and can
-    // silently clobber a domain-owning tile's correct value with a neighbour's
-    // redundant ghost-box copy. reduce_single_ reads only each tile's own domain box
-    // (expanded, for patch-border tiles, to also cover the patch's true external
-    // ghost margin), so every cell is read from exactly one unambiguous owner.
     reduce_single_<SetEqual<typename basic::Field<opts>::value_type>>(src, dst);
 }
-
 
 template<auto opts0, auto opts1>
 void copy_fields(basic::Field<opts0>& dst, basic::Field<opts1> const& src)
@@ -489,7 +454,6 @@ void copy_fields(basic::Field<opts0>& dst, basic::Field<opts1> const& src)
     std::memcpy(dst.data(), src.data(),
                 src.size() * sizeof(typename basic::Field<opts0>::value_type));
 }
-
 
 template<typename Operator, typename Grid_t, typename GridTiles_t>
 auto& reduce_single_(GridTiles_t const& tiles, Grid_t& grid)
@@ -516,10 +480,8 @@ auto& reduce_single_(GridTiles_t const& tiles, Grid_t& grid)
             grid(lix)           = tile()(tile_lix);
         }
     }
-
     return grid;
 }
-
 
 template<typename Operator, typename Grid_t, typename GridTiles_t>
 auto& reduce_single_(Grid_t const& grid, GridTiles_t& tiles)
@@ -547,10 +509,8 @@ auto& reduce_single_(Grid_t const& grid, GridTiles_t& tiles)
             tile()(tile_lix)    = grid(lix);
         }
     }
-
     return grid;
 }
-
 
 template<typename Dst, typename Src>
 auto& reduce_single(Dst& dst, Src const& src)
@@ -567,7 +527,6 @@ auto& reduce_single(Dst& dst, Src const& src)
     return dst;
 }
 
-
 template<typename Tiles>
 auto reduce_single(Tiles const& input)
     requires(is_field_tile_set_v<Tiles>)
@@ -578,15 +537,12 @@ auto reduce_single(Tiles const& input)
     return grid;
 }
 
-
 template<typename Tiles>
 auto& reduce_single(Tiles const& input)
     requires(!is_field_tile_set_v<Tiles>)
 {
     return input;
 }
-
-
 
 template<typename Operator, typename Grid_t, typename GridTiles_t>
 auto& reduce_into_(GridTiles_t const& tiles, Grid_t& grid)
@@ -606,10 +562,8 @@ auto& reduce_into_(GridTiles_t const& tiles, Grid_t& grid)
         FieldBox{grid, patch_layout, patch_layout.AMRToLocal(tile_box)}. //
             template op<Operator>(core::FieldBox{tile(), tile_layout, tile_box});
     }
-
     return grid;
 }
-
 
 template<typename Dst, typename Src>
 auto& reduce_into(Dst& dst, Src const& src)
@@ -621,10 +575,8 @@ auto& reduce_into(Dst& dst, Src const& src)
         static_assert(is_field_v<Dst> and is_field_v<Src>);
         copy_fields(dst, src);
     }
-
     return dst;
 }
-
 
 template<typename Dst, typename TiledField>
 auto& reduce_single(Dst& dst, TiledField const& tiles,
@@ -657,33 +609,10 @@ auto& reduce_single(Dst& dst, TiledField const& tiles,
     return dst;
 }
 
-
-template<typename TiledField>
-bool no_nans(TiledField const& field)
-    requires(is_field_tile_set_v<TiledField>)
-{
-    for (auto const& tile : field())
-        for (auto const& v : tile())
-            if (std::isnan(v))
-                return false;
-    return true;
-}
-template<typename Field>
-bool no_nans(Field const& field)
-    requires(not is_field_tile_set_v<Field>)
-{
-    for (auto const& v : field)
-        if (std::isnan(v))
-            return false;
-    return true;
-}
-
-
 template<typename Tiles>
 auto reduce(Tiles const& input)
     requires(is_field_tile_set_v<Tiles>)
 {
-    // assert(no_nans(input));
     using Grid_t = Tiles::grid_type;
     Grid_t grid{input.name(), input.physicalQuantity(), input.shape()};
     reduce_into(grid, input);
@@ -731,7 +660,6 @@ void fill_ghost(Field_t& field, auto const& layout, auto const v)
 {
     auto const pq        = field.physicalQuantity();
     auto const patch_box = layout.AMRBoxFor(field);
-
     for (auto& tile : field())
     {
         auto const tile_gb = tile.layout().AMRGhostBoxFor(pq);
@@ -744,8 +672,6 @@ void fill_ghost(Field_t& field, auto const& layout, auto const v)
     }
 }
 
-
 } // namespace PHARE::core
-
 
 #endif

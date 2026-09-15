@@ -34,17 +34,13 @@ template<typename Patch>
 void cmp_do(Patch& patch)
 {
     using GridLayout_t = Patch::GridLayout_t;
-    using Field_vt     = Patch::Field_t::View::value_type;
-    using VecField_vt  = basic::TensorField<Field_vt, 1>;
-
-    auto constexpr tile_accessor = [](auto& ts, auto const ti) { return ts[ti]; };
 
     auto const n_tiles = patch.em.B[0]().size();
     for (std::uint16_t ti = 0; ti < n_tiles; ++ti)
     {
-        auto const B = patch.em.B.template as<VecField_vt>(tile_accessor, ti);
-        auto const E = patch.em.E.template as<VecField_vt>(tile_accessor, ti);
-        auto BNew    = patch.emNew.B.template as<VecField_vt>(tile_accessor, ti);
+        auto const B = tile_at(patch.em.B, ti);
+        auto const E = tile_at(patch.em.E, ti);
+        auto BNew    = tile_at(patch.emNew.B, ti);
 
         pool.detach_task([=, layout = patch.em.B[0][ti].layout()]() mutable {
             Faraday<GridLayout_t>{layout}(B, E, BNew, dt);

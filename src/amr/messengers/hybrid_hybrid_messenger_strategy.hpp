@@ -1115,10 +1115,7 @@ namespace amr
         std::unordered_map<std::size_t, double> beforePushCoarseTime_;
         std::unordered_map<std::size_t, double> afterPushCoarseTime_;
 
-        // core::Interpolator<dimension, interpOrder> interpolate_;
-        core::Interpolating<typename HybridModel::particle_array_type, interpOrder,
-                            /*atomic_ops*/ false>
-            interpolate_;
+        core::Interpolating<dimension, interpOrder> interpolate_;
 
         using rm_t                    = ResourcesManagerT;
         using RefineOperator          = SAMRAI::hier::RefineOperator;

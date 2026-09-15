@@ -2,9 +2,8 @@
 #define PHARE_ELECTRONS_HPP
 
 #include "core/def.hpp"
-#include "core/data/grid/grid_tiles.hpp"
+#include "core/data/field/field_tiles.hpp"
 #include "core/models/quantities/hybrid_quantities.hpp"
-#include "core/data/tensorfield/tensorfield.hpp"
 #include "core/data/vecfield/vecfield_component.hpp"
 
 #include "initializer/data_provider.hpp"
@@ -105,7 +104,6 @@ public:
     void computeChargeDensity() {}
 
 
-
     void static Vxyz(auto const& layout, auto const& Ne, auto&&... args)
     {
         auto&& [J, Vi, Ve] = std::forward_as_tuple(args...);
@@ -130,29 +128,13 @@ public:
         });
     }
 
-    template<typename V_t>
-    V_t static tt(auto& vf, auto i)
-    {
-        return vf.template as<V_t>([&](auto& c) { return c()[i](); });
-    }
-
     void computeBulkVelocity(GridLayout const& layout)
     {
         if constexpr (is_field_tile_set_v<Field>)
-        {
-            using Tile_vt = Field::value_type::value_type;
-            using V_t     = basic::TensorField<Tile_vt, 1>;
-            for (std::size_t tidx = 0; tidx < J_[0]().size(); ++tidx)
-            {
-                auto Ve = Ve_.template as<V_t>([&](auto& c) { return c()[tidx](); });
-                Vxyz(J_[0]()[tidx].layout(), ions_.chargeDensity()()[tidx](), tt<V_t>(J_, tidx),
-                     tt<V_t>(ions_.velocity(), tidx), Ve);
-            }
-        }
+            core::tile_exec_with_layout([&](auto&&... args) { Vxyz(args...); },
+                                        ions_.chargeDensity(), J_, ions_.velocity(), Ve_);
         else
-        {
             Vxyz(layout, ions_.chargeDensity(), J_, ions_.velocity(), Ve_);
-        }
     }
 
 

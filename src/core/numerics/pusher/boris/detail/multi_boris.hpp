@@ -180,7 +180,7 @@ struct MultiBorisFunctors
         auto const tile_em   = em_tile(tile_idx);
         auto& rhoP           = pop.particleDensity()[tile_idx];
         auto& rhoC           = pop.chargeDensity()[tile_idx];
-        auto F = pop.flux().template as<VecField_vt>([&](auto& c) { return c()[tile_idx](); });
+        auto F = tile_at(pop.flux(), tile_idx);
         Interpolator_t interp;
 
         for (auto& cell : cell_particles()) // all cells, for levelghosts
@@ -219,9 +219,8 @@ struct MultiBorisFunctors
 
     auto em_tile(auto const tidx)
     {
-        return electromag.template as<Electromag_vt>([&](auto const& vf) {
-            return for_N_make_array<3>([&](auto i) { return vf[i][tidx](); });
-        });
+        return electromag.template as<Electromag_vt>(
+            [&](auto const& vf) { return tile_at(vf, tidx); });
     }
 
     ParticleArray_v pps;

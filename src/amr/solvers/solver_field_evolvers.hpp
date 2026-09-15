@@ -1,6 +1,7 @@
 #ifndef PHARE_AMR_SOLVERS_SOLVER_FIELD_EVOLVERS_HPP
 #define PHARE_AMR_SOLVERS_SOLVER_FIELD_EVOLVERS_HPP
 
+#include "core/data/field/field_tiles.hpp"
 #include "core/numerics/ampere/ampere.hpp"
 #include "core/numerics/faraday/faraday.hpp"
 
@@ -11,10 +12,10 @@ namespace PHARE::solver
 
 class FaradaySingleTransformer
 {
-    template<typename V_t>
-    V_t static tt(auto& vf, auto i)
+    template<typename GridLayout>
+    void operate(GridLayout const& layout, auto&&... args)
     {
-        return vf.template as<V_t>([&](auto& c) { return c()[i](); });
+        core::Faraday<GridLayout>{layout}(args...);
     }
 
 public:
@@ -26,22 +27,14 @@ public:
 
         if constexpr (core::is_field_tile_set_v<field_type>)
         {
-            using Tile_vt = field_type::value_type::value_type;
-            using V_t     = core::basic::TensorField<Tile_vt, 1>;
+            core::tile_exec_with_layout(
+                [&](auto& layout, auto&&... args) { operate(layout, args...); }, B, E, Bnew, dt);
 
-            for (std::size_t tidx = 0; tidx < B[0]().size(); ++tidx)
-            {
-                auto Bnw             = Bnew.template as<V_t>([&](auto& c) { return c()[tidx](); });
-                auto const& tile_lay = B[0]()[tidx].layout();
-                using TL             = std::remove_cvref_t<decltype(tile_lay)>;
-                core::Faraday<TL>{tile_lay}(tt<V_t>(B, tidx), tt<V_t>(E, tidx), Bnw, dt);
-            }
-            for (std::uint8_t i = 0; i < 3; ++i)
-                Bnew[i].sync_inner_ghosts();
+            core::sync_inner_ghosts(Bnew);
         }
         else
         {
-            core::Faraday<GridLayout>{layout}(B, E, Bnew, dt);
+            operate(layout, B, E, Bnew, dt);
         }
     }
 };
@@ -87,10 +80,10 @@ FaradayLevelTransformer(typename Model::amr_types::level_t&, Model&)
 
 class AmpereSingleTransformer
 {
-    template<typename V_t>
-    V_t static tt(auto& vf, auto i)
+    template<typename GridLayout>
+    void operate(GridLayout const& layout, auto&&... args)
     {
-        return vf.template as<V_t>([&](auto& c) { return c()[i]; });
+        core::Ampere<GridLayout>{layout}(args...);
     }
 
 public:
@@ -101,22 +94,14 @@ public:
 
         if constexpr (core::is_field_tile_set_v<field_type>)
         {
-            using Tile_vt = field_type::value_type;
-            using V_t     = core::basic::TensorField<Tile_vt, 1>;
+            core::tile_exec_with_layout(
+                [&](auto& layout, auto&&... args) { operate(layout, args...); }, B, J);
 
-            for (std::size_t tidx = 0; tidx < J[0]().size(); ++tidx)
-            {
-                auto Jt              = J.template as<V_t>([&](auto& c) { return c()[tidx]; });
-                auto const& tile_lay = J[0]()[tidx].layout();
-                using TL             = std::remove_cvref_t<decltype(tile_lay)>;
-                core::Ampere<TL>{tile_lay}(tt<V_t>(B, tidx), Jt);
-            }
-            for (std::uint8_t i = 0; i < 3; ++i)
-                J[i].sync_inner_ghosts();
+            core::sync_inner_ghosts(J);
         }
         else
         {
-            core::Ampere<GridLayout>{layout}(B, J);
+            operate(layout, B, J);
         }
     }
 };

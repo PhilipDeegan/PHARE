@@ -1,7 +1,6 @@
 #ifndef PHARE_CORE_DATA_NDARRAY_NDARRAY_VECTOR_HPP
 #define PHARE_CORE_DATA_NDARRAY_NDARRAY_VECTOR_HPP
 
-#include "core/def.hpp"
 #include "core/data/vector.hpp"
 #include "core/utilities/types.hpp"
 #include "core/data/ndarray/ndarray_view.hpp"
@@ -119,7 +118,6 @@ auto& update_from(F f, NdArrayVector<dim, Type, c_ordering, alloc_mode> const& i
         in.data()[i] = f(i);
     return in;
 }
-
 
 template<auto alloc_mode0, typename F, std::size_t dim, typename Type, bool c_ordering,
          auto alloc_mode1>

@@ -1,17 +1,11 @@
 #ifndef PHARE_FARADAY_HPP
 #define PHARE_FARADAY_HPP
 
-
-#include "core/def.hpp"
-#include "core/data/grid/grid_tiles.hpp"
 #include "core/data/grid/gridlayoutdefs.hpp"
-#include "core/data/tensorfield/tensorfield.hpp"
 #include "core/data/vecfield/vecfield_component.hpp"
-
 
 namespace PHARE::core
 {
-
 
 template<typename GridLayout>
 class Faraday

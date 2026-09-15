@@ -24,7 +24,7 @@ public:
     using Box_t                        = Box<int, dimension>;
     using ParticleArray_t              = Particles;
     using Interpolator_t               = Interpolator<dimension, interp_order, atomic_interp>;
-    using Interpolating_t              = Interpolating<Particles, interp_order, atomic_interp>;
+    using Interpolating_t              = Interpolating<dimension, interp_order, atomic_interp>;
     using Pusher_t = MultiBorisPusherImpl<Particles::layout_mode, Particles::alloc_mode, GridLayout,
                                           Particles, Electromag, Interpolator_t>;
     using Vecfield_t = Electromag::vecfield_type;

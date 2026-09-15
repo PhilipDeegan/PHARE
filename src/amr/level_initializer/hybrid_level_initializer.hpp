@@ -1,8 +1,9 @@
 #ifndef PHARE_HYBRID_LEVEL_INITIALIZER_HPP
 #define PHARE_HYBRID_LEVEL_INITIALIZER_HPP
 
-#include "core/errors.hpp"
 #include "mpi/mpi_utils.hpp"
+
+#include "core/errors.hpp"
 #include "core/numerics/moments/moments.hpp"
 #include "core/numerics/interpolator/interpolating.hpp"
 
@@ -16,7 +17,6 @@
 
 #include "initializer/data_provider.hpp"
 
-#include <cmath>
 #include <exception>
 
 namespace PHARE
@@ -41,7 +41,7 @@ namespace solver
         using Ohm_t           = OhmLevelTransformer<HybridModel>;
         using ParticleArray_t = HybridModel::particle_array_type;
         using Interpolating_t
-            = core::Interpolating<ParticleArray_t, interp_order, /*atomic_interp*/ false>;
+            = core::Interpolating<dimension, interp_order, /*atomic_interp*/ false>;
 
 
         core::OhmInfo ohm_info;

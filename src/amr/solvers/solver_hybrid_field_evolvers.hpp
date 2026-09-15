@@ -2,6 +2,7 @@
 #define PHARE_AMR_SOLVERS_SOLVER_HYBRID_FIELD_EVOLVERS_HPP
 
 #include "core/numerics/ohm/ohm.hpp"
+#include "core/data/field/field_tiles.hpp"
 
 #include "amr/resources_manager/amr_utils.hpp"
 
@@ -12,10 +13,10 @@ class OhmSingleTransformer
 {
     using info_type = core::OhmInfo;
 
-    template<typename V_t>
-    V_t static tt(auto& vf, auto i)
+    template<typename GridLayout>
+    void operate(GridLayout const& layout, auto&&... args)
     {
-        return vf.template as<V_t>([&](auto& c) { return c()[i](); });
+        core::Ohm<GridLayout>{info_, layout}(args...);
     }
 
 public:
@@ -30,24 +31,15 @@ public:
     {
         if constexpr (core::is_field_tile_set_v<Field>)
         {
-            using Tile_vt = Field::value_type::value_type;
-            static_assert(core::is_field_v<Tile_vt>);
-            using V_t = core::basic::TensorField<Tile_vt, 1>;
+            core::tile_exec_with_layout(
+                [&](auto& layout, auto&&... args) { operate(layout, args...); }, n, Ve, Pe, B, J,
+                Enew);
 
-            for (std::size_t tidx = 0; tidx < n().size(); ++tidx)
-            {
-                auto Enw             = Enew.template as<V_t>([&](auto& c) { return c()[tidx](); });
-                auto const& tile_lay = n()[tidx].layout();
-                using TL             = std::remove_cvref_t<decltype(tile_lay)>;
-                core::Ohm<TL>{info_, tile_lay}(n()[tidx](), tt<V_t>(Ve, tidx), Pe()[tidx](),
-                                               tt<V_t>(B, tidx), tt<V_t>(J, tidx), Enw);
-            }
-            for (std::uint8_t i = 0; i < 3; ++i)
-                Enew[i].sync_inner_ghosts();
+            core::sync_inner_ghosts(Enew);
         }
         else
         {
-            core::Ohm<GridLayout>{info_, layout}(n, Ve, Pe, B, J, Enew);
+            operate(layout, n, Ve, Pe, B, J, Enew);
         }
     }
 
@@ -61,12 +53,6 @@ class OhmLevelTransformer : public OhmSingleTransformer
     using GridLayout = Model::gridlayout_type;
     using level_t    = Model::amr_types::level_t;
     using info_type  = core::OhmInfo;
-
-    template<typename V_t>
-    V_t static tt(auto& vf, auto i)
-    {
-        return vf.template as<V_t>([&](auto& c) { return c()[i](); });
-    }
 
 public:
     explicit OhmLevelTransformer(info_type const& info, level_t& level, Model& model)
@@ -100,6 +86,5 @@ OhmLevelTransformer(core::OhmInfo, typename Model::amr_types::level_t&, Model&)
     -> OhmLevelTransformer<Model>;
 
 } // namespace PHARE::solver
-
 
 #endif /* PHARE_AMR_SOLVERS_SOLVER_HYBRID_FIELD_EVOLVERS_HPP */

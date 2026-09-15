@@ -7,6 +7,7 @@
 
 namespace PHARE::core
 {
+
 template<std::size_t dim, bool c_ordering = true>
 struct NdArrayViewer
 {
@@ -32,6 +33,7 @@ struct NdArrayViewer
         else
             return i + j * nCells[0];
     }
+
     static inline std::uint32_t idx(auto const nCells, std::uint32_t const i, std::uint32_t const j,
                                     std::uint32_t const k)
     {
@@ -41,11 +43,9 @@ struct NdArrayViewer
             return i + j * nCells[0] + k * nCells[1] * nCells[0];
     }
 
-
     template<template<typename, std::size_t> typename Indexes, typename Index>
     NO_DISCARD static inline auto& at(auto* data, auto const& nCells,
                                       Indexes<Index, dim> const& indexes)
-
     {
         auto const& i = idx(nCells, indexes);
         assert(i < product(nCells, std::uint32_t{1}));

@@ -1,10 +1,9 @@
 #ifndef DEFAULT_TAGGER_STRATEGY_H
 #define DEFAULT_TAGGER_STRATEGY_H
 
-#include "core/data/grid/grid_tiles.hpp"
+#include "core/data/field/field_tiles.hpp"
 #include "core/utilities/types.hpp"
 #include "core/data/grid/gridlayoutdefs.hpp"
-#include "core/data/tensorfield/tensorfield.hpp"
 #include "core/data/particles/particle_array_def.hpp"
 
 #include "amr/physical_models/mhd_model.hpp"
@@ -73,21 +72,15 @@ void DefaultTaggerStrategy<Model>::tag(Model& model, gridlayout_type const& layo
 
     if constexpr (core::is_field_tile_set_v<Field_t>)
     {
-        using Field_vt       = Model::field_type::value_type;
-        using TensorField_vt = core::basic::TensorField<Field_vt, 1>;
+        core::tile_exec_with_layout(
+            [&](auto& tile_layout, auto&& Btile) {
+                auto const& tile_amr_box   = tile_layout.AMRBox();
+                auto const tag_local_lower = layout.AMRToLocal(tile_amr_box.lower)
+                                             - gridlayout_type::options.field_ghost_width;
 
-        auto const ntiles = B[0]().size();
-        for (std::size_t tidx = 0; tidx < ntiles; ++tidx)
-        {
-            auto Btile = B.template as<TensorField_vt>([&](auto& c) { return c()[tidx]; });
-
-            auto const& tile_layout    = B[0]()[tidx].layout();
-            auto const& tile_amr_box   = tile_layout.AMRBox();
-            auto const tag_local_lower = layout.AMRToLocal(tile_amr_box.lower)
-                                         - gridlayout_type::options.field_ghost_width;
-
-            tagger.tag(layout, tags, Btile, tile_layout, tag_local_lower);
-        }
+                tagger.tag(layout, tags, Btile, tile_layout, tag_local_lower);
+            },
+            B);
         return;
     }
     else

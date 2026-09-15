@@ -1,7 +1,6 @@
 #ifndef PHARE_CORE_DATA_NDARRAY_NDARRAY_VIEW_HPP
 #define PHARE_CORE_DATA_NDARRAY_NDARRAY_VIEW_HPP
 
-
 #include "core/def.hpp"
 #include "core/utilities/types.hpp"
 #include "core/data/ndarray/ndarray_base.hpp"
@@ -15,7 +14,6 @@
 namespace PHARE::core
 {
 
-
 template<std::size_t dim, typename DataType = double, bool c_ordering = true>
 class NdArrayView
 {
@@ -27,7 +25,6 @@ public:
     using value_type                   = DataType;
     using pointer_type                 = DataType*;
 
-
     NdArrayView() = default;
 
     NdArrayView(pointer_type ptr, std::array<std::uint32_t, dim> const nCells)
@@ -36,7 +33,6 @@ public:
         , nCells_{nCells}
     {
     }
-
 
     NdArrayView(NdArrayView const&)            = default;
     NdArrayView& operator=(NdArrayView const&) = default;
@@ -65,7 +61,6 @@ public:
         return const_cast<DataType&>(static_cast<NdArrayView const&>(*this)(indexes));
     }
 
-
     NO_DISCARD inline auto const& operator()(auto const... indexes) const
     {
         return viewer::at(ptr_, nCells_, indexes...);
@@ -85,7 +80,6 @@ public:
 
     NO_DISCARD auto end() const { return ptr_ + size_; }
     NO_DISCARD auto end() { return ptr_ + size_; }
-
 
     void zero() { fill(0); }
     auto zeros() const
@@ -263,6 +257,12 @@ auto make_array_view(std::vector<DataType> const& vec, std::array<std::uint32_t,
 }
 
 
+template<typename T>
+concept is_ndarray_c
+    = requires(T* p) { []<std::size_t dim, typename D>(NdArrayView<dim, D> const*) {}(p); };
+
+template<typename T>
+inline constexpr bool is_ndarray_v = is_ndarray_c<T>;
 
 
 } // namespace PHARE::core

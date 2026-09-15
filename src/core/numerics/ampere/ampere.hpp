@@ -1,18 +1,12 @@
 #ifndef PHARE_CORE_NUMERICS_AMPERE_AMPERE_HPP
 #define PHARE_CORE_NUMERICS_AMPERE_AMPERE_HPP
 
-
-#include "core/data/grid/grid_tiles.hpp"
-#include "core/data/grid/gridlayoutdefs.hpp"
-#include "core/data/tensorfield/tensorfield.hpp"
-#include "core/data/vecfield/vecfield_component.hpp"
 #include "core/utilities/types.hpp"
-
+#include "core/data/grid/gridlayoutdefs.hpp"
+#include "core/data/vecfield/vecfield_component.hpp"
 
 namespace PHARE::core
 {
-
-
 
 template<typename GridLayout>
 class Ampere
@@ -24,7 +18,6 @@ public:
         : layout_{layout}
     {
     }
-
 
     template<typename VecField>
     void operator()(VecField const& B, VecField& J)
