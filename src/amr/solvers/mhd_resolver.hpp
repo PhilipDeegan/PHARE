@@ -1,7 +1,7 @@
 #ifndef PHARE_AMR_SOLVERS_MHD_RESOLVER_HPP
 #define PHARE_AMR_SOLVERS_MHD_RESOLVER_HPP
 
-#include "phare_simulator_options.hpp"
+#include "core/models/options/mhd_options_def.hpp"
 
 #include "core/numerics/godunov_fluxes/godunov_fluxes.hpp"
 
@@ -171,8 +171,6 @@ struct RiemannSolverSelector<MHDOpts::RiemannSolverType::HLLD>
 template<auto opts, typename MHDModel>
 struct MHDResolver
 {
-    // Get the types from opts
-
     static constexpr bool Hall             = opts.Hall;
     static constexpr bool Resistivity      = opts.Resistivity;
     static constexpr bool HyperResistivity = opts.HyperResistivity;
@@ -191,12 +189,8 @@ struct MHDResolver
     using MHDTimeStepper
         = TimeIntegratorSelector<opts.time_integrator_type, MHDModel>::template type<FVMethod>;
 
-    // Resolution
-
-    using GridLayout = MHDModel::gridlayout_type;
-
-    using Equations_t = core::MHDEquations<Hall, Resistivity, HyperResistivity>;
-
+    using GridLayout      = MHDModel::gridlayout_type;
+    using Equations_t     = core::MHDEquations<Hall, Resistivity, HyperResistivity>;
     using RiemannSolver_t = RiemannSolver<Hall>;
 
     template<typename Layout>
