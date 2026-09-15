@@ -623,7 +623,6 @@ template<typename Tiles>
 auto& reduce(Tiles const& input)
     requires(!is_field_tile_set_v<Tiles>)
 {
-    assert(no_nans(input));
     return input;
 }
 

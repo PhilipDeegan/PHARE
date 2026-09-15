@@ -460,9 +460,6 @@ namespace amr
          */
         std::size_t countNumberParticlesIn_(SAMRAI::pdat::CellOverlap const& overlap) const
         {
-            // throw std::runtime_error("This is never called!");
-            // but if it is, below should work (maybe)
-
             PHARE_LOG_SCOPE(3, "ParticleData::countNumberParticlesIn_");
 
             if (overlap.isOverlapEmpty())

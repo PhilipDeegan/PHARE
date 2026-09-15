@@ -6,57 +6,28 @@
 
 #include "amr/data/field/field_data.hpp"
 #include "amr/data/tensorfield/tensor_field_overlap.hpp"
-#include "amr/data/tensorfield/tensor_field_data.hpp"
-#include "amr/resources_manager/tensor_field_resource.hpp"
-
-#include "field_refiner.hpp"
 
 #include <SAMRAI/tbox/Dimension.h>
 #include <SAMRAI/hier/RefineOperator.h>
 
 #include <cstddef>
-#include <stdexcept>
 
 namespace PHARE::amr
 {
 
-
-template<typename Dst>
-void refine_field(Dst& destinationField, auto& sourceField, auto& intersectionBox, auto& refiner)
-{
-    for (auto const bix : phare_box_from<Dst::dimension>(intersectionBox))
-        refiner(sourceField, destinationField, bix);
-}
-
 template<typename Refiner, typename FieldT>
 void refine_field(FieldT& dst, auto const& dstBox, auto const& dstLayout, FieldT const& src,
                   auto const& srcBox, auto& overlap, auto ratio)
-// requires(not core::is_field_tile_set_v<FieldT>)
 {
     auto const& qty = dst.physicalQuantity();
 
     Refiner refiner{dstLayout.centering(qty), dstBox, srcBox, ratio};
-
     for (auto const& box : overlap.getDestinationBoxContainer())
     {
-        // we compute the intersection with the destination,
-        // and then we apply the refine operation on each fine index.
         auto intersectionBox = dstBox * box;
         refine_field(dst, src, intersectionBox, refiner);
     }
 }
-
-// template<typename Refiner, typename FieldT>
-// void refine_field(FieldT& dst, auto const& dstBox, auto const& dstLayout, FieldT const& src,
-//                   auto const& srcBox, auto& overlap, auto ratio)
-//     requires(core::is_field_tile_set_v<FieldT>)
-// {
-//     auto const& qty = dst.physicalQuantity();
-
-//     throw std::runtime_error("finish");
-// }
-
-
 
 template<typename GridLayoutT, typename FieldT, typename FieldRefinerPolicy>
 class FieldRefineOperator : public SAMRAI::hier::RefineOperator
@@ -76,13 +47,11 @@ public:
     virtual ~FieldRefineOperator() = default;
 
     /** This implementation have the top priority for refine operation
-     *
      */
     NO_DISCARD int getOperatorPriority() const override { return 0; }
 
     /**
      * @brief This operator needs to have at least 1 ghost cell to work properly
-     *
      */
     NO_DISCARD SAMRAI::hier::IntVector
     getStencilWidth(SAMRAI::tbox::Dimension const& dim) const override
@@ -91,14 +60,11 @@ public:
     }
 
 
-
-
     /**
      * @brief Given a set of box on a fine patch, compute the interpolation from
      * a coarser patch that is underneath the fine box.
      * Since we get our boxes from a FieldOverlap, we know that they are in correct
      * Field Indexes
-     *
      */
     void refine(SAMRAI::hier::Patch& destination, SAMRAI::hier::Patch const& source,
                 int const destinationId, int const sourceId,
@@ -155,13 +121,11 @@ public:
     virtual ~TensorFieldRefineOperator() = default;
 
     /** This implementation have the top priority for refine operation
-     *
      */
     NO_DISCARD int getOperatorPriority() const override { return 0; }
 
     /**
      * @brief This operator needs to have at least 1 ghost cell to work properly
-     *
      */
     NO_DISCARD SAMRAI::hier::IntVector
     getStencilWidth(SAMRAI::tbox::Dimension const& dim) const override
@@ -170,14 +134,11 @@ public:
     }
 
 
-
-
     /**
      * @brief Given a set of box on a fine patch, compute the interpolation from
      * a coarser patch that is underneath the fine box.
      * Since we get our boxes from a FieldOverlap, we know that they are in correct
      * Field Indexes
-     *
      */
     void refine(SAMRAI::hier::Patch& destination, SAMRAI::hier::Patch const& source,
                 int const destinationId, int const sourceId,
@@ -219,7 +180,5 @@ using VecFieldRefineOperator = TensorFieldRefineOperator<VectorFieldDataT, Field
 
 
 } // namespace PHARE::amr
-
-
 
 #endif

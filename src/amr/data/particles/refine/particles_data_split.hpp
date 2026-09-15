@@ -42,8 +42,6 @@ namespace amr
 namespace PHARE::amr
 {
 
-
-
 template<typename Iterator>
 NO_DISCARD auto toFineGrid(Iterator iterator)
 {
@@ -107,7 +105,6 @@ struct ParticlesRefining
     // temporary restriction "source" patchData
     // therefore we need references to the domain and ghost particle arrays
 
-
     auto& pickDestParticles()
     {
         bool constexpr putParticlesInCoarseBoundary
@@ -128,7 +125,6 @@ struct ParticlesRefining
             else
                 compile error  */
         }
-
         else
             return destParticlesData.domainParticles;
     }
@@ -157,7 +153,6 @@ void ParticlesRefining<HybridTypes, splitType, Splitter>::forBoxes(
     SAMRAI::hier::BoxContainer const& boxes)
 {
     using ArrayParticleArray = array_type_t;
-
 
     auto const domainBox = phare_box_from<dim>(destParticlesData.getBox());
 
@@ -195,7 +190,6 @@ void ParticlesRefining<HybridTypes, splitType, Splitter>::forBoxes(
 
     destParticles.template on_appended<ParticleType_v>();
 }
-
 
 } // namespace PHARE::amr
 

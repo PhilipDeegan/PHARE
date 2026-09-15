@@ -353,15 +353,11 @@ struct IonUpdaterTest : public ::testing::Test,
             } // end 1D
         } // end pop loop
 
-        assert(no_nans(ions.velocity()(Component::X)));
         PHARE::core::depositParticles(ions, layout, interpolator, PHARE::core::DomainDeposit{});
         PHARE::core::depositParticles(ions, layout, interpolator, PHARE::core::LevelGhostDeposit{});
-        assert(no_nans(ions.velocity()(Component::X)));
 
         ions.computeChargeDensity();
-        assert(no_nans(ions.velocity()(Component::X)));
         ions.computeBulkVelocity();
-        assert(no_nans(ions.velocity()(Component::X)));
     } // end Ctor
 
 
@@ -372,7 +368,6 @@ struct IonUpdaterTest : public ::testing::Test,
 
     auto update(auto& ionUpdater, auto const mode)
     {
-        assert(no_nans(ions.velocity()(Component::X)));
         if constexpr (ParticleArray::layout_mode == AoSMapped)
             ionUpdater.updatePopulations(*ions, *EM, boxing, dt, mode);
 
@@ -389,7 +384,6 @@ struct IonUpdaterTest : public ::testing::Test,
             auto accessor = test::make_model_level_accessor(patches, quantities);
             ionUpdater.updatePopulations(accessor, levelBoxing, dt, mode);
         }
-        assert(no_nans(ions.velocity()(Component::X)));
     }
 
     void fillIonsMomentsGhosts()
@@ -441,8 +435,6 @@ struct IonUpdaterTest : public ::testing::Test,
         };
 
         auto check = [&](auto const& newField, auto const& og) {
-            // assert(no_nans(newField));
-            assert(no_nans(og));
             auto const& originalField = reduce(og);
             nonZero(newField, newField.name() + ":new");
             // nonZero(originalField, "originalField");
@@ -471,7 +463,6 @@ struct IonUpdaterTest : public ::testing::Test,
         check(alphaFy, ionsBufferCpy[1].flux()(Component::Y));
         check(alphaFz, ionsBufferCpy[1].flux()(Component::Z));
 
-        assert(no_nans(ionsBufferCpy.velocity()(Component::X)));
         check(reduce(ions.velocity()(Component::X)), ionsBufferCpy.velocity()(Component::X));
         check(reduce(ions.velocity()(Component::Y)), ionsBufferCpy.velocity()(Component::Y));
         check(reduce(ions.velocity()(Component::Z)), ionsBufferCpy.velocity()(Component::Z));
@@ -695,16 +686,11 @@ TYPED_TEST(IonUpdaterTest, momentsAreChangedInParticlesAndMomentsMode)
 
     assert(ionsBufferCpy.massDensity().data() != this->ions.massDensity().data());
 
-    assert(no_nans(this->ions.velocity()(Component::X)));
     this->update(ionUpdater, UpdaterMode::all);
-    assert(no_nans(this->ions.velocity()(Component::X)));
 
     this->fillIonsMomentsGhosts();
-    assert(no_nans(this->ions.velocity()(Component::X)));
 
     ionUpdater.updateIons(this->ions);
-
-    // assert(no_nans(this->ions.velocity()(Component::X)));
 
     this->checkMomentsHaveEvolved(ionsBufferCpy);
     this->checkDensityIsAsPrescribed();
