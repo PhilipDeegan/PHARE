@@ -1,12 +1,16 @@
 #ifndef PHARE_AMR_MAGNETIC_REFINE_PATCH_STRATEGY_HPP
 #define PHARE_AMR_MAGNETIC_REFINE_PATCH_STRATEGY_HPP
 
+
 #include "core/utilities/types.hpp"
 #include "core/utilities/constants.hpp"
+#include "core/data/grid/grid_tiles.hpp"
+
 
 #include "amr/utilities/box/amr_box.hpp"
 #include "amr/data/field/field_geometry.hpp"
 #include "amr/resources_manager/amr_utils.hpp"
+#include "amr/data/field/refine/coarse_cell_round_out.hpp"
 
 
 #include "SAMRAI/xfer/RefinePatchStrategy.h"
@@ -14,6 +18,7 @@
 #include <array>
 #include <cmath>
 #include <cassert>
+#include <stdexcept>
 
 namespace PHARE::amr
 {
@@ -21,9 +26,55 @@ using core::dirX;
 using core::dirY;
 using core::dirZ;
 
+// PHARE::core::Box counterparts of coarse_cell_round_out.hpp's SAMRAI::hier::Box helpers - same
+// parity rules (roundDownToEven/roundUpToOddIndex/roundUpToEvenIndex/isOddIndex), applied to the
+// per-component field boxes tiles are natively expressed in, to avoid round-tripping through
+// SAMRAI::hier::Box per tile.
+template<std::size_t dim>
+NO_DISCARD core::Box<int, dim>
+roundFieldBoxOutToCoarseCells(core::Box<int, dim> box,
+                              std::array<core::QtyCentering, dim> const& centering)
+{
+    for (std::size_t d = 0; d < dim; ++d)
+    {
+        box.lower[d] = roundDownToEven(box.lower[d]);
+        box.upper[d] = centering[d] == core::QtyCentering::primal ? roundUpToEvenIndex(box.upper[d])
+                                                                  : roundUpToOddIndex(box.upper[d]);
+    }
+    return box;
+}
+
+template<std::size_t dim>
+NO_DISCARD bool isWholeCoarseFieldCells(core::Box<int, dim> const& box,
+                                        std::array<core::QtyCentering, dim> const& centering)
+{
+    for (std::size_t d = 0; d < dim; ++d)
+    {
+        if (isOddIndex(box.lower[d]))
+            return false;
+        bool const upper_ok = centering[d] == core::QtyCentering::primal ? !isOddIndex(box.upper[d])
+                                                                         : isOddIndex(box.upper[d]);
+        if (!upper_ok)
+            return false;
+    }
+    return true;
+}
+
+
 template<typename ResMan, typename TensorFieldDataT>
 class MagneticRefinePatchStrategy : public SAMRAI::xfer::RefinePatchStrategy
 {
+    auto make_fine_field_boxes(auto& fields, auto& fine_box, auto& layout, auto& fineLayout) const
+    {
+        return core::for_N_make_array<N>([&](auto i) {
+            using PhysicalQuantity = std::decay_t<decltype(fields[i].physicalQuantity())>;
+
+            return phare_box_from<dimension>(
+                FieldGeometry<gridlayout_type, PhysicalQuantity>::toFieldBox(
+                    fine_box, fields[i].physicalQuantity(), fineLayout));
+        });
+    }
+
 public:
     using Geometry        = TensorFieldDataT::Geometry;
     using gridlayout_type = TensorFieldDataT::gridlayout_type;
@@ -62,6 +113,64 @@ public:
     {
     }
 
+    // The region a magnetic reconstruction over the SAMRAI fill box `fine_box` must run over.
+    //
+    // The Toth & Roe reconstruction below (fix()/postprocessBx3d & friends) touches faces of
+    // exactly one coarse cell per "new fine face" it fills. SAMRAI's fill boxes do not respect
+    // that: a recursive refine schedule fills a coarse-interpolation temporary plus a 1-cell
+    // stencil ring, and one cell is always *half* a coarse cell, whatever the temporary's own
+    // parity - so the coarse-aligned face on the far side of a cut cell may never have been
+    // refined yet. Rounding the box out to a whole-coarse-cell union (see
+    // coarse_cell_round_out.hpp) guarantees every input the reconstruction reads was written.
+    // See https://github.com/PHAREHUB/PHARE/issues/1296.
+    SAMRAI::hier::Box reconstructionRegion(SAMRAI::hier::Box const& fine_box,
+                                           SAMRAI::hier::Box const& ghost_box) const
+    {
+        auto const region = roundCellBoxOutToCoarseCells<dimension>(fine_box) * ghost_box;
+
+        if (!isWholeCoarseCells<dimension>(region))
+            throw std::runtime_error(
+                "magnetic prolongation region is not a union of whole coarse cells: fill box "
+                + to_str(fine_box) + ", rounded out and clipped to the allocated "
+                + to_str(ghost_box) + ", gives " + to_str(region)
+                + ", which half-covers a coarse cell. The field ghost width must be at least the "
+                  "fill ring plus one.");
+
+        return region;
+    }
+
+    // Tile-level analog of reconstructionRegion, in already-per-component field-box space.
+    //
+    // fine_field_box is already a whole-coarse-cell union at the PATCH level, but tiles are not
+    // always coarse-cell aligned (refined-level patches can have odd extents, which pushes their
+    // tiling off the coarse grid - see tile_set_mapper.hpp's all_even_shape fallback), so clipping
+    // it to one tile's ghost_box() can still cut a coarse cell in half at the tile boundary.
+    //
+    // The actual requirement is only that every fine array cell ends up with a good value
+    // *eventually* - not that every individual tile can reconstruct everything its ghost_box()
+    // touches. Field ghost cells have no single owning tile (unlike particles): whichever tile
+    // fully contains a given coarse cell in its own ghost_box() computes it correctly; a tile for
+    // which the cell is only half-covered (round-out doesn't fit back inside its ghost_box()) is
+    // simply the wrong one to ask and skips it, same as if there had been no overlap at all -
+    // some other tile's own attempt is relied on to cover it.
+    static std::optional<core::Box<int, dimension>>
+    tileReconstructionFieldBox(core::Box<int, dimension> const& fine_field_box,
+                               core::Box<int, dimension> const& tile_ghost_box,
+                               std::array<core::QtyCentering, dimension> const& centering)
+    {
+        auto const clipped = fine_field_box * tile_ghost_box;
+        if (!clipped)
+            return std::nullopt;
+
+        auto const region
+            = roundFieldBoxOutToCoarseCells<dimension>(*clipped, centering) * tile_ghost_box;
+
+        if (!region || !isWholeCoarseFieldCells<dimension>(*region, centering))
+            return std::nullopt;
+
+        return region;
+    }
+
     // We compute the values of the new fine magnetic faces using what was already refined, ie
     // the values on the old coarse faces.
     void postprocessRefine(SAMRAI::hier::Patch& fine, SAMRAI::hier::Patch const& coarse,
@@ -73,60 +182,95 @@ public:
         auto& fields       = TensorFieldDataT::getFields(fine, b_id_);
         auto& [bx, by, bz] = fields;
 
-        auto layout        = PHARE::amr::layoutFromPatch<gridlayout_type>(fine);
-        auto fineBoxLayout = Geometry::layoutFromBox(fine_box, layout);
+        // BISECTION: temporarily bypassing reconstructionRegion's round-out to check whether it
+        // is the source of the AoSMapped (non-tiled, same algorithm as master) B/E divergence
+        // seen from the first advance step onward. Revert to the commented block once confirmed.
+        auto const& region = fine_box;
+        // auto const region
+        //     = reconstructionRegion(fine_box, fine.getPatchData(b_id_)->getGhostBox());
 
-        auto const fine_field_box = core::for_N_make_array<N>([&](auto i) {
-            using PhysicalQuantity = std::decay_t<decltype(fields[i].physicalQuantity())>;
+        auto layout                 = PHARE::amr::layoutFromPatch<gridlayout_type>(fine);
+        auto fineBoxLayout          = Geometry::layoutFromBox(region, layout);
+        auto const fine_field_boxes = make_fine_field_boxes(fields, region, layout, fineBoxLayout);
 
-            return FieldGeometry<gridlayout_type, PhysicalQuantity>::toFieldBox(
-                fine_box, fields[i].physicalQuantity(), fineBoxLayout);
-        });
+        using Field_t = std::decay_t<decltype(bx)>;
+        if constexpr (core::is_field_tile_set_v<Field_t>)
+        {
+            auto const centerings = core::for_N_make_array<N>(
+                [&](auto i) { return gridlayout_type::centering(fields[i].physicalQuantity()); });
 
+            for (std::size_t ti = 0; ti < bx().size(); ++ti)
+            {
+                auto& bx_tile = bx()[ti];
+                auto& by_tile = by()[ti];
+                auto& bz_tile = bz()[ti];
+
+                auto const xoverlap = tileReconstructionFieldBox(
+                    fine_field_boxes[dirX], bx_tile.ghost_box(), centerings[dirX]);
+                auto const yoverlap = tileReconstructionFieldBox(
+                    fine_field_boxes[dirY], by_tile.ghost_box(), centerings[dirY]);
+                auto const zoverlap = tileReconstructionFieldBox(
+                    fine_field_boxes[dirZ], bz_tile.ghost_box(), centerings[dirZ]);
+
+                if (!xoverlap && !yoverlap && !zoverlap)
+                    continue;
+
+                auto const& tile_layout          = bx_tile.layout();
+                auto const tile_fine_field_boxes = std::array{
+                    xoverlap.value_or(bx_tile.ghost_box()),
+                    yoverlap.value_or(by_tile.ghost_box()),
+                    zoverlap.value_or(bz_tile.ghost_box()),
+                };
+
+                fix(bx_tile(), by_tile(), bz_tile(), tile_layout, tile_fine_field_boxes);
+            }
+        }
+        else
+        {
+            fix(bx, by, bz, layout, fine_field_boxes);
+        }
+    }
+
+
+    void fix(auto& bx, auto& by, auto& bz, auto& layout, auto& fine_field_boxes)
+    {
         if constexpr (dimension == 1)
         {
             // if we ever go to c++23 we could use std::views::zip to iterate both on the local and
             // global indices instead of passing the box to do an amr to local inside the function,
             // which is not obvious at call site
-            for (auto const& i : phare_box_from<dimension>(fine_field_box[dirX]))
-            {
+            for (auto const& i : fine_field_boxes[dirX])
                 postprocessBx1d(bx, layout, i);
-            }
         }
 
         else if constexpr (dimension == 2)
         {
-            for (auto const& i : phare_box_from<dimension>(fine_field_box[dirX]))
-            {
+            for (auto const& i : fine_field_boxes[dirX])
                 postprocessBx2d(bx, by, layout, i);
-            }
 
-            for (auto const& i : phare_box_from<dimension>(fine_field_box[dirY]))
-            {
+
+            for (auto const& i : fine_field_boxes[dirY])
                 postprocessBy2d(bx, by, layout, i);
-            }
         }
 
         else if constexpr (dimension == 3)
         {
             auto meshSize = layout.meshSize();
 
-            for (auto const& i : phare_box_from<dimension>(fine_field_box[dirX]))
-            {
+            for (auto const& i : fine_field_boxes[dirX])
                 postprocessBx3d(bx, by, bz, meshSize, layout, i);
-            }
 
-            for (auto const& i : phare_box_from<dimension>(fine_field_box[dirY]))
-            {
+
+            for (auto const& i : fine_field_boxes[dirY])
                 postprocessBy3d(bx, by, bz, meshSize, layout, i);
-            }
 
-            for (auto const& i : phare_box_from<dimension>(fine_field_box[dirZ]))
-            {
+
+            for (auto const& i : fine_field_boxes[dirZ])
                 postprocessBz3d(bx, by, bz, meshSize, layout, i);
-            }
         }
     }
+
+
 
 
     static auto isNewFineFace(auto const& amrIdx, auto const dir)

@@ -181,7 +181,7 @@ private:
 
         auto const& simDict = initializer::PHAREDictHandler::INSTANCE().dict()["simulation"];
 
-        Simulator* simulator_ptr = core::makeAtRuntime<SimulatorCaster>(
+        Simulator* simulator_ptr = makeSimulatorAtRuntime<SimulatorCaster>(
             simDict["dimension"].template to<int>(), simDict["interp_order"].template to<int>(),
             simDict["refined_particle_nbr"].template to<int>(), SimulatorCaster{simulator});
         if (!simulator_ptr)
