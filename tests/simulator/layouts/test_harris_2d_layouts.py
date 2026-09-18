@@ -148,8 +148,8 @@ class HarrisTest(SimulatorTest):
     def _run(self, layout):
         ph.global_vars.sim = None
         sim, diag_dir = config(layout)
-        # self.register_diag_dir_for_cleanup(diag_dir)
-        # Simulator(sim).run().reset()
+        self.register_diag_dir_for_cleanup(diag_dir)
+        Simulator(sim).run().reset()
         return diag_dir
 
     def test_run(self):
