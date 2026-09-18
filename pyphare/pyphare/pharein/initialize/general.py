@@ -81,6 +81,13 @@ def add_vector_int(path, val):
 add_string = pp.add_string
 
 
+def add_enum_int(path, enum_name, member_name):
+    from pyphare.cpp import cpp_etc_lib
+
+    enum_cls = getattr(cpp_etc_lib(), enum_name)
+    add_int(path, int(getattr(enum_cls, member_name).value))
+
+
 def populateDict(sim):
     add_string("simulation/name", "simulation_test")
     add_int("simulation/dimension", sim.ndim)
@@ -107,6 +114,23 @@ def populateDict(sim):
 
     add_int("simulation/interp_order", sim.interp_order)
     add_int("simulation/refined_particle_nbr", sim.refined_particle_nbr)
+
+    add_enum_int("simulation/particle_layout", "LayoutMode", sim.particle_layout)
+    add_enum_int("simulation/allocator", "AllocatorMode", sim.allocator)
+
+    if sim.mhd_timestepper:
+        add_enum_int(
+            "simulation/mhd_timestepper", "TimeIntegratorType", sim.mhd_timestepper
+        )
+        add_enum_int(
+            "simulation/reconstruction", "ReconstructionType", sim.reconstruction
+        )
+        add_enum_int("simulation/limiter", "SlopeLimiterType", sim.limiter)
+        add_enum_int("simulation/riemann", "RiemannSolverType", sim.riemann)
+        add_bool("simulation/hall", sim.hall)
+        add_bool("simulation/res", sim.res)
+        add_bool("simulation/hyper_res", sim.hyper_res)
+
     add_double("simulation/time_step", sim.time_step)
     add_int("simulation/time_step_nbr", sim.time_step_nbr)
     add_double("simulation/final_time", sim.final_time)
