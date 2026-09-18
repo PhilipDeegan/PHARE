@@ -58,6 +58,11 @@ NO_DISCARD constexpr int roundUpToEvenIndex(int const i)
     return isOddIndex(i) ? i + 1 : i;
 }
 
+NO_DISCARD constexpr int roundDownToOddIndex(int const i)
+{
+    return isOddIndex(i) ? i : i - 1;
+}
+
 
 //! smallest union of whole coarse cells containing the given cell box
 template<std::size_t dim>

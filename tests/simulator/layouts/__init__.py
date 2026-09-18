@@ -25,7 +25,6 @@ from tests.simulator.advance.test_advance_hybrid import HybridAdvanceTest
 _ref_layout = "AoSMapped"
 cells = 14
 ppc_per_dim = [100, 33, 15]
-# os.environ["PHARE_TILING_MIN_BEFORE_SPLIT"] = "1000"
 
 
 def permute(ndim_list, interp_orders=[1]):
@@ -48,39 +47,60 @@ def compare_hierarchies(test, run0, run1, atol):
     times = run0.all_times()["B"]
     pops = run0.all_pops()
 
+    # subTest only collects-and-continues when run through the real unittest
+    # machinery (TestCase.run() / unittest.main()); direct calls like
+    # HarrisTest().test_run() have no TestResult attached, so subTest can't
+    # suppress anything there and a single failure would raise immediately.
+    # Collecting failures manually here works the same way either way, and
+    # loops per time/quantity so one bad check doesn't hide the rest.
+    failures = []
+
+    def check(label, eqr):
+        if not eqr:
+            print(f"{label}\n{eqr}", flush=True)
+            failures.append(label)
+
     # Priority order for debugging: particles -> moments -> B -> E, so the
-    # first assertion to fail points at the earliest quantity in the causal
-    # chain (particles feed moments, moments feed E, E feeds B).
-    for pop in pops:
-        for kind in ["levelGhost", "domain"]:
-            p0 = run0.GetParticles(times, pop, type=kind)
-            p1 = run1.GetParticles(times, pop, type=kind)
-            test.assertTrue(hierarchy_compare(p0, p1, atol=atol["particles"]))
+    # first failure in the report points at the earliest quantity in the
+    # causal chain (particles feed moments, moments feed E, E feeds B).
+    for time in times:
+        for pop in pops:
+            for kind in ["levelGhost", "domain"]:
+                p0 = run0.GetParticles(time, pop, type=kind)
+                p1 = run1.GetParticles(time, pop, type=kind)
+                check(
+                    f"time={time} pop={pop} particles_{kind}",
+                    hierarchy_compare(p0, p1, atol=atol["particles"]),
+                )
 
-    Ni0 = run0.GetNi(times)
-    Ni1 = run1.GetNi(times)
-    test.assertTrue(hierarchy_compare(Ni0, Ni1, atol=atol["moments"]))
+        Ni0 = run0.GetNi(time)
+        Ni1 = run1.GetNi(time)
+        check(f"time={time} Ni", hierarchy_compare(Ni0, Ni1, atol=atol["moments"]))
 
-    Vi0 = run0.GetVi(times)
-    Vi1 = run1.GetVi(times)
-    test.assertTrue(hierarchy_compare(Vi0, Vi1, atol=atol["moments"]))
+        Vi0 = run0.GetVi(time)
+        Vi1 = run1.GetVi(time)
+        check(f"time={time} Vi", hierarchy_compare(Vi0, Vi1, atol=atol["moments"]))
 
-    for pop in pops:
-        N0 = run0.GetN(times, pop_name=pop)
-        N1 = run1.GetN(times, pop_name=pop)
-        test.assertTrue(hierarchy_compare(N0, N1, atol=atol["moments"]))
+        for pop in pops:
+            N0 = run0.GetN(time, pop_name=pop)
+            N1 = run1.GetN(time, pop_name=pop)
+            check(f"time={time} pop={pop} N", hierarchy_compare(N0, N1, atol=atol["moments"]))
 
-        F0 = run0.GetFlux(times, pop_name=pop)
-        F1 = run1.GetFlux(times, pop_name=pop)
-        test.assertTrue(hierarchy_compare(F0, F1, atol=atol["moments"]))
+            F0 = run0.GetFlux(time, pop_name=pop)
+            F1 = run1.GetFlux(time, pop_name=pop)
+            check(
+                f"time={time} pop={pop} flux", hierarchy_compare(F0, F1, atol=atol["moments"])
+            )
 
-    b0 = run0.GetB(times, all_primal=False)
-    b1 = run1.GetB(times, all_primal=False)
-    test.assertTrue(hierarchy_compare(b0, b1, atol=atol["b"]))
+        b0 = run0.GetB(time, all_primal=False)
+        b1 = run1.GetB(time, all_primal=False)
+        check(f"time={time} B", hierarchy_compare(b0, b1, atol=atol["b"]))
 
-    e0 = run0.GetE(times, all_primal=False)
-    e1 = run1.GetE(times, all_primal=False)
-    test.assertTrue(hierarchy_compare(e0, e1, atol=atol["e"]))
+        e0 = run0.GetE(time, all_primal=False)
+        e1 = run1.GetE(time, all_primal=False)
+        check(f"time={time} E", hierarchy_compare(e0, e1, atol=atol["e"]))
+
+    test.assertTrue(not failures, f"{len(failures)} check(s) failed, see output above")
 
 
 class ALayoutInitTest(HybridInitializationTest):
