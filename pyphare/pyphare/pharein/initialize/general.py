@@ -86,13 +86,12 @@ def add_enum_int(path, enum_name, member_name):
     from pyphare.cpp import cpp_etc_lib
 
     enum_cls = getattr(cpp_etc_lib(), enum_name)
-    member = member_name.lower()
-    if member not in enum_cls.__members__:
+    if member_name not in enum_cls.__members__:
         raise ValueError(
             f"{enum_name}: unknown value '{member_name}',"
             f" expected one of {list(enum_cls.__members__)}"
         )
-    add_int(path, int(getattr(enum_cls, member)))
+    add_int(path, int(getattr(enum_cls, member_name).value))
 
 
 def populateDict(sim):

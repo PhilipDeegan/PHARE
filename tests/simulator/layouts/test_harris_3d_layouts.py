@@ -134,8 +134,7 @@ def config(layout):
     dump_all_diags(model.populations)
 
     ph.ElectronModel(closure="isothermal", Te=0.0)
-    ph.LoadBalancer(active=True, mode="nppc", tol=0.05, every=1000)
-
+    ph.LoadBalancer(active=True, every=1, mode="nppc", tol=0.001)
     return sim, diag_dir
 
 
@@ -154,8 +153,8 @@ class HarrisTest(SimulatorTest):
     def _run(self, layout):
         ph.global_vars.sim = None
         sim, diag_dir = config(layout)
-        # self.register_diag_dir_for_cleanup(diag_dir)
-        # Simulator(sim).run().reset()
+        self.register_diag_dir_for_cleanup(diag_dir)
+        Simulator(sim).run().reset()
         return diag_dir
 
     def test_run(self):

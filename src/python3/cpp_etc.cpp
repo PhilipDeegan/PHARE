@@ -204,12 +204,6 @@ PYBIND11_MODULE(cpp_etc, m, py::mod_gil_not_used())
         .def_readwrite("Hall", &SimOpts::Hall)
         .def("__eq__", [](SimOpts const& a, SimOpts const& b) { return a == b; });
 
-    py::enum_<MHDOpts::TimeIntegratorType>(m, "TimeIntegratorType")
-        .value("euler", MHDOpts::TimeIntegratorType::Euler)
-        .value("tvdrk2", MHDOpts::TimeIntegratorType::TVDRK2)
-        .value("tvdrk3", MHDOpts::TimeIntegratorType::TVDRK3)
-        .value("ssprk4_5", MHDOpts::TimeIntegratorType::SSPRK4_5);
-
     py::enum_<core::HyperMode>(m, "HyperMode")
         .value("constant", core::HyperMode::constant)
         .value("spatial", core::HyperMode::spatial);
