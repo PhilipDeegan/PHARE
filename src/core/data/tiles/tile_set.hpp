@@ -254,7 +254,35 @@ public:
     {
         auto const box_shape = tile_set.box_.shape().as_unsigned();
 
-        if constexpr (dimension == 3)
+        if constexpr (dimension == 1)
+        {
+            for (auto xi = 0u; xi < box_shape[0];)
+            {
+                Point const xip{xi};
+                auto const xitile = tile_set.cells_(xip);
+                link_dim1(tile_set, box_shape, xip);
+                xi += xitile->shape().as_unsigned()[0];
+            }
+        }
+        else if constexpr (dimension == 2)
+        {
+            for (auto xi = 0u; xi < box_shape[0];)
+            {
+                Point const xip{xi, 0u};
+                auto const xitile       = tile_set.cells_(xip);
+                auto const xitile_shape = xitile->shape().as_unsigned();
+
+                for (auto yi = 0u; yi < box_shape[1];)
+                {
+                    Point const yip{xi, yi};
+                    auto const yitile = tile_set.cells_(yip);
+                    link_dim2(tile_set, box_shape, yip);
+                    yi += yitile->shape().as_unsigned()[1];
+                }
+                xi += xitile_shape[0];
+            }
+        }
+        else if constexpr (dimension == 3)
         {
             // links[0] = {0, 0, 1};
             // links[1] = {0, 1, 0};
@@ -298,6 +326,37 @@ private:
         auto const& [tile_set, tile, box_shape, point, idx] = std::forward_as_tuple(args...);
         if (for_N_all<dimension>([&](auto i) { return point[i] < box_shape[i]; }))
             tile->link(idx) = tile_set.cells_(point);
+    }
+
+    template<typename... Args>
+    void static link_dim1(Args&&... args)
+    {
+        auto const& [tile_set, box_shape, point] = std::forward_as_tuple(args...);
+        auto tile                                = tile_set.cells_(point);
+        auto const tile_shape                    = tile->shape().as_unsigned();
+
+        _link(tile_set, tile, box_shape, point + tile_shape, 0);
+    }
+
+    template<typename... Args>
+    void static link_dim2(Args&&... args)
+    {
+        auto const& [tile_set, box_shape, point] = std::forward_as_tuple(args...);
+        auto tile                                = tile_set.cells_(point);
+        auto const tile_shape                    = tile->shape().as_unsigned();
+
+        { // +Y (fastest/last axis, mirrors link_dim3's slot 0)
+            auto link0 = point;
+            link0[1] += tile_shape[1];
+            _link(tile_set, tile, box_shape, link0, 0);
+        }
+        { // +X (mirrors link_dim3's slot 1/3 role as the outer axis)
+            auto link1 = point;
+            link1[0] += tile_shape[0];
+            _link(tile_set, tile, box_shape, link1, 1);
+        }
+        // +X+Y corner
+        _link(tile_set, tile, box_shape, point + tile_shape, 2);
     }
 
     template<typename... Args>

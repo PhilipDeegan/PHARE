@@ -4,6 +4,7 @@
 #include "core/def.hpp"
 #include "core/utilities/box/box.hpp"
 #include "core/data/tiles/tile_set.hpp"
+#include "core/data/tiles/tile_set_traversal.hpp"
 
 #include <tuple>
 #include <string>
@@ -193,30 +194,15 @@ public:
 
     void sync_inner_ghosts()
     {
-        for (std::size_t ti0 = 0; ti0 < super().size() - 1; ++ti0)
-        {
-            for (std::size_t ti1 = ti0 + 1; ti1 < super().size(); ++ti1)
-            {
-                auto& t0 = super()[ti0];
-                auto& t1 = super()[ti1];
-
-                if (auto const t0_overlap = t0.ghost_box() * t1.field_box())
-                    for (auto const& bix : *t0_overlap)
-                    {
-                        auto const& t0_lix = (bix - t0.ghost_box().lower).as_unsigned();
-                        auto const& t1_lix = (bix - t1.ghost_box().lower).as_unsigned();
-                        t0()(t0_lix)       = t1()(t1_lix);
-                    }
-
-                if (auto const t1_overlap = t1.ghost_box() * t0.field_box())
-                    for (auto const& bix : *t1_overlap)
-                    {
-                        auto const& t0_lix = (bix - t0.ghost_box().lower).as_unsigned();
-                        auto const& t1_lix = (bix - t1.ghost_box().lower).as_unsigned();
-                        t1()(t1_lix)       = t0()(t0_lix);
-                    }
-            }
-        }
+        visit_tile_neighbours(super(), [](auto& t0, auto& t1) {
+            if (auto const overlap = t0.ghost_box() * t1.field_box())
+                for (auto const& bix : *overlap)
+                {
+                    auto const& t0_lix = (bix - t0.ghost_box().lower).as_unsigned();
+                    auto const& t1_lix = (bix - t1.ghost_box().lower).as_unsigned();
+                    t0()(t0_lix)       = t1()(t1_lix);
+                }
+        });
     }
 
 
