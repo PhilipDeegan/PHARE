@@ -24,7 +24,7 @@ public:
     }
 
 protected:
-    std::size_t const nx = 10;
+    std::uint32_t const nx = 10u;
     Grid<NdArrayImpl, HybridQuantity::Scalar> f;
 };
 
@@ -39,8 +39,8 @@ public:
     }
 
 protected:
-    std::size_t const nx = 10u;
-    std::size_t const ny = 12u;
+    std::uint32_t const nx = 10u;
+    std::uint32_t const ny = 12u;
     Grid<NdArrayImpl, HybridQuantity::Scalar> f;
 };
 
@@ -55,9 +55,9 @@ public:
     }
 
 protected:
-    std::size_t const nx = 10;
-    std::size_t const ny = 12;
-    std::size_t const nz = 12;
+    std::uint32_t const nx = 10u;
+    std::uint32_t const ny = 12u;
+    std::uint32_t const nz = 12u;
     Grid<NdArrayImpl, HybridQuantity::Scalar> f;
 };
 

@@ -1,8 +1,6 @@
 #ifndef PHARE_SIMULATOR_SIMULATOR_DEF_HPP
 #define PHARE_SIMULATOR_SIMULATOR_DEF_HPP
 
-#include "core/def.hpp"
-#include "core/logger.hpp"
 #include "core/models/options/mhd_options_def.hpp"
 #include "core/data/particles/particle_array_def.hpp"
 
@@ -30,11 +28,11 @@ public:
 
     virtual ~ISimulator() {}
 
-    virtual bool dump_diagnostics(double timestamp, double timestep)
+    virtual bool dump_diagnostics(double /*timestamp*/, double /*timestep*/)
     {
         return false; // overriding optional
     }
-    virtual bool dump_restarts(double timestamp, double timestep)
+    virtual bool dump_restarts(double /*timestamp*/, double /*timestep*/)
     {
         return false; // overriding optional
     }
@@ -103,14 +101,14 @@ SimOpts inline SimOpts::FROM(initializer::PHAREDict const& dict)
 
 constexpr bool operator==(SimOpts const& lhs, SimOpts const& rhs)
 {
-    return lhs.dimension == rhs.dimension                           //
-           and lhs.interp_order == rhs.interp_order                 //
-           and lhs.nbRefinedPart == rhs.nbRefinedPart               //
-           and lhs.layout_mode == rhs.layout_mode                   //
-           and lhs.alloc_mode == rhs.alloc_mode                     //
-           and lhs.reconstruction_type == rhs.reconstruction_type   //
-           and lhs.slope_limiter_type == rhs.slope_limiter_type     //
-           and lhs.riemann_solver_type == rhs.riemann_solver_type   //
+    return lhs.dimension == rhs.dimension                         //
+           and lhs.interp_order == rhs.interp_order               //
+           and lhs.nbRefinedPart == rhs.nbRefinedPart             //
+           and lhs.layout_mode == rhs.layout_mode                 //
+           and lhs.alloc_mode == rhs.alloc_mode                   //
+           and lhs.reconstruction_type == rhs.reconstruction_type //
+           and lhs.slope_limiter_type == rhs.slope_limiter_type   //
+           and lhs.riemann_solver_type == rhs.riemann_solver_type //
            and lhs.Hall == rhs.Hall;
 }
 
