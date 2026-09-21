@@ -1,8 +1,6 @@
 #ifndef PHARE_CORE_UTILITIES_THREAD_POOL_HPP
 #define PHARE_CORE_UTILITIES_THREAD_POOL_HPP
 
-#include "core/logger.hpp"
-
 #include "BS_thread_pool.hpp"
 
 #include <mutex>
@@ -24,7 +22,7 @@ struct ThreadPool
         : mutices(n_pools)
     {
         thread_pools.reserve(n_pools);
-        for (std::uint8_t i = 0; i < n_pools; ++i)
+        for (std::size_t i = 0; i < n_pools; ++i)
             thread_pools.emplace_back(
                 std::make_shared<::BS::thread_pool<::BS::tp::none>>(threads_per_pool));
     }
