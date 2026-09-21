@@ -26,44 +26,40 @@ namespace MHDOpts = PHARE::MHDOpts;
 static_assert(has_hybrid_v<SimOpts{}> && !has_mhd_v<SimOpts{}>); // defaults
 
 static_assert(
-    has_hybrid_v<SimOpts{.dimension            = 2,
-                         .interp_order         = 1,
-                         .nbRefinedPart        = 4,
-                         .layout_mode          = PHARE::core::LayoutMode::AoSMapped,
-                         .alloc_mode           = PHARE::core::AllocatorMode::CPU,
-                         .time_integrator_type = MHDOpts::TimeIntegratorType::TVDRK3,
-                         .reconstruction_type  = MHDOpts::ReconstructionType::WENOZ,
-                         .slope_limiter_type   = MHDOpts::SlopeLimiterType::None,
-                         .riemann_solver_type  = MHDOpts::RiemannSolverType::Rusanov}>); // coupled
-static_assert(has_mhd_v<SimOpts{.dimension            = 2,
-                                .interp_order         = 1,
-                                .nbRefinedPart        = 4,
-                                .layout_mode          = PHARE::core::LayoutMode::AoSMapped,
-                                .alloc_mode           = PHARE::core::AllocatorMode::CPU,
-                                .time_integrator_type = MHDOpts::TimeIntegratorType::TVDRK3,
-                                .reconstruction_type  = MHDOpts::ReconstructionType::WENOZ,
-                                .slope_limiter_type   = MHDOpts::SlopeLimiterType::None,
-                                .riemann_solver_type  = MHDOpts::RiemannSolverType::Rusanov}>);
+    has_hybrid_v<SimOpts{.dimension           = 2,
+                         .interp_order        = 1,
+                         .nbRefinedPart       = 4,
+                         .layout_mode         = PHARE::core::LayoutMode::AoSMapped,
+                         .alloc_mode          = PHARE::core::AllocatorMode::CPU,
+                         .reconstruction_type = MHDOpts::ReconstructionType::WENOZ,
+                         .slope_limiter_type  = MHDOpts::SlopeLimiterType::None,
+                         .riemann_solver_type = MHDOpts::RiemannSolverType::Rusanov}>); // coupled
+static_assert(has_mhd_v<SimOpts{.dimension           = 2,
+                                .interp_order        = 1,
+                                .nbRefinedPart       = 4,
+                                .layout_mode         = PHARE::core::LayoutMode::AoSMapped,
+                                .alloc_mode          = PHARE::core::AllocatorMode::CPU,
+                                .reconstruction_type = MHDOpts::ReconstructionType::WENOZ,
+                                .slope_limiter_type  = MHDOpts::SlopeLimiterType::None,
+                                .riemann_solver_type = MHDOpts::RiemannSolverType::Rusanov}>);
 
-static_assert(!has_hybrid_v<SimOpts{.dimension            = 2,
-                                    .interp_order         = 0,
-                                    .nbRefinedPart        = 0,
-                                    .layout_mode          = PHARE::core::LayoutMode::AoSMapped,
-                                    .alloc_mode           = PHARE::core::AllocatorMode::CPU,
-                                    .time_integrator_type = MHDOpts::TimeIntegratorType::TVDRK3,
-                                    .reconstruction_type  = MHDOpts::ReconstructionType::WENOZ,
-                                    .slope_limiter_type   = MHDOpts::SlopeLimiterType::None,
+static_assert(!has_hybrid_v<SimOpts{.dimension           = 2,
+                                    .interp_order        = 0,
+                                    .nbRefinedPart       = 0,
+                                    .layout_mode         = PHARE::core::LayoutMode::AoSMapped,
+                                    .alloc_mode          = PHARE::core::AllocatorMode::CPU,
+                                    .reconstruction_type = MHDOpts::ReconstructionType::WENOZ,
+                                    .slope_limiter_type  = MHDOpts::SlopeLimiterType::None,
                                     .riemann_solver_type
                                     = MHDOpts::RiemannSolverType::Rusanov}>); // decoupled MHD-only
-static_assert(has_mhd_v<SimOpts{.dimension            = 2,
-                                .interp_order         = 0,
-                                .nbRefinedPart        = 0,
-                                .layout_mode          = PHARE::core::LayoutMode::AoSMapped,
-                                .alloc_mode           = PHARE::core::AllocatorMode::CPU,
-                                .time_integrator_type = MHDOpts::TimeIntegratorType::TVDRK3,
-                                .reconstruction_type  = MHDOpts::ReconstructionType::WENOZ,
-                                .slope_limiter_type   = MHDOpts::SlopeLimiterType::None,
-                                .riemann_solver_type  = MHDOpts::RiemannSolverType::Rusanov}>);
+static_assert(has_mhd_v<SimOpts{.dimension           = 2,
+                                .interp_order        = 0,
+                                .nbRefinedPart       = 0,
+                                .layout_mode         = PHARE::core::LayoutMode::AoSMapped,
+                                .alloc_mode          = PHARE::core::AllocatorMode::CPU,
+                                .reconstruction_type = MHDOpts::ReconstructionType::WENOZ,
+                                .slope_limiter_type  = MHDOpts::SlopeLimiterType::None,
+                                .riemann_solver_type = MHDOpts::RiemannSolverType::Rusanov}>);
 
 static_assert(SimOpts{}.mhd_axes_consistent());
 } // namespace

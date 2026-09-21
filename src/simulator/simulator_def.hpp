@@ -51,22 +51,20 @@ struct SimOpts
     core::LayoutMode layout_mode   = core::LayoutMode::AoSMapped;
     core::AllocatorMode alloc_mode = core::AllocatorMode::CPU;
 
-    MHDOpts::TimeIntegratorType time_integrator_type = MHDOpts::TimeIntegratorType::MHDOff;
-    MHDOpts::ReconstructionType reconstruction_type  = MHDOpts::ReconstructionType::MHDOff;
-    MHDOpts::SlopeLimiterType slope_limiter_type     = MHDOpts::SlopeLimiterType::MHDOff;
-    MHDOpts::RiemannSolverType riemann_solver_type   = MHDOpts::RiemannSolverType::MHDOff;
-    bool Hall                                        = false;
+    MHDOpts::ReconstructionType reconstruction_type = MHDOpts::ReconstructionType::MHDOff;
+    MHDOpts::SlopeLimiterType slope_limiter_type    = MHDOpts::SlopeLimiterType::MHDOff;
+    MHDOpts::RiemannSolverType riemann_solver_type  = MHDOpts::RiemannSolverType::MHDOff;
+    bool Hall                                       = false;
 
     // derived — two independent axes, never one as the other's negation
     bool hybrid_enabled = interp_order > 0;
     bool mhd_enabled    = reconstruction_type != MHDOpts::ReconstructionType::MHDOff;
 
-    // all four MHD axes must agree on off-ness; a member fn keeps SimOpts an aggregate
+    // all MHD axes must agree on off-ness; a member fn keeps SimOpts an aggregate
     constexpr bool mhd_axes_consistent() const
     {
         bool const mhd_is_off = !mhd_enabled;
-        return mhd_is_off == (time_integrator_type == MHDOpts::TimeIntegratorType::MHDOff)
-               && mhd_is_off == (slope_limiter_type == MHDOpts::SlopeLimiterType::MHDOff)
+        return mhd_is_off == (slope_limiter_type == MHDOpts::SlopeLimiterType::MHDOff)
                && mhd_is_off == (riemann_solver_type == MHDOpts::RiemannSolverType::MHDOff);
     }
 
@@ -95,7 +93,6 @@ SimOpts inline SimOpts::FROM(initializer::PHAREDict const& dict)
                                static_cast<int>(defaultNbrRefinedParts(dimension, interp_order)))),
         enum_from("particle_layout", defaults.layout_mode),
         enum_from("allocator", defaults.alloc_mode),
-        enum_from("mhd_timestepper", defaults.time_integrator_type),
         enum_from("reconstruction", defaults.reconstruction_type),
         enum_from("limiter", defaults.slope_limiter_type),
         enum_from("riemann", defaults.riemann_solver_type),
@@ -111,7 +108,6 @@ constexpr bool operator==(SimOpts const& lhs, SimOpts const& rhs)
            and lhs.nbRefinedPart == rhs.nbRefinedPart               //
            and lhs.layout_mode == rhs.layout_mode                   //
            and lhs.alloc_mode == rhs.alloc_mode                     //
-           and lhs.time_integrator_type == rhs.time_integrator_type //
            and lhs.reconstruction_type == rhs.reconstruction_type   //
            and lhs.slope_limiter_type == rhs.slope_limiter_type     //
            and lhs.riemann_solver_type == rhs.riemann_solver_type   //

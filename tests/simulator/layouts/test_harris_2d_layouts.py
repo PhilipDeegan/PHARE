@@ -129,7 +129,7 @@ def config(layout):
     )
     dump_all_diags(model.populations)
     ph.ElectronModel(closure="isothermal", Te=0.0)
-    # ph.LoadBalancer(active=True, every=1, mode="nppc", tol=0.001)
+    ph.LoadBalancer(active=True, every=1, mode="nppc", tol=0.001)
     return sim, diag_dir
 
 

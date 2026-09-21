@@ -20,13 +20,13 @@ while(THIS_FILE)
     string(REPLACE "," ";" LINE_LIST ${LINE})
     list(LENGTH LINE_LIST LINE_LENGTH)
 
-    # dim,interp,refined,layout,allocator[,timeint,recon,slope,riemann,hall]
-    if(NOT LINE_LENGTH EQUAL 5 AND NOT LINE_LENGTH EQUAL 10)
+    # dim,interp,refined,layout,allocator[,recon,slope,riemann,hall]
+    if(NOT LINE_LENGTH EQUAL 5 AND NOT LINE_LENGTH EQUAL 9)
         message(FATAL_ERROR "PHARE permutation line has unsupported arity (${LINE_LENGTH}): ${LINE}")
     endif()
 
     SET(_OFFSET 3)
-    SET(_PREFIXES "LayoutMode;AllocatorMode;TimeIntegratorType;ReconstructionType;SlopeLimiterType;RiemannSolverType")
+    SET(_PREFIXES "LayoutMode;AllocatorMode;ReconstructionType;SlopeLimiterType;RiemannSolverType")
     foreach(PREFIX IN LISTS _PREFIXES)
       if(LINE_LENGTH GREATER ${_OFFSET})
           list(TRANSFORM LINE_LIST PREPEND "${PREFIX}::" AT ${_OFFSET})

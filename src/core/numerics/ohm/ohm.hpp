@@ -10,7 +10,7 @@
 
 namespace PHARE::core
 {
-enum class HyperMode : std::uint8_t { constant = 0, spatial, LAST };
+enum class HyperMode : std::uint8_t { constant = 0, spatial, count };
 
 struct OhmInfo
 {
@@ -241,7 +241,7 @@ private:
                          MeshIndex<VecField::dimension> index) const
     {
         // if compile error, fix this function
-        static_assert(static_cast<std::underlying_type_t<HyperMode>>(HyperMode::LAST) == 2);
+        static_assert(static_cast<std::underlying_type_t<HyperMode>>(HyperMode::count) == 2);
 
         if (hyper_mode == HyperMode::constant)
             return constant_hyperresistive_<component>(J, index);

@@ -40,38 +40,35 @@
 3,3,6,AoSPCTS,CPU
 3,3,12,AoSMapped,CPU
 3,3,27,AoSMapped,CPU
-# --- MHD-only builds (dim,0,0,layout,allocator,timestepper,reconstruction,limiter,riemann,hall) ---
+# --- MHD-only builds (dim,0,0,layout,allocator,reconstruction,limiter,riemann,hall) ---
 # interp/refined are forced to 0 (layout/allocator are unused but kept explicit for a
 # stable module name) so hybrid code is not compiled into these -- decoupled surfaces.
+# timestepper is a runtime choice (not a compile-time axis), so it is not a column here.
 # --- one line per single-run functional test ---
-# mhd_harris (higher-order, kept)
-2,0,0,AoSMapped,CPU,TVDRK3,WENOZ,None,Rusanov,true
-# mhd_harris_3d (higher-order, kept)
-3,0,0,AoSMapped,CPU,TVDRK3,WENOZ,None,Rusanov,true
-# mhd_alfven2d, mhd_rotor, mhd_orszagtang (ideal)
-2,0,0,AoSMapped,CPU,TVDRK2,Linear,VanLeer,Rusanov,false
-# mhd_shock
-1,0,0,AoSMapped,CPU,TVDRK2,Linear,VanLeer,Rusanov,false
+# mhd_harris, mhd_harris_3d (higher-order, kept)
+2,0,0,AoSMapped,CPU,WENOZ,None,Rusanov,true
+3,0,0,AoSMapped,CPU,WENOZ,None,Rusanov,true
+# mhd_alfven2d, mhd_rotor, mhd_orszagtang, mhd_shock, mhd_orszagtang_3d (ideal);
+# also covers mhd_convergence (1D) and mhd_multidimensional_convergence (3D) @ Linear
+2,0,0,AoSMapped,CPU,Linear,VanLeer,Rusanov,false
+1,0,0,AoSMapped,CPU,Linear,VanLeer,Rusanov,false
+3,0,0,AoSMapped,CPU,Linear,VanLeer,Rusanov,false
 # mhd_dispersion (whistler1d, Hall)
-1,0,0,AoSMapped,CPU,TVDRK2,Linear,VanLeer,Rusanov,true
-# mhd_orszagtang_3d
-3,0,0,AoSMapped,CPU,TVDRK2,Linear,VanLeer,Rusanov,false
-# --- mhd_convergence (1D): all reconstructions @ SSPRK4_5 ---
-1,0,0,AoSMapped,CPU,SSPRK4_5,Constant,None,Rusanov,false
-1,0,0,AoSMapped,CPU,SSPRK4_5,Linear,VanLeer,Rusanov,false
-1,0,0,AoSMapped,CPU,SSPRK4_5,WENO3,None,Rusanov,false
-1,0,0,AoSMapped,CPU,SSPRK4_5,WENOZ,None,Rusanov,false
-1,0,0,AoSMapped,CPU,SSPRK4_5,MP5,None,Rusanov,false
-# --- mhd_multidimensional_convergence (3D): order-2 reconstructions @ SSPRK4_5 ---
-3,0,0,AoSMapped,CPU,SSPRK4_5,Linear,VanLeer,Rusanov,false
-3,0,0,AoSMapped,CPU,SSPRK4_5,WENO3,None,Rusanov,false
-3,0,0,AoSMapped,CPU,SSPRK4_5,WENOZ,None,Rusanov,false
-3,0,0,AoSMapped,CPU,SSPRK4_5,MP5,None,Rusanov,false
+1,0,0,AoSMapped,CPU,Linear,VanLeer,Rusanov,true
+# --- mhd_convergence (1D): remaining reconstructions ---
+1,0,0,AoSMapped,CPU,Constant,None,Rusanov,false
+1,0,0,AoSMapped,CPU,WENO3,None,Rusanov,false
+1,0,0,AoSMapped,CPU,WENOZ,None,Rusanov,false
+1,0,0,AoSMapped,CPU,MP5,None,Rusanov,false
+# --- mhd_multidimensional_convergence (3D): remaining order-2 reconstructions ---
+3,0,0,AoSMapped,CPU,WENO3,None,Rusanov,false
+3,0,0,AoSMapped,CPU,WENOZ,None,Rusanov,false
+3,0,0,AoSMapped,CPU,MP5,None,Rusanov,false
 # --- coverage-only: gaps not hit by any test ---
-1,0,0,AoSMapped,CPU,Euler,Linear,MinMod,Rusanov,false
-1,0,0,AoSMapped,CPU,Euler,Constant,None,HLL,false
-1,0,0,AoSMapped,CPU,Euler,Constant,None,HLLD,false
-# --- coupled ("both") build (dim,interp,nbRefinedPart,layout,allocator,timestepper,reconstruction,limiter,riemann,hall) ---
+1,0,0,AoSMapped,CPU,Linear,MinMod,Rusanov,false
+1,0,0,AoSMapped,CPU,Constant,None,HLL,false
+1,0,0,AoSMapped,CPU,Constant,None,HLLD,false
+# --- coupled ("both") build (dim,interp,nbRefinedPart,layout,allocator,reconstruction,limiter,riemann,hall) ---
 # proven by a one-timestep gate: mhd_harris/harris.py's config with interp_order/
 # refined_particle_nbr forced explicit (its own default is decoupled MHD-only)
-2,1,4,AoSMapped,CPU,TVDRK3,WENOZ,None,Rusanov,true
+2,1,4,AoSMapped,CPU,WENOZ,None,Rusanov,true
