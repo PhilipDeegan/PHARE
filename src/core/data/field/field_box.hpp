@@ -49,6 +49,16 @@ bool constexpr is_border_op()
 template<typename Op>
 auto constexpr static is_border_op_v = is_border_op<Op>();
 
+template<typename Op>
+bool constexpr is_border_max_op()
+{
+    using value_type = Op::value_type;
+    return std::is_same_v<Op, FieldBorderMaxOp<value_type>>;
+}
+
+template<typename Op>
+auto constexpr static is_border_max_op_v = is_border_max_op<Op>();
+
 template<typename Field_t>
 class FieldBox
 {
@@ -140,6 +150,10 @@ BoxExpander(Box_t, Box_t) -> BoxExpander<Box_t>;
 template<typename Operator, typename GridLayout_t, typename... Args>
 void operate_on_fields(FieldBox<GridTileSet<GridLayout_t, Args...>>& dst,
                        FieldBox<GridTileSet<GridLayout_t, Args...> const> const& src);
+
+template<typename Tiles>
+auto reduce_single(Tiles const& input)
+    requires(is_field_tile_set_v<Tiles>);
 
 
 template<typename Operator, typename GridLayout_t, typename... Args>
@@ -275,9 +289,69 @@ void FieldBox<Field_t>::op(FieldBox<Field_t0> const& that)
 }
 
 
+// Max-combine: source tile ghost regions hold redundant *complete* copies of a node's
+// value (not partial contributions), so overlapping tiles must be de-duplicated into one
+// flat, unambiguous view before combining. Iterating src.field()'s tiles directly and
+// applying Operator once per overlapping tile applies it multiple times to the same dst
+// cell whenever several tiles' redundant ghost copies overlap the same destination region
+// (last tile in container order wins, an order not guaranteed stable between serial and
+// parallel runs, and not guaranteed stable across different tile decompositions).
 template<typename Operator, typename... T0s, typename... T1s>
 void operate_on_fields(FieldBox<Grid<T0s...>>& dst, FieldBox<GridTileSet<T1s...> const> const& src)
-    requires(is_border_op_v<Operator>)
+    requires(is_border_max_op_v<Operator>)
+{
+    PHARE_LOG_SCOPE(3, "operate_on_fields_border_max<Grid, GridTileSet>");
+
+    // de-duplicate only the border-touching tiles into one flat, unambiguous view. This
+    // overload is only ever used to fill a border/ghost selection box, which non-border
+    // (fully interior) tiles can never overlap, so populating them would be wasted work.
+    using Tiles_t = GridTileSet<T1s...>;
+    using Grid_t0 = typename Tiles_t::grid_type;
+
+    auto const pq           = src.field.physicalQuantity();
+    auto const patch_layout = src.field.layout();
+    auto const patch_box    = patch_layout.AMRBox();
+    auto const ghost_box    = patch_layout.AMRGhostBoxFor(pq);
+    auto const expander     = BoxExpander{ghost_box, patch_box};
+
+    Grid_t0 srcScratch{src.field.name(), pq, src.field.shape()};
+    srcScratch.zero();
+    for (auto const& tile : src.field())
+    {
+        auto const tile_gb = tile.layout().AMRGhostBoxFor(pq);
+        if (*(tile_gb * patch_box) == tile_gb) // fully interior, cannot reach a border box
+            continue;
+        for (auto const& bix : expander(*tile))
+        {
+            auto const lix      = (bix - ghost_box.lower).as_unsigned();
+            auto const tile_lix = (bix - tile_gb.lower).as_unsigned();
+            srcScratch(lix)     = tile()(tile_lix);
+        }
+    }
+
+    auto const dst_layout = src.field.layout().copy_as(dst.amr_box);
+    auto const src_selection_box = src.field.layout().localToAMR(src.lcl_box);
+    auto const dst_selection_box = shift(dst_layout.localToAMR(dst.lcl_box), src.offset_ * -1);
+    assert(src_selection_box.shape() == dst_selection_box.shape());
+
+    if (auto const overlap = src_selection_box * dst_selection_box)
+    {
+        auto const lcl_src_box = src.field.layout().AMRToLocal(*overlap);
+        auto const lcl_dst_box = dst_layout.AMRToLocal(shift(*overlap, src.offset_));
+
+        auto src_it = lcl_src_box.begin();
+        auto dst_it = lcl_dst_box.begin();
+        for (; dst_it != lcl_dst_box.end() and src_it != lcl_src_box.end(); ++src_it, ++dst_it)
+            Operator{dst.field(*dst_it)}(srcScratch(*src_it));
+    }
+}
+
+// Sum-combine: each source tile's ghost region holds a genuinely *partial* contribution
+// (e.g. raw particle deposit split across tile-ghost boundaries), so every overlapping
+// tile must be visited and accumulated.
+template<typename Operator, typename... T0s, typename... T1s>
+void operate_on_fields(FieldBox<Grid<T0s...>>& dst, FieldBox<GridTileSet<T1s...> const> const& src)
+    requires(is_border_op_v<Operator> and !is_border_max_op_v<Operator>)
 {
     // USED IN BORDER SUM SCHEDULES FOR TILES!
     PHARE_LOG_SCOPE(3, "operate_on_fields_border_sum<Grid, GridTileSet>");
@@ -310,11 +384,7 @@ void operate_on_fields(FieldBox<Grid<T0s...>>& dst, FieldBox<GridTileSet<T1s...>
                 auto dst_it = lcl_dst_box.begin();
                 for (; dst_it != lcl_dst_box.end() and src_it != lcl_src_box.end();
                      ++src_it, ++dst_it)
-                {
-                    // auto d = dst.field(*dst_it);
-                    // auto s = src_tile()(*src_it);
                     Operator{dst.field(*dst_it)}(src_tile()(*src_it));
-                }
             }
     }
 }

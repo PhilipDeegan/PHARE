@@ -5,6 +5,8 @@
 #include "core/data/particles/particle_array_def.hpp"
 #include "core/models/quantities/hybrid_quantities.hpp"
 
+#include "amr/solvers/solver_hybrid_field_evolvers.hpp"
+
 #include "simulator/simulator_def.hpp"
 
 #include "tests/core/data/field/test_field_fixtures.hpp"

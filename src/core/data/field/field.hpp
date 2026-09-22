@@ -145,7 +145,7 @@ public:
     NO_DISCARD auto& name() const { return name_; }
 
     Super& operator*() { return *this; }
-    Super& operator*() const { return *this; }
+    Super const& operator*() const { return *this; }
 
 private:
     std::string name_{"No Name"};

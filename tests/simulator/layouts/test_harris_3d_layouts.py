@@ -1,3 +1,4 @@
+import os
 import numpy as np
 
 from pyphare import cpp
@@ -22,7 +23,10 @@ ppc = 33
 def config(layout):
     L = 0.5
 
-    diag_dir = f"phare_outputs/test/layouts/harris_3d_{layout}/{cpp.mpi_size()}"
+    split_size = os.environ.get("PHARE_TILING_MIN_BEFORE_SPLIT", 4)
+    diag_dir = (
+        f"phare_outputs/test/layouts/harris_3d_{layout}/{cpp.mpi_size()}/{split_size}"
+    )
     sim = ph.Simulation(
         time_step=time_step,
         final_time=final_time,
