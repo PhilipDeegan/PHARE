@@ -1,12 +1,16 @@
 #ifndef PHARE_CORE_DATA_PARTICLES_PARTICLE_ARRAY_HPP
 #define PHARE_CORE_DATA_PARTICLES_PARTICLE_ARRAY_HPP
 
+#include "core/data/particles/particle.hpp"
 #include "core/data/particles/particle_array_def.hpp"
 #include "core/data/particles/particle_array_detail.hpp"
 
+#include "core/utilities/box/box.hpp"
 #include "core/utilities/equality.hpp"
 
 #include <utility>
+#include <sstream>
+#include <stdexcept>
 
 namespace PHARE::core
 {
@@ -207,6 +211,62 @@ template<typename ParticleArray_t>
 auto constexpr base_layout_type()
 {
     return LayoutMode::AoS;
+}
+
+
+template<typename ParticleArray_t>
+void check_level_ghost_particles(ParticleArray_t const& particles)
+    requires(ParticleArray_t::layout_mode == LayoutMode::AoSPCTS)
+{
+    // level ghost particles are expected to be duplicated per tile: any cell reachable
+    // (via ghost halo) from more than one tile must hold the same particle count in
+    // every tile that reaches it, or some tile is missing contributions.
+
+    auto const& tiles = particles();
+
+    auto const count_at = [](auto const& ps, auto const& cell) { return ps(cell).size(); };
+
+    for (auto const& bix : particles.ghost_box())
+    {
+        if (isIn(bix, particles.box()))
+            continue;
+
+        for (std::size_t i = 0; i < tiles.size(); ++i)
+        {
+            auto const& tile_0 = tiles[i];
+
+            if (not isIn(bix, tile_0().ghost_box()))
+                continue;
+
+            for (std::size_t j = i + 1; j < tiles.size(); ++j)
+            {
+                auto const& tile_1 = tiles[j];
+
+                if (not isIn(bix, tile_1().ghost_box()))
+                    continue;
+
+                auto const lcl_0 = (bix - tile_0().ghost_box().lower).as_unsigned();
+                auto const lcl_1 = (bix - tile_1().ghost_box().lower).as_unsigned();
+                auto const na    = count_at(tile_0(), lcl_0);
+                auto const nb    = count_at(tile_1(), lcl_1);
+
+                if (na != nb)
+                {
+                    std::ostringstream oss;
+                    oss << "check_level_ghost_particles: tile mismatch at cell " << bix << ": "
+                        << na << " vs " << nb;
+                    throw std::runtime_error(oss.str());
+                }
+            }
+        }
+    }
+}
+
+
+template<typename ParticleArray_t>
+void check_level_ghost_particles(ParticleArray_t const& particles)
+{
+    // fallthrough
 }
 
 

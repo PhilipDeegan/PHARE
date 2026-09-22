@@ -64,14 +64,16 @@ def check_and_plot(qty_label, h0, h1, plot=True):
     eqr = hierarchy_compare(h0, h1, atol=atol)
     print(f"\n\t{qty_label}", eqr)
 
-    if plot:
-        for reason, cmp_data, ref_data in eqr.failed:
-            short_reason = reason.split("\n")[0]
-            plot_patch_diff(cmp_data.field_name, short_reason, ref_data, cmp_data)
-            plot_patch_side_by_side(
-                cmp_data.field_name, short_reason, ref_data, cmp_data
-            )
-
+    try:
+        if plot:
+            for reason, cmp_data, ref_data in eqr.failed:
+                short_reason = reason.split("\n")[0]
+                plot_patch_diff(cmp_data.field_name, short_reason, ref_data, cmp_data)
+                plot_patch_side_by_side(
+                    cmp_data.field_name, short_reason, ref_data, cmp_data
+                )
+    except Exception:
+        ...
     return bool(eqr)
 
 
@@ -96,10 +98,6 @@ def main():
         check_and_plot(
             "E", run0.GetE(time, all_primal=False), run1.GetE(time, all_primal=False)
         )
-        check_and_plot("Ni", run0.GetNi(time), run1.GetNi(time))
-        check_and_plot(
-            "V", run0.GetVi(time, all_primal=False), run1.GetVi(time, all_primal=False)
-        )
 
         for pop in run0.all_pops():
             check_and_plot(
@@ -112,6 +110,11 @@ def main():
                 run0.GetFlux(time, pop_name=pop),
                 run1.GetFlux(time, pop_name=pop),
             )
+
+        check_and_plot("Ni", run0.GetNi(time), run1.GetNi(time))
+        check_and_plot(
+            "V", run0.GetVi(time, all_primal=False), run1.GetVi(time, all_primal=False)
+        )
 
 
 if __name__ == "__main__":
