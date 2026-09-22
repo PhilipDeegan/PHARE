@@ -134,6 +134,8 @@ void operate_on_fields(FieldBox<GridTileSet<GridLayout_t, Args...>>& dst,
 {
     PHARE_LOG_SCOPE(3, "operate_on_fields_border_sum<GridTileSet,GridTileSet>");
 
+    static_assert(dependent_false_v<Operator>);
+
     auto const pq = dst.field.physicalQuantity();
     assert(src.field.physicalQuantity() == pq);
 
@@ -263,34 +265,42 @@ void operate_on_fields(FieldBox<Grid<T0s...>>& dst, FieldBox<GridTileSet<T1s...>
     requires(is_border_op_v<Operator>)
 {
     // USED IN BORDER SUM SCHEDULES FOR TILES!
-    PHARE_LOG_SCOPE(3, "operate_on_fields_border_sum<Grid,GridTileSet>");
+    PHARE_LOG_SCOPE(3, "operate_on_fields_border_sum<Grid, GridTileSet>");
 
     auto const pq         = dst.field.physicalQuantity();
     auto const dst_layout = src.field.layout().copy_as(dst.amr_box);
-    auto const get_box    = [&](auto const& tile) { return tile.layout().AMRGhostBoxFor(pq); };
+    auto const skip       = [](auto const& field, auto const& tile) {
+        auto const tbox = grow(tile, 1);
+        return *(tbox * field.layout().AMRBox()) == tbox;
+    };
+    auto const get_box = [&](auto const& tile) { return tile.layout().AMRGhostBoxFor(pq); };
     auto const src_selection_box = src.field.layout().localToAMR(src.lcl_box);
     auto const dst_selection_box = shift(dst_layout.localToAMR(dst.lcl_box), src.offset_ * -1);
     assert(src_selection_box.shape() == dst_selection_box.shape());
 
     for (auto const& src_tile : src.field())
     {
+        if (skip(src.field, src_tile))
+            continue;
         auto const src_tile_ghost_box = get_box(src_tile);
         if (auto const src_overlap = src_selection_box * src_tile_ghost_box)
-        {
-            auto const lcl_src_box = src_tile.layout().AMRToLocal(*src_overlap);
-            auto const lcl_dst_box = dst_layout.AMRToLocal(shift(*src_overlap, src.offset_));
-
-            assert(lcl_src_box.size() <= src_tile().size());
-
-            auto src_it = lcl_src_box.begin();
-            auto dst_it = lcl_dst_box.begin();
-            for (; dst_it != lcl_dst_box.end() and src_it != lcl_src_box.end(); ++src_it, ++dst_it)
+            if (auto const overlap = *src_overlap * dst_selection_box)
             {
-                auto d = dst.field(*dst_it);
-                auto s = src_tile()(*src_it);
-                Operator{dst.field(*dst_it)}(src_tile()(*src_it));
+                auto const lcl_src_box = src_tile.layout().AMRToLocal(*overlap);
+                auto const lcl_dst_box = dst_layout.AMRToLocal(shift(*overlap, src.offset_));
+
+                assert(lcl_src_box.size() <= src_tile().size());
+
+                auto src_it = lcl_src_box.begin();
+                auto dst_it = lcl_dst_box.begin();
+                for (; dst_it != lcl_dst_box.end() and src_it != lcl_src_box.end();
+                     ++src_it, ++dst_it)
+                {
+                    // auto d = dst.field(*dst_it);
+                    // auto s = src_tile()(*src_it);
+                    Operator{dst.field(*dst_it)}(src_tile()(*src_it));
+                }
             }
-        }
     }
 }
 
