@@ -55,6 +55,7 @@ class HybridAdvanceTest(AdvanceTestBase):
         extra_diag_options = extra_diag_options or dict()
         extra_diag_options["dir"] = base_diag_dir
         extra_diag_options["mode"] = "overwrite"
+        extra_diag_options["fine_dump_lvl_max"] = 10
         sim = self.simulation(
             smallest_patch_size=smallest_patch_size,
             largest_patch_size=largest_patch_size,
