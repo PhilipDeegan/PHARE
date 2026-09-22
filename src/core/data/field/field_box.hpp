@@ -8,6 +8,7 @@
 #include "core/data/grid/grid_tiles.hpp"
 
 #include <vector>
+#include <cmath>
 #include <cstddef>
 #include <cstring>
 #include <type_traits>
@@ -19,9 +20,23 @@ struct FieldBorderSumOp : public PlusEquals<D>
 {
 };
 
+// Picks whichever side is "more complete" (domain deposit vs. a partial/
+// level-ghost-approximated contribution). For non-negative quantities (density)
+// the more complete side is also the numerically larger one, so a plain max
+// works. For signed quantities (e.g. bulk velocity) that's not true, so we
+// compare magnitudes instead and keep the winning side's sign.
 template<typename D>
-struct FieldBorderMaxOp : public SetMax<D>
+struct FieldBorderMaxOp
 {
+    using value_type = D;
+
+    void operator()(auto const& d0)
+    {
+        if (std::abs(d0) > std::abs(d))
+            d = d0;
+    }
+
+    D& d;
 };
 
 template<typename Op>
