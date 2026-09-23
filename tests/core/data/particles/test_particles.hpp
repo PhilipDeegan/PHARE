@@ -258,6 +258,30 @@ std::size_t count_equal(ParticleArray0 const& p0, ParticleArray1 const& p1, Shif
     return eq;
 }
 
+// tiled level ghosts are duplicated per tile: take only each cell's clamp-owner tile copy
+template<typename AoS_t, typename Particles>
+auto clamp_owner_particles(Particles const& particles)
+{
+    AoS_t out;
+    auto const& tiles = particles();
+    for (auto const& tile : tiles)
+    {
+        auto const take = [&](auto const& p) {
+            if (isIn(p.iCell(), particles.ghost_box()) and tiles.at(Point{p.iCell()}) == &tile)
+                out.push_back(p);
+        };
+        if constexpr (Particles::layout_mode == LayoutMode::AoSCMTS)
+            for (auto const& p : tile())
+                take(p);
+        else
+            for (auto const& cps : tile()())
+                for (auto const& p : cps)
+                    take(p);
+    }
+    return out;
+}
+
+
 } // namespace PHARE::core
 
 #endif /* PHARE_CORE_DATA_TEST_PARTICLES_HPP */

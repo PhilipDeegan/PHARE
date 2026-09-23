@@ -83,9 +83,9 @@ void MultiBoris<ModelAccessor, Interpolator>::move(auto const& boxings)
 }
 
 
-// AoSPCTS only: tiles of per-cell AoS particles, tiled fields. Particle iteration relies
-// on each tile containing a PerCellParticles container (flat iterators over all particles
-// in that tile), so this isn't generic over LayoutMode.
+// tiled layouts: tiled fields, one particle container per tile. AoSCMTS subclasses this
+// (see below); where the per-tile container differs (per-cell for AoSPCTS, flat
+// cell-mapped for AoSCMTS) the layout is handled locally in MultiBorisFunctors.
 template<typename ModelAccessor, typename Interpolator>
 struct MultiBorisBackend<LayoutMode::AoSPCTS, ModelAccessor, Interpolator>
 {
@@ -348,6 +348,14 @@ void MultiBorisBackend<LayoutMode::AoSPCTS, ModelAccessor, Interpolator>::move_p
 }
 
 
+// AoSCMTS: same dispatch as AoSPCTS, the per-tile differences live in MultiBorisFunctors
+template<typename ModelAccessor, typename Interpolator>
+struct MultiBorisBackend<LayoutMode::AoSCMTS, ModelAccessor, Interpolator>
+    : public MultiBorisBackend<LayoutMode::AoSPCTS, ModelAccessor, Interpolator>
+{
+};
+
+
 // ── Per-tile functors (shared between CPU and GPU specialisations) ─────────────────────
 
 template<auto particle_type, auto boris_mode, typename Backend_t>
@@ -369,8 +377,11 @@ struct MultiBorisFunctors
         , electromag{em}
         , dto2m{0.5 * in.dt / pop.mass()}
         , halfdt{in.mesh(view.layout.meshSize(), in.dt)}
+        , particles{parts}
     {
     }
+
+    static constexpr bool cell_mapped = Particles_t::layout_mode == LayoutMode::AoSCMTS;
 
     void operator()(auto& in, [[maybe_unused]] auto const i) { on_cpu_tiles(in); }
 
@@ -397,19 +408,28 @@ struct MultiBorisFunctors
             return make_particle_tracker<Particles_t::layout_mode, particle_type, dim>(args...);
         };
 
-        for (auto const& bix : parts.local_box())
-        {
-            auto& cell_particles = parts.particles_(bix);
-            for (std::size_t pid = 0; pid < cell_particles.size(); ++pid)
-            {
-                auto const& old_cell = cell_particles[pid].iCell();
-                // tile_cell names the tile PHYSICALLY holding this particle;
-                // pps.local_tile_cell would instead give the clamp-owner, which
-                // diverges for duplicated level ghost cells
-                auto const pt = tracker(old_cell, tile_cell);
-                per_particle(cell_particles[pid], layout, pt, pid, em);
-            }
-        }
+        // tile_cell names the tile PHYSICALLY holding this particle;
+        // pps.local_tile_cell would instead give the clamp-owner, which
+        // diverges for duplicated level ghost cells
+        auto const per_array = [&](auto& ps) {
+            for (std::size_t pid = 0; pid < ps.size(); ++pid)
+                per_particle(ps[pid], layout, tracker(ps[pid].iCell(), tile_cell), pid, em);
+        };
+
+        if constexpr (cell_mapped) // one flat array per tile, pid is the tile index
+            per_array(parts);
+        else
+            for (auto const& bix : parts.local_box())
+                per_array(parts.particles_(bix));
+    }
+
+    // AoSCMTS registers on the vector: a cellmap can't be updated through its view
+    void move_check(auto const& pt, std::size_t const pidx, auto& particle)
+    {
+        if constexpr (cell_mapped)
+            particles.template move_check<particle_type>(pt, pidx, particle);
+        else
+            pps.template move_check<particle_type>(pt, pidx, particle);
     }
 
     void per_particle_still_in_ghost_box(auto&&... args)
@@ -427,7 +447,7 @@ struct MultiBorisFunctors
             // per-cell buckets are tracked even in the tile ghost layer, so any particle
             // whose cell changed needs registering — domain and level ghost alike. pt was
             // built in per_tile, before advance() ran.
-            pps.template move_check<particle_type>(pt, pidx, particle);
+            move_check(pt, pidx, particle);
     }
 
     void per_particle(auto&&... args)
@@ -446,7 +466,7 @@ struct MultiBorisFunctors
             else if constexpr (boris_mode == MultiBorisMode::REF)
                 // left the ghost box on the first half-step — register the departure or
                 // the bucket holding it goes stale; move_check resolves it as a deletion
-                pps.template move_check<particle_type>(pt, pidx, particle);
+                move_check(pt, pidx, particle);
         }
         else
         {
@@ -474,9 +494,8 @@ struct MultiBorisFunctors
         auto F               = tile_at(pop.flux(), tile_idx);
         Interpolator_t interp;
 
-        for (auto& cell : cell_particles()) // all cells, for levelghosts
-        {
-            for (auto p : cell)
+        auto const per_array = [&](auto const& ps) {
+            for (auto p : ps)
             {
                 if constexpr (particle_type == ParticleType::LevelGhost)
                     if (!isIn(p, pps.ghost_box()))
@@ -499,7 +518,13 @@ struct MultiBorisFunctors
                         interp.particleToMesh(p, rhoP(), rhoC(), F, layout);
                 }
             }
-        }
+        };
+
+        if constexpr (cell_mapped)
+            per_array(cell_particles);
+        else
+            for (auto& cell : cell_particles()) // all cells, for levelghosts
+                per_array(cell);
     }
 
     void per_copy_of_cpu_tile(auto& boxings, auto& view, auto& pop)
@@ -513,6 +538,7 @@ struct MultiBorisFunctors
     Electromag_t::Super const electromag;
     double const dto2m;
     std::array<double, dim> halfdt;
+    Particles_t& particles;
 };
 
 } // namespace PHARE::core

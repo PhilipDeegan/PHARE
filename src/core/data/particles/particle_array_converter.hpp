@@ -112,6 +112,17 @@ Dst ParticlesConverter<AoSPCTS, CPU, AoS, CPU>::operator()(Src const& src, GridL
     return out;
 }
 
+template<>
+template<typename Dst, typename Src, typename GridLayout>
+Dst ParticlesConverter<AoSCMTS, CPU, AoS, CPU>::operator()(Src const& src, GridLayout const& layout)
+{
+    auto out = make_particles<Dst>(layout);
+    out.reserve(src.size());
+    for (auto const& tile : src()) // one flat AoSMapped array per tile
+        std::copy(tile().begin(), tile().end(), std::back_inserter(out));
+    return out;
+}
+
 
 } // namespace PHARE::core
 

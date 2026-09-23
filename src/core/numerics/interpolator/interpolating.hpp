@@ -24,17 +24,20 @@ public:
     template<typename Particles>
     void particleToMesh(Particles const& particles, auto const& layout, auto& rhoP, auto& rhoC,
                         auto& flux, double coef = 1.)
-        requires(Particles::layout_mode == LayoutMode::AoSPCTS)
+        requires(is_tiled(Particles::layout_mode))
     {
         for (std::size_t tidx = 0; tidx < particles().size(); ++tidx)
         {
             auto [rhop, rhoc, F] = tiles_at(tidx, rhoP, rhoC, flux);
             auto const& rho_lay  = tile_layout(rhoP, tidx);
-            auto& pctile         = particles()[tidx];
-            auto& cps            = pctile();
-            for (auto const& bix : cps.local_box())
-                for (auto const& p : cps(bix))
+            auto& tile_particles = particles()[tidx]();
+            if constexpr (Particles::layout_mode == LayoutMode::AoSCMTS)
+                for (auto const& p : tile_particles)
                     interp_.particleToMesh(p, rhop, rhoc, F, rho_lay, coef);
+            else
+                for (auto const& bix : tile_particles.local_box())
+                    for (auto const& p : tile_particles(bix))
+                        interp_.particleToMesh(p, rhop, rhoc, F, rho_lay, coef);
         }
     }
 
@@ -68,17 +71,19 @@ public:
     template<typename Particles_t>
     inline void operator()(Particles_t& particles, auto& momentumTensor, auto const& layout,
                            double mass = 1.)
-        requires(Particles_t::layout_mode == LayoutMode::AoSPCTS)
+        requires(is_tiled(Particles_t::layout_mode))
     {
         for (std::size_t tidx = 0; tidx < particles().size(); ++tidx)
         {
             auto mt            = tile_at(momentumTensor, tidx);
             auto const& mt_lay = tile_layout(momentumTensor, tidx);
 
-            auto& pctile = particles()[tidx];
-            auto& cps    = pctile();
-            for (auto const& bix : cps.local_box())
-                interp_(cps(bix), mt, mt_lay, mass);
+            auto& tile_particles = particles()[tidx]();
+            if constexpr (Particles_t::layout_mode == LayoutMode::AoSCMTS)
+                interp_(tile_particles, mt, mt_lay, mass);
+            else
+                for (auto const& bix : tile_particles.local_box())
+                    interp_(tile_particles(bix), mt, mt_lay, mass);
         }
     }
 };

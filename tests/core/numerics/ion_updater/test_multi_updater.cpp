@@ -47,6 +47,13 @@ bool static const premain = []() {
 
 auto& pool = *ThreadPool::INSTANCE().thread_pools[0];
 
+// as solver_ppc.hpp
+template<typename ParticleArray, typename GridLayout>
+using IonUpdater_t
+    = std::conditional_t<ParticleArray::layout_mode == LayoutMode::AoSMapped,
+                         IonUpdater<ParticleArray, GridLayout>,
+                         ParallelIonUpdater<ParticleArray, GridLayout>>;
+
 template<typename Patches>
 void ref_update(UpdaterMode mode, Patches& patches)
 {
@@ -56,13 +63,12 @@ void ref_update(UpdaterMode mode, Patches& patches)
         for (auto& patch : patches)
         {
             auto& [layout, ions, em, electromag] = patch.model.state;
-            using IonUpdater_t = IonUpdater<std::decay_t<decltype(ions)>, std::decay_t<decltype(electromag)>,
-                                            GridLayout_t>;
-            using Boxing_t
-                = std::decay_t<decltype(*selection_boxing_impl<IonUpdater_t, GridLayout_t>())>;
+            using ParticleArray_t = std::decay_t<decltype(ions)>::particle_array_type;
+            using Updater_t       = IonUpdater_t<ParticleArray_t, GridLayout_t>;
+            using Boxing_t        = Updater_t::Boxing_t;
 
             Boxing_t const boxing{layout, {layout.AMRBox()}};
-            IonUpdater_t{}.updatePopulations(ions, electromag, boxing, dt, mode);
+            Updater_t{}.updatePopulations(ions, electromag, boxing, dt, mode);
             ions.computeChargeDensity();
             ions.computeBulkVelocity();
         }
@@ -84,15 +90,15 @@ void cmp_update(UpdaterMode mode, Patches& patches)
     };
     auto accessor = test::make_model_level_accessor(patches, quantities);
 
-    using Ions_t       = std::decay_t<decltype(patches[0].model.state.ions)>;
-    using Electromag_t = std::decay_t<decltype(patches[0].model.state.electromag)>;
+    using Ions_t          = std::decay_t<decltype(patches[0].model.state.ions)>;
+    using ParticleArray_t = Ions_t::particle_array_type;
 
     try
     {
         for (std::size_t i = 0; i < n_push; ++i)
         {
-            IonUpdater<Ions_t, Electromag_t, GridLayout_t, decltype(accessor)>{accessor}
-                .updatePopulations(boxings, dt, mode);
+            IonUpdater_t<ParticleArray_t, GridLayout_t>{}.updatePopulations(accessor, boxings, dt,
+                                                                            mode);
 
             for (auto& patch : patches)
             {
@@ -119,12 +125,17 @@ auto make_ref_ions(auto const& layout)
     auto const disperse = [&](auto& particles) {
         delta_disperse(particles.domain_particles, seed);
         vary_velocity(particles.domain_particles, -6, 6, seed);
+
+        delta_disperse(particles.level_ghost_particles, seed);
+        vary_velocity(particles.level_ghost_particles, -6, 6, seed);
     };
 
     auto const particle_box = layout.AMRBox();
     auto add_particles      = [&](auto& particles) {
         particles.domain_particles.reserve(particle_box.size() * ppc);
         core::add_particles(particles.domain_particles, particle_box, ppc);
+
+        add_ghost_particles(particles.level_ghost_particles, particle_box, ppc, 1);
     };
 
     add_particles(ions.populations[0].particles);
@@ -152,6 +163,10 @@ auto from_ions(auto const& layout, auto const& from)
         from.populations[0].particles.domain_particles,
         ions.populations[0].particles.domain_particles);
 
+    _add_particles_from.template operator()<ParticleType::LevelGhost>(
+        from.populations[0].particles.level_ghost_particles,
+        ions.populations[0].particles.level_ghost_particles);
+
     auto const particle_box = layout.AMRBox();
     EXPECT_EQ(ions.populations[0].particles.domain_particles.size(), particle_box.size() * ppc);
     return ions;
@@ -177,7 +192,12 @@ void check_particles(GridLayout_t const& layout, P0& ref, P1& cmp_, double const
                               ? box
                               : grow(box, GridLayout_t::options.particle_ghost_width);
 
-    auto cmp = convert_particles<CPU_ref>(cmp_, layout);
+    auto cmp = [&]() {
+        if constexpr (type == ParticleType::LevelGhost and is_tiled(P1::layout_mode))
+            return clamp_owner_particles<CPU_ref>(cmp_);
+        else
+            return convert_particles<CPU_ref>(cmp_, layout);
+    }();
     sort_particles(cmp, sort_box);
     sort_particles(ref, sort_box);
 
@@ -218,6 +238,10 @@ void compare(GridLayout_t const& layout, R& ref, C& cmp)
     check_particles<ParticleType::PatchGhost>(
         layout, ref.populations[0].particles.patch_ghost_particles,
         cmp.populations[0].particles.patch_ghost_particles, diff, "patchghost");
+
+    check_particles<ParticleType::LevelGhost>(
+        layout, ref.populations[0].particles.level_ghost_particles,
+        cmp.populations[0].particles.level_ghost_particles, diff, "levelghost");
 
     {
         // zero_ghost_layer(layout, ref.rhoC, cmp.rhoC);
@@ -333,6 +357,8 @@ using Permutations_t = testing::Types< // ! notice commas !
    ,TestParam<2, LayoutMode::AoSPCTS, AllocatorMode::CPU, UpdaterMode::all>
    ,TestParam<3, LayoutMode::AoSPCTS, AllocatorMode::CPU, UpdaterMode::domain_only>
    ,TestParam<3, LayoutMode::AoSPCTS, AllocatorMode::CPU, UpdaterMode::all>
+   ,TestParam<3, LayoutMode::AoSCMTS, AllocatorMode::CPU, UpdaterMode::domain_only>
+   ,TestParam<3, LayoutMode::AoSCMTS, AllocatorMode::CPU, UpdaterMode::all>
 
 >;
 // clang-format on

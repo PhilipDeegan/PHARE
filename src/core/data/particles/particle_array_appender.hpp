@@ -42,6 +42,13 @@ void reserve(Dst& dst, Box_t const& box, std::size_t const& ppc)
                 for (auto const& bix : tile().local_box(*overlap))
                     tile()(bix).reserve(ppc);
     }
+    else if constexpr (Dst::layout_mode == AoSCMTS)
+    {
+        // one flat vector per tile - same box*tile approximation as above
+        for (auto& tile : dst())
+            if (auto const overlap = box * tile)
+                tile().reserve(tile().size() + ppc * overlap->size());
+    }
     else
     {
         dst.reserve(ppc * box.size());
@@ -78,7 +85,9 @@ void append_particles(Src const& src, Dst& dst)
 
     Appending{0, src.size()}.template operator()<type>(src, dst);
 
-    assert(dst.size() == old_size + src.size());
+    // tiled level ghosts are duplicated per reaching tile, see append_to_tiles
+    if constexpr (!(type == ParticleType::LevelGhost and is_tiled(Dst::layout_mode)))
+        assert(dst.size() == old_size + src.size());
 }
 
 
@@ -139,20 +148,53 @@ void ParticlesAppender<LM::AoS, AM::CPU, LM::AoS, AM::CPU>::operator()( //
 
 
 
+// tiled dst: level ghosts are duplicated into every tile whose grown box reaches their cell
+// (as the refiner does), everything else goes to the owning tile only
+template<auto type, typename Src, typename Dst>
+void append_to_tiles(Src const& src, Dst& dst)
+{
+    if constexpr (type == ParticleType::LevelGhost)
+    {
+        for (auto& tile : dst())
+        {
+            auto const tile_ghost_box = [&]() {
+                if constexpr (Dst::layout_mode == LM::AoSCMTS)
+                    return tile().box();
+                else
+                    return tile().ghost_box();
+            }();
+            for (auto const& p : src)
+                if (isIn(p.iCell(), tile_ghost_box))
+                    tile().emplace_back(p);
+        }
+    }
+    else
+        for (auto const& p : src)
+            dst.emplace_back(p);
+
+    dst.template on_appended<type>();
+}
+
 template<>
 template<auto type, typename Src, typename Dst>
 void ParticlesAppender<LM::AoSMapped, AM::CPU, LM::AoSPCTS, AM::CPU>::operator()( //
     Src const& src, Dst& dst)
 {
     PHARE_LOG_SCOPE(3, "ParticlesAppender<AoSMapped, CPU, AoSPCTS, CPU>::operator()");
-
-    for (auto const& p : src)
-        dst.emplace_back(p);
-
-    dst.template on_appended<type>();
+    append_to_tiles<type>(src, dst);
 }
 
 
+
+
+template<>
+template<auto type, typename Src, typename Dst>
+void ParticlesAppender<LM::AoSMapped, AM::CPU, LM::AoSCMTS, AM::CPU>::operator()( //
+    Src const& src, Dst& dst)
+{
+    PHARE_LOG_SCOPE(3, "ParticlesAppender<AoSMapped, CPU, AoSCMTS, CPU>::operator()");
+    append_to_tiles<type>(src, dst);
+}
 
 
 template<>

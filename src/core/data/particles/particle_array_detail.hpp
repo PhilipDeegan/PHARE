@@ -7,6 +7,7 @@
 // Mutators
 #include "core/data/particles/arrays/particle_array_pc.hpp"
 #include "core/data/particles/arrays/particle_array_pc_ts.hpp"
+#include "core/data/particles/arrays/particle_array_cm_ts.hpp"
 
 // Impls
 #include "core/data/particles/arrays/particle_array_aos.hpp"
@@ -117,6 +118,23 @@ struct ParticleArrayLayoutResolver<opts, o, LayoutMode::AoSPCTS, StorageMode::SP
     using value_type = PCTileSetParticles<PCTileSetSpan<Inner>>;
 };
 
+template<auto opts, auto o>
+struct ParticleArrayLayoutResolver<opts, o, LayoutMode::AoSCMTS, StorageMode::VECTOR>
+{
+    using Inner      = ParticleArray<opts.with_layout(LayoutMode::AoSMapped)>;
+    using value_type = MappedTileSetParticles<MappedTileSetVector<Inner>>;
+};
+
+template<auto opts, auto o> // NOT DEFINED CAUSE NOT SENSICAL!
+struct ParticleArrayLayoutResolver<opts, o, LayoutMode::AoSCMTS, StorageMode::ARRAY>;
+
+template<auto opts, auto o>
+struct ParticleArrayLayoutResolver<opts, o, LayoutMode::AoSCMTS, StorageMode::SPAN>
+{
+    using Inner      = ParticleArray<opts.with_layout(LayoutMode::AoSMapped)>;
+    using value_type = MappedTileSetParticles<MappedTileSetSpan<Inner>>;
+};
+
 // internal only - see LayoutMode::SoA
 template<auto opts, auto o>
 struct ParticleArrayLayoutResolver<opts, o, LayoutMode::SoA, StorageMode::VECTOR>
@@ -171,6 +189,15 @@ void per_particle(Particles_t& particles, auto const&& fn)
     for (auto& tile : particles())
         for (auto& cell_particles : tile()())
             per_particle_iterate(cell_particles, std::move(fn));
+}
+
+// one flat (AoSMapped) particle array per tile
+template<typename Particles_t>
+    requires(Particles_t::layout_mode == LayoutMode::AoSCMTS)
+void per_particle(Particles_t& particles, auto const&& fn)
+{
+    for (auto& tile : particles())
+        per_particle_iterate(tile(), std::move(fn));
 }
 
 } // namespace PHARE::core
