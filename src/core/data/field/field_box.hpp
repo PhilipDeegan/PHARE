@@ -6,6 +6,7 @@
 #include "core/data/field/field.hpp"
 #include "core/utilities/box/box.hpp"
 #include "core/data/grid/grid_tiles.hpp"
+#include "core/data/field/field_box_span.hpp"
 
 #include <vector>
 #include <cmath>
@@ -222,28 +223,31 @@ void operate_on_fields(FieldBox<GridTileSet<GridLayout_t, Args...>>& dst,
 
     assert(src_selection_box.shape() == dst_selection_box.shape());
 
+    // the selection boxes are thin ghost slabs, so only a few tiles on either side touch them,
+    // resolve those once rather than intersecting every dst tile with every src tile
+    using SrcTile = std::decay_t<decltype(src.field()[0])>;
+    using Box_t   = std::decay_t<decltype(src_selection_box)>;
+    std::vector<std::pair<SrcTile const*, Box_t>> src_tiles;
+    for (auto const& src_tile : src.field())
+        if (auto const src_overlap = src_selection_box * get_src_box(src_tile))
+            src_tiles.emplace_back(&src_tile, *src_overlap);
+
     for (auto& dst_tile : dst.field())
         if (auto const dst_overlap
             = dst_selection_box * shift(get_dst_box(dst_tile), src.offset_ * -1))
-            for (auto const& src_tile : src.field())
-                if (auto const src_overlap = src_selection_box * get_src_box(src_tile))
-                    if (auto const overlap = *src_overlap * *dst_overlap)
-                    {
-                        auto const lcl_src_box = src_tile.layout().AMRToLocal(*overlap);
-                        auto const lcl_dst_box
-                            = dst_tile.layout().AMRToLocal(shift(*overlap, src.offset_));
+            for (auto const& [src_tile_ptr, src_overlap] : src_tiles)
+                if (auto const overlap = src_overlap * *dst_overlap)
+                {
+                    auto const& src_tile   = *src_tile_ptr;
+                    auto const lcl_src_box = src_tile.layout().AMRToLocal(*overlap);
+                    auto const lcl_dst_box
+                        = dst_tile.layout().AMRToLocal(shift(*overlap, src.offset_));
 
-                        assert(lcl_src_box.size() <= src_tile().size());
-                        assert(lcl_dst_box.size() <= dst_tile().size());
+                    assert(lcl_src_box.size() <= src_tile().size());
+                    assert(lcl_dst_box.size() <= dst_tile().size());
 
-                        auto src_it = lcl_src_box.begin();
-                        auto dst_it = lcl_dst_box.begin();
-                        for (; dst_it != lcl_dst_box.end() and src_it != lcl_src_box.end();
-                             ++src_it, ++dst_it)
-                        {
-                            Operator{dst_tile()(*dst_it)}(src_tile()(*src_it));
-                        }
-                    }
+                    operate_on_spans<Operator>(dst_tile(), lcl_dst_box, src_tile(), lcl_src_box);
+                }
 }
 
 
@@ -329,7 +333,7 @@ void operate_on_fields(FieldBox<Grid<T0s...>>& dst, FieldBox<GridTileSet<T1s...>
         }
     }
 
-    auto const dst_layout = src.field.layout().copy_as(dst.amr_box);
+    auto const dst_layout        = src.field.layout().copy_as(dst.amr_box);
     auto const src_selection_box = src.field.layout().localToAMR(src.lcl_box);
     auto const dst_selection_box = shift(dst_layout.localToAMR(dst.lcl_box), src.offset_ * -1);
     assert(src_selection_box.shape() == dst_selection_box.shape());
@@ -760,9 +764,31 @@ void fill_ghost(Field_t& field, auto const& layout, auto const v)
         if (auto const is_border = *(tile_gb * patch_box) != tile_gb; not is_border)
             continue;
 
-        for (auto const& bix : tile_gb)
-            if (!isIn(bix, patch_box))
-                tile()((bix - tile_gb.lower).as_unsigned()) = v;
+        // tile_gb minus patch_box, peeled off one disjoint slab per side per dimension
+        auto rest       = tile_gb;
+        auto const fill = [&](auto const& slab) {
+            for (auto const& field_slab :
+                 make_field_box_span(as_unsigned(shift(slab, tile_gb.lower * -1)), tile()))
+                for (auto&& span : field_slab)
+                    std::fill(span.begin(), span.end(), v);
+        };
+        for (std::size_t d = 0; d < Field_t::dimension; ++d)
+        {
+            if (rest.lower[d] < patch_box.lower[d])
+            {
+                auto slab     = rest;
+                slab.upper[d] = patch_box.lower[d] - 1;
+                fill(slab);
+                rest.lower[d] = patch_box.lower[d];
+            }
+            if (rest.upper[d] > patch_box.upper[d])
+            {
+                auto slab     = rest;
+                slab.lower[d] = patch_box.upper[d] + 1;
+                fill(slab);
+                rest.upper[d] = patch_box.upper[d];
+            }
+        }
     }
 }
 

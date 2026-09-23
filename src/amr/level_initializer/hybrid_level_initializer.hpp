@@ -178,8 +178,7 @@ namespace solver
                     hybMessenger.fillCurrentGhosts(J, level, 0.);
 
                     auto& electrons = hybridModel.state.electrons;
-                    for (auto& patch : rm.enumerate(level, electrons))
-                        electrons.update(amr::layoutFromPatch<GridLayoutT>(*patch));
+                    ElectronsLevelTransformer{level, hybridModel}(electrons);
 
                     Ohm_t{ohm_info, level, hybridModel}(B, J, E, electrons);
                     setTime(E);

@@ -14,7 +14,7 @@ ph.NO_GUI()
 cells = (100, 50)
 time_step = 0.005
 final_time = time_step * 2
-ppc = 55
+ppc = 22
 
 
 def config(layout):
@@ -148,21 +148,28 @@ class HarrisTest(SimulatorTest):
     def _run(self, layout):
         ph.global_vars.sim = None
         sim, diag_dir = config(layout)
-        # self.register_diag_dir_for_cleanup(diag_dir)
+        self.register_diag_dir_for_cleanup(diag_dir)
         Simulator(sim).run().reset()
         return diag_dir
 
     def test_run(self):
         diag_dir0 = self._run("AoSMapped")
         diag_dir1 = self._run("AoSPCTS")
+        diag_dir2 = self._run("AoSCMTS")
 
-        # if cpp.mpi_rank() == 0:
-        #     compare_hierarchies(
-        #         self,
-        #         Run(diag_dir0),
-        #         Run(diag_dir1),
-        #         atol=dict(b=5e-15, e=3e-14, moments=2e-14, particles=1e-14),
-        #     )
+        if cpp.mpi_rank() == 0:
+            compare_hierarchies(
+                self,
+                Run(diag_dir0),
+                Run(diag_dir1),
+                atol=dict(b=5e-15, e=3e-14, moments=2e-14, particles=1e-14),
+            )
+            compare_hierarchies(
+                self,
+                Run(diag_dir0),
+                Run(diag_dir2),
+                atol=dict(b=5e-15, e=3e-14, moments=2e-14, particles=1e-14),
+            )
         return self
 
 

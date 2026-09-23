@@ -7,7 +7,7 @@ from pyphare.pharesee.run import Run
 from pyphare.pharesee.hierarchy.hierarchy_utils import hierarchy_compare
 
 
-atol = 1e-12
+atol = 1e-14
 
 outputpath = Path("phare_outputs/compare_diags/")
 outputs = str(outputpath)

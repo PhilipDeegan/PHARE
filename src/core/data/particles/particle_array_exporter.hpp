@@ -272,6 +272,54 @@ void ParticlesExporter<AoSPCTS, CPU>::move_in_ghost_layer(Dst& dst, Src& src,
 }
 
 
+// AoSCMTS: one flat cell-mapped array per tile, see MappedTileSetVector::erase_if
+template<>
+template<typename Src, std::size_t dim>
+void ParticlesExporter<AoSCMTS, CPU>::delete_particles_not_in(Src& src, Box<int, dim> const& box)
+{
+    src.erase_if([&](auto const& p) { return !isIn(p.iCell(), box); });
+}
+
+template<>
+template<typename Src, typename Boxes>
+void ParticlesExporter<AoSCMTS, CPU>::delete_particles_not_in(Src& src, Boxes const& boxes)
+{
+    src.erase_if([&](auto const& p) { return !isIn(p.iCell(), boxes); });
+}
+
+template<>
+template<typename Dst, typename Src, std::size_t dim>
+void ParticlesExporter<AoSCMTS, CPU>::move_in_domain(Dst& dst, Src& src,
+                                                     Box<int, dim> const& domain_box)
+{
+    src.erase_if([&](auto const& p) { return isIn(p.iCell(), domain_box); },
+                 [&](auto const& p) { dst.push_back(p); });
+    dst.template on_appended<ParticleType::Domain>();
+}
+
+template<>
+template<typename Dst, typename Src, std::size_t dim>
+void ParticlesExporter<AoSCMTS, CPU>::move_in_ghost_layer(Dst& dst, Src& src,
+                                                          Box<int, dim> const& domain_box,
+                                                          Box<int, dim> const& ghost_box)
+{
+    auto const ghost_layer_boxes = ghost_box.remove(domain_box);
+    src.erase_if([&](auto const& p) { return isIn(p.iCell(), ghost_layer_boxes); },
+                 [&](auto const& p) { dst.push_back(p); });
+    dst.template on_appended<ParticleType::Domain>();
+}
+
+template<>
+template<typename Dst, typename Src, std::size_t dim, typename Boxes>
+void ParticlesExporter<AoSCMTS, CPU>::move_in_ghost_layer(Dst& dst, Src& src,
+                                                          Box<int, dim> const& domain_box,
+                                                          Boxes const& ghost_boxes)
+{
+    for (auto const& gb : ghost_boxes)
+        this->move_in_ghost_layer(dst, src, domain_box, gb);
+}
+
+
 } // namespace PHARE::core
 
 #endif /* PHARE_CORE_DATA_PARTICLES_PARTICLE_ARRAY_EXPORTER */

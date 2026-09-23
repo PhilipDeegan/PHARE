@@ -36,6 +36,8 @@ template<auto opts>
 struct ParticleArrayTypeOptions<opts, LayoutMode::AoSPC, StorageMode::ARRAY>; // nonsense
 template<auto opts>
 struct ParticleArrayTypeOptions<opts, LayoutMode::AoSPCTS, StorageMode::ARRAY>; // nonsense
+template<auto opts>
+struct ParticleArrayTypeOptions<opts, LayoutMode::AoSCMTS, StorageMode::ARRAY>; // nonsense
 
 
 template<auto opts>

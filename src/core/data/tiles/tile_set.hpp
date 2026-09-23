@@ -106,6 +106,7 @@ struct TileSetter
 
     Box_t box;
     std::size_t ghosts;
+    TilingOptions tiling = TilingOptions::from_env();
 };
 
 template<typename Tile, auto alloc_mode = AllocatorMode::CPU>
@@ -140,7 +141,7 @@ public:
         : box_{setter.box}
         , cells_{grow(setter.box, setter.ghosts).shape().template toArray<std::uint32_t>()}
     {
-        make_tiles_(args...);
+        make_tiles_(setter.tiling, args...);
         tag_cells_(setter);
         box_ = grow(setter.box, setter.ghosts); // ghost box now!
     }
@@ -150,7 +151,7 @@ public:
         : box_{box}
         , cells_{box.shape().template toArray<std::uint32_t>()}
     {
-        make_tiles_(args...);
+        make_tiles_(TilingOptions::from_env(), args...);
         tag_cells_();
     }
 
@@ -405,9 +406,9 @@ private:
 
 
     template<typename... Args>
-    void make_tiles_(Args&&... args)
+    void make_tiles_(TilingOptions const& tiling, Args&&... args)
     {
-        tile_set_make_tiles(*this, args...);
+        tile_set_make_tiles(*this, tiling, args...);
     }
 
     void tag_cells_(auto const& setter)

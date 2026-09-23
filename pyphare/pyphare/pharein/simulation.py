@@ -191,7 +191,7 @@ def check_layout(**kwargs):
     return layout
 
 
-valid_particle_layouts = ("AoSMapped", "AoSPCTS")
+valid_particle_layouts = ("AoSMapped", "AoSPCTS", "AoSCMTS")
 
 
 def check_particle_layout(**kwargs):
@@ -973,7 +973,7 @@ class Simulation(object):
           is incompatible with ``time_step_nbr``.
 
           * **cfl_wave** (``float``), hyperbolic/wave CFL coefficient. Normalized so 1 is
-            the stability limit; choose in (0, 1]. In hall mhd and hybrid, 
+            the stability limit; choose in (0, 1]. In hall mhd and hybrid,
             whistler wave speed limits is used.
           * **cfl_diffusive** (``float``), diffusive CFL coefficient. Normalized so 1 is
             the diffusion stability limit; choose in (0, 1]. Defaults to ``cfl_wave``. Only

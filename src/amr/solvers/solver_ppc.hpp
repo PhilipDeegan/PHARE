@@ -196,9 +196,7 @@ private:
 
     void update_electrons(auto& level, auto& model)
     {
-        auto& rm = *model.resourcesManager;
-        for (auto& patch : rm.enumerate(level, model.state.electrons))
-            model.state.electrons.update(amr::layoutFromPatch<GridLayout>(*patch));
+        ElectronsLevelTransformer{level, model}(model.state.electrons);
     }
 
 

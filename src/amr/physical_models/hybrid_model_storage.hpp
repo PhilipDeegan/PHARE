@@ -13,8 +13,9 @@ namespace PHARE::solver
 template<auto layout_mode, typename Ions, typename Grid_t>
 struct hybrid_model_storage;
 
-template<typename TiledIons, typename Grid_t>
-struct hybrid_model_storage<core::LayoutMode::AoSPCTS, TiledIons, Grid_t>
+template<auto layout_mode, typename TiledIons, typename Grid_t>
+    requires(core::is_tiled(layout_mode))
+struct hybrid_model_storage<layout_mode, TiledIons, Grid_t>
 {
     auto static constexpr dim = TiledIons::dimension;
     using gridlayout_type     = TiledIons::gridlayout_type;

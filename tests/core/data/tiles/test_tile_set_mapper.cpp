@@ -54,7 +54,7 @@ struct TestTileSet
     using Tile_t                    = Tile;
     using Box_t                     = Box<int, dimension>;
 
-    NO_DISCARD auto box() const { return box_; }
+    NO_DISCARD auto& box() const { return box_; }
     NO_DISCARD auto shape() const { return shape_; }
     NO_DISCARD auto size() const { return tiles_.size(); }
     NO_DISCARD auto begin() { return tiles_.begin(); }
@@ -80,33 +80,39 @@ TYPED_TEST(TileMappingTest, view_outputs)
 {
     auto static constexpr dimension = TestFixture::dimension;
     using TileSet_t                 = TestFixture::TileSet_t;
-    using Tile_t                    = TileSet_t::value_type;
     using Box_t                     = TileSet_t::Box_t;
 
-
-    auto& self = *this;
-
-    auto const doBox = [&](auto const box) {
-        TileSet_t tiles;
-        Tiler<TileSet_t>{{tiles, box}}.f();
+    auto const doBox = [&](auto const box, TilingOptions const& opts) {
+        TileSet_t tiles{box};
+        Tiler<TileSet_t>{{tiles}, opts}.map();
 
         EXPECT_GT(tiles.size(), 0);
 
+        bool const even = for_N_all<dimension>([&](auto i) { return box.shape()[i] % 2 == 0; });
         for (auto const& tile : tiles)
-        {
-            auto const& shape = tile.shape();
-            EXPECT_TRUE(for_N_all<dimension>([&](auto i) { return shape[i] > 2; }));
-        }
+            for (std::size_t i = 0; i < dimension; ++i)
+            {
+                auto const s = static_cast<std::size_t>(tile.shape()[i]);
+                EXPECT_GT(s, 0u);
+                if (static_cast<std::size_t>(box.shape()[i]) >= opts.min_patch_size_before_split)
+                    EXPECT_LE(s, opts.max_tile_size);
+                if (even)
+                    EXPECT_EQ(s % 2, 0u);
+            }
 
         EXPECT_TRUE(this->all_in(tiles, box));
         EXPECT_FALSE(any_overlaps_in(tiles, [](auto const& tile) { return tile; }));
         EXPECT_EQ(this->count_cells(tiles), product(box.shape()));
     };
 
-    for (std::uint8_t i = 4; i < 33; ++i)
-        for (std::uint8_t j = 4; j < 33; ++j)
-            for (std::uint8_t k = 4; k < 33; ++k)
-                doBox(Box_t{ConstArray<int, dimension>(0), {i, j, k}});
+    auto const options = std::vector<TilingOptions>{
+        {4, 6, 8}, {4, 4, 8}, {4, 10, 8}, {5, 7, 10}, {15, 15, 30}, {6, 15, 12}};
+
+    for (auto const& opts : options)
+        for (std::uint8_t i = 4; i < 33; ++i)
+            for (std::uint8_t j = 4; j < 33; ++j)
+                for (std::uint8_t k = 4; k < 33; ++k)
+                    doBox(Box_t{ConstArray<int, dimension>(0), {i - 1, j - 1, k - 1}}, opts);
 }
 
 int main(int argc, char** argv)

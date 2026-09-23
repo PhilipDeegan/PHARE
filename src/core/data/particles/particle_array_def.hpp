@@ -23,15 +23,16 @@ enum class LayoutMode : std::uint16_t {
     AoS = 0,
     AoSMapped, // 1
     AoSPCTS,   // 2
-    AoSPC,     // 3 - internal only: per-cell inner storage of AoSPCTS, not user-selectable
-    SoA,       // 4 - internal only: HDF5/restart write buffer + python particle-splitting
+    AoSCMTS,   // 3
+    AoSPC,     // 4 - internal only: per-cell inner storage of AoSPCTS, not user-selectable
+    SoA,       // 5 - internal only: HDF5/restart write buffer + python particle-splitting
                //     interop (zero-copy span over numpy arrays), not user-selectable
 };
 
 bool constexpr is_tiled(LayoutMode lm)
 {
     using enum LayoutMode;
-    return any_in(lm, AoSPCTS);
+    return any_in(lm, AoSPCTS, AoSCMTS);
 }
 
 std::string_view constexpr enum_name(LayoutMode const mode)
@@ -41,6 +42,7 @@ std::string_view constexpr enum_name(LayoutMode const mode)
         case LayoutMode::AoS: return "AoS";
         case LayoutMode::AoSMapped: return "AoSMapped";
         case LayoutMode::AoSPCTS: return "AoSPCTS";
+        case LayoutMode::AoSCMTS: return "AoSCMTS";
         case LayoutMode::AoSPC: return "AoSPC";
         case LayoutMode::SoA: return "SoA";
     }

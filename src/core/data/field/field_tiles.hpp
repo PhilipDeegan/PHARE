@@ -5,8 +5,12 @@
 #include "core/utilities/box/box.hpp"
 #include "core/data/tiles/tile_set.hpp"
 #include "core/data/tiles/tile_set_traversal.hpp"
+#include "core/utilities/types.hpp"
+#include "core/utilities/box/box_span.hpp"
 
 #include <tuple>
+#include <cassert>
+#include <cstdint>
 #include <string>
 #include <cstddef>
 #include <stdexcept>
@@ -21,6 +25,30 @@ struct TensorField;
 
 namespace PHARE::core
 {
+// applies Operator{dst}(src) between two equally shaped local boxes of two arrays, one
+// contiguous span at a time (see box_span.hpp) rather than an ndarray lookup per index
+template<typename Operator, typename Dst, typename Src, std::size_t dim>
+void operate_on_spans(Dst& dst, Box<std::uint32_t, dim> const& dst_lcl_box, Src const& src,
+                      Box<std::uint32_t, dim> const& src_lcl_box)
+{
+    using value_type = Dst::value_type;
+
+    assert(dst_lcl_box.shape() == src_lcl_box.shape());
+    auto const offset = src_lcl_box.lower - dst_lcl_box.lower; // unsigned wrap undone below
+
+    for (auto const& slab : make_box_span(dst_lcl_box))
+        for (auto const& [start, size] : slab)
+        {
+            auto* d       = &dst(start);
+            auto const* s = &src(start + offset);
+            if constexpr (std::is_same_v<Operator, SetEqual<value_type>>)
+                std::copy_n(s, size, d);
+            else
+                for (std::uint32_t i = 0; i < size; ++i)
+                    Operator{d[i]}(s[i]);
+        }
+}
+
 template<typename GridLayout_t, typename Grid_t, typename Field_t>
 struct GridTile;
 
@@ -194,15 +222,15 @@ public:
 
     void sync_inner_ghosts()
     {
-        visit_tile_neighbours(super(), [](auto& t0, auto& t1) {
-            if (auto const overlap = t0.ghost_box() * t1.field_box())
-                for (auto const& bix : *overlap)
-                {
-                    auto const& t0_lix = (bix - t0.ghost_box().lower).as_unsigned();
-                    auto const& t1_lix = (bix - t1.ghost_box().lower).as_unsigned();
-                    t0()(t0_lix)       = t1()(t1_lix);
-                }
-        });
+        visit_tile_neighbours(super(), [](auto& t0, auto& t1) { sync_ghosts_from_(t0, t1); });
+    }
+
+    // only writes the ghosts of tile `tile_idx` (reading its neighbours' domains), so distinct
+    // tiles can be synced concurrently
+    void sync_inner_ghosts(std::size_t const tile_idx)
+    {
+        auto& t0 = super()[tile_idx];
+        traverse_tile_neighbours(super(), t0, [&](auto& t1) { sync_ghosts_from_(t0, t1); });
     }
 
 
@@ -223,6 +251,14 @@ public:
 private:
     Super& super() { return *this; }
     Super const& super() const { return *this; }
+
+    static void sync_ghosts_from_(auto& t0, auto const& t1)
+    {
+        if (auto const overlap = t0.ghost_box() * t1.field_box())
+            operate_on_spans<SetEqual<typename Field_t::value_type>>(
+                t0(), as_unsigned(shift(*overlap, t0.ghost_box().lower * -1)), t1(),
+                as_unsigned(shift(*overlap, t1.ghost_box().lower * -1)));
+    }
 
     physical_quantity_type qty_;
     Box<int, dimension> ghost_box_{};
@@ -312,19 +348,25 @@ auto& tile_layout(T const& tiled, std::size_t const i)
 }
 
 template<typename Fn, typename Tiled0, typename... Args>
+void tile_exec_with_layout_at(std::size_t const i, Fn&& fn, Tiled0&& tiled0, Args&&... args)
+{
+    fn(tile_layout(tiled0, i), tile_at(tiled0, i), tile_at(args, i)...);
+}
+
+template<typename Fn, typename Tiled0, typename... Args>
 void tile_exec_with_layout(Fn&& fn, Tiled0&& tiled0, Args&&... args)
 {
     for (std::size_t i = 0; i < tile_count(tiled0); ++i)
-        fn(tile_layout(tiled0, i), tile_at(tiled0, i), tile_at(args, i)...);
+        tile_exec_with_layout_at(i, fn, tiled0, args...);
 }
 
-void sync_inner_ghosts(auto& vf)
+void sync_inner_ghosts(auto& vf, auto const&... tile_idx)
 {
     if constexpr (is_field_tile_set_v<std::remove_cvref_t<decltype(vf)>>)
-        vf.sync_inner_ghosts();
+        vf.sync_inner_ghosts(tile_idx...);
     else
         for (auto& c : vf)
-            c.sync_inner_ghosts();
+            c.sync_inner_ghosts(tile_idx...);
 }
 
 

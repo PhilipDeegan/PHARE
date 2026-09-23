@@ -44,8 +44,9 @@ struct UsingResolver
     using Field_t = Field<dimension, Scalar, field_value_type, A_>;
 };
 
-template<typename GridLayout_t, auto A_>
-struct UsingResolver<GridLayout_t, LayoutMode::AoSPCTS, A_>
+template<typename GridLayout_t, auto L_, auto A_>
+    requires(is_tiled(L_))
+struct UsingResolver<GridLayout_t, L_, A_>
 {
     bool static constexpr c_ordering = true;
     auto static constexpr dimension  = GridLayout_t::dimension;

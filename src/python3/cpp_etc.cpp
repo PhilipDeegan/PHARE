@@ -54,6 +54,7 @@ auto supported_layouts()
     using enum core::LayoutMode;
     std::vector layouts{AoSMapped};
     layouts.emplace_back(AoSPCTS);
+    layouts.emplace_back(AoSCMTS);
     return layouts;
 }
 
@@ -167,6 +168,7 @@ PYBIND11_MODULE(cpp_etc, m, py::mod_gil_not_used())
     py::native_enum<core::LayoutMode>(m, "LayoutMode", "enum.Enum")
         .value("AoSMapped", AoSMapped)
         .value("AoSPCTS", AoSPCTS)
+        .value("AoSCMTS", AoSCMTS)
         .finalize();
 
     m.def("supported_layouts", supported_layouts);

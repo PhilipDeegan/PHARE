@@ -10,6 +10,8 @@
 
 
 #include <tuple>
+#include <cstddef>
+#include <stdexcept>
 
 
 namespace PHARE::core
@@ -137,6 +139,13 @@ public:
             Vxyz(layout, ions_.chargeDensity(), J_, ions_.velocity(), Ve_);
     }
 
+    void computeBulkVelocity(std::size_t const tile_idx)
+        requires(is_field_tile_set_v<Field>)
+    {
+        core::tile_exec_with_layout_at(tile_idx, [&](auto&&... args) { Vxyz(args...); },
+                                       ions_.chargeDensity(), J_, ions_.velocity(), Ve_);
+    }
+
 
     auto& getIons() const { return ions_; }
 
@@ -220,6 +229,16 @@ public:
         transform(Ne_, Pe_, [this](auto n) { return n * Te_; });
     }
 
+    void computePressure(std::size_t const tile_idx)
+        requires(is_field_tile_set_v<Field>)
+    {
+        if (!Pe_.isUsable())
+            throw std::runtime_error("Error - isothermal closure pressure not usable");
+
+        auto const& Ne_ = ions_.chargeDensity();
+        transform(Ne_[tile_idx](), Pe_[tile_idx](), [this](auto n) { return n * Te_; });
+    }
+
 private:
     Ions ions_;
     double const Te_ = 0;
@@ -286,8 +305,14 @@ public:
 
 
     void computeChargeDensity() { fluxComput_.computeChargeDensity(); }
-    void computeBulkVelocity(GridLayout const& layout) { fluxComput_.computeBulkVelocity(layout); }
-    void computePressure(GridLayout const& layout) { pressureClosure_.computePressure(layout); }
+    void computeBulkVelocity(auto const& layout_or_tile_idx)
+    {
+        fluxComput_.computeBulkVelocity(layout_or_tile_idx);
+    }
+    void computePressure(auto const& layout_or_tile_idx)
+    {
+        pressureClosure_.computePressure(layout_or_tile_idx);
+    }
 
 private:
     FluxComputer fluxComput_;
@@ -310,16 +335,13 @@ public:
     }
 
 
-    void update(GridLayout const& layout)
+    void update(GridLayout const& layout) { update_(layout); }
+
+    // one tile's worth of work, tiles can be updated concurrently
+    void update(std::size_t const tile_idx)
+        requires(is_field_tile_set_v<Field>)
     {
-        if (isUsable())
-        {
-            momentModel_.computeChargeDensity();
-            momentModel_.computeBulkVelocity(layout);
-            momentModel_.computePressure(layout);
-        }
-        else
-            throw std::runtime_error("Error - Electron  is not usable");
+        update_(tile_idx);
     }
 
 
@@ -360,6 +382,18 @@ public:
     NO_DISCARD Field& pressure() { return momentModel_.pressure(); }
 
 private:
+    void update_(auto const& layout_or_tile_idx)
+    {
+        if (isUsable())
+        {
+            momentModel_.computeChargeDensity();
+            momentModel_.computeBulkVelocity(layout_or_tile_idx);
+            momentModel_.computePressure(layout_or_tile_idx);
+        }
+        else
+            throw std::runtime_error("Error - Electron  is not usable");
+    }
+
     ElectronMomentModel<Ions> momentModel_;
 };
 

@@ -138,6 +138,52 @@ void ParticlesSelector<AoSPCTS, CPU>::select( // box is unshifted global AMR ind
     dst.template on_appended<particle_type>();
 }
 
+// AoSCMTS, CPU
+// Domain particles live only in their own tile, while ghost-layer particles may be duplicated
+// across tiles (level ghosts), so ghost cells are taken from their clamp-owner tile only.
+// fn(tile, box) gets each tile's owned sub-box of box, to use with the tile's cellmap
+template<ParticleType particle_type, typename SrcParticles, typename Fn>
+void on_owned_cell_mapped_boxes(SrcParticles const& src, auto const& box, Fn&& fn)
+{
+    using Box_t       = Box<int, SrcParticles::dimension>;
+    auto const& tiles = src();
+    for (auto const& tile : tiles)
+    {
+        if constexpr (particle_type == ParticleType::Domain)
+        {
+            if (auto const overlap = *tile * box)
+                fn(tile, *overlap);
+        }
+        else if (auto const overlap = grow(*tile, src.ghost_cells()) * box)
+            for (auto const [bix, lix] : src.amr_lcl_idx(*overlap))
+                if (tiles.at(lix) == &tile)
+                    fn(tile, Box_t{bix, bix});
+    }
+}
+
+template<>
+template<ParticleType particle_type, typename SrcParticles, typename DstParticles, typename box_t>
+void ParticlesSelector<AoSCMTS, CPU>::select( //
+    SrcParticles const& src, DstParticles& dst, box_t const& box)
+{
+    on_owned_cell_mapped_boxes<particle_type>(
+        src, box, [&](auto const& tile, auto const& b) { tile().export_particles(b, dst); });
+    dst.template on_appended<particle_type>();
+}
+
+template<>
+template<ParticleType particle_type, typename SrcParticles, typename DstParticles, typename box_t,
+         typename Shift>
+void ParticlesSelector<AoSCMTS, CPU>::select( // box is unshifted global AMR indexing
+    SrcParticles const& src, DstParticles& dst, box_t const& box, Shift&& shifter)
+{
+    auto const offseter = [&](auto const& particle) { return shift_particle(particle, shifter); };
+    on_owned_cell_mapped_boxes<particle_type>(src, box, [&](auto const& tile, auto const& b) {
+        tile().export_particles(b, dst, offseter);
+    });
+    dst.template on_appended<particle_type>();
+}
+
 // AoSPC, CPU
 template<>
 template<ParticleType particle_type, typename SrcParticles, typename DstParticles, typename box_t>
@@ -239,6 +285,17 @@ std::size_t ParticlesSelector<AoSPCTS, CPU>::count(SrcParticles const& src, box_
                 n += pc(*it).size();
         }
     }
+    return n;
+}
+
+// AoSCMTS, CPU
+template<>
+template<ParticleType particle_type, typename SrcParticles, typename box_t>
+std::size_t ParticlesSelector<AoSCMTS, CPU>::count(SrcParticles const& src, box_t const& box)
+{
+    std::size_t n = 0;
+    on_owned_cell_mapped_boxes<particle_type>(
+        src, box, [&](auto const& tile, auto const& b) { n += tile().nbr_particles_in(b); });
     return n;
 }
 

@@ -2,8 +2,11 @@
 #define PHARE_CORE_DATA_TILES_TILE_SET_MAPPER_HPP
 
 #include "core/utilities/point/point.hpp"
+#include "core/data/tiles/tiling_options.hpp"
 
+#include <vector>
 #include <cassert>
+#include <algorithm>
 
 namespace PHARE::core
 {
@@ -23,21 +26,10 @@ struct ATiler
 template<typename TileSet_t>
 struct Tiler : public ATiler<TileSet_t>
 {
-    static inline std::string const min_tile    = "PHARE_TILING_MIN_TILE_SIZE";
-    static inline std::string const max_tile    = "PHARE_TILING_MAX_TILE_SIZE";
-    static inline std::string const min_key     = "PHARE_TILING_MIN_BEFORE_SPLIT";
-    static inline std::string const prefer_max_ = "PHARE_TILING_PREFER_MAX";
-
     template<typename... Args>
     auto map(Args&&... args);
 
-    std::size_t const min_tile_size = get_env_as(min_tile, 4);
-    // matters for gpu dynamic shared mem
-    std::size_t const max_tile_size               = get_env_as(max_tile, 6);
-    std::size_t const min_patch_size_before_split = get_env_as(min_key, min_tile_size * 2);
-    // default preserves split_1d's existing balanced chunking for level 0; split_1d_even
-    // (fine levels) always prefers max_tile_size regardless.
-    bool const prefer_max = get_env_as(prefer_max_, false);
+    TilingOptions const opts = TilingOptions::from_env();
 };
 
 
@@ -45,20 +37,24 @@ template<typename TileSet_t>
 template<typename... Args>
 auto Tiler<TileSet_t>::map(Args&&... args)
 {
-    auto constexpr static dim          = TileSet_t::dimension;
-    using Box_t                        = TileSet_t::Box_t;
-    auto const& shape                  = this->box.shape();
-    auto& tiles                        = this->tile_set();
-    std::size_t const min_before_split = min_patch_size_before_split;
+    auto constexpr static dim = TileSet_t::dimension;
+    using Box_t               = TileSet_t::Box_t;
+    auto const& shape         = this->box.shape();
+    auto& tiles               = this->tile_set();
 
-    // Greedily fills with max_tile_size chunks; a too-small remainder borrows from the
-    // previous tile so neither drops below min_tile_size. `step` keeps sizes a multiple of
-    // it (1 for split_1d, 2 for split_1d_even).
-    auto split_1d_prefer_max
-        = [&](std::size_t const length, std::size_t const step) -> std::vector<std::size_t> {
-        std::size_t const max_size = max_tile_size - (max_tile_size % step);
-        std::size_t const min_size
-            = min_tile_size + (min_tile_size % step == 0 ? 0 : step - (min_tile_size % step));
+    // Greedily fills with max size chunks, sizes are multiples of `step` (1 for level 0, 2 for
+    // fine levels). A remainder below min size is rebalanced with the previous tile, so no tile
+    // ever exceeds max size or is empty, even if min/max don't round to step (e.g. min=max=15)
+    auto const split_1d = [&](std::size_t const length,
+                              std::size_t const step) -> std::vector<std::size_t> {
+        assert(length % step == 0);
+        if (length < opts.min_patch_size_before_split)
+            return {length};
+
+
+        auto const round_up        = [&](auto const v) { return (v + step - 1) / step * step; };
+        std::size_t const max_size = std::max(step, opts.max_tile_size / step * step);
+        std::size_t const min_size = std::min(max_size, round_up(opts.min_tile_size));
         std::vector<std::size_t> sizes;
         std::size_t rem = length;
         while (rem > max_size)
@@ -71,73 +67,16 @@ auto Tiler<TileSet_t>::map(Args&&... args)
             sizes.push_back(rem);
         else
         {
-            auto const borrow = min_size - rem;
-            sizes.back() -= borrow;
-            sizes.push_back(rem + borrow);
+            auto const total = sizes.back() + rem; // in (max_size, 2 * max_size)
+            sizes.back()     = round_up(total / 2);
+            sizes.push_back(total - sizes.back());
         }
         return sizes;
     };
 
-    // Returns tile sizes for an arbitrary-length dimension (may produce odd sizes).
-    // Used for level 0 patches that can have any cell count.
-    auto split_1d = [&](std::size_t const length) -> std::vector<std::size_t> {
-        if (length < min_before_split)
-            return {length};
-        if (prefer_max)
-            return split_1d_prefer_max(length, /*step=*/1);
-
-        if (length == 8)
-            return std::vector<std::size_t>{4, 4};
-        if (length == 9)
-            return std::vector<std::size_t>{5, 4};
-        if (length == 10)
-            return std::vector<std::size_t>{5, 5};
-        if (length < 13)
-            return std::vector<std::size_t>{6, length - 6};
-
-        std::size_t const border = 4;
-        std::size_t middle       = length - (2 * border);
-        std::vector<std::size_t> sizes{border};
-
-        if (middle / 4 < 3)
-            sizes.emplace_back(middle);
-        else
-        {
-            if (middle / 6 < 3)
-            {
-                sizes.emplace_back(6);
-                sizes.emplace_back(middle - 6);
-            }
-            else
-            {
-                auto rem = middle % 6;
-                while (middle > 5)
-                {
-                    std::size_t add = rem > 1 ? 2 : rem > 0 ? 1 : 0;
-                    sizes.emplace_back(6 + add);
-                    middle -= (6 + add);
-                    rem -= add;
-                }
-                assert(middle == 0);
-            }
-        }
-
-        sizes.push_back(border);
-        return sizes;
-    };
-
-    // Returns tile sizes where every size is even. Required for fine-level patches
-    // (even AMR alignment) so that each tile's outermost ghost cell lands on an even
-    // AMR index and is therefore filled by the init refiner. Always prefers
-    // max_tile_size, same as split_1d does when prefer_max is set.
-    auto split_1d_even = [&](std::size_t const length) -> std::vector<std::size_t> {
-        assert(length % 2 == 0);
-        if (length < min_before_split)
-            return {length};
-        return split_1d_prefer_max(length, /*step=*/2);
-    };
-
-    // Even box shape → fine level → even tiles required; odd shape → level 0 → any tiles.
+    // Even box shape → fine level → even tiles required, so that each tile's outermost ghost
+    // cell lands on an even AMR index and is therefore filled by the init refiner;
+    // odd shape → level 0 → any tiles.
     bool const all_even_shape = [&] {
         for (std::size_t d = 0; d < dim; ++d)
             if (shape[d] % 2 != 0)
@@ -146,7 +85,7 @@ auto Tiler<TileSet_t>::map(Args&&... args)
     }();
 
     auto const do_split = [&](std::size_t const length) {
-        return all_even_shape ? split_1d_even(length) : split_1d(length);
+        return split_1d(length, all_even_shape ? 2 : 1);
     };
 
     auto const get_ranges = [](auto const& sizes) {
@@ -211,9 +150,9 @@ auto Tiler<TileSet_t>::map(Args&&... args)
 }
 
 template<typename TileSet_t, typename... Args>
-void tile_set_make_tiles(TileSet_t& tile_set, Args&&... args)
+void tile_set_make_tiles(TileSet_t& tile_set, TilingOptions const& opts, Args&&... args)
 {
-    Tiler<TileSet_t>{{tile_set}}.map(args...);
+    Tiler<TileSet_t>{{tile_set}, opts.validate()}.map(args...);
 }
 
 template<typename TileSet_t, typename TileSet0>

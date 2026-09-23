@@ -56,6 +56,7 @@ using Permutations_t = testing::Types< // ! notice commas !
     TestParam<3, LayoutMode::AoS, AllocatorMode::CPU>
    ,TestParam<3, LayoutMode::AoSMapped, AllocatorMode::CPU>
    ,TestParam<3, LayoutMode::AoSPCTS, AllocatorMode::CPU>
+   ,TestParam<3, LayoutMode::AoSCMTS, AllocatorMode::CPU>
 >;
 // clang-format on
 

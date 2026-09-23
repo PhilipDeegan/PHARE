@@ -115,6 +115,50 @@ private:
 
 
 template<typename ParticleArray_>
+struct PackerBackend<LayoutMode::AoSCMTS, ParticleArray_>
+{
+    // one flat cell-mapped array per tile; level ghosts are duplicated into every
+    // reaching tile, so LevelGhost counts/packs only the clamp-owner's copy
+    template<ParticleType ptype>
+    NO_DISCARD static std::size_t size(ParticleArray_ const& particles)
+    {
+        if constexpr (ptype != ParticleType::LevelGhost)
+            return particles.size();
+        else
+        {
+            std::size_t n = 0;
+            visit<ptype>(particles, [&](auto const&) { ++n; });
+            return n;
+        }
+    }
+
+    template<ParticleType ptype, typename SoAParticles_t>
+    static void pack(ParticleArray_ const& particles, SoAParticles_t& copy)
+    {
+        std::size_t idx = 0;
+        visit<ptype>(particles, [&](auto const& particle) { pack_one(copy, idx++, particle); });
+        if constexpr (ptype != ParticleType::LevelGhost)
+            assert(idx == particles.size());
+    }
+
+private:
+    template<ParticleType ptype, typename Fn>
+    static void visit(ParticleArray_ const& particles, Fn&& fn)
+    {
+        auto const& tile_set = particles();
+        for (auto const& tile : tile_set)
+            for (auto const& particle : tile())
+            {
+                if constexpr (ptype == ParticleType::LevelGhost)
+                    if (tile_set.at(Point{particle.iCell()}) != &tile)
+                        continue;
+                fn(particle);
+            }
+    }
+};
+
+
+template<typename ParticleArray_>
 class ParticlePacker
 {
     auto constexpr static dim = ParticleArray_::dimension;

@@ -6,6 +6,8 @@
 
 #include "interpolator.hpp"
 
+#include <stdexcept>
+
 namespace PHARE::core
 {
 
@@ -38,7 +40,7 @@ public:
     template<auto type = ParticleType::Domain, typename Particles>
     void particleToMesh(Particles const& particles, auto const& layout, auto& rhoP, auto& rhoC,
                         auto& flux, double coef = 1.)
-        requires(Particles::layout_mode == LayoutMode::AoSPCTS)
+        requires(is_tiled(Particles::layout_mode))
     {
         static_assert(any_in(type, ParticleType::Domain, ParticleType::LevelGhost));
 
@@ -51,14 +53,19 @@ public:
                     interp_.particleToMesh(p, rhop, rhoc, F, rho_lay, coef);
             };
 
+            auto& tile_particles = particles()[tidx]();
             if constexpr (type == ParticleType::LevelGhost)
-                on_reachable_level_ghosts(particles, tidx, deposit);
-            else
             {
-                auto& cps = particles()[tidx]();
-                for (auto const& bix : cps.local_box())
-                    deposit(cps(bix));
+                if constexpr (Particles::layout_mode == LayoutMode::AoSCMTS)
+                    throw std::runtime_error("AoSCMTS LevelGhost particleToMesh not implemented");
+                else
+                    on_reachable_level_ghosts(particles, tidx, deposit);
             }
+            else if constexpr (Particles::layout_mode == LayoutMode::AoSCMTS)
+                deposit(tile_particles);
+            else
+                for (auto const& bix : tile_particles.local_box())
+                    deposit(tile_particles(bix));
         }
     }
 
@@ -100,7 +107,7 @@ public:
     template<auto type = ParticleType::Domain, typename Particles_t>
     void particleToMesh(Particles_t& particles, auto& momentumTensor, auto const& layout,
                         double mass = 1.)
-        requires(Particles_t::layout_mode == LayoutMode::AoSPCTS)
+        requires(is_tiled(Particles_t::layout_mode))
     {
         static_assert(any_in(type, ParticleType::Domain, ParticleType::LevelGhost));
 
@@ -111,14 +118,19 @@ public:
             auto const deposit
                 = [&](auto const& cell_particles) { interp_(cell_particles, mt, mt_lay, mass); };
 
+            auto& tile_particles = particles()[tidx]();
             if constexpr (type == ParticleType::LevelGhost)
-                on_reachable_level_ghosts(particles, tidx, deposit);
-            else
             {
-                auto& cps = particles()[tidx]();
-                for (auto const& bix : cps.local_box())
-                    deposit(cps(bix));
+                if constexpr (Particles_t::layout_mode == LayoutMode::AoSCMTS)
+                    throw std::runtime_error("AoSCMTS LevelGhost particleToMesh not implemented");
+                else
+                    on_reachable_level_ghosts(particles, tidx, deposit);
             }
+            else if constexpr (Particles_t::layout_mode == LayoutMode::AoSCMTS)
+                deposit(tile_particles);
+            else
+                for (auto const& bix : tile_particles.local_box())
+                    deposit(tile_particles(bix));
         }
     }
 };

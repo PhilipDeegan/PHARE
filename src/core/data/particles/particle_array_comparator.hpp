@@ -146,6 +146,28 @@ EqualityReport ParticlesComparator<AoSPCTS, CPU, AoSPCTS, CPU>::operator()(PS0 c
 
 template<>
 template<typename PS0, typename PS1>
+EqualityReport ParticlesComparator<AoSCMTS, CPU, AoSCMTS, CPU>::operator()(PS0 const& ps0,
+                                                                           PS1 const& ps1,
+                                                                           double const atol)
+{
+    if (ps0.size() != ps1.size())
+        return EqualityReport{false, "different sizes: " + std::to_string(ps0.size()) + " vs "
+                                         + std::to_string(ps1.size())};
+
+    if (ps0().size() != ps1().size())
+        return EqualityReport{false, "different tile counts: " + std::to_string(ps0().size())
+                                         + " vs " + std::to_string(ps1().size())};
+
+    for (std::size_t ti = 0; ti < ps0().size(); ++ti)
+        if (auto eq = index_based_particles_equals(ps0()[ti](), ps1()[ti](), atol); !eq)
+            return eq;
+
+    return EqualityReport{true};
+}
+
+
+template<>
+template<typename PS0, typename PS1>
 EqualityReport ParticlesComparator<SoA, CPU, SoA, CPU>::operator()(PS0 const& ps0, PS1 const& ps1,
                                                                    double const atol)
 {

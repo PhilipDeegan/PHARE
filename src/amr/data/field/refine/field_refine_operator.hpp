@@ -18,8 +18,8 @@ namespace PHARE::amr
 template<typename Dst>
 void refine_field(Dst& destinationField, auto& sourceField, auto& intersectionBox, auto& refiner)
 {
-    for (auto const bix : phare_box_from<Dst::dimension>(intersectionBox))
-        refiner(sourceField, destinationField, bix);
+    refiner.refine_box(sourceField, destinationField,
+                       phare_box_from<Dst::dimension>(intersectionBox));
 }
 
 template<typename Refiner, typename FieldT>
