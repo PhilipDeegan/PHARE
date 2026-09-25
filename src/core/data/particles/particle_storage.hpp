@@ -153,11 +153,11 @@ struct particle_velocity_storage<8>
 
 
 #ifndef PHARE_PARTICLE_DELTA_BYTES
-#define PHARE_PARTICLE_DELTA_BYTES 8
+#define PHARE_PARTICLE_DELTA_BYTES 6
 #endif
 
 #ifndef PHARE_PARTICLE_V_BYTES
-#define PHARE_PARTICLE_V_BYTES 8
+#define PHARE_PARTICLE_V_BYTES 6
 #endif
 
 using ParticleDelta_t = typename particle_delta_storage<PHARE_PARTICLE_DELTA_BYTES>::type;
