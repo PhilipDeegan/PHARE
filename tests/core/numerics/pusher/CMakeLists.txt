@@ -20,3 +20,9 @@ add_custom_command(TARGET test-pusher
                    COMMAND "PYTHONPATH=${PHARE_PYTHONPATH}" ${Python_EXECUTABLE} ${CMAKE_CURRENT_SOURCE_DIR}/test_pusher.py ${CMAKE_CURRENT_BINARY_DIR})
 
 add_no_mpi_phare_test(${PROJECT_NAME} ${CMAKE_CURRENT_BINARY_DIR})
+
+
+add_executable(test-particle-precision test_particle_precision.cpp)
+target_include_directories(test-particle-precision PRIVATE ${GTEST_INCLUDE_DIRS})
+target_link_libraries(test-particle-precision PRIVATE phare_core ${GTEST_LIBS})
+add_no_mpi_phare_test(test-particle-precision ${CMAKE_CURRENT_BINARY_DIR})

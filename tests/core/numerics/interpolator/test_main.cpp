@@ -716,9 +716,9 @@ struct ACollectionOfParticles_2d : public ::testing::Test
         for (int i = start; i < end; i++)
             for (int j = start; j < end; j++)
             {
-                auto& part  = particles.emplace_back();
-                part.iCell  = {i, j};
-                part.delta  = ConstArray<double, dim>(.5);
+                auto& part = particles.emplace_back();
+                part.iCell = {i, j};
+                part.delta.fill(.5);
                 part.weight = 1.;
                 part.v[0]   = +2.;
                 part.v[1]   = -1.;
