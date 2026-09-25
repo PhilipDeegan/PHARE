@@ -5,4 +5,4 @@
 
 set -ex
 
-jupyter nbconvert --to script "$1" --output run
+jupyter nbconvert --to script "$1" --output "$2"
