@@ -6,6 +6,7 @@
 #include "core/numerics/ion_updater/ion_updater/ion_updater_impl1.hpp"
 
 
+#include "tests/core/data/gridlayout/test_gridlayout.hpp"
 #include "tests/core/data/electromag/test_electromag_fixtures.hpp"
 #include "tests/core/data/ion_population/test_ion_population_fixtures.hpp"
 
@@ -49,7 +50,7 @@ void ref_update(UpdaterMode mode, Patches& patches)
     for (auto& [layout, ions, _, electromag] : patches)
     {
         auto const domainBox = layout.AMRBox();
-        auto const ghostBox  = grow(domainBox, GridLayout_t::nbrParticleGhosts());
+        auto const ghostBox  = grow(domainBox, GridLayout_t::options.particle_ghost_width);
         auto updater         = get_updater_for<0>(*ions);
 
         Boxing_t const boxing{layout, remove(ghostBox, domainBox)};
@@ -67,7 +68,7 @@ void cmp_update(UpdaterMode mode, Patches& patches)
     for (auto& [layout, ions, _, electromag] : patches)
     {
         auto const domainBox = layout.AMRBox();
-        auto const ghostBox  = grow(domainBox, GridLayout_t::nbrParticleGhosts());
+        auto const ghostBox  = grow(domainBox, GridLayout_t::options.particle_ghost_width);
         auto updater         = get_updater_for<impl>(*ions);
 
         Boxing_t const boxing{layout, remove(ghostBox, domainBox)};
@@ -79,7 +80,7 @@ void cmp_update(UpdaterMode mode, Patches& patches)
 template<typename Particles_t, typename GridLayout_t>
 auto make_ions(GridLayout_t const& layout)
 {
-    auto constexpr static interp = GridLayout_t::interp_order;
+    auto constexpr static interp = GridLayout_t::options.interp_order;
 
     UsableIons<Particles_t, interp> ions{layout};
     std::optional<int> seed = std::nullopt;
@@ -117,7 +118,7 @@ auto make_ions(GridLayout_t const& layout)
 template<typename Particles_t, typename GridLayout_t, typename Ions>
 auto from_ions(GridLayout_t const& layout, Ions const& from)
 {
-    auto constexpr static interp = GridLayout_t::interp_order;
+    auto constexpr static interp = GridLayout_t::options.interp_order;
 
     UsableIons<Particles_t, interp> ions{layout, "protons"};
     EXPECT_EQ(ions.populations[0].particles.domain_particles.size(), 0ull);
@@ -192,7 +193,7 @@ struct UpdatersComparisonTest : public ::testing::Test
     auto constexpr static interp = opts.interp_order;
 
     using PHARE_Types        = core::PHARE_Types<opts>;
-    using GridLayout_t       = TestGridLayout<typename PHARE_Types::GridLayout_t>;
+    using GridLayout_t       = TestGridLayout<typename PHARE_Types::Hybrid::GridLayout_t>;
     using RefParticleArray_t = ParticleArray<dim>;
     using CmpParticleArray_t = RefParticleArray_t;
     using UsableElectromag_t = UsableElectromag<dim>;

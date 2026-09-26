@@ -527,8 +527,11 @@ std::string Simulator<opts>::summary() const
     // if (mhdModel_)
     //     ss << mhdModel_->summarize(*hierarchy_);
 
-    if (hybridModel_)
-        ss << hybridModel_->summarize(*hierarchy_);
+    if constexpr (has_hybrid_v<opts>)
+    {
+        if (hyb_.model_)
+            ss << hyb_.model_->summarize(*hierarchy_);
+    }
 
     return ss.str();
 }

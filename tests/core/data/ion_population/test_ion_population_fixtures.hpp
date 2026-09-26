@@ -79,35 +79,12 @@ class UsableIonsPopulation_ : public _defaults::IonPopulation_t
 public:
     UsableIonsPopulation_(initializer::PHAREDict const& dict, GridLayout_t const& layout)
         : Super{dict}
-        , particleDensity{this->name() + "_particleDensity", layout, HybridQuantity::Scalar::rho}
-        , chargeDensity{this->name() + "_chargeDensity", layout, HybridQuantity::Scalar::rho}
-        , F{this->name() + "_flux", layout, HybridQuantity::Vector::V}
-        , M{this->name() + "_momentumTensor", layout, HybridQuantity::Tensor::M}
-        , particles{this->name(), layout.AMRBox()}
-    {
-        set();
-    }
-
-    UsableIonsPopulation_(UsableIonsPopulation_ const& that)
-        : Super{pop_dict(that.name())}
-        , particleDensity{that.particleDensity}
-        , chargeDensity{that.chargeDensity}
-        , F{that.F}
-        , M{that.M}
-        , particles{that.particles}
-    {
-        set();
-    }
-
-public:
-    UsableIonsPopulation_(initializer::PHAREDict const& dict, GridLayout_t const& layout)
-        : Super{dict}
         , layout_{layout}
         , rhoP{this->name() + "_particleDensity", layout_, Quantity::Scalar::rho, 1}
         , rhoC{this->name() + "_chargeDensity", layout_, Quantity::Scalar::rho, 1}
         , F{this->name() + "_flux", layout, Quantity::Vector::V, 1}
         , M{this->name() + "_momentumTensor", layout, Quantity::Tensor::M, 1}
-        , particles{this->name(), grow(layout.AMRBox(), GridLayout_t::nbrParticleGhosts() + 1)}
+        , particles{this->name(), grow(layout.AMRBox(), GridLayout_t::options.particle_ghost_width + 1)}
     {
         set();
     }
@@ -212,17 +189,6 @@ public:
                 std::size_t const ppc = 0)
         : UsableIons_{layout, super(pop_names, ppc)}
     {
-        auto& super_pops = Super::getRunTimeResourcesViewList();
-        populations.reserve(super_pops.size());
-        for (std::size_t i = 0; i < super_pops.size(); ++i)
-            populations.emplace_back(dict["pop" + std::to_string(i)], layout);
-        set();
-    }
-
-    UsableIons_(GridLayout_t const& layout, std::vector<std::string> const& pop_names,
-                std::size_t const ppc = 0)
-        : UsableIons_{layout, super(pop_names, ppc)}
-    {
     }
 
     UsableIons_(GridLayout_t const& layout, std::size_t const ppc = 0)
@@ -230,29 +196,7 @@ public:
     {
     }
 
-    UsableIons_(UsableIons_&& that)
-        : Super(super(*that))
-        , massDensity{std::move(that.massDensity)}
-        , chargeDensity{std::move(that.chargeDensity)}
-        , Vi{std::move(that.Vi)}
-        , M{std::move(that.M)}
-        , populations{std::move(that.populations)}
-    {
-        set();
-    }
-
-    UsableIons_(UsableIons_ const& that)
-        : Super(super(*that))
-        , massDensity{that.massDensity}
-        , chargeDensity{that.chargeDensity}
-        , Vi{that.Vi}
-        , M{that.M}
-        , populations{that.populations}
-    {
-        set();
-    }
-
-    UsableIons_(GridLayout_t const& layout, std::string const& pop = "protons")
+    UsableIons_(GridLayout_t const& layout, std::string const& pop)
         : UsableIons_{layout, std::vector<std::string>{pop}}
     {
     }

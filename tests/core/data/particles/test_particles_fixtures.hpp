@@ -120,7 +120,7 @@ auto& sort_particles(GridLayout const& layout, auto& particles)
         std::sort(particles.begin() + l, particles.begin() + r, cmp_deltas);
     };
 
-    auto const ghostBox = grow(layout.AMRBox(), GridLayout::nbrParticleGhosts());
+    auto const ghostBox = grow(layout.AMRBox(), GridLayout::options.particle_ghost_width);
     CellFlattener cell_flattener{ghostBox};
 
     std::sort(

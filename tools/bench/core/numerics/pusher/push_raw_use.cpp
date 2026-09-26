@@ -73,10 +73,10 @@ void push()
     constexpr std::uint32_t cells       = 65;
     // constexpr std::uint32_t n_parts = 1e7;
     using PHARE_Types   = PHARE_Types<opts>;
-    using GridLayout_t  = TestGridLayout<typename PHARE_Types::GridLayout_t>;
+    using GridLayout_t  = TestGridLayout<typename PHARE_Types::Hybrid::GridLayout_t>;
     using Electromag_t  = UsableElectromag<dim>;
     using Interpolator  = Interpolator<dim, interp>;
-    using Ions_t        = PHARE_Types::Ions_t;
+    using Ions_t        = PHARE_Types::Hybrid::Ions_t;
     using ParticleArray = Ions_t::particle_array_type;
     using Pusher        = IonUpdater1<Ions_t>::Pusher;
     using UsableIons_t  = UsableIons<ParticleArray, interp>;
@@ -85,7 +85,7 @@ void push()
     GridLayout_t layout{cells};
     Electromag_t em{layout};
     UsableIons_t ions{layout};
-    Boxing_t const boxing{layout, {grow(layout.AMRBox(), GridLayout_t::nbrParticleGhosts())}};
+    Boxing_t const boxing{layout, {grow(layout.AMRBox(), GridLayout_t::options.particle_ghost_width)}};
 
     std::stringstream ss;
     ss << "unsorted_particles_" << dim << ".raw";

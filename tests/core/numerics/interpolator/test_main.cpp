@@ -761,9 +761,9 @@ struct ACollectionOfParticles_3d : public ::testing::Test
     constexpr static PHARE::SimOpts opts{dim, interp_order};
 
     using PHARE_TYPES      = PHARE::core::PHARE_Types<opts>;
-    using ParticleArray_t  = PHARE_TYPES::ParticleArray_t;
-    using GridLayout_t     = PHARE_TYPES::GridLayout_t;
-    using Grid_t           = PHARE_TYPES::Grid_t;
+    using ParticleArray_t  = PHARE_TYPES::Hybrid::ParticleArray_t;
+    using GridLayout_t     = PHARE_TYPES::Hybrid::GridLayout_t;
+    using Grid_t           = PHARE_TYPES::Hybrid::Grid_t;
     using UsableVecFieldND = UsableVecField<dim>;
 
     GridLayout_t layout{ConstArray<double, dim>(.1), {nx, ny}, ConstArray<double, dim>(0)};

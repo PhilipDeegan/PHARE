@@ -3,9 +3,9 @@
 
 
 #include "core/def.hpp"
-#include "core/def/phare_mpi.hpp" // IWYU pragma: keep
+#include "phare_mpi.hpp" // IWYU pragma: keep
 #include "core/utilities/types.hpp"
-#include "core/utilities/mpi_utils.hpp"
+#include "mpi/mpi_utils.hpp"
 #include "core/models/hybrid_state.hpp"
 #include "core/data/ions/particle_initializers/particle_initializer_factory.hpp"
 
@@ -153,8 +153,8 @@ struct TensorFieldMinMax
         auto mm = *this;
         for (std::size_t i = 0; i < min.size(); ++i)
         {
-            mm.min[i] = core::mpi::min_on_rank0(min[i]);
-            mm.max[i] = core::mpi::max_on_rank0(max[i]);
+            mm.min[i] = mpi::min_on_rank0(min[i]);
+            mm.max[i] = mpi::max_on_rank0(max[i]);
         }
         return mm;
     }
@@ -252,19 +252,19 @@ std::string HybridModel<GridLayoutT, Electromag, Ions, Electrons, AMR_Types, Gri
                                   [](auto const& pop) { return pop.domainParticles().size(); });
         });
 
-        auto const on_lvl = core::mpi::sum_on_rank_0(lcl);
+        auto const on_lvl = mpi::sum_on_rank_0(lcl);
         total += on_lvl;
 
         // auto const minmax = ElectromagMinMax::GET(rm, state.electromag, lvl).collect();
         auto const level_stats
             = LevelStats<GridLayoutT>::GET(rm, state.ions.velocity(), lvl, hierarchy).collect();
 
-        if (core::mpi::rank() == 0)
+        if (mpi::rank() == 0)
             ss << "lvl:" << lvl.getLevelNumber() << " (" << level_stats << ") " // << minmax
                << " parts(" << on_lvl << "), " << std::endl;
     });
 
-    if (core::mpi::rank() == 0)
+    if (mpi::rank() == 0)
         ss << "tot:" << total;
 
     return ss.str();

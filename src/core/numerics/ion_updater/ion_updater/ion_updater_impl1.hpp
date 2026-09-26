@@ -23,7 +23,7 @@ class IonUpdater1
 
 public:
     static constexpr auto dimension    = GridLayout_t::dimension;
-    static constexpr auto interp_order = GridLayout_t::interp_order;
+    static constexpr auto interp_order = GridLayout_t::options.interp_order;
 
     using Box                 = PHARE::core::Box<int, dimension>;
     using Interpolator_t      = Interpolator<dimension, interp_order>;

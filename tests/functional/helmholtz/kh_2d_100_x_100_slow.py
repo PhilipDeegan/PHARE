@@ -14,7 +14,7 @@ SCOPE_TIMING = os.getenv("PHARE_SCOPE_TIMING", "False").lower() in ("true", "1",
 """
   For scope timings to work
   The env var PHARE_SCOPE_TIMING must be == "1" (or "true")
-    See src/phare/phare.hpp
+    See src/amr/samrai.cpp
   CMake must be configured with: -DwithPhlop=ON
   And a LOG_LEVEL must be defined via compile args: -DPHARE_LOG_LEVEL=1
   Or change the default value in src/core/logger.hpp

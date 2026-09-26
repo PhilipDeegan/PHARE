@@ -18,7 +18,7 @@ enum class UpdaterMode { ref = 0, copy };
 template<typename GridLayout, typename ParticleArray_t>
 struct UpdaterSelectionBoxing
 {
-    auto constexpr static partGhostWidth = GridLayout::nbrParticleGhosts();
+    auto constexpr static partGhostWidth = GridLayout::options.particle_ghost_width;
     using GridLayout_t                   = GridLayout;
     using Box_t                          = GridLayout_t::AMRBox_t;
     using ParticleRange                  = IndexRange<ParticleArray_t>;

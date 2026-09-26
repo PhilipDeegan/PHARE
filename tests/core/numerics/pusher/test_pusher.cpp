@@ -122,8 +122,8 @@ class APusher : public ::testing::Test
 {
     using Particle     = typename ParticleArray<dim>::Particle_t;
     using PhareTypes   = PHARE_Types<PHARE::SimOpts{dim, /*interp=*/1}>;
-    using GridLayout_t = TestGridLayout<typename PhareTypes::GridLayout_t>;
-    using Ions_t       = PhareTypes::Ions_t;
+    using GridLayout_t = TestGridLayout<typename PhareTypes::Hybrid::GridLayout_t>;
+    using Ions_t       = PhareTypes::Hybrid::Ions_t;
 
 public:
     using Pusher = IonUpdater0<Ions_t>::Pusher;
@@ -239,8 +239,8 @@ TEST_F(APusher1D, trajectoryIsOk)
 class APusherWithLeavingParticles : public ::testing::Test
 {
     using PhareTypes   = PHARE_Types<PHARE::SimOpts{/*dim=*/1, /*interp=*/1}>;
-    using GridLayout_t = TestGridLayout<typename PhareTypes::GridLayout_t>;
-    using Ions_t       = PhareTypes::Ions_t;
+    using GridLayout_t = TestGridLayout<typename PhareTypes::Hybrid::GridLayout_t>;
+    using Ions_t       = PhareTypes::Hybrid::Ions_t;
 
 public:
     using Pusher = IonUpdater0<Ions_t>::Pusher;

@@ -64,17 +64,18 @@ void inline declare_etc_hybrid(py::module& m)
     using DW         = DataWrangler<opts>;
     std::string name = "DataWrangler";
 
-    py::class_<DW, py::smart_holder>(m, name.c_str(), py::module_local())
+    auto dw = py::class_<DW, py::smart_holder>(m, name.c_str(), py::module_local())
         .def(py::init<std::shared_ptr<Sim> const&, std::shared_ptr<amr::Hierarchy> const&>())
         .def(py::init<std::shared_ptr<ISimulator> const&, std::shared_ptr<amr::Hierarchy> const&>())
         .def("sync", &DW::sync)
-        .def("getMHDPatchLevel", &DW::getMHDPatchLevel)
         .def("getHybridPatchLevel", &DW::getHybridPatchLevel)
         .def("getNumberOfLevels", &DW::getNumberOfLevels);
+    if constexpr (has_mhd_v<opts>)
+        dw.def("getMHDPatchLevel", &DW::getMHDPatchLevel);
 
 
 
-    using HybPL = PatchLevel<typename Sim::HybridModel>;
+    using HybPL = PatchLevel<typename solver::PHARE_Types<opts>::Hybrid::Model_t>;
     name        = "HybridPatchLevel";
     if constexpr (core::defaultNbrRefinedParts(opts.dimension, opts.interp_order)
                   == opts.nbRefinedPart) // register once!
@@ -88,11 +89,14 @@ void inline declare_etc_hybrid(py::module& m)
             .def("getParticles", &HybPL::getParticles, py::arg("pop_name"));
 
 
-    using MHDPL = PatchLevel<typename Sim::MHDModel>;
-    name        = "MHDPatchLevel";
-    if constexpr (core::defaultNbrRefinedParts(opts.dimension, opts.interp_order)
-                  == opts.nbRefinedPart)
-        py::class_<MHDPL, py::smart_holder>(m, name.c_str());
+    if constexpr (has_mhd_v<opts>)
+    {
+        using MHDPL = PatchLevel<typename solver::PHARE_Types<opts>::MHD::Model_t>;
+        name        = "MHDPatchLevel";
+        if constexpr (core::defaultNbrRefinedParts(opts.dimension, opts.interp_order)
+                      == opts.nbRefinedPart)
+            py::class_<MHDPL, py::smart_holder>(m, name.c_str());
+    }
 
     using _Splitter
         = PHARE::amr::Splitter<core::DimConst<opts.dimension>, core::InterpConst<opts.interp_order>,

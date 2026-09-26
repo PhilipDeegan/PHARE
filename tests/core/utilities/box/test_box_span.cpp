@@ -25,7 +25,7 @@ TEST(BoxSpanTest, test_reverse_iterator)
     static constexpr std::size_t IDX = dim - 1;
     static constexpr PHARE::SimOpts opts{dim, 1};
     using PHARE_Types  = PHARE::core::PHARE_Types<opts>;
-    using GridLayout_t = TestGridLayout<typename PHARE_Types::GridLayout_t>;
+    using GridLayout_t = TestGridLayout<typename PHARE_Types::Hybrid::GridLayout_t>;
 
     GridLayout_t layout{3};
 
@@ -106,8 +106,8 @@ TEST(FieldBoxSpanTest, test_field_box_span_3d)
 {
     static constexpr PHARE::SimOpts opts{3, 1};
     using PHARE_Types  = PHARE::core::PHARE_Types<opts>;
-    using GridLayout_t = TestGridLayout<typename PHARE_Types::GridLayout_t>;
-    using Grid_t       = PHARE_Types::Grid_t;
+    using GridLayout_t = TestGridLayout<typename PHARE_Types::Hybrid::GridLayout_t>;
+    using Grid_t       = PHARE_Types::Hybrid::Grid_t;
 
     GridLayout_t layout{9};
     Grid_t rho{"rho", layout, PHARE::core::HybridQuantity::Scalar::rho, 0};
@@ -149,8 +149,8 @@ TEST(FieldBoxSpanTest, test_field_box_poiont_span_3d)
     static constexpr std::size_t dim = 3;
     static constexpr PHARE::SimOpts opts{dim, 1};
     using PHARE_Types  = PHARE::core::PHARE_Types<opts>;
-    using GridLayout_t = TestGridLayout<typename PHARE_Types::GridLayout_t>;
-    using Grid_t       = PHARE_Types::Grid_t;
+    using GridLayout_t = TestGridLayout<typename PHARE_Types::Hybrid::GridLayout_t>;
+    using Grid_t       = PHARE_Types::Hybrid::Grid_t;
 
     GridLayout_t layout{9};
     Grid_t src{"rho", layout, PHARE::core::HybridQuantity::Scalar::rho, 0};

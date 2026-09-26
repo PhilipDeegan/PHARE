@@ -76,12 +76,12 @@ void push(benchmark::State& state)
     constexpr std::uint32_t n_parts     = 1e7;
 
     using PHARE_Types   = PHARE_Types<opts>;
-    using GridLayout_t  = TestGridLayout<typename PHARE_Types::GridLayout_t>;
+    using GridLayout_t  = TestGridLayout<typename PHARE_Types::Hybrid::GridLayout_t>;
     using Electromag_t  = UsableElectromag<dim>;
     using Interpolator  = PHARE::core::Interpolator<dim, interp>;
-    using ParticleArray = PHARE_Types::ParticleArray_t;
+    using ParticleArray = PHARE_Types::Hybrid::ParticleArray_t;
     using Particle_t    = ParticleArray::value_type;
-    using Ions_t        = PHARE_Types::Ions_t;
+    using Ions_t        = PHARE_Types::Hybrid::Ions_t;
     using Pusher        = IonUpdater1<Ions_t>::Pusher;
     using Boxing_t      = PHARE::core::UpdaterSelectionBoxing<GridLayout_t, ParticleArray>;
 
@@ -93,7 +93,7 @@ void push(benchmark::State& state)
     domainParticles.vector() = std::vector<Particle_t>(n_parts, bench::particle<dim>());
     bench::disperse(domainParticles, 0, cells - 1, 13337);
 
-    Boxing_t const boxing{layout, {grow(layout.AMRBox(), GridLayout_t::nbrParticleGhosts())}};
+    Boxing_t const boxing{layout, {grow(layout.AMRBox(), GridLayout_t::options.particle_ghost_width)}};
     Interpolator interpolator;
     Pusher pusher{.001, 1.0, layout};
     while (state.KeepRunningBatch(1))

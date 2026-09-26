@@ -253,7 +253,7 @@ namespace amr
     {
         auto constexpr dimension    = GridLayoutT::dimension;
         auto const domBox           = phare_box_from<dimension>(patch.getBox());
-        auto const particleGhostBox = grow(domBox, GridLayoutT::nbrParticleGhosts());
+        auto const particleGhostBox = grow(domBox, GridLayoutT::options.particle_ghost_width);
         return core::generate(
             [&](auto& neighbox) {
                 return *(particleGhostBox * phare_box_from<dimension>(neighbox));

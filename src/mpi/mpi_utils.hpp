@@ -238,10 +238,10 @@ NO_DISCARD core::SpanSet<typename Vector::value_type, int> collect_raw(Vector co
 
 
 template<typename T>
-NO_DISCARD auto collect(Span<T> const& sendBuff, int mpi_size = 0)
+NO_DISCARD auto collect(core::Span<T> const& sendBuff, int mpi_size = 0)
 {
-    using V = Span<T>::value_type;
-    return collectVector<Span<T>, std::vector<std::vector<V>>>(sendBuff, mpi_size);
+    using V = core::Span<T>::value_type;
+    return collectVector<core::Span<T>, std::vector<std::vector<V>>>(sendBuff, mpi_size);
 }
 
 

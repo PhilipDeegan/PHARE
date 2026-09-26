@@ -74,8 +74,7 @@ public:
     static constexpr std::size_t dimension = opts.dimension;
 
     using Simulator   = PHARE::Simulator<opts>;
-    using HybridModel = solver::PHARE_Types<opts>::Hybrid::Model_t;
-    using MHDModel    = solver::PHARE_Types<opts>::MHD::Model_t;
+    using PHARETypes  = solver::PHARE_Types<opts>;
 
 
 
@@ -97,12 +96,16 @@ public:
     auto getNumberOfLevels() const { return hierarchy_->getNumberOfLevels(); }
 
     auto getMHDPatchLevel(size_t lvl)
+        requires has_mhd_v<opts>
     {
+        using MHDModel = PHARETypes::MHD::Model_t;
         return PatchLevel<MHDModel>{*hierarchy_, *simulator_.getMHDModel(), lvl};
     }
 
     auto getHybridPatchLevel(size_t lvl)
+        requires has_hybrid_v<opts>
     {
+        using HybridModel = PHARETypes::Hybrid::Model_t;
         return PatchLevel<HybridModel>{*hierarchy_, *simulator_.getHybridModel(), lvl};
     }
 

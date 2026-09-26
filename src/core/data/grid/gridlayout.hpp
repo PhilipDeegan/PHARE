@@ -1214,6 +1214,7 @@ namespace core
                     return make_index(index[0], index[1], index[2] - 1);
                 }
             }
+        }
 
 
         template<typename... Args>

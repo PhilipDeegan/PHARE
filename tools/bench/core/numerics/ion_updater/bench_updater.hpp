@@ -40,9 +40,9 @@ struct BenchSetup
     static constexpr auto opts             = PHARE::SimOpts{dim, interp};
 
     using PHARE_Types   = core::PHARE_Types<opts>;
-    using GridLayout_t  = TestGridLayout<typename PHARE_Types::GridLayout_t>;
+    using GridLayout_t  = TestGridLayout<typename PHARE_Types::Hybrid::GridLayout_t>;
     using Electromag_t  = UsableElectromag<dim>;
-    using ParticleArray = PHARE_Types::ParticleArray_t;
+    using ParticleArray = PHARE_Types::Hybrid::ParticleArray_t;
     using Particle_t    = ParticleArray::value_type;
     using Ions          = UsableIons<ParticleArray, interp>;
     using Boxing_t      = UpdaterSelectionBoxing<GridLayout_t, ParticleArray>;
@@ -50,7 +50,7 @@ struct BenchSetup
     GridLayout_t layout{cells};
     Electromag_t em{layout};
     Ions ions{layout};
-    Boxing_t const boxing{layout, {grow(layout.AMRBox(), GridLayout_t::nbrParticleGhosts())}};
+    Boxing_t const boxing{layout, {grow(layout.AMRBox(), GridLayout_t::options.particle_ghost_width)}};
     ParticleArray particles_copy;
 
     void SetUp(::benchmark::State&)
