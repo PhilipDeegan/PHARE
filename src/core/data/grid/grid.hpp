@@ -22,6 +22,7 @@ On the contrary, components that just need to manipulate data (and may not be ab
 objects encapsulating allocating objects such as vectors) will access it through a Field view. For
 convenience, Grid can spawn its own Field view.
 */
+
 template<typename NdArrayImpl, typename PhysicalQuantity>
 class Grid : public NdArrayImpl
 {
@@ -89,6 +90,7 @@ public:
     // returns view when getting address of this object, could be misleading, but convenient
     NO_DISCARD auto operator&() { return &field_; }
     NO_DISCARD auto operator&() const { return &field_; }
+    NO_DISCARD auto operator*() const { return field_; }
 
 private:
     std::string name_{"No Name"};

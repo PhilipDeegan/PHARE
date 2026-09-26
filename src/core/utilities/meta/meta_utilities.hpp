@@ -20,6 +20,7 @@ namespace core
     using tryToInstanciate = void;
 
 
+
     struct dummy
     {
         using type              = int;
