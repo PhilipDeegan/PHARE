@@ -49,6 +49,8 @@ bool static const premain = []() {
     assert(!(cmp_only and ref_only) && "Cant have both only");
     PHARE_WITH_MKN_GPU({ //
         ::mkn::gpu::setLimitMallocHeapSize(bytes);
+        // per-thread device stack (default ~1KB) overflows in the MultiBoris push kernel
+        ::mkn::gpu::setLimitStackSize(get_env_as("PHARE_GPU_STACK", std::size_t{16384}));
     })
 
     PHARE_WITH_PHLOP({

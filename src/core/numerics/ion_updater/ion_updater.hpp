@@ -468,21 +468,49 @@ void ParallelIonUpdater<ParticleArray_t, GridLayout>::updateAndDepositAll_(
             auto [ions, _] = view.args;
             for (std::size_t j = 0; j < ions.size(); ++j)
             {
-                auto& pop              = ions[j];
-                std::uint32_t const ds = ions.chargeDensity().max_tile_size();
-                auto const domain      = *pop.domainParticles();
-                using Launcher         = gpu::ChunkLauncher<false>;
-                Launcher launcher{1, 0};
-                launcher.b.x = kernel::warp_size();
-                launcher.g.x = domain().size();
-                launcher.ds  = ds * 5 * 8;
-                assert(launcher.ds < 65000);
-                auto pdensity = pop.particleDensity();
-                auto cdensity = pop.chargeDensity();
-                auto flux     = *pop.flux();
-                launcher.stream(in.streamer.streams[i], [=] __device__() mutable {
-                    Interpolating_t::template on_tiles<Tile_vt>(domain, flux, pdensity, cdensity);
-                });
+                auto& pop = ions[j];
+
+                if constexpr (ParticleArray_t::layout_mode == LayoutMode::AoSPCTS)
+                {
+                    // block = (tile, cell), threads stride the cell (see on_tile_cells)
+                    auto const deposit_tiles = [&](auto& particles) {
+                        using Launcher       = gpu::TileCellLauncher<false>;
+                        auto const parts     = *particles;
+                        auto const max_cells = Launcher::max_cells(parts);
+                        if (max_cells == 0)
+                            return;
+
+                        std::size_t const threads = kernel::warp_size();
+                        auto pdensity             = pop.particleDensity();
+                        auto cdensity             = pop.chargeDensity();
+                        auto flux                 = *pop.flux();
+                        Launcher{parts().size(), max_cells, threads}.stream(
+                            in.streamer.streams[i], [=] __device__() mutable {
+                                Interpolating_t::template on_tile_cells<Tile_vt, Launcher>(
+                                    parts, flux, pdensity, cdensity, threads);
+                            });
+                    };
+                    deposit_tiles(pop.domainParticles());
+                    deposit_tiles(pop.patchGhostParticles());
+                }
+                else
+                {
+                    std::uint32_t const ds = ions.chargeDensity().max_tile_size();
+                    auto const domain      = *pop.domainParticles();
+                    using Launcher         = gpu::ChunkLauncher<false>;
+                    Launcher launcher{1, 0};
+                    launcher.b.x = kernel::warp_size();
+                    launcher.g.x = domain().size();
+                    launcher.ds  = ds * 5 * 8;
+                    assert(launcher.ds < 65000);
+                    auto pdensity = pop.particleDensity();
+                    auto cdensity = pop.chargeDensity();
+                    auto flux     = *pop.flux();
+                    launcher.stream(in.streamer.streams[i], [=] __device__() mutable {
+                        Interpolating_t::template on_tiles<Tile_vt>(domain, flux, pdensity,
+                                                                    cdensity);
+                    });
+                }
             }
         };
 

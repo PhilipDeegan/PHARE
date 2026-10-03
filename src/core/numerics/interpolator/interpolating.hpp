@@ -4,6 +4,7 @@
 #include "core/utilities/kernels.hpp"
 #include "core/data/field/field_tiles.hpp"
 #include "core/utilities/range/range.hpp"
+#include "core/data/electromag/electromag.hpp"
 #include "core/data/tensorfield/tensorfield.hpp"
 #include "core/data/particles/particle_array_def.hpp"
 
@@ -60,8 +61,9 @@ public:
 
     template<auto type = ParticleType::Domain, typename Particles>
     void particleToMesh(Particles const& particles, auto const& layout, auto& rhoP, auto& rhoC,
-                        auto& flux, double coef = 1.) _PHARE_ALL_FN_
+                        auto& flux, double coef = 1.)
         requires(Particles::layout_mode == LayoutMode::AoSPCTS)
+    _PHARE_ALL_FN_
     {
         static_assert(any_in(type, ParticleType::Domain, ParticleType::LevelGhost));
 
@@ -87,8 +89,9 @@ public:
 
     template<auto type = ParticleType::Domain, typename Particles>
     void particleToMesh(Particles const& particles, auto const& layout, auto& rhoP, auto& rhoC,
-                        auto& flux, double coef = 1.) _PHARE_ALL_FN_
+                        auto& flux, double coef = 1.)
         requires(Particles::layout_mode == LayoutMode::AoSCMTS)
+    _PHARE_ALL_FN_
     {
         static_assert(any_in(type, ParticleType::Domain, ParticleType::LevelGhost));
 
@@ -110,16 +113,18 @@ public:
 
     template<auto type = ParticleType::Domain, typename Particles>
     void particleToMesh(Particles const& particles, auto const& layout, auto& rhoP, auto& rhoC,
-                        auto& flux, double coef = 1.) _PHARE_ALL_FN_
+                        auto& flux, double coef = 1.)
         requires(Particles::layout_mode == LayoutMode::AoSMapped)
+    _PHARE_ALL_FN_
     {
         interp_(particles, rhoP, rhoC, flux, layout, coef);
     }
 
     template<typename Particles>
     void particleToMesh(Particles const& particles, auto const& layout, auto& rhoP, auto& rhoC,
-                        auto& flux, double coef = 1.) _PHARE_ALL_FN_
+                        auto& flux, double coef = 1.)
         requires(Particles::layout_mode == LayoutMode::AoSTS)
+    _PHARE_ALL_FN_
     {
         // GPU_UNIFIED falls back to the CPU path until there's an optimized GPU version
         for (std::size_t tidx = 0; tidx < particles().size(); ++tidx)
@@ -133,8 +138,9 @@ public:
 
     template<typename Particles>
     void particleToMesh(Particles const& particles, auto const& layout, auto& rhoP, auto& rhoC,
-                        auto& flux, double coef = 1.) _PHARE_ALL_FN_
+                        auto& flux, double coef = 1.)
         requires(Particles::layout_mode == LayoutMode::SoATS)
+    _PHARE_ALL_FN_
     {
         for (auto const& tile : particles())
             for (std::size_t i = 0; i < tile().size(); ++i)
@@ -143,8 +149,9 @@ public:
 
     template<typename Particles>
     void particleToMesh(Particles const& particles, auto const& layout, auto& rhoP, auto& rhoC,
-                        auto& flux, double coef = 1.) _PHARE_ALL_FN_
+                        auto& flux, double coef = 1.)
         requires(Particles::layout_mode == LayoutMode::AoSPC)
+    _PHARE_ALL_FN_
     {
         auto constexpr static alloc_mode = Particles::alloc_mode;
 
@@ -181,9 +188,10 @@ public:
 
     template<typename Particles>
     void particleToMesh(Particles const& particles, auto const& layout, auto& rhoP, auto& rhoC,
-                        auto& flux, double coef = 1.) _PHARE_ALL_FN_
+                        auto& flux, double coef = 1.)
         requires(any_in(Particles::layout_mode, LayoutMode::AoS, LayoutMode::SoA,
                         LayoutMode::SoAVX))
+    _PHARE_ALL_FN_
     {
         auto constexpr static alloc_mode = Particles::alloc_mode;
 
@@ -211,6 +219,35 @@ public:
         }
         else
             throw std::runtime_error("fail");
+    }
+
+    // AoSPCTS GPU deposit, launched with gpu::TileCellLauncher: block = (tile, cell), the block's
+    // threads stride the cell's particles. Cells share field nodes, so the interpolator must be
+    // atomic. Field_t as on_tiles (tiled field value_type)
+    template<typename Field_t, typename Launcher>
+    static void on_tile_cells(auto& particles, auto& Flux, auto& Rhop, auto& Rhoc,
+                              std::size_t const threads, double coef = 1.) _PHARE_DEV_FN_
+    {
+#if PHARE_HAVE_MKN_GPU_HW
+        static_assert(atomic_ops, "GPU must be atomic");
+        using TensorField_t = basic::TensorField<typename Field_t::value_type, 1>;
+
+        auto const tidx   = Launcher::tile_idx();
+        auto& cps         = particles()[tidx]();
+        auto const& lobox = cps.local_box();
+        if (Launcher::cell_idx() >= lobox.size())
+            return;
+
+        auto& parts         = cps(*(lobox.begin() + Launcher::cell_idx()));
+        auto& rhop_tile     = Rhop[tidx];
+        auto& rhoc_tile     = Rhoc[tidx];
+        auto flux           = Flux.template as<TensorField_t>([&](auto& c) { return c[tidx](); });
+        auto const& layout  = rhop_tile.layout();
+        auto& pdensity      = rhop_tile();
+        auto& cdensity      = rhoc_tile();
+        for (std::size_t pid = Launcher::thread_idx(); pid < parts.size(); pid += threads)
+            Interpolator_t{}.particleToMesh(parts[pid], pdensity, cdensity, flux, layout, coef);
+#endif // PHARE_HAVE_MKN_GPU_HW
     }
 
     template<bool in_box = false, typename Particles, typename GridLayout, typename VecField,

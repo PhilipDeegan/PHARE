@@ -125,13 +125,13 @@ struct TensorField
 
 
     //! return true if the TensorField can be used to access component data
-    NO_DISCARD bool isUsable() const
+    NO_DISCARD bool isUsable() const _PHARE_ALL_FN_
     {
         return std::all_of(std::begin(components_), std::end(components_),
                            [](auto const& c) { return c.isUsable(); });
     }
 
-    NO_DISCARD bool isSettable() const
+    NO_DISCARD bool isSettable() const _PHARE_ALL_FN_
     {
         return std::all_of(std::begin(components_), std::end(components_),
                            [](auto const& c) { return c.isSettable(); });

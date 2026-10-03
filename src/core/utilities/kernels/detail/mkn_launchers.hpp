@@ -79,6 +79,37 @@ private:
     std::size_t n_per_cell = 0;
 };
 
+// 1 block per (tile, cell): grid y = tile, grid x = cell in tile (noop past a tile's cells)
+//  block threads stride the cell's particles, so a fixed block size works for any cell size
+template<bool sync = false>
+class TileCellLauncher : public DeviceLauncher<mkn::gpu::Fixed, sync>
+{
+    using Super = DeviceLauncher<mkn::gpu::Fixed, sync>;
+
+public:
+    TileCellLauncher(std::size_t const n_tiles, std::size_t const max_cells_per_tile,
+                     std::size_t const threads_per_cell)
+        : Super{dim3{}, dim3{}}
+    {
+        this->g.x = max_cells_per_tile;
+        this->g.y = n_tiles;
+        this->b.x = threads_per_cell;
+    }
+
+    // largest per-cell local box over AoSPCTS tiles, the grid x size; 0 = nothing to launch
+    static std::size_t max_cells(auto const& tiles)
+    {
+        std::size_t max = 0;
+        for (std::size_t tidx = 0; tidx < tiles().size(); ++tidx)
+            max = std::max<std::size_t>(max, tiles()[tidx]().local_box().size());
+        return max;
+    }
+
+    static std::uint32_t tile_idx() _PHARE_DEV_FN_ { return blockIdx.y; }
+    static std::uint32_t cell_idx() _PHARE_DEV_FN_ { return blockIdx.x; }
+    static std::uint32_t thread_idx() _PHARE_DEV_FN_ { return threadIdx.x; }
+};
+
 template<bool sync = false>
 class ChunkLauncher : public DeviceLauncher<mkn::gpu::Fixed, sync>
 {

@@ -2,7 +2,6 @@
 #define PHARE_CORE_OPERATORS_HPP
 
 #include "core/def.hpp"
-#include "core/utilities/span.hpp"
 #include "core/utilities/types.hpp"
 
 #ifndef PHARE_HAVE_GPU
@@ -10,6 +9,14 @@
 #endif
 
 #include <atomic>
+
+// device atomics (atomicAdd...) only exist in the device compilation pass; host calls of
+// _PHARE_ALL_FN_ code (e.g. GPU_UNIFIED CPU fallbacks) use the std::atomic paths instead
+#if defined(__CUDA_ARCH__) || defined(__HIP_DEVICE_COMPILE__)
+#define PHARE_DEVICE_PASS 1
+#else
+#define PHARE_DEVICE_PASS 0
+#endif
 
 
 namespace PHARE::core
@@ -19,11 +26,13 @@ struct Operators
 {
     T static constexpr ONE = 1;
 
+    static constexpr bool device_atomic = GPU and atomic and PHARE_DEVICE_PASS;
+
     static_assert(not std::is_const_v<T>); // doesn't make sense
 
     void operator+=(T const& v) _PHARE_ALL_FN_
     {
-        if constexpr (GPU and atomic)
+        if constexpr (device_atomic)
         {
             atomicAdd(&t, v);
         }
@@ -40,7 +49,7 @@ struct Operators
 
     void operator-=(T const& v) _PHARE_ALL_FN_
     {
-        if constexpr (GPU and atomic)
+        if constexpr (device_atomic)
         {
             atomicSub(&t, v);
         }
@@ -57,7 +66,7 @@ struct Operators
 
     auto increment_return_old() _PHARE_ALL_FN_ // postfix increment
     {
-        if constexpr (GPU and atomic)
+        if constexpr (device_atomic)
         {
             auto o = atomicAdd(&t, ONE);
             PHARE_ASSERT(o < t);
@@ -77,13 +86,13 @@ struct Operators
 
     auto static compare_and_swap(T* addr, T compare, T value) _PHARE_ALL_FN_
     {
-        if constexpr (GPU and atomic)
+        if constexpr (device_atomic)
         {
             return atomicCAS(addr, compare, value);
         }
         else if constexpr (atomic)
         {
-            // returns the value at addr before the call, == compare on success
+            // like atomicCAS: returns the value at addr before the call, == compare on success
             std::atomic_ref<T>{*addr}.compare_exchange_strong(compare, value);
             return compare;
         }

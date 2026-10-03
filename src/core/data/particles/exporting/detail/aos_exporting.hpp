@@ -497,6 +497,50 @@ void ParticlesExporter<AoSPCTS, CPU>::move_in_ghost_layer(Dst& dst, Src& src,
 }
 
 
+// AoSPCTS GPU_UNIFIED: unified memory, CPU path until there's a GPU version
+
+template<> // slow
+template<typename Src, std::size_t dim>
+void ParticlesExporter<AoSPCTS, GPU_UNIFIED>::delete_particles_not_in(Src& src,
+                                                                      Box<int, dim> const& box)
+{
+    ParticlesExporter<AoSPCTS, CPU>{}.delete_particles_not_in(src, box);
+}
+
+template<> // slow
+template<typename Src, typename Boxes>
+void ParticlesExporter<AoSPCTS, GPU_UNIFIED>::delete_particles_not_in(Src& src, Boxes const& boxes)
+{
+    ParticlesExporter<AoSPCTS, CPU>{}.delete_particles_not_in(src, boxes);
+}
+
+template<> // slow
+template<typename Dst, typename Src, std::size_t dim>
+void ParticlesExporter<AoSPCTS, GPU_UNIFIED>::move_in_domain(Dst& dst, Src& src,
+                                                             Box<int, dim> const& domain_box)
+{
+    ParticlesExporter<AoSPCTS, CPU>{}.move_in_domain(dst, src, domain_box);
+}
+
+template<> // slow
+template<typename Dst, typename Src, std::size_t dim>
+void ParticlesExporter<AoSPCTS, GPU_UNIFIED>::move_in_ghost_layer(Dst& dst, Src& src,
+                                                                  Box<int, dim> const& domain_box,
+                                                                  Box<int, dim> const& ghost_box)
+{
+    ParticlesExporter<AoSPCTS, CPU>{}.move_in_ghost_layer(dst, src, domain_box, ghost_box);
+}
+
+template<> // slow
+template<typename Dst, typename Src, std::size_t dim, typename Boxes>
+void ParticlesExporter<AoSPCTS, GPU_UNIFIED>::move_in_ghost_layer(Dst& dst, Src& src,
+                                                                  Box<int, dim> const& domain_box,
+                                                                  Boxes const& ghost_boxes)
+{
+    ParticlesExporter<AoSPCTS, CPU>{}.move_in_ghost_layer(dst, src, domain_box, ghost_boxes);
+}
+
+
 } // namespace PHARE::core
 
 
