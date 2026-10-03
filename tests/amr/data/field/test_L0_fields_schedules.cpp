@@ -94,7 +94,7 @@ TYPED_TEST(FieldScheduleHierarchyTest, testing_hyhy_schedules)
 
     using FieldData_t = TestFixture::ResourceManager_t::UserField_t::patch_data_type;
     using Interpolating_t
-        = core::Interpolating<ParticleArray_t, TestParam::interp, /*atomic_interp*/ false>;
+        = core::Interpolating<dim, TestParam::interp, /*atomic_interp*/ false>;
 
     auto constexpr function_id = join_string_views_v<>;
 

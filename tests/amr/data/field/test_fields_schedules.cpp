@@ -72,10 +72,9 @@ TYPED_TEST(FieldScheduleHierarchyTest, testing_hyhy_schedules)
 {
     auto constexpr static dim = TypeParam::dim;
     using TestParam           = TestFixture::TestParam;
-    using ParticleArray_t     = TestParam::ParticleArray_t;
     using GridLayout_t        = TestParam::GridLayout_t;
     using Interpolating_t
-        = core::Interpolating<ParticleArray_t, TestParam::interp, /*atomic_interp*/ false>;
+        = core::Interpolating<dim, TestParam::interp, /*atomic_interp*/ false>;
 
 
     auto constexpr static interp      = GridLayout_t::options.interp_order;

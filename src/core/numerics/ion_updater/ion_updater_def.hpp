@@ -185,7 +185,7 @@ auto static const timings_dir_str
     = get_env_as("PHARE_ASYNC_TIMES", std::string{".phare/async/multi_updater"});
 
 static bool ion_updater_io_setup = []() {
-    ::mkn::kul::Dir timings{timings_dir_str};
+    mkn::kul::Dir timings{timings_dir_str};
     timings.mk();
     return true;
 }();

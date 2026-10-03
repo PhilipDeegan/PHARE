@@ -215,7 +215,7 @@ class ParallelIonUpdater
     static constexpr auto dimension    = GridLayout::dimension;
     static constexpr auto interp_order = GridLayout::options.interp_order;
     using Interpolator_t               = Interpolator<dimension, interp_order, /*atomic=*/false>;
-    using Interpolating_t = Interpolating<dimension, interp_order, /*atomic=*/false>;
+    using Interpolating_t              = Interpolating<dimension, interp_order, /*atomic=*/false>;
 
 public:
     using Boxing_t = UpdaterSelectionBoxing<GridLayout>;
@@ -228,7 +228,7 @@ public:
     void reset() {}
 
 protected:
-    // per patch steps, shared with mkn::ParallelIonUpdater (different dispatch)
+    // per patch steps, shared with mkn_xyz::ParallelIonUpdater (different dispatch)
     static void reset_moments(auto& accessor);
     static void post_move_sync(auto& accessor, auto const& boxings, std::size_t const i);
     static void deposit(auto& accessor, auto const& boxings, std::size_t const i);
@@ -367,11 +367,11 @@ void ParallelIonUpdater<ParticleArray_t, GridLayout>::updateAndDepositAll_(
 
 #if PHARE_HAVE_MKN_GPU
 
-namespace PHARE::core::mkn
+namespace PHARE::core::mkn_xyz
 {
 
 /**
- * @brief mkn::ParallelIonUpdater: core::ParallelIonUpdater steps dispatched with mkn.gpu
+ * @brief mkn_xyz::ParallelIonUpdater: core::ParallelIonUpdater steps dispatched with mkn.gpu
  * ThreadedStreamLauncher (one host thread + stream per patch), and GPU deposit kernels
  */
 template<typename ParticleArray_t, typename GridLayout>
@@ -406,7 +406,7 @@ void ParallelIonUpdater<ParticleArray_t, GridLayout>::updatePopulations(
     auto& accessor, std::unordered_map<std::string, Boxing_t> const& boxings, double const& dt,
     UpdaterMode mode)
 {
-    PHARE_LOG_SCOPE(2, "mkn::IonUpdater::updatePopulations");
+    PHARE_LOG_SCOPE(2, "mkn_xyz::IonUpdater::updatePopulations");
 
     Super::reset_moments(accessor);
     this->dt_ = dt;
@@ -421,7 +421,7 @@ template<typename ParticleArray_t, typename GridLayout>
 void ParallelIonUpdater<ParticleArray_t, GridLayout>::updateAndDepositDomain_(
     auto& accessor, std::unordered_map<std::string, Boxing_t> const& boxings)
 {
-    PHARE_LOG_SCOPE(1, "mkn::IonUpdater::updateAndDepositDomain_");
+    PHARE_LOG_SCOPE(1, "mkn_xyz::IonUpdater::updateAndDepositDomain_");
 
     if (accessor.size() == 0)
         return;
@@ -442,7 +442,7 @@ template<typename ParticleArray_t, typename GridLayout>
 void ParallelIonUpdater<ParticleArray_t, GridLayout>::updateAndDepositAll_(
     auto& accessor, std::unordered_map<std::string, Boxing_t> const& boxings)
 {
-    PHARE_LOG_SCOPE(1, "mkn::IonUpdater::updateAndDepositAll_");
+    PHARE_LOG_SCOPE(1, "mkn_xyz::IonUpdater::updateAndDepositAll_");
 
     if (accessor.size() == 0)
         return;
@@ -453,7 +453,8 @@ void ParallelIonUpdater<ParticleArray_t, GridLayout>::updateAndDepositAll_(
     MultiBoris<Accessor_t, Interpolator_t> in{this->dt_, accessor};
     in.move(boxings);
 
-    auto post_move_sync = [&](auto const i) mutable { Super::post_move_sync(accessor, boxings, i); };
+    auto post_move_sync
+        = [&](auto const i) mutable { Super::post_move_sync(accessor, boxings, i); };
 
     if constexpr (use_main_thread)
         for (std::size_t i = 0; i < accessor.size(); ++i)
@@ -560,7 +561,7 @@ void ParallelIonUpdater<ParticleArray_t, GridLayout>::updateAndDepositAll_(
 }
 
 
-} // namespace PHARE::core::mkn
+} // namespace PHARE::core::mkn_xyz
 
 #endif // PHARE_HAVE_MKN_GPU
 

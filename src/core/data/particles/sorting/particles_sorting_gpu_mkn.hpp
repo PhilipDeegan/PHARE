@@ -132,7 +132,7 @@ public:
     void sort_by_key(std::uint64_t l, std::uint64_t r) // unused but for reference
     {
         auto ps = particles.view();
-        std::vector<int, ::mkn::gpu::ManagedAllocator<int>> flats(r - l);
+        std::vector<int, mkn::gpu::ManagedAllocator<int>> flats(r - l);
         auto fv = flats.data();
         kernel::launch(flats.size(), [=, cf = cell_flattener] _PHARE_ALL_FN_() {
             auto idx          = kernel::idx() + l;
