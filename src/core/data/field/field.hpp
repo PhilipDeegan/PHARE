@@ -61,8 +61,8 @@ public:
 
     NO_DISCARD auto& physicalQuantity() const _PHARE_ALL_FN_ { return qty_; }
 
-    bool isUsable() const { return Super::data() != nullptr; }
-    bool isSettable() const { return !isUsable(); }
+    bool isUsable() const _PHARE_ALL_FN_ { return Super::data() != nullptr; }
+    bool isSettable() const _PHARE_ALL_FN_ { return !isUsable(); }
 
     auto& operator*() { return super(); }
     auto& operator*() const { return super(); }
@@ -141,8 +141,8 @@ public:
 
     void setData(Data_t* const data) _PHARE_ALL_FN_ { Super::setBuffer(data); }
 
-    bool isUsable() const { return Super::data() != nullptr; }
-    bool isSettable() const { return !isUsable(); }
+    bool isUsable() const _PHARE_ALL_FN_ { return Super::data() != nullptr; }
+    bool isSettable() const _PHARE_ALL_FN_ { return !isUsable(); }
 
 
     template<typename... Args>

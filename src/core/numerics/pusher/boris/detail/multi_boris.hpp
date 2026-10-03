@@ -464,6 +464,44 @@ struct MultiBorisFunctors
 #if !PHARE_HAVE_GPU
         throw std::runtime_error("NEEDS GPU IMPL!");
 #else
+        if constexpr (Particles_t::layout_mode == LayoutMode::AoSPCTS)
+            on_gpu_tile_cells(in, i);
+        else
+            on_gpu_flat_tiles(in, i);
+#endif
+    }
+
+    // AoSPCTS: block = (tile, cell), block threads stride the cell's particles
+    void on_gpu_tile_cells([[maybe_unused]] auto& in, [[maybe_unused]] auto const i)
+    {
+#if PHARE_HAVE_GPU
+        using Launcher = gpu::TileCellLauncher<false>;
+
+        auto const max_cells = Launcher::max_cells(pps);
+        if (max_cells == 0)
+            return;
+
+        std::size_t const threads = kernel::warp_size();
+        Launcher{pps().size(), max_cells, threads}.stream(
+            in.streamer.streams[i], [self = *this, threads] __device__() mutable {
+                auto const tile_idx = Launcher::tile_idx();
+                auto& tile          = self.pps()[tile_idx];
+                auto& parts         = tile();
+                auto const& lobox   = parts.local_box();
+                if (Launcher::cell_idx() >= lobox.size())
+                    return;
+                auto const& bix = *(lobox.begin() + Launcher::cell_idx());
+                self.per_cell(parts.particles_(bix), self.electromag.E[0][tile_idx].layout(),
+                              self.em_tile(tile_idx), self.pps.local_cell(tile.lower),
+                              Launcher::thread_idx(), threads);
+            });
+#endif
+    }
+
+    // flat tiles: block = tile, warp of threads striding the tile's particles
+    void on_gpu_flat_tiles([[maybe_unused]] auto& in, [[maybe_unused]] auto const i)
+    {
+#if PHARE_HAVE_GPU
         using Launcher = gpu::ChunkLauncher<false>;
         Launcher launcher{1, 0};
         launcher.b.x           = kernel::warp_size();
@@ -503,26 +541,11 @@ struct MultiBorisFunctors
         auto& parts          = tile();
         auto const tile_cell = pps.local_cell(tile.lower);
 
-        auto constexpr static tracker = [] _PHARE_ALL_FN_(auto&&... args) {
-            return make_particle_tracker<Particles_t::layout_mode, particle_type, dim>(args...);
-        };
-
         if constexpr (Particles_t::layout_mode == AoSPCTS)
         {
-            // GPU_UNIFIED for AoSPCTS to be handled separately later
+            // GPU uses on_gpu_tile_cells, one block per cell
             for (auto const& bix : parts.local_box())
-            {
-                auto& cell_particles = parts.particles_(bix);
-                for (std::size_t pid = 0; pid < cell_particles.size(); ++pid)
-                {
-                    auto const& old_cell = cell_particles[pid].iCell();
-                    // tile_cell names the tile PHYSICALLY holding this particle;
-                    // pps.local_tile_cell would instead give the clamp-owner, which
-                    // diverges for duplicated level ghost cells
-                    auto const pt = tracker(old_cell, tile_cell);
-                    per_particle(cell_particles[pid], layout, pt, pid, em);
-                }
-            }
+                per_cell(parts.particles_(bix), layout, em, tile_cell, tidx, ws);
         }
         else
         {
@@ -539,6 +562,25 @@ struct MultiBorisFunctors
                 if (tidx < parts.size() - (ws * each))
                     one(pid * ws + tidx);
         }
+    }
+
+    // AoSPCTS: one cell of a tile, particles from tidx strided by ws (CPU: 0, 1)
+    void per_cell(auto& cell_particles, auto const& layout, auto const& em, auto const& tile_cell,
+                  std::size_t const tidx, std::size_t const ws) _PHARE_ALL_FN_
+    {
+        for (std::size_t pid = tidx; pid < cell_particles.size(); pid += ws)
+        {
+            // tile_cell names the tile PHYSICALLY holding this particle;
+            // pps.local_tile_cell would instead give the clamp-owner, which
+            // diverges for duplicated level ghost cells
+            auto const pt = tracker(cell_particles[pid].iCell(), tile_cell);
+            per_particle(cell_particles[pid], layout, pt, pid, em);
+        }
+    }
+
+    static auto tracker(auto&&... args) _PHARE_ALL_FN_
+    {
+        return make_particle_tracker<Particles_t::layout_mode, particle_type, dim>(args...);
     }
 
     void per_any_particle(auto& particles, auto&&... args) _PHARE_ALL_FN_
@@ -756,10 +798,14 @@ void MultiBoris<ModelAccessor, Interpolator>::move(auto const& boxings)
         Backend::prepare_gpu_copy(*this, boxings);
 
     auto move = [&](auto const i) mutable {
-        if constexpr (copy and is_cpu)
-            Backend::template move_cpu_copy<mode>(*this, boxings, i);
-        else if constexpr (gpu_copy)
+        if constexpr (gpu_copy)
             Backend::template move_gpu_copy<mode>(*this, i);
+        else if constexpr (copy) // CPU, or GPU_UNIFIED without a GPU copy kernel (AoSPCTS)
+        {
+            if constexpr (is_gpu) // unified memory: wait for prior work on this patch
+                streamer.streams[i].sync();
+            Backend::template move_cpu_copy<mode>(*this, boxings, i);
+        }
         else
             Backend::template move_rest<mode>(*this, i);
     };

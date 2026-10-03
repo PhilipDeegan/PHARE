@@ -60,6 +60,14 @@ Dst ParticlesConverter<AoSPCTS, CPU, AoS, CPU>::operator()(Src const& src,
     return out;
 }
 
+template<> // unified memory is host readable, so the CPU path works as is
+template<typename Dst, typename Src, typename GridLayout>
+Dst ParticlesConverter<AoSPCTS, GPU_UNIFIED, AoS, CPU>::operator()(Src const& src,
+                                                                    GridLayout const& layout)
+{
+    return ParticlesConverter<AoSPCTS, CPU, AoS, CPU>{}.template operator()<Dst>(src, layout);
+}
+
 template<>
 template<typename Dst, typename Src, typename GridLayout>
 Dst ParticlesConverter<AoSTS, GPU_UNIFIED, AoS, CPU>::operator()( //
