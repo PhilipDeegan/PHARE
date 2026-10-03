@@ -29,7 +29,7 @@ struct MultiBorisBackend;
 
 // ── MultiBoris state struct / ModelAccessor ───────────────────────────────────────────
 // default dispatch: BS thread pool (or sequential with MultiBorisOptions::use_main_thread)
-// see core::mkn::MultiBoris below for the mkn.gpu ThreadedStreamLauncher dispatch
+// see core::mkn_xyz::MultiBoris below for the mkn.gpu ThreadedStreamLauncher dispatch
 
 template<typename ModelAccessor, typename Interpolator>
 struct MultiBoris
@@ -142,9 +142,9 @@ void MultiBoris<ModelAccessor, Interpolator>::move_pooled(auto const& boxings)
 }
 
 
-// ── Per patch steps, shared by every dispatch (core::MultiBoris / mkn::MultiBoris) ────
+// ── Per patch steps, shared by every dispatch (core::MultiBoris / mkn_xyz::MultiBoris) ────
 // tiles of particles, tiled fields: AoSPCTS (per-cell AoS per tile), AoSTS/AoSMapped (flat)
-// `in` is either MultiBoris state struct, GPU paths require mkn::MultiBoris (in.streamer)
+// `in` is either MultiBoris state struct, GPU paths require mkn_xyz::MultiBoris (in.streamer)
 
 template<LayoutMode layout, typename ModelAccessor, typename Interpolator>
 struct MultiBorisBackend
@@ -385,7 +385,7 @@ void MultiBorisBackend<layout, ModelAccessor, Interpolator>::move_gpu_copy(
         auto rhop             = pop.particleDensity();
         auto rhoc             = pop.chargeDensity();
         auto flux             = *pop.flux();
-        auto const ds = static_cast<std::uint32_t>(ions.chargeDensity().max_tile_size());
+        auto const ds         = static_cast<std::uint32_t>(ions.chargeDensity().max_tile_size());
 
         auto const launch = [&](auto parts) {
             if (parts().size() == 0)
@@ -528,7 +528,8 @@ struct MultiBorisFunctors
     // thread-pooled path (see MultiBorisBackend::move_rest_pooled).
     void one_tile(std::size_t const tile_idx)
     {
-        auto const tile_picker = [&]() { return std::make_tuple(tile_idx, &pps()[tile_idx], 0, 1); };
+        auto const tile_picker
+            = [&]() { return std::make_tuple(tile_idx, &pps()[tile_idx], 0, 1); };
         per_tile(tile_picker);
     }
 
@@ -798,7 +799,7 @@ struct MultiBorisFunctors
 
 #if PHARE_HAVE_MKN_GPU
 
-namespace PHARE::core::mkn
+namespace PHARE::core::mkn_xyz
 {
 
 // ── mkn.gpu dispatch: one ThreadedStreamLauncher host thread + stream per patch ────────
@@ -812,7 +813,7 @@ struct MultiBoris : core::MultiBoris<ModelAccessor, Interpolator>
     using ParticleArray_t = Super::ParticleArray_t;
     using Box_t           = Box<int, Super::dim>;
     using StreamLauncher  = gpu::ThreadedStreamLauncher<ModelAccessor>;
-    using GpuBoxSpanSet_t = SpanSet<Box_t, default_span_size_t, ::mkn::gpu::ManagedAllocator<Box_t>>;
+    using GpuBoxSpanSet_t = SpanSet<Box_t, default_span_size_t, mkn::gpu::ManagedAllocator<Box_t>>;
 
     static constexpr auto opts = MultiBorisOptions{};
 
@@ -877,7 +878,7 @@ void MultiBoris<ModelAccessor, Interpolator>::move(auto const& boxings)
 }
 
 
-} // namespace PHARE::core::mkn
+} // namespace PHARE::core::mkn_xyz
 
 #endif // PHARE_HAVE_MKN_GPU
 

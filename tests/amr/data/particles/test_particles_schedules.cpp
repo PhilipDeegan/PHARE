@@ -123,7 +123,13 @@ TYPED_TEST(ParticleScheduleHierarchyTest, testing_inject_ghost_layer)
         {
             EXPECT_EQ(pop.domainParticles().size(), ncells * ppc);
 
-            if constexpr (core::is_tiled(ParticleArray_t::layout_mode))
+            if constexpr (ParticleArray_t::layout_mode == core::LayoutMode::AoSPCTS)
+            {
+                for (auto const& tile : pop.domainParticles()())
+                    for (auto const& bix : tile().local_box())
+                        check_array(tile()(bix));
+            }
+            else if constexpr (core::is_tiled(ParticleArray_t::layout_mode))
                 for (auto const& tile : pop.domainParticles()())
                     check_array(tile());
             else

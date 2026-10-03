@@ -619,7 +619,7 @@ template<typename Particles>
 template<auto type>
 void TileSetVector<Particles>::on_moved(auto&&... args)
 {
-    sync_moved<type>();                                        // realloc + resize
+    sync_moved<type>();                                       // realloc + resize
     TileSetSpan<PSpan_t>{*this}.template sync<type>(args...); // cross-tile copy
 
     on_appended<type>(); // finalize: recount, size gaps, reset views

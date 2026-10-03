@@ -48,9 +48,9 @@ auto static const ref_only  = get_env_as("PHARE_REF_ONLY", std::size_t{0});
 bool static const premain = []() {
     assert(!(cmp_only and ref_only) && "Cant have both only");
     PHARE_WITH_MKN_GPU({ //
-        ::mkn::gpu::setLimitMallocHeapSize(bytes);
+        mkn::gpu::setLimitMallocHeapSize(bytes);
         // per-thread device stack (default ~1KB) overflows in the MultiBoris push kernel
-        ::mkn::gpu::setLimitStackSize(get_env_as("PHARE_GPU_STACK", std::size_t{16384}));
+        mkn::gpu::setLimitStackSize(get_env_as("PHARE_GPU_STACK", std::size_t{16384}));
     })
 
     PHARE_WITH_PHLOP({
@@ -72,7 +72,7 @@ auto& pool = *ThreadPool::INSTANCE().thread_pools[0];
 
 // serial       = IonUpdater, one patch at a time (always used for the ref patches)
 // parallel     = ParallelIonUpdater, all patches via BS thread pool
-// mkn_parallel = mkn::ParallelIonUpdater, all patches via mkn.gpu ThreadedStreamLauncher
+// mkn_parallel = mkn_xyz::ParallelIonUpdater, all patches via mkn.gpu ThreadedStreamLauncher
 enum class UpdaterVersion : std::uint16_t { serial = 0, parallel, mkn_parallel };
 
 template<UpdaterVersion version, typename ParticleArray_t, typename GridLayout_t>
@@ -83,8 +83,8 @@ auto constexpr updater_impl()
     else if constexpr (version == UpdaterVersion::parallel)
         return static_cast<ParallelIonUpdater<ParticleArray_t, GridLayout_t>*>(0);
 #if PHARE_HAVE_MKN_GPU
-    else if constexpr (version == UpdaterVersion::mkn_parallel)
-        return static_cast<mkn::ParallelIonUpdater<ParticleArray_t, GridLayout_t>*>(0);
+    else if constexpr (version == UpdaterVersionmkn_parallel)
+        return static_cast<mkn_xyz::ParallelIonUpdater<ParticleArray_t, GridLayout_t>*>(0);
 #endif
 }
 
@@ -459,22 +459,22 @@ using Permutations_t = testing::Types< // ! notice commas !
    ,TestParam<2, LayoutMode::AoSCMTS, AllocatorMode::CPU, UpdaterMode::all>
 
 // PHARE_WITH_MKN_GPU(
-//    ,TestParam<1, LayoutMode::AoSPCTS, AllocatorMode::CPU, UpdaterMode::domain_only, UpdaterVersion::mkn_parallel>
-//    ,TestParam<1, LayoutMode::AoSPCTS, AllocatorMode::CPU, UpdaterMode::all,         UpdaterVersion::mkn_parallel>
-//    ,TestParam<2, LayoutMode::AoSPCTS, AllocatorMode::CPU, UpdaterMode::domain_only, UpdaterVersion::mkn_parallel>
-//    ,TestParam<2, LayoutMode::AoSPCTS, AllocatorMode::CPU, UpdaterMode::all,         UpdaterVersion::mkn_parallel>
-//    ,TestParam<3, LayoutMode::AoSPCTS, AllocatorMode::CPU, UpdaterMode::domain_only, UpdaterVersion::mkn_parallel>
-//    ,TestParam<3, LayoutMode::AoSPCTS, AllocatorMode::CPU, UpdaterMode::all,         UpdaterVersion::mkn_parallel>
+//    ,TestParam<1, LayoutMode::AoSPCTS, AllocatorMode::CPU, UpdaterMode::domain_only, UpdaterVersionmkn_parallel>
+//    ,TestParam<1, LayoutMode::AoSPCTS, AllocatorMode::CPU, UpdaterMode::all,         UpdaterVersionmkn_parallel>
+//    ,TestParam<2, LayoutMode::AoSPCTS, AllocatorMode::CPU, UpdaterMode::domain_only, UpdaterVersionmkn_parallel>
+//    ,TestParam<2, LayoutMode::AoSPCTS, AllocatorMode::CPU, UpdaterMode::all,         UpdaterVersionmkn_parallel>
+//    ,TestParam<3, LayoutMode::AoSPCTS, AllocatorMode::CPU, UpdaterMode::domain_only, UpdaterVersionmkn_parallel>
+//    ,TestParam<3, LayoutMode::AoSPCTS, AllocatorMode::CPU, UpdaterMode::all,         UpdaterVersionmkn_parallel>
 // )
 
 PHARE_WITH_GPU(
-   ,TestParam<1, LayoutMode::AoSPCTS, AllocatorMode::GPU_UNIFIED, UpdaterMode::domain_only, UpdaterVersion::mkn_parallel>
-   // ,TestParam<1, LayoutMode::AoSPCTS, AllocatorMode::GPU_UNIFIED, UpdaterMode::domain_only, UpdaterVersion::mkn_parallel>
-   // ,TestParam<1, LayoutMode::AoSPCTS, AllocatorMode::GPU_UNIFIED, UpdaterMode::all,         UpdaterVersion::mkn_parallel>
-   // ,TestParam<2, LayoutMode::AoSPCTS, AllocatorMode::GPU_UNIFIED, UpdaterMode::domain_only, UpdaterVersion::mkn_parallel>
-   // ,TestParam<2, LayoutMode::AoSPCTS, AllocatorMode::GPU_UNIFIED, UpdaterMode::all,         UpdaterVersion::mkn_parallel>
-   // ,TestParam<3, LayoutMode::AoSPCTS, AllocatorMode::GPU_UNIFIED, UpdaterMode::domain_only, UpdaterVersion::mkn_parallel>
-   // ,TestParam<3, LayoutMode::AoSPCTS, AllocatorMode::GPU_UNIFIED, UpdaterMode::all,         UpdaterVersion::mkn_parallel>
+   ,TestParam<1, LayoutMode::AoSPCTS, AllocatorMode::GPU_UNIFIED, UpdaterMode::domain_only, UpdaterVersionmkn_parallel>
+   // ,TestParam<1, LayoutMode::AoSPCTS, AllocatorMode::GPU_UNIFIED, UpdaterMode::domain_only, UpdaterVersionmkn_parallel>
+   // ,TestParam<1, LayoutMode::AoSPCTS, AllocatorMode::GPU_UNIFIED, UpdaterMode::all,         UpdaterVersionmkn_parallel>
+   // ,TestParam<2, LayoutMode::AoSPCTS, AllocatorMode::GPU_UNIFIED, UpdaterMode::domain_only, UpdaterVersionmkn_parallel>
+   // ,TestParam<2, LayoutMode::AoSPCTS, AllocatorMode::GPU_UNIFIED, UpdaterMode::all,         UpdaterVersionmkn_parallel>
+   // ,TestParam<3, LayoutMode::AoSPCTS, AllocatorMode::GPU_UNIFIED, UpdaterMode::domain_only, UpdaterVersionmkn_parallel>
+   // ,TestParam<3, LayoutMode::AoSPCTS, AllocatorMode::GPU_UNIFIED, UpdaterMode::all,         UpdaterVersionmkn_parallel>
 )
 
 >;
