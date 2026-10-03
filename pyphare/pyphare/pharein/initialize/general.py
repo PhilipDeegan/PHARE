@@ -1,4 +1,5 @@
 import os
+import threading
 
 import numpy as np
 import pybindlibs.dictator as pp
@@ -29,6 +30,8 @@ def _serialized_simulation_string(restart_file_dir):
 class py_fn_wrapper:
     def __init__(self, fn):
         self.fn = fn
+        self.ret = {}
+        self.lock = threading.Lock()
 
     def __call__(self, *xyz):
         args = [np.asarray(arg) for arg in xyz]
@@ -37,6 +40,9 @@ class py_fn_wrapper:
             ret = np.asarray(ret)
         if is_scalar(ret):
             ret = np.full(len(args[-1]), ret)
+        # assert threading.get_native_id() not in self.ret
+        # with self.lock:
+        #     self.ret[threading.get_native_id()] = ret  # keep alive
         return ret
 
 
@@ -49,8 +55,7 @@ class fn_wrapper(py_fn_wrapper):
     def __call__(self, *xyz):
         from pyphare.cpp import cpp_etc_lib
 
-        # convert numpy array to C++ SubSpan
-        # couples vector init functions to C++
+        # return cpp_etc_lib().makeSpan(super().__call__(*xyz))
         return cpp_etc_lib().makePyArrayWrapper(super().__call__(*xyz))
 
 
@@ -123,13 +128,12 @@ def add_enum_int(path, enum_name, member_name):
     from pyphare.cpp import cpp_etc_lib
 
     enum_cls = getattr(cpp_etc_lib(), enum_name)
-    member = member_name.lower()
-    if member not in enum_cls.__members__:
+    if member_name not in enum_cls.__members__:
         raise ValueError(
             f"{enum_name}: unknown value '{member_name}',"
             f" expected one of {list(enum_cls.__members__)}"
         )
-    add_int(path, int(getattr(enum_cls, member)))
+    add_int(path, int(getattr(enum_cls, member_name).value))
 
 
 def populateDict(sim):
@@ -158,6 +162,20 @@ def populateDict(sim):
 
     add_int("simulation/interp_order", sim.interp_order)
     add_int("simulation/refined_particle_nbr", sim.refined_particle_nbr)
+
+    add_enum_int("simulation/particle_layout", "LayoutMode", sim.particle_layout)
+    add_enum_int("simulation/allocator", "AllocatorMode", sim.allocator)
+
+    if sim.mhd_timestepper:
+        add_enum_int(
+            "simulation/mhd_timestepper", "TimeIntegratorType", sim.mhd_timestepper
+        )
+        add_enum_int(
+            "simulation/reconstruction", "ReconstructionType", sim.reconstruction
+        )
+        add_enum_int("simulation/limiter", "SlopeLimiterType", sim.limiter)
+        add_enum_int("simulation/riemann", "RiemannSolverType", sim.riemann)
+        add_bool("simulation/hall", sim.hall)
 
     sim.time_stepper.populate_dict(dict_populator())
 
