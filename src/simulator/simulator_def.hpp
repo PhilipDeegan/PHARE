@@ -24,7 +24,7 @@ public:
     virtual std::vector<double> const& cellWidth() const = 0;
     virtual std::size_t interporder() const              = 0;
 
-    virtual std::string to_str() = 0;
+    virtual std::string to_str() const = 0;
 
     virtual ~ISimulator() {}
 

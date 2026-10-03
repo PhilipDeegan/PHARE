@@ -258,12 +258,22 @@ namespace amr
         for (auto const& neighbox : neighbors)
             patchGhostLayerBoxes.emplace_back(
                 *(particleGhostBox * phare_box_from<dimension>(neighbox)));
-
         return patchGhostLayerBoxes;
     }
 
-
-
+    template<typename GridLayoutT>
+    NO_DISCARD auto patchGhostBoxOverlaps(SAMRAI::hier::Patch const& patch,
+                                          SAMRAI::hier::PatchHierarchy const& hierarchy)
+    {
+        auto constexpr dimension    = GridLayoutT::dimension;
+        auto const domBox           = phare_box_from<dimension>(patch.getBox());
+        auto const particleGhostBox = grow(domBox, GridLayoutT::options.particle_ghost_width);
+        return core::generate_from(
+            [&](auto& neighbox) {
+                return *(particleGhostBox * phare_box_from<dimension>(neighbox));
+            },
+            getSameLevelNeighbors(patch, hierarchy));
+    }
 
     template<typename GridLayout, typename ResMan, typename Action, typename... Args>
     void visitLevel(SAMRAI_Types::level_t& level, ResMan& resman, Action&& action, Args&&... args)
