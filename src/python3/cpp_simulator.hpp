@@ -48,7 +48,7 @@ auto static constexpr resolve_simulator_options()
 
 
 template<typename Type, std::size_t dimension>
-void declarePatchData(py::module& m, std::string key)
+void declarePatchData(py::module& m, std::string const& key)
 {
     using PatchDataType = PatchData<Type, dimension>;
     py::class_<PatchDataType>(m, key.c_str(), py::module_local())
@@ -73,8 +73,6 @@ void declareParticles(py::module& m)
 
     declarePatchData<ParticleArray, opts.dimension>(m, "PatchDataParticleArray");
     declarePatchData<ParticleArray*, opts.dimension>(m, "PatchDataParticleArrayPtr");
-
-    declarePatchData<py_array_t<double>, opts.dimension>(m, "PatchPyArrayDouble");
 }
 
 template<typename Simulator, typename PyClass>
@@ -182,6 +180,8 @@ void inline declare_macro_sim(py::module& m)
         return makeSimulator<Sim>(hier);
     });
 
+
+    declarePatchData<py_array_t<double>, opts.dimension>(m, "PatchPyArrayDouble");
 
     declare_etc<opts>(m);
     if constexpr (has_hybrid_v<opts>)

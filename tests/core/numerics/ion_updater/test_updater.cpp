@@ -332,6 +332,7 @@ struct IonUpdaterTest : public ::testing::Test
         assert(no_nans(ions.velocity()(Component::X)));
         PHARE::core::depositParticles(ions, layout, interpolator, PHARE::core::DomainDeposit{});
         PHARE::core::depositParticles(ions, layout, interpolator, PHARE::core::LevelGhostDeposit{});
+        sumTileBorders();
         assert(no_nans(ions.velocity()(Component::X)));
 
         ions.computeChargeDensity();
@@ -342,9 +343,8 @@ struct IonUpdaterTest : public ::testing::Test
 
 
 
-    using Patch = test::HybridPatch<Ions, Electromag>;
+    using Patch = test::HybridPatch<Ions, UsableElectromag_t>;
 
-    Patch as_patch() { return Patch{layout, *ions, *EM}; }
 
     auto update(auto const mode)
     {
@@ -355,7 +355,11 @@ struct IonUpdaterTest : public ::testing::Test
             ionUpdater.updatePopulations(*ions, *EM, boxing, dt, mode);
         else
         {
-            std::vector<Patch> patches{as_patch()};
+            // state = {layout, ions, em, electromag}: em is an unused owner (UsableElectromag
+            // is move-only, hence emplace), electromag views this->EM
+            std::vector<Patch> patches;
+            patches.reserve(1);
+            patches.emplace_back(layout, *ions, layout, *EM);
 
             auto const quantities = [&](int i) {
                 return std::forward_as_tuple(patches[0].model.state.ions,
@@ -384,6 +388,28 @@ struct IonUpdaterTest : public ::testing::Test
                 pop.flux(),
                 /*coef = */ (1. - alpha));
         }
+
+        sumTileBorders();
+    }
+
+    // tiles hold only their own partial deposits on shared border/ghost nodes; in a run the
+    // messenger's border sum completes them. no messenger here: reduce (sums every tile's
+    // ghost box) and copy the totals back so per-tile ions.update() sees full moments.
+    // tiles are then complete, so checks read them with reduce_single (copy, no sum)
+    void sumTileBorders()
+    {
+        if constexpr (is_field_tile_set_v<std::decay_t<decltype(ions.massDensity())>>)
+        {
+            auto const sum = [](auto& tiles) { copy_fields(tiles, *reduce(tiles)); };
+
+            for (auto& pop : this->ions)
+            {
+                sum(pop.particleDensity());
+                sum(pop.chargeDensity());
+                for (auto& component : pop.flux())
+                    sum(component);
+            }
+        }
     }
 
 
@@ -392,17 +418,17 @@ struct IonUpdaterTest : public ::testing::Test
     {
         auto& populations = this->ions.getRunTimeResourcesViewList();
 
-        auto const& protonParticleDensity = reduce(populations[0].particleDensity());
-        auto const& protonChargeDensity   = reduce(populations[0].chargeDensity());
-        auto const& protonFx              = reduce(populations[0].flux()(Component::X));
-        auto const& protonFy              = reduce(populations[0].flux()(Component::Y));
-        auto const& protonFz              = reduce(populations[0].flux()(Component::Z));
+        auto const& protonParticleDensity = reduce_single(populations[0].particleDensity());
+        auto const& protonChargeDensity   = reduce_single(populations[0].chargeDensity());
+        auto const& protonFx              = reduce_single(populations[0].flux()(Component::X));
+        auto const& protonFy              = reduce_single(populations[0].flux()(Component::Y));
+        auto const& protonFz              = reduce_single(populations[0].flux()(Component::Z));
 
-        auto const& alphaParticleDensity = reduce(populations[1].particleDensity());
-        auto const& alphaChargeDensity   = reduce(populations[1].chargeDensity());
-        auto const& alphaFx              = reduce(populations[1].flux()(Component::X));
-        auto const& alphaFy              = reduce(populations[1].flux()(Component::Y));
-        auto const& alphaFz              = reduce(populations[1].flux()(Component::Z));
+        auto const& alphaParticleDensity = reduce_single(populations[1].particleDensity());
+        auto const& alphaChargeDensity   = reduce_single(populations[1].chargeDensity());
+        auto const& alphaFx              = reduce_single(populations[1].flux()(Component::X));
+        auto const& alphaFy              = reduce_single(populations[1].flux()(Component::Y));
+        auto const& alphaFz              = reduce_single(populations[1].flux()(Component::Z));
 
 
         auto ix0 = this->layout.physicalStartIndex(QtyCentering::primal, Direction::X);
@@ -422,7 +448,7 @@ struct IonUpdaterTest : public ::testing::Test
         auto check = [&](auto const& newField, auto const& og) {
             // assert(no_nans(newField));
             assert(no_nans(og));
-            auto const& originalField = reduce(og);
+            auto const& originalField = reduce_single(og);
             nonZero(newField, newField.name() + ":new");
             // nonZero(originalField, "originalField");
             for (auto ix = ix0; ix <= ix1; ++ix)
@@ -451,9 +477,9 @@ struct IonUpdaterTest : public ::testing::Test
         check(alphaFz, ionsBufferCpy[1].flux()(Component::Z));
 
         assert(no_nans(ionsBufferCpy.velocity()(Component::X)));
-        check(reduce(ions.velocity()(Component::X)), ionsBufferCpy.velocity()(Component::X));
-        check(reduce(ions.velocity()(Component::Y)), ionsBufferCpy.velocity()(Component::Y));
-        check(reduce(ions.velocity()(Component::Z)), ionsBufferCpy.velocity()(Component::Z));
+        check(reduce_single(ions.velocity()(Component::X)), ionsBufferCpy.velocity()(Component::X));
+        check(reduce_single(ions.velocity()(Component::Y)), ionsBufferCpy.velocity()(Component::Y));
+        check(reduce_single(ions.velocity()(Component::Z)), ionsBufferCpy.velocity()(Component::Z));
     }
 
 
@@ -499,8 +525,8 @@ struct IonUpdaterTest : public ::testing::Test
         auto& protonParticleDensity = populations[0].particleDensity();
         auto& alphaParticleDensity  = populations[1].particleDensity();
 
-        check(reduce(protonParticleDensity), density);
-        check(reduce(alphaParticleDensity), density);
+        check(reduce_single(protonParticleDensity), density);
+        check(reduce_single(alphaParticleDensity), density);
     }
 };
 
@@ -510,7 +536,9 @@ using Permutations = ::testing::Types<
     TestParam<SimOpts{1, 1}>
   , TestParam<SimOpts{1, 2}>
   , TestParam<SimOpts{1, 3}>
-  // , TestParam<SimOpts{.dimension = 1, .interp_order = 1, .layout_mode = LayoutMode::AoSPCTS}>
+  , TestParam<SimOpts{.dimension = 1, .interp_order = 1, .layout_mode = LayoutMode::AoSPCTS}>
+  , TestParam<SimOpts{.dimension = 1, .interp_order = 2, .layout_mode = LayoutMode::AoSPCTS}>
+  , TestParam<SimOpts{.dimension = 1, .interp_order = 3, .layout_mode = LayoutMode::AoSPCTS}>
 >;
 // clang-format on
 TYPED_TEST_SUITE(IonUpdaterTest, Permutations, );
@@ -730,12 +758,12 @@ TYPED_TEST(IonUpdaterTest, thatNoNaNsExistOnPhysicalNodesMoments)
     {
         for (auto ix = ix0; ix <= ix1; ++ix)
         {
-            auto const& density = reduce(pop.particleDensity());
+            auto const& density = reduce_single(pop.particleDensity());
             auto const& flux    = pop.flux();
 
-            auto const& fx = reduce(flux(Component::X));
-            auto const& fy = reduce(flux(Component::Y));
-            auto const& fz = reduce(flux(Component::Z));
+            auto const& fx = reduce_single(flux(Component::X));
+            auto const& fy = reduce_single(flux(Component::Y));
+            auto const& fz = reduce_single(flux(Component::Z));
 
             EXPECT_FALSE(std::isnan(density(ix)));
             EXPECT_FALSE(std::isnan(fx(ix)));

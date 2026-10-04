@@ -197,6 +197,24 @@ TYPED_TEST(ParticleScheduleL1HierarchyTest, fillIonPopMomentGhostsContributesToB
 
     this->hierarchy.messenger->fillIonPopMomentGhosts(ions, *lvl1, 0.);
 
+    // only level ghost particles are deposited: border nodes on a patch-patch boundary get
+    // nothing, so restrict checks to nodes next to ghost zones no same-level neighbour covers
+    auto const level_ghost_zones = [&](auto const& patch, auto const& amr_ghost_box,
+                                       auto const& amr_domain) {
+        auto zones = amr_ghost_box.remove(amr_domain);
+        SAMRAI::hier::HierarchyNeighbors const neighbours{*hier, 1, 1};
+        for (auto const& sam_neighbour : neighbours.getSameLevelNeighbors(patch.getBox(), 1))
+        {
+            auto const neighbour = grow(phare_box_from<dim>(sam_neighbour), 1); // cells -> nodes
+            std::vector<core::Box<int, dim>> remaining;
+            for (auto const& zone : zones)
+                for (auto const& left : zone.remove(neighbour))
+                    remaining.push_back(left);
+            zones = std::move(remaining);
+        }
+        return zones;
+    };
+
     for (auto& patch : *lvl1)
     {
         auto dataOnPatch = rm.setOnPatch(*patch, ions);
@@ -204,27 +222,25 @@ TYPED_TEST(ParticleScheduleL1HierarchyTest, fillIonPopMomentGhostsContributesToB
 
         for (auto& pop : ions)
         {
-            auto const& density            = reduce(pop.particleDensity());
-            auto const local_domain        = layout.domainBoxFor(density);
-            auto const local_domain_border = local_domain.remove(shrink(local_domain, 1));
-            // ghost zones in local coords: avoids SAMRAI periodic-wrap in AMR indices
-            auto const local_ghost_zones = layout.ghostBoxFor(density).remove(local_domain);
-            std::size_t checked          = 0;
-            for (auto const& border : local_domain_border)
-            {
-                // grow border outward (lower always >= nghosts >= 1, no uint32_t underflow)
-                auto const grown_border = grow(border, 1);
-                for (auto const& ghost : local_ghost_zones)
+            auto const& density    = reduce(pop.particleDensity());
+            auto const amr_domain  = layout.AMRBoxFor(density);
+            auto const ghost_zones = level_ghost_zones(*patch, layout.AMRGhostBoxFor(density),
+                                                       amr_domain);
+            std::size_t checked = 0;
+            for (auto const& border : amr_domain.remove(shrink(amr_domain, 1)))
+                for (auto const& bix : border)
                 {
-                    if (grown_border * ghost)
-                        for (auto const& bix : border)
-                        {
-                            EXPECT_GT(density(bix), 0.);
-                            ++checked;
-                        }
+                    auto const around = grow(core::Box<int, dim>{bix, bix}, 1);
+                    if (std::none_of(ghost_zones.begin(), ghost_zones.end(),
+                                     [&](auto const& zone) { return bool{around * zone}; }))
+                        continue;
+                    EXPECT_GT(density(layout.AMRToLocal(bix)), 0.) << "node " << bix;
+                    ++checked;
                 }
+            if (ghost_zones.size())
+            {
+                EXPECT_GT(checked, 0u);
             }
-            EXPECT_GE(checked, local_domain.size() - shrink(local_domain, 1).size());
         }
     }
 }
