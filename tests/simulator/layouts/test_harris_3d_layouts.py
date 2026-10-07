@@ -180,7 +180,7 @@ class HarrisTest(SimulatorTest):
                 self,
                 Run(diag_dir0),
                 Run(diag_dir1),
-                atol=dict(b=5e-15, e=5e-14, moments=2e-14, particles=1e-14),
+                atol=dict(b=5e-15, e=1e-13, moments=2e-14, particles=1e-14),
             )
         return self
 

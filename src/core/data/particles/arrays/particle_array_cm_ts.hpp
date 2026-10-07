@@ -50,6 +50,18 @@ public:
     auto& links() { return _links; }
     auto& links() const { return _links; }
 
+    template<ParticleType type>
+    void on_reachable_cells(auto&& fn) const
+    {
+        Super const& tbox = *this;
+        for (auto const& amr : tbox)
+            fn(amr);
+        if constexpr (type == ParticleType::LevelGhost)
+            for (auto const& amr : particles.box()) // box is AoSMapped ghost box!
+                if (!isIn(amr, tbox))
+                    fn(amr);
+    }
+
     Particles_t particles;
 
     // indices of particles registered by move_check as leaving for another tile's domain
@@ -85,10 +97,7 @@ public:
     }
 
     // iterates [amr, local] cell pairs of box, as GridLayout::amr_lcl_idx
-    auto amr_lcl_idx(Box<int, dim> const& box) const
-    {
-        return boxes_iterator{box, local_box(box)};
-    }
+    auto amr_lcl_idx(Box<int, dim> const& box) const { return boxes_iterator{box, local_box(box)}; }
 
 protected:
     MappedTileSetBoxes(Box<int, dim> const& box, std::size_t const ghost_cells)
@@ -367,9 +376,9 @@ auto& MappedTileSetVector<Particles>::move_check(auto const& pt, std::size_t con
     bool const into_other_tile = isIn(newcell, box_) and not isIn(newcell, tile);
     bool leaves                = into_other_tile;
     if constexpr (particle_type == LevelGhost)
-        // level ghosts are duplicated per tile: one leaving this tile's grown box, or
-        // entering another tile's domain, is covered by that tile's own copy - delete only
-        leaves = leaves or not isIn(newcell, grow(tile, ghost_cells_));
+        if (not isIn(newcell, box_))
+            leaves = not isIn(newcell, this->ghost_box())
+                     or particles_.at(Point<int, dim>{newcell}) != &tile;
 
     if (leaves)
         tile.leavers.push_back(idx); // stays unmapped, removed in on_moved
@@ -384,16 +393,21 @@ template<auto type>
 void MappedTileSetVector<Particles>::on_moved()
 {
     // pull: each tile is the only writer of its own vector and cellmap
-    // level ghost leavers are only deleted, see move_check
-    for (std::size_t ti = 0; ti < particles_.size() and type == ParticleType::Domain; ++ti)
+    for (std::size_t ti = 0; ti < particles_.size(); ++ti)
     {
         auto& dst = particles_[ti];
         for (auto const ni : neighbours_[ti])
         {
             auto& src = particles_[ni];
             for (auto const idx : src.leavers)
-                if (particles_.at(Point<int, dim>{src()[idx].iCell()}) == &dst)
+            {
+                auto const cell = Point<int, dim>{src()[idx].iCell()};
+                if constexpr (type == ParticleType::LevelGhost)
+                    if (isIn(cell, box_) or not isIn(cell, this->ghost_box()))
+                        continue;
+                if (particles_.at(cell) == &dst)
                     dst().emplace_back(src()[idx]); // maps it
+            }
         }
     }
 

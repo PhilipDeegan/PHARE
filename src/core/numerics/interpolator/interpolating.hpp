@@ -2,11 +2,10 @@
 #define PHARE_CORE_NUMERICS_INTERPOLATOR_INTERPOLATING_HPP
 
 #include "core/data/field/field_tiles.hpp"
+#include "core/utilities/range/range.hpp"
 #include "core/data/particles/particle_array_def.hpp"
 
 #include "interpolator.hpp"
-
-#include <stdexcept>
 
 namespace PHARE::core
 {
@@ -18,7 +17,11 @@ void on_reachable_level_ghosts(Particles const& particles, std::size_t const tid
 {
     particles()[tidx].template on_reachable_cells<ParticleType::LevelGhost>([&](auto const& amr) {
         auto const& owner = (*particles().at(amr))();
-        fn(owner(owner.local_cell(amr)));
+        if constexpr (Particles::layout_mode == LayoutMode::AoSCMTS)
+            for (auto const idx : owner.map(amr))
+                fn(makeRange(owner, idx, idx + 1));
+        else
+            fn(owner(owner.local_cell(amr)));
     });
 }
 
@@ -55,12 +58,7 @@ public:
 
             auto& tile_particles = particles()[tidx]();
             if constexpr (type == ParticleType::LevelGhost)
-            {
-                if constexpr (Particles::layout_mode == LayoutMode::AoSCMTS)
-                    throw std::runtime_error("AoSCMTS LevelGhost particleToMesh not implemented");
-                else
-                    on_reachable_level_ghosts(particles, tidx, deposit);
-            }
+                on_reachable_level_ghosts(particles, tidx, deposit);
             else if constexpr (Particles::layout_mode == LayoutMode::AoSCMTS)
                 deposit(tile_particles);
             else
@@ -120,12 +118,7 @@ public:
 
             auto& tile_particles = particles()[tidx]();
             if constexpr (type == ParticleType::LevelGhost)
-            {
-                if constexpr (Particles_t::layout_mode == LayoutMode::AoSCMTS)
-                    throw std::runtime_error("AoSCMTS LevelGhost particleToMesh not implemented");
-                else
-                    on_reachable_level_ghosts(particles, tidx, deposit);
-            }
+                on_reachable_level_ghosts(particles, tidx, deposit);
             else if constexpr (Particles_t::layout_mode == LayoutMode::AoSCMTS)
                 deposit(tile_particles);
             else
