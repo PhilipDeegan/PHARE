@@ -33,8 +33,8 @@ namespace PHARE::core
 {
 // RUNTIME ENV VAR OVERRIDES
 auto static const bytes     = get_env_as("PHARE_GPU_BYTES", std::uint64_t{500000000}); // .5GB
-auto static const cells     = get_env_as("PHARE_CELLS", std::uint32_t{30});
-auto static const ppc       = get_env_as("PHARE_PPC", std::size_t{100});
+auto static const cells     = get_env_as("PHARE_CELLS", std::uint32_t{20});
+auto static const ppc       = get_env_as("PHARE_PPC", std::size_t{33});
 auto static const seed      = get_env_as("PHARE_SEED", std::size_t{1067});
 auto static const n_patches = get_env_as("PHARE_PATCHES", std::size_t{1});
 auto static const dt        = get_env_as("PHARE_TIMESTEP", double{.001});
@@ -453,33 +453,31 @@ using Permutations_t = testing::Types< // ! notice commas !
    ,TestParam<1, LayoutMode::AoSPCTS, AllocatorMode::CPU, UpdaterMode::all>
    ,TestParam<2, LayoutMode::AoSPCTS, AllocatorMode::CPU, UpdaterMode::domain_only>
    ,TestParam<2, LayoutMode::AoSPCTS, AllocatorMode::CPU, UpdaterMode::all>
-   // ,TestParam<3, LayoutMode::AoSPCTS, AllocatorMode::CPU, UpdaterMode::domain_only>
-   // ,TestParam<3, LayoutMode::AoSPCTS, AllocatorMode::CPU, UpdaterMode::all>
+   ,TestParam<3, LayoutMode::AoSPCTS, AllocatorMode::CPU, UpdaterMode::domain_only>
+   ,TestParam<3, LayoutMode::AoSPCTS, AllocatorMode::CPU, UpdaterMode::all>
+   ,TestParam<1, LayoutMode::AoSCMTS, AllocatorMode::CPU, UpdaterMode::domain_only>
+   ,TestParam<1, LayoutMode::AoSCMTS, AllocatorMode::CPU, UpdaterMode::all>
    ,TestParam<2, LayoutMode::AoSCMTS, AllocatorMode::CPU, UpdaterMode::domain_only>
    ,TestParam<2, LayoutMode::AoSCMTS, AllocatorMode::CPU, UpdaterMode::all>
-// 3D disabled until 2D AoSPCTS UpdaterMode::all passes
-//    ,TestParam<3, LayoutMode::AoSPCTS, AllocatorMode::CPU, UpdaterMode::domain_only>
-//    ,TestParam<3, LayoutMode::AoSPCTS, AllocatorMode::CPU, UpdaterMode::all>
-//    ,TestParam<3, LayoutMode::AoSCMTS, AllocatorMode::CPU, UpdaterMode::domain_only>
-//    ,TestParam<3, LayoutMode::AoSCMTS, AllocatorMode::CPU, UpdaterMode::all>
+   ,TestParam<3, LayoutMode::AoSCMTS, AllocatorMode::CPU, UpdaterMode::domain_only>
+   ,TestParam<3, LayoutMode::AoSCMTS, AllocatorMode::CPU, UpdaterMode::all>
 
-// PHARE_WITH_MKN_GPU(
-//    ,TestParam<1, LayoutMode::AoSPCTS, AllocatorMode::CPU, UpdaterMode::domain_only, UpdaterVersion::mkn_parallel>
-//    ,TestParam<1, LayoutMode::AoSPCTS, AllocatorMode::CPU, UpdaterMode::all,         UpdaterVersion::mkn_parallel>
-//    ,TestParam<2, LayoutMode::AoSPCTS, AllocatorMode::CPU, UpdaterMode::domain_only, UpdaterVersion::mkn_parallel>
-//    ,TestParam<2, LayoutMode::AoSPCTS, AllocatorMode::CPU, UpdaterMode::all,         UpdaterVersion::mkn_parallel>
-//    ,TestParam<3, LayoutMode::AoSPCTS, AllocatorMode::CPU, UpdaterMode::domain_only, UpdaterVersion::mkn_parallel>
-//    ,TestParam<3, LayoutMode::AoSPCTS, AllocatorMode::CPU, UpdaterMode::all,         UpdaterVersion::mkn_parallel>
-// )
+PHARE_WITH_MKN_GPU(
+   ,TestParam<1, LayoutMode::AoSPCTS, AllocatorMode::CPU, UpdaterMode::domain_only, UpdaterVersion::mkn_parallel>
+   ,TestParam<1, LayoutMode::AoSPCTS, AllocatorMode::CPU, UpdaterMode::all,         UpdaterVersion::mkn_parallel>
+   ,TestParam<2, LayoutMode::AoSPCTS, AllocatorMode::CPU, UpdaterMode::domain_only, UpdaterVersion::mkn_parallel>
+   ,TestParam<2, LayoutMode::AoSPCTS, AllocatorMode::CPU, UpdaterMode::all,         UpdaterVersion::mkn_parallel>
+   ,TestParam<3, LayoutMode::AoSPCTS, AllocatorMode::CPU, UpdaterMode::domain_only, UpdaterVersion::mkn_parallel>
+   ,TestParam<3, LayoutMode::AoSPCTS, AllocatorMode::CPU, UpdaterMode::all,         UpdaterVersion::mkn_parallel>
+)
 
 PHARE_WITH_GPU(
    ,TestParam<1, LayoutMode::AoSPCTS, AllocatorMode::GPU_UNIFIED, UpdaterMode::domain_only, UpdaterVersion::mkn_parallel>
-   // ,TestParam<1, LayoutMode::AoSPCTS, AllocatorMode::GPU_UNIFIED, UpdaterMode::domain_only, UpdaterVersion::mkn_parallel>
-   // ,TestParam<1, LayoutMode::AoSPCTS, AllocatorMode::GPU_UNIFIED, UpdaterMode::all,         UpdaterVersion::mkn_parallel>
-   // ,TestParam<2, LayoutMode::AoSPCTS, AllocatorMode::GPU_UNIFIED, UpdaterMode::domain_only, UpdaterVersion::mkn_parallel>
-   // ,TestParam<2, LayoutMode::AoSPCTS, AllocatorMode::GPU_UNIFIED, UpdaterMode::all,         UpdaterVersion::mkn_parallel>
-   // ,TestParam<3, LayoutMode::AoSPCTS, AllocatorMode::GPU_UNIFIED, UpdaterMode::domain_only, UpdaterVersion::mkn_parallel>
-   // ,TestParam<3, LayoutMode::AoSPCTS, AllocatorMode::GPU_UNIFIED, UpdaterMode::all,         UpdaterVersion::mkn_parallel>
+   ,TestParam<1, LayoutMode::AoSPCTS, AllocatorMode::GPU_UNIFIED, UpdaterMode::all,         UpdaterVersion::mkn_parallel>
+   ,TestParam<2, LayoutMode::AoSPCTS, AllocatorMode::GPU_UNIFIED, UpdaterMode::domain_only, UpdaterVersion::mkn_parallel>
+   ,TestParam<2, LayoutMode::AoSPCTS, AllocatorMode::GPU_UNIFIED, UpdaterMode::all,         UpdaterVersion::mkn_parallel>
+   ,TestParam<3, LayoutMode::AoSPCTS, AllocatorMode::GPU_UNIFIED, UpdaterMode::domain_only, UpdaterVersion::mkn_parallel>
+   ,TestParam<3, LayoutMode::AoSPCTS, AllocatorMode::GPU_UNIFIED, UpdaterMode::all,         UpdaterVersion::mkn_parallel>
 )
 
 >;
