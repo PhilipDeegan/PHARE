@@ -120,7 +120,7 @@ public:
         interp_(particles, rhoP, rhoC, flux, layout, coef);
     }
 
-    template<typename Particles>
+    template<auto type = ParticleType::Domain, typename Particles>
     void particleToMesh(Particles const& particles, auto const& layout, auto& rhoP, auto& rhoC,
                         auto& flux, double coef = 1.)
         requires(Particles::layout_mode == LayoutMode::AoSTS)
@@ -136,7 +136,7 @@ public:
         }
     }
 
-    template<typename Particles>
+    template<auto type = ParticleType::Domain, typename Particles>
     void particleToMesh(Particles const& particles, auto const& layout, auto& rhoP, auto& rhoC,
                         auto& flux, double coef = 1.)
         requires(Particles::layout_mode == LayoutMode::SoATS)
@@ -147,7 +147,7 @@ public:
                 interp_.particleToMesh(tile()[i], rhoP, rhoC, flux, layout, coef);
     }
 
-    template<typename Particles>
+    template<auto type = ParticleType::Domain, typename Particles>
     void particleToMesh(Particles const& particles, auto const& layout, auto& rhoP, auto& rhoC,
                         auto& flux, double coef = 1.)
         requires(Particles::layout_mode == LayoutMode::AoSPC)
@@ -186,7 +186,7 @@ public:
             throw std::runtime_error("fail");
     }
 
-    template<typename Particles>
+    template<auto type = ParticleType::Domain, typename Particles>
     void particleToMesh(Particles const& particles, auto const& layout, auto& rhoP, auto& rhoC,
                         auto& flux, double coef = 1.)
         requires(any_in(Particles::layout_mode, LayoutMode::AoS, LayoutMode::SoA,
@@ -757,7 +757,7 @@ public:
         }
     }
 
-    template<typename Particles_t>
+    template<auto type = ParticleType::Domain, typename Particles_t>
     void particleToMesh(Particles_t& particles, auto& momentumTensor, auto const& layout,
                         double mass = 1.)
         requires(Particles_t::layout_mode == LayoutMode::AoSTS)
