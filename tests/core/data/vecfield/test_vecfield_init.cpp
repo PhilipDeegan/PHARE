@@ -42,7 +42,7 @@ struct TestParam
 
 struct InitFunctor
 {
-    using Param  = std::vector<double> const&;
+    using Param  = PHARE::core::Span<double const> const&;
     using Return = std::shared_ptr<PHARE::core::Span<double>>;
 
     Return operator()(Param x) { return std::make_shared<core::VectorSpan<double>>(x); }
