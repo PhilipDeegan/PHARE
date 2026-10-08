@@ -3,6 +3,7 @@
 #include "core/utilities/types.hpp"
 #include "core/utilities/monitoring.hpp"
 #include "core/data/particles/particle_array_def.hpp"
+#include "core/data/particles/particle_packer.hpp"
 
 #include "amr/data/particles/particles_data.hpp"
 #include "amr/data/particles/refine/particles_data_split.hpp"
@@ -344,13 +345,18 @@ TYPED_TEST(ParticlesDataTest, splitWorksForLevelGhost)
     std::size_t const expected = (ghost_box.size() - L1domainBox.size()) * ppc
                                  * nb_split_parts(TestFixture::ParticleArray_t::dimension)
                                  / (1u << TestFixture::ParticleArray_t::dimension);
-    EXPECT_EQ(expected, dst.data->levelGhostParticles.size());
+    // AoSPCTS duplicates level ghosts in overlapping tile halos: count only the clamp-owned
+    // copies (as packing does), which is what matches the unique count other layouts store
+    using ParticleArray_t = TestFixture::ParticleArray_t;
+    EXPECT_EQ(expected, ParticlePacker<ParticleArray_t>::template size<ParticleType::LevelGhost>(
+                            dst.data->levelGhostParticles));
 
     // reserves are expected to closely track the final size, not grossly over-allocate
-    // (see splitWorksForDomain for why this holds for AoSPCTS too)
+    // (see splitWorksForDomain for why this holds for AoSPCTS too). total_size includes the
+    // halo duplicates, so it's only checked against capacity here
     auto const [total_size, total_capacity]
         = total_size_and_capacity(dst.data->levelGhostParticles);
-    EXPECT_EQ(expected, total_size);
+    EXPECT_EQ(dst.data->levelGhostParticles.size(), total_size);
     EXPECT_LE(total_capacity, static_cast<std::size_t>(total_size * 2.0));
 
     dst.data->levelGhostParticles.check();
