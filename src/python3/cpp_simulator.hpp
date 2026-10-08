@@ -17,7 +17,6 @@
 #include "simulator/simulator.hpp" // IWYU pragma: keep
 
 #include "python3/pybind_def.hpp" // IWYU pragma: keep
-#include "simulator/simulator.hpp"
 
 #include "pybind11/stl.h"        // IWYU pragma: keep
 #include "pybind11/numpy.h"      // IWYU pragma: keep
