@@ -457,6 +457,11 @@ using Permutations_t = testing::Types< // ! notice commas !
    // ,TestParam<3, LayoutMode::AoSPCTS, AllocatorMode::CPU, UpdaterMode::all>
    ,TestParam<2, LayoutMode::AoSCMTS, AllocatorMode::CPU, UpdaterMode::domain_only>
    ,TestParam<2, LayoutMode::AoSCMTS, AllocatorMode::CPU, UpdaterMode::all>
+// 3D disabled until 2D AoSPCTS UpdaterMode::all passes
+//    ,TestParam<3, LayoutMode::AoSPCTS, AllocatorMode::CPU, UpdaterMode::domain_only>
+//    ,TestParam<3, LayoutMode::AoSPCTS, AllocatorMode::CPU, UpdaterMode::all>
+//    ,TestParam<3, LayoutMode::AoSCMTS, AllocatorMode::CPU, UpdaterMode::domain_only>
+//    ,TestParam<3, LayoutMode::AoSCMTS, AllocatorMode::CPU, UpdaterMode::all>
 
 // PHARE_WITH_MKN_GPU(
 //    ,TestParam<1, LayoutMode::AoSPCTS, AllocatorMode::CPU, UpdaterMode::domain_only, UpdaterVersion::mkn_parallel>
