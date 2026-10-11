@@ -19,7 +19,7 @@ ph.NO_GUI()
 
 
 cells = (200, 100)
-time_step = 0.005
+time_step = {"mode": "adaptive", "cfl_wave": 0.5}  # was constant 0.005, see #1329
 final_time = 50
 
 timestamps = [0, final_time / 2, final_time]
@@ -153,7 +153,7 @@ def config():
             quantity=quantity, write_timestamps=timestamps, population_name="protons"
         )
 
-    ph.InfoDiagnostics(quantity="particle_count")
+    ph.InfoDiagnostics(quantity="particle_count", write_timestamps=timestamps)
 
     ph.LoadBalancer(active=True, auto=True, mode="nppc", tol=0.05)
 

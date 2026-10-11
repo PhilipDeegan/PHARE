@@ -328,8 +328,6 @@ double SolverPPC<HybridModel, AMR_Types>::computeStableDt(IPhysicalModel_t& mode
 {
     PHARE_LOG_SCOPE(1, "SolverPPC::computeStableDt");
 
-    throw std::runtime_error("Adaptive time-stepping not ready in hybrid.");
-
     double const wave = cflNumbers.wave;
 
     auto& hybridModel = dynamic_cast<HybridModel&>(model);
