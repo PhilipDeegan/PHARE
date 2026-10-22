@@ -2,6 +2,7 @@
 #define PHARE_CORE_PUSHER_BORIS_HPP
 
 
+#include "core/def.hpp"
 #include "core/errors.hpp"
 #include "core/logger.hpp"
 #include "core/numerics/pusher/pusher.hpp"
@@ -215,7 +216,7 @@ private:
         }
     }
 
-    void postPushStep_(ParticleRange& range, std::size_t idx)
+    PHARE_ALWAYS_INLINE void postPushStep_(ParticleRange& range, std::size_t idx)
     {
         try
         {

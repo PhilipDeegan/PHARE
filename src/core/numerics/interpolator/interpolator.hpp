@@ -243,18 +243,23 @@ public:
 
         auto const& order_size = xWeights.size();
 
+        // the full 3D flat index once, then fixed strides: recomputing it per support point
+        // dominated the gather (integer multiplies, register spills)
+        auto const* base   = &field(xStartIndex, yStartIndex, zStartIndex);
+        auto const xStride = &field(xStartIndex + 1, yStartIndex, zStartIndex) - base;
+        auto const yStride = &field(xStartIndex, yStartIndex + 1, zStartIndex) - base;
+        auto const zStride = &field(xStartIndex, yStartIndex, zStartIndex + 1) - base;
+
         double fieldAtParticle = 0.;
         for (auto ix = 0u; ix < order_size; ++ix)
         {
             double Yinterp = 0.;
             for (auto iy = 0u; iy < order_size; ++iy)
             {
-                double Zinterp = 0.;
+                auto const* line = base + ix * xStride + iy * yStride;
+                double Zinterp   = 0.;
                 for (auto iz = 0u; iz < order_size; ++iz)
-                {
-                    Zinterp += field(xStartIndex + ix, yStartIndex + iy, zStartIndex + iz)
-                               * zWeights[iz];
-                }
+                    Zinterp += line[iz * zStride] * zWeights[iz];
                 Yinterp += Zinterp * yWeights[iy];
             }
             fieldAtParticle += Yinterp * xWeights[ix];
@@ -418,7 +423,8 @@ public:
      * onto the particle.
      */
     template<typename Particle_t, typename Electromag, typename GridLayout>
-    inline auto operator()(Particle_t& currPart, Electromag const& Em, GridLayout const& layout)
+    PHARE_ALWAYS_INLINE auto operator()(Particle_t& currPart, Electromag const& Em,
+                                        GridLayout const& layout)
     {
         using E_B_tuple = std::tuple<std::array<double, 3>, std::array<double, 3>>;
         using Scalar    = HybridQuantity::Scalar;
