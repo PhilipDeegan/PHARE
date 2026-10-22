@@ -6,6 +6,7 @@
 #include "core/utilities/types.hpp"
 #include "core/utilities/box/box.hpp"
 #include "core/utilities/constants.hpp"
+#include "core/utilities/box/box_slabs.hpp"
 #include "core/utilities/point/point.hpp"
 
 #include "gridlayoutdefs.hpp"
@@ -1025,8 +1026,20 @@ namespace core
         NO_DISCARD auto static constexpr JzToEz() { return implT::JzToEz(); }
 
 
+        // essentially box form of allocSize(...)
+        template<typename Field>
+        Box<std::uint32_t, dimension> ghostBoxFor(Field const& field) const
+        {
+            return boxFor(field, [&](auto&&... args) { return this->ghostStartToEnd(args...); });
+        }
 
         auto AMRBoxFor(auto const& field) const { return toCenteredBox(AMRBox_, centering(field)); }
+
+        template<typename Field>
+        Box<std::uint32_t, dimension> domainBoxFor(Field const& field) const
+        {
+            return boxFor(field, [&](auto&&... args) { return this->physicalStartToEnd(args...); });
+        }
 
         auto AMRGhostBoxFor(auto const& field) const
         {
@@ -1056,47 +1069,27 @@ namespace core
         template<typename Field, typename Fn, typename... Args>
         void evalOnBox(Field& field, Fn&& fn, Args&&... args) const
         {
-            auto indices = [&](auto const& centering, auto const direction) {
-                return this->physicalStartToEnd(centering, direction);
-            };
-
-            evalOnBox_(field, fn, indices, args...);
+            evalOnAnyBox(domainBoxFor(field), fn, args...);
         }
 
         template<typename Field, typename Fn, typename... Args>
         void evalOnBiggerBox(Field& field, Point<std::uint32_t, dimension> const& grow, Fn&& fn,
                              Args&&... args) const
         {
-            auto indices = [&](auto const& centering, auto const direction) {
-                auto [start, end] = this->physicalStartToEnd(centering, direction);
-                return std::make_pair(start - grow[static_cast<std::size_t>(direction)],
-                                      end + grow[static_cast<std::size_t>(direction)]);
-            };
-
-            evalOnBox_(field, fn, indices, args...);
+            evalOnAnyBox(core::grow(domainBoxFor(field), grow), fn, args...);
         }
 
         template<typename Field, typename Fn, typename... Args>
         void evalOnShrinkedGhostBox(Field& field, Point<std::uint32_t, dimension> const& shrink,
                                     Fn&& fn, Args&&... args) const
         {
-            auto indices = [&](auto const& centering, auto const direction) {
-                auto [start, end] = this->ghostStartToEnd(centering, direction);
-                return std::make_pair(start + shrink[static_cast<std::size_t>(direction)],
-                                      end - shrink[static_cast<std::size_t>(direction)]);
-            };
-
-            evalOnBox_(field, fn, indices, args...);
+            evalOnAnyBox(core::shrink(ghostBoxFor(field), shrink), fn, args...);
         }
 
         template<typename Field, typename Fn, typename... Args>
         void evalOnGhostBox(Field& field, Fn&& fn, Args&&... args) const
         {
-            auto indices = [&](auto const& centering, auto const direction) {
-                return this->ghostStartToEnd(centering, direction);
-            };
-
-            evalOnBox_(field, fn, indices, args...);
+            evalOnAnyBox(ghostBoxFor(field), fn, args...);
         }
         auto levelNumber() const { return levelNumber_; }
 
@@ -1110,46 +1103,20 @@ namespace core
         }
 
     private:
-        template<typename Field, typename IndicesFn, typename Fn, typename... Args>
-        static void evalOnBox_(Field& field, Fn& fn, IndicesFn& startToEnd, Args&... args)
+        // calls fn(index, args...) once per point of box, walking it span by span
+        // (see for_each_point in core/utilities/box/box_slabs.hpp)
+        template<typename Fn, typename... Args>
+        static void evalOnAnyBox(auto const& box, Fn& fn, Args&... args)
         {
             static_assert(std::is_empty_v<std::decay_t<Fn>>,
                           "evalOn*Box: fn must be captureless, pass state through args");
 
-            Point<std::uint32_t, dimension> ijk;
-
-            auto const [ix0, ix1] = startToEnd(field, Direction::X);
-            for (ijk[0] = ix0; ijk[0] <= ix1; ++ijk[0])
-            {
-                if constexpr (dimension == 1)
-                {
-                    fn(ijk, args...);
-                }
-                else
-                {
-                    auto const [iy0, iy1] = startToEnd(field, Direction::Y);
-
-                    for (ijk[1] = iy0; ijk[1] <= iy1; ++ijk[1])
-                    {
-                        if constexpr (dimension == 2)
-                        {
-                            fn(ijk, args...);
-                        }
-                        else
-                        {
-                            auto const [iz0, iz1] = startToEnd(field, Direction::Z);
-
-                            for (ijk[2] = iz0; ijk[2] <= iz1; ++ijk[2])
-                                fn(ijk, args...);
-                        }
-                    }
-                }
-            }
+            for_each_point(box, fn, args...);
         }
 
 
         template<typename Field, typename Fn>
-        auto BoxFor(Field const& field, Fn startToEnd) const
+        auto boxFor(Field const& field, Fn const startToEnd) const
         {
             std::array<std::uint32_t, dimension> lower, upper;
 
