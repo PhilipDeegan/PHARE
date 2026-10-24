@@ -3,6 +3,7 @@
 
 #include "core/utilities/box/box.hpp"
 
+#include <cassert>
 #include <cstddef>
 #include <algorithm>
 #include <cstdint>
@@ -298,6 +299,39 @@ void for_each_point(Box<T, dim> const& box, auto&& fn, auto&&... args)
         for (auto const& span : slab)
             for (auto const& point : span)
                 fn(point, args...);
+}
+
+
+/** @brief Like for_each_point, but walks two same-shaped boxes in step, calling
+ * fn(point0, point1, args...) for each point of box0 and its counterpart in box1,
+ * e.g. the AMR and local indices of the same cells.
+ *
+ * Both points are owned by their span's point_iterator: they are only valid for the
+ * duration of the call.
+ */
+template<typename T0, typename T1, std::size_t dim>
+void for_each_point_zip(Box<T0, dim> const& box0, Box<T1, dim> const& box1, auto&& fn,
+                        auto&&... args)
+{
+    assert(box0.shape() == box1.shape());
+    auto const slabs0 = make_box_slabs(box0);
+    auto const slabs1 = make_box_slabs(box1);
+
+    auto slab1 = slabs1.begin();
+    for (auto slab0 = slabs0.begin(); slab0 != slabs0.end(); ++slab0, ++slab1)
+    {
+        auto spans1 = slab1.begin();
+        for (auto spans0 = slab0.begin(); spans0 != slab0.end(); ++spans0, ++spans1)
+        {
+            auto const span1 = *spans1;
+            auto point1      = span1.begin();
+            for (auto const& point0 : *spans0)
+            {
+                fn(point0, *point1, args...);
+                ++point1;
+            }
+        }
+    }
 }
 
 

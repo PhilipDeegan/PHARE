@@ -49,8 +49,7 @@ TYPED_TEST(FieldBoxSlabsTest, test_field_box_slabs_nd)
     auto& src             = this->src;
     auto const domain_box = layout.domainBoxFor(dst);
 
-    for (auto const& bix : domain_box)
-        src(bix) = product(bix);
+    for_each_point(domain_box, [&](auto const& bix) { src(bix) = product(bix); });
 
     auto d_span       = make_field_box_slabs(domain_box, dst);
     auto const s_span = make_field_box_slabs(domain_box, src);
@@ -75,10 +74,7 @@ TYPED_TEST(FieldBoxSlabsTest, test_field_box_slabs_nd)
     }
 
 
-    for (auto const& bix : domain_box)
-    {
-        EXPECT_EQ(dst(bix), product(bix));
-    }
+    for_each_point(domain_box, [&](auto const& bix) { EXPECT_EQ(dst(bix), product(bix)); });
 
     EXPECT_EQ(sum(dst), sum(src));
 }
