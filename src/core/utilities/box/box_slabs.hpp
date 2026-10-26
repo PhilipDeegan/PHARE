@@ -267,6 +267,31 @@ void for_each_point(Box<T, dim> const& box, auto&& fn, auto&&... args)
 }
 
 
+/** @brief Like for_each_point, but visits the points of `box` in reverse C order, from
+ * upper to lower, e.g. for updates where each point reads the one after it.
+ *
+ * `point` is only valid for the duration of the call, `args` are passed as in for_each_point.
+ */
+template<typename T, std::size_t dim>
+void for_each_point_reverse(Box<T, dim> const& box, auto&& fn, auto&&... args)
+{
+    auto constexpr static last = dim - 1;
+    auto const slabs           = make_box_slabs(box);
+
+    // each loop compares, then steps back (postfix): the first index is visited and nothing
+    //  below it is used, so unsigned boxes starting at 0 do not underflow into a visit
+    for (auto slab = slabs.end(); slab-- > slabs.begin();)
+        for (auto span = (*slab).end(); span-- > (*slab).begin();)
+        {
+            auto const [start, size] = *span;
+            auto point               = start;
+            point[last] += size;
+            while (point[last]-- > start[last])
+                fn(point, args...);
+        }
+}
+
+
 /** @brief Like for_each_point, but walks two same-shaped boxes in step, calling
  * fn(point0, point1, args...) for each point of box0 and its counterpart in box1,
  * e.g. the AMR and local indices of the same cells.
