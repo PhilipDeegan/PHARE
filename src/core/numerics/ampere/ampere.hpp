@@ -2,6 +2,7 @@
 #define PHARE_CORE_NUMERICS_AMPERE_AMPERE_HPP
 
 #include "core/data/grid/gridlayoutdefs.hpp"
+#include "core/data/field/field_box_value_accessor.hpp"
 #include "core/data/vecfield/vecfield_component.hpp"
 #include "core/numerics/differential_operators.hpp"
 
@@ -48,19 +49,19 @@ public:
             amount[i] = box.amount;
         }
 
-        // evalOn* calls fn(point, trailingArgs...); trailing args (Jc, curlB component)
-        // are passed through it rather than captured, so the lambdas stay capture-free
+        // evalOn* calls fn(point, trailingArgs...); Jc is wrapped in FieldBoxValueAccessor so
+        // fn receives the J value at point, indexed span-wise rather than per point
         auto const eval = [&](auto& Jc, auto&& fn, auto const& curlBc) {
             if constexpr (box.mode == AmpereMode::ShrinkedGhost)
-                layout_.evalOnShrinkedGhostBox(Jc, amount, fn, Jc, curlBc);
+                layout_.evalOnShrinkedGhostBox(Jc, amount, fn, FieldBoxValueAccessor{Jc}, curlBc);
             else
-                layout_.evalOnBiggerBox(Jc, amount, fn, Jc, curlBc);
+                layout_.evalOnBiggerBox(Jc, amount, fn, FieldBoxValueAccessor{Jc}, curlBc);
         };
 
         auto const curlB = curl(layout_, B);
 
         auto constexpr JEq
-            = [](auto const& ijk, auto& Jc, auto const& curlBc) { Jc(ijk) = curlBc(ijk); };
+            = [](auto const& ijk, auto& J_ijk, auto const& curlBc) { J_ijk = curlBc(ijk); };
 
         eval(Jx, JEq, curlB.x);
         eval(Jy, JEq, curlB.y);

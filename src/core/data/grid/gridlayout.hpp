@@ -1119,7 +1119,7 @@ namespace core
             static_assert(std::is_empty_v<std::decay_t<Fn>>,
                           "evalOn*Box: fn must be captureless, pass state through args");
 
-            for_each_point(box, [&](auto const& point) { fn(point, args...); });
+            for_each_point(box, fn, args...);
         }
 
 

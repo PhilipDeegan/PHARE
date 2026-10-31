@@ -78,20 +78,57 @@ void for_each_span(Box<T, dim> const& box, auto&& fn)
 }
 
 
-/** Calls fn(point) for every point of `box`, in memory order.
+/** @brief An argument of for_each_point that is resolved span-wise: on_span(start) is called
+ * once at the start of each span, and fn receives at(point) instead of the argument itself
+ * (e.g. FieldBoxValueAccessor, which yields the field value at point without a full index
+ * computation per point).
+ */
+template<typename T, typename Point_t>
+concept SpanAccessor = requires(T& t, Point_t const& p) {
+    t.on_span(p);
+    t.at(p);
+};
+
+
+namespace detail
+{
+    template<typename Arg, typename Point_t>
+    void span_start_(Arg& arg, Point_t const& start)
+    {
+        if constexpr (SpanAccessor<Arg, Point_t>)
+            arg.on_span(start);
+    }
+
+    template<typename Arg, typename Point_t>
+    decltype(auto) span_value_(Arg& arg, Point_t const& point)
+    {
+        if constexpr (SpanAccessor<Arg, Point_t>)
+            return arg.at(point);
+        else
+            return (arg);
+    }
+} // namespace detail
+
+
+/** Calls fn(point, args...) for every point of `box`, in memory order.
  * `point` is only valid for the duration of the call.
+ * `args` are passed to every call as lvalues, never forwarded: fn runs once per
+ * point, so a by-value parameter could otherwise move from them on the first one.
+ * A SpanAccessor arg is passed as arg.at(point) instead, after arg.on_span(start) per span.
  */
 template<typename T, std::size_t dim>
-void for_each_point(Box<T, dim> const& box, auto&& fn)
+void for_each_point(Box<T, dim> const& box, auto&& fn, auto&&... args)
 {
     for_each_span(box, [&](auto const& start, std::uint32_t const size) {
+        (detail::span_start_(args, start), ...);
+
         auto point = start;
         // `<` and not `!=`: the compiler then knows the 32 bit index cannot wrap,
         // so array offsets stay affine in i and the loop can be vectorized
         for (T i = start[dim - 1], end = i + size; i < end; ++i)
         {
             point[dim - 1] = i;
-            fn(point);
+            fn(point, detail::span_value_(args, point)...);
         }
     });
 }
