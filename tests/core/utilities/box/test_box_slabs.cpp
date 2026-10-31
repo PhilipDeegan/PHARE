@@ -10,7 +10,11 @@
 #include "tests/core/data/gridlayout/test_gridlayout.hpp"
 
 #include "gtest/gtest.h"
+
+#include <vector>
 #include <cstdint>
+#include <algorithm>
+#include <type_traits>
 
 
 namespace PHARE::core
@@ -202,6 +206,69 @@ TEST(BoxSlabsTest, test_ill_formed_box_is_empty)
     EXPECT_EQ(count(Box<int, 3>{{0, 5, 0}, {9, 3, 9}}), 0);
     EXPECT_EQ(count(Box<int, 3>{{0, 0, 5}, {9, 9, 3}}), 0);
     EXPECT_EQ(count(Box<std::uint32_t, 3>{{0, 0, 5}, {9, 9, 3}}), 0);
+}
+
+
+// for_each_point_zip pairs each point of box0, in C order, with the point at the same offset
+//  in box1, for boxes of different point types (e.g. a GridLayout's AMR and local boxes)
+TEST(BoxSlabsTest, test_for_each_point_zip)
+{
+    auto const check = [](auto const& box0, auto const& box1) {
+        using Point0 = std::decay_t<decltype(box0.lower)>;
+        using Point1 = std::decay_t<decltype(box1.lower)>;
+        std::vector<Point0> points0;
+        std::vector<Point1> points1;
+
+        for_each_point_zip(box0, box1, [&](auto const& p0, auto const& p1) {
+            points0.emplace_back(p0);
+            points1.emplace_back(p1);
+        });
+
+        ASSERT_EQ(points0.size(), box0.size());
+        ASSERT_EQ(points1.size(), box1.size());
+
+        // strictly increasing in C order, so every point of box0 is visited once
+        auto const not_increasing
+            = [](auto const& a, auto const& b) { return !(a.toArray() < b.toArray()); };
+        EXPECT_EQ(std::adjacent_find(points0.begin(), points0.end(), not_increasing),
+                  points0.end());
+
+        for (std::size_t i = 0; i < points0.size(); ++i)
+            for (std::size_t d = 0; d < box0.dimension; ++d)
+                EXPECT_EQ(static_cast<long>(points0[i][d]) - static_cast<long>(box0.lower[d]),
+                          static_cast<long>(points1[i][d]) - static_cast<long>(box1.lower[d]));
+    };
+
+    check(Box<int, 1>{{5}, {9}}, Box<std::uint32_t, 1>{{2}, {6}});
+    check(Box<int, 2>{{5, -2}, {9, 1}}, Box<std::uint32_t, 2>{{2, 0}, {6, 3}});
+    check(Box<int, 3>{{5, -2, 0}, {7, 1, 2}}, Box<std::uint32_t, 3>{{2, 0, 1}, {4, 3, 3}});
+}
+
+
+// for_each_point_reverse visits exactly the points of for_each_point, last to first, including
+//  unsigned boxes starting at 0 (no underflow) and ill-formed boxes (nothing visited)
+TEST(BoxSlabsTest, test_for_each_point_reverse)
+{
+    auto const check = [](auto const& box) {
+        using Point_t = std::decay_t<decltype(box.lower)>;
+        std::vector<Point_t> forward, reverse;
+
+        for_each_point(box, [&](auto const& p) { forward.emplace_back(p); });
+        for_each_point_reverse(box, [&](auto const& p) { reverse.emplace_back(p); });
+
+        std::reverse(forward.begin(), forward.end());
+        EXPECT_EQ(forward, reverse);
+        return reverse.size();
+    };
+
+    EXPECT_EQ(check(Box<int, 1>{{-2}, {9}}), 12);
+    EXPECT_EQ(check(Box<int, 2>{{5, -2}, {9, 1}}), 5 * 4);
+    EXPECT_EQ(check(Box<int, 3>{{5, -2, 0}, {7, 1, 2}}), 3 * 4 * 3);
+    EXPECT_EQ(check(Box<std::uint32_t, 1>{{0}, {4}}), 5);
+    EXPECT_EQ(check(Box<std::uint32_t, 2>{{0, 0}, {3, 2}}), 4 * 3);
+    EXPECT_EQ(check(Box<std::uint32_t, 3>{{0, 0, 0}, {2, 3, 1}}), 3 * 4 * 2);
+    EXPECT_EQ(check(Box<int, 3>{{0, 5, 0}, {9, 3, 9}}), 0);
+    EXPECT_EQ(check(Box<std::uint32_t, 2>{{0, 5}, {9, 3}}), 0);
 }
 
 

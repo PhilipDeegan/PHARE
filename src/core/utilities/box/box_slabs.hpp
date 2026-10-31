@@ -267,17 +267,44 @@ void for_each_point(Box<T, dim> const& box, auto&& fn, auto&&... args)
 }
 
 
+/** @brief Like for_each_point, but visits the points of `box` in reverse C order, from
+ * upper to lower, e.g. for updates where each point reads the one after it.
+ *
+ * `point` is only valid for the duration of the call, `args` are passed as in for_each_point.
+ */
+template<typename T, std::size_t dim>
+void for_each_point_reverse(Box<T, dim> const& box, auto&& fn, auto&&... args)
+{
+    auto constexpr static last = dim - 1;
+    auto const slabs           = make_box_slabs(box);
+
+    // each loop compares, then steps back (postfix): the first index is visited and nothing
+    //  below it is used, so unsigned boxes starting at 0 do not underflow into a visit
+    for (auto slab = slabs.end(); slab-- > slabs.begin();)
+        for (auto span = (*slab).end(); span-- > (*slab).begin();)
+        {
+            auto const [start, size] = *span;
+            auto point               = start;
+            point[last] += size;
+            while (point[last]-- > start[last])
+                fn(point, args...);
+        }
+}
+
+
 /** @brief Like for_each_point, but walks two same-shaped boxes in step, calling
  * fn(point0, point1, args...) for each point of box0 and its counterpart in box1,
  * e.g. the AMR and local indices of the same cells.
  *
- * Both points are owned by their span's point_iterator: they are only valid for the
- * duration of the call.
+ * Both points are copies of their span's start advanced along the fastest-varying
+ * dimension, as in for_each_point: they are only valid for the duration of the call.
  */
 template<typename T0, typename T1, std::size_t dim>
 void for_each_point_zip(Box<T0, dim> const& box0, Box<T1, dim> const& box1, auto&& fn,
                         auto&&... args)
 {
+    auto constexpr static last = dim - 1;
+
     assert(box0.shape() == box1.shape());
     auto const slabs0 = make_box_slabs(box0);
     auto const slabs1 = make_box_slabs(box1);
@@ -285,16 +312,14 @@ void for_each_point_zip(Box<T0, dim> const& box0, Box<T1, dim> const& box1, auto
     auto slab1 = slabs1.begin();
     for (auto slab0 = slabs0.begin(); slab0 != slabs0.end(); ++slab0, ++slab1)
     {
-        auto spans1 = slab1.begin();
-        for (auto spans0 = slab0.begin(); spans0 != slab0.end(); ++spans0, ++spans1)
+        auto span1 = slab1.begin();
+        for (auto span0 = slab0.begin(); span0 != slab0.end(); ++span0, ++span1)
         {
-            auto const span1 = *spans1;
-            auto point1      = span1.begin();
-            for (auto const& point0 : *spans0)
-            {
-                fn(point0, *point1, args...);
-                ++point1;
-            }
+            auto const& [start0, size] = *span0;
+            auto point0                = start0;
+            auto point1                = std::get<0>(*span1);
+            for (std::uint32_t i = 0; i < size; ++i, ++point0[last], ++point1[last])
+                fn(point0, point1, args...);
         }
     }
 }
