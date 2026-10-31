@@ -57,6 +57,15 @@ struct OwnedVecField
 
     double first() const { return *grids[0].begin(); }
 
+    double sum() const
+    {
+        double s = 0;
+        for (auto const& grid : grids)
+            for (auto const& v : grid)
+                s += v;
+        return s;
+    }
+
     Model::VecField_t view;
     std::array<typename Model::Grid_t, 3> grids;
 
@@ -111,7 +120,30 @@ void faraday(benchmark::State& state)
     state.SetItemsProcessed(state.iterations() * updatedPoints<Layout>(n));
 }
 
-template<typename Param>
+// Ampere as before FieldBoxValueAccessor: J indexed per point rather than span-wise
+template<typename Layout>
+struct AmperePerPoint
+{
+    template<typename VecField>
+    void operator()(VecField const& B, VecField& J) const
+    {
+        auto const amount = ConstArray<std::uint32_t, Layout::dimension>(1);
+        auto const curlB  = curl(layout, B);
+
+        auto constexpr JEq
+            = [](auto const& ijk, auto& Jc, auto const& curlBc) { Jc(ijk) = curlBc(ijk); };
+
+        layout.evalOnShrinkedGhostBox(J(Component::X), amount, JEq, J(Component::X), curlB.x);
+        layout.evalOnShrinkedGhostBox(J(Component::Y), amount, JEq, J(Component::Y), curlB.y);
+        layout.evalOnShrinkedGhostBox(J(Component::Z), amount, JEq, J(Component::Z), curlB.z);
+    }
+
+    Layout const& layout;
+};
+
+enum class AmpereImpl { per_point, spans };
+
+template<typename Param, AmpereImpl impl>
 void ampere(benchmark::State& state)
 {
     using Model  = Param::Model;
@@ -124,11 +156,31 @@ void ampere(benchmark::State& state)
     OwnedVecField<Model> B{layout, Qty::Vector::B, 0.1};
     OwnedVecField<Model> J{layout, Qty::Vector::J, 0.2};
 
-    Ampere<Layout> op{layout};
+    AmperePerPoint<Layout> const per_point{layout};
+    Ampere<Layout> spans{layout};
+
+    auto const run = [&](auto& Jv) {
+        if constexpr (impl == AmpereImpl::per_point)
+            per_point(B.view, Jv);
+        else
+            spans(B.view, Jv);
+    };
+
+    { // regression: both implementations must produce the same J, bit for bit
+        OwnedVecField<Model> Jref{layout, Qty::Vector::J, 0.2};
+        per_point(B.view, Jref.view);
+        run(J.view);
+        if (J.sum() != Jref.sum())
+        {
+            state.SkipWithError("ampere: sum(J) differs from the per point implementation");
+            return;
+        }
+        state.counters["sum_J"] = J.sum();
+    }
 
     for (auto _ : state)
     {
-        op(B.view, J.view);
+        run(J.view);
         benchmark::DoNotOptimize(J.first());
         benchmark::ClobberMemory();
     }
@@ -141,8 +193,27 @@ void ampere(benchmark::State& state)
     BENCHMARK_TEMPLATE(name, Hybrid<2>)->Name(#name "/hybrid2d")->Arg(256)->Arg(1024);             \
     BENCHMARK_TEMPLATE(name, MHD<2>)->Name(#name "/mhd2d")->Arg(256)->Arg(1024)
 
+#define PHARE_AMPERE_CASES(dim, nA, nB)                                                            \
+    BENCHMARK_TEMPLATE(ampere, Hybrid<dim>, AmpereImpl::per_point)                                 \
+        ->Name("ampere/hybrid" #dim "d/per_point")                                                 \
+        ->Arg(nA)                                                                                  \
+        ->Arg(nB);                                                                                 \
+    BENCHMARK_TEMPLATE(ampere, Hybrid<dim>, AmpereImpl::spans)                                     \
+        ->Name("ampere/hybrid" #dim "d/spans")                                                     \
+        ->Arg(nA)                                                                                  \
+        ->Arg(nB);                                                                                 \
+    BENCHMARK_TEMPLATE(ampere, MHD<dim>, AmpereImpl::per_point)                                    \
+        ->Name("ampere/mhd" #dim "d/per_point")                                                    \
+        ->Arg(nA)                                                                                  \
+        ->Arg(nB);                                                                                 \
+    BENCHMARK_TEMPLATE(ampere, MHD<dim>, AmpereImpl::spans)                                        \
+        ->Name("ampere/mhd" #dim "d/spans")                                                        \
+        ->Arg(nA)                                                                                  \
+        ->Arg(nB)
+
 PHARE_DIFF_OPS_CASES(faraday);
-PHARE_DIFF_OPS_CASES(ampere);
+PHARE_AMPERE_CASES(3, 32, 128);
+PHARE_AMPERE_CASES(2, 256, 1024);
 
 } // namespace PHARE::core::bench
 
