@@ -1,19 +1,20 @@
 #ifndef PHARE_SOLVER_MHD_HPP
 #define PHARE_SOLVER_MHD_HPP
 
+#include "core/def.hpp"
+#include "core/errors.hpp"
+#include "core/logger.hpp"
+#include "core/utilities/algorithm.hpp"
+#include "core/models/quantities/mhd_quantities.hpp"
+#include "core/numerics/godunov_fluxes/godunov_utils.hpp"
+#include "core/numerics/stable_dt/stable_dt.hpp"
+#include "core/utilities/index/index.hpp"
 
+#include "amr/solvers/solver.hpp"
 #include "amr/messengers/messenger.hpp"
 #include "amr/messengers/mhd_messenger_info.hpp"
 #include "amr/physical_models/physical_model.hpp"
-#include "amr/solvers/solver.hpp"
 #include "amr/solvers/time_integrator/euler_using_computed_flux.hpp"
-
-#include "core/errors.hpp"
-#include "core/logger.hpp"
-#include "core/models/quantities/mhd_quantities.hpp"
-#include "core/numerics/godunov_fluxes/godunov_utils.hpp"
-#include "core/numerics/riemann_solvers/mhd_speeds.hpp"
-#include "core/utilities/index/index.hpp"
 
 #include "initializer/data_provider.hpp"
 
@@ -398,6 +399,14 @@ double SolverMHD<MHDModel, AMR_Types, TimeIntegratorStrategy>::computeStableDt(
 
     double dt = std::numeric_limits<double>::max();
 
+    // on one patch, or one tile of it - tiles are traversed sequentially, so reducing into dt is
+    //  safe; min is order independent and tile overlaps don't matter
+    auto const waveDt = [&](auto const& layout, auto const& rho, auto const& rhoV, auto const& B,
+                            auto const& Etot) {
+        dt = std::min(
+            dt, wave / core::max_inv_mhd_wave_dt(layout, gamma_, isHall_, rho, rhoV, B, Etot));
+    };
+
     for (auto& patch : level)
     {
         auto const& layout = amr::layoutFromPatch<GridLayout>(*patch);
@@ -414,45 +423,12 @@ double SolverMHD<MHDModel, AMR_Types, TimeIntegratorStrategy>::computeStableDt(
             dt = std::min(dt, diffusive / (2.0 * eta_ * invdx2));
         }
 
-        auto const& rhoVx = rhoV(core::Component::X);
-        auto const& rhoVy = rhoV(core::Component::Y);
-        auto const& rhoVz = rhoV(core::Component::Z);
-        auto const& Bx    = B(core::Component::X);
-        auto const& By    = B(core::Component::Y);
-        auto const& Bz    = B(core::Component::Z);
-
         // wave cfl constraint
-        layout.evalOnBox(rho, [&](auto&... args) mutable {
-            core::MeshIndex<dimension> const index{args...};
-
-            auto const r  = rho(index);
-            auto const vx = rhoVx(index) / r;
-            auto const vy = rhoVy(index) / r;
-            auto const vz = rhoVz(index) / r;
-
-            auto const bx = GridLayout::template project<Scalar::Bx, Scalar::rho>(Bx, index);
-            auto const by = GridLayout::template project<Scalar::By, Scalar::rho>(By, index);
-            auto const bz = GridLayout::template project<Scalar::Bz, Scalar::rho>(Bz, index);
-
-            auto const P     = core::eosEtotToP(gamma_, r, vx, vy, vz, bx, by, bz, Etot(index));
-            auto const BdotB = bx * bx + by * by + bz * bz;
-
-            std::array<double, 3> const v{vx, vy, vz};
-            std::array<double, 3> const b{bx, by, bz};
-
-            // sum_d (|v_d| + c_fast_d + c_whistler_d) / dx_d over simulated directions
-            double invDtWave = 0;
-            for (std::size_t d = 0; d < dimension; ++d)
-            {
-                auto const cfast = core::compute_fast_magnetosonic_(gamma_, r, b[d], BdotB, P);
-                // Hall whistler
-                auto const cw = isHall_ ? std::numbers::pi
-                                              * core::compute_whistler_(1.0 / meshSize[d], r, BdotB)
-                                        : 0.0;
-                invDtWave += (std::abs(v[d]) + cfast + cw) / meshSize[d];
-            }
-            dt = std::min(dt, wave / invDtWave);
-        });
+        using field_type = std::decay_t<decltype(rho)>;
+        if constexpr (core::is_field_tile_set_v<field_type>)
+            core::tile_exec_with_layout(waveDt, rho, rhoV, B, Etot);
+        else
+            waveDt(layout, rho, rhoV, B, Etot);
     }
 
     return dt;
@@ -466,23 +442,26 @@ void SolverMHD<MHDModel, AMR_Types, TimeIntegratorStrategy>::mhdNaNCheck_(MHDMod
     auto& rm  = model.resourcesManager;
     auto& rho = model.state.rho;
 
-    auto check_nans = [&](auto const& field, auto const& origin,
-                          core::MeshIndex<MHDModel::dimension> const& index) {
-        if (std::isnan(field(index)))
-        {
-            std::stringstream ss;
-            ss << "NaN detected in MHD field at index " << index << " on patch of origin " << origin
-               << " on level " << level.getLevelNumber() << " at time " << time;
-            core::DictionaryException ex{"cause", ss.str()};
-            throw ex;
-        }
+    // no neighbor access here, so this can be a flat per-cell loop rather than box iteration
+    auto check_nans = [&](auto const& origin) {
+        core::operate_on_fields(
+            [&](auto const& v) {
+                if (std::isnan(v))
+                {
+                    std::stringstream ss;
+                    ss << "NaN detected in MHD field on patch of origin " << origin << " on level "
+                       << level.getLevelNumber() << " at time " << time;
+                    core::DictionaryException ex{"cause", ss.str()};
+                    throw ex;
+                }
+            },
+            rho);
     };
 
     for (auto const& patch : rm->enumerate(level, rho))
     {
         auto layout = amr::layoutFromPatch<GridLayout>(*patch);
-        layout.evalOnGhostBox(
-            rho, [&](auto const&... args) { check_nans(rho, layout.origin(), {args...}); });
+        check_nans(layout.origin());
     }
 }
 

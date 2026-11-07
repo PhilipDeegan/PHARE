@@ -36,7 +36,7 @@ namespace PHARE::core
  * A box with lower > upper in any direction (e.g. an empty intersection) has no spans.
  */
 template<typename T, std::size_t dim>
-void for_each_span(Box<T, dim> const& box, auto&& fn)
+void for_each_span(Box<T, dim> const& box, auto&& fn) _PHARE_ALL_FN_
 {
     static_assert(dim >= 1 and dim <= 3);
 
@@ -70,11 +70,11 @@ void for_each_span(Box<T, dim> const& box, auto&& fn)
  * The start points are only valid for the duration of the call.
  */
 template<typename T0, typename T1, std::size_t dim>
-void for_each_span(Box<T0, dim> const& a, Box<T1, dim> const& b, auto&& fn)
+void for_each_span(Box<T0, dim> const& a, Box<T1, dim> const& b, auto&& fn) _PHARE_ALL_FN_
 {
     assert(a.shape() == b.shape()); // b is only read through its lower corner
 
-    for_each_span(a, [&](auto const& a_start, auto const size) {
+    for_each_span(a, [&] _PHARE_ALL_FN_(auto const& a_start, auto const size) {
         Point<T1, dim> b_start = b.lower;
         for (std::size_t d = 0; d < dim; ++d)
             b_start[d] += static_cast<T1>(a_start[d] - a.lower[d]);
@@ -87,9 +87,9 @@ void for_each_span(Box<T0, dim> const& a, Box<T1, dim> const& b, auto&& fn)
  * `point` is only valid for the duration of the call.
  */
 template<typename T, std::size_t dim>
-void for_each_point(Box<T, dim> const& box, auto&& fn)
+void for_each_point(Box<T, dim> const& box, auto&& fn) _PHARE_ALL_FN_
 {
-    for_each_span(box, [&](auto const& start, std::uint32_t const size) {
+    for_each_span(box, [&] _PHARE_ALL_FN_(auto const& start, std::uint32_t const size) {
         auto point = start;
         // `<` and not `!=`: the compiler then knows the 32 bit index cannot wrap,
         // so array offsets stay affine in i and the loop can be vectorized
@@ -107,7 +107,7 @@ void for_each_point(Box<T, dim> const& box, auto&& fn)
  * `point` is only valid for the duration of the call.
  */
 template<typename T, std::size_t dim>
-void for_each_point_reverse(Box<T, dim> const& box, auto&& fn)
+void for_each_point_reverse(Box<T, dim> const& box, auto&& fn) _PHARE_ALL_FN_
 {
     static_assert(dim >= 1 and dim <= 3);
 
@@ -118,7 +118,7 @@ void for_each_point_reverse(Box<T, dim> const& box, auto&& fn)
     // each loop checks, then steps back: no index is stepped below its lower bound, so an
     // unsigned box starting at 0 does not wrap, and an ill-formed direction (end <= lo)
     // runs zero times
-    auto const span = [&]() {
+    auto const span = [&]() _PHARE_ALL_FN_ {
         for (T i = end[dim - 1]; i > lo[dim - 1];)
         {
             point[dim - 1] = --i;
@@ -149,24 +149,56 @@ void for_each_point_reverse(Box<T, dim> const& box, auto&& fn)
 }
 
 
+/** The i-th point of `box` in memory order (last direction fastest), i in [0, box.size()).
+ * For kernels where each thread handles one cell of a box.
+ */
+template<typename T, std::size_t dim>
+NO_DISCARD auto point_at(Box<T, dim> const& box, std::size_t const i) _PHARE_ALL_FN_
+{
+    static_assert(dim >= 1 and dim <= 3);
+
+    auto const& lo = box.lower;
+    auto const& up = box.upper;
+
+    if constexpr (dim == 1)
+        return Point<T, 1>{static_cast<T>(lo[0] + i)};
+
+    if constexpr (dim == 2)
+    {
+        std::size_t const ny = up[1] - lo[1] + 1;
+        return Point<T, 2>{static_cast<T>(lo[0] + i / ny), static_cast<T>(lo[1] + i % ny)};
+    }
+
+    if constexpr (dim == 3)
+    {
+        std::size_t const ny = up[1] - lo[1] + 1;
+        std::size_t const nz = up[2] - lo[2] + 1;
+        return Point<T, 3>{static_cast<T>(lo[0] + i / (ny * nz)),
+                           static_cast<T>(lo[1] + (i / nz) % ny), static_cast<T>(lo[2] + i % nz)};
+    }
+}
+
+
 /** Calls fn(a_point, b_point) for every point of `a` and its counterpart in the
  * same-shaped box `b` (e.g. the AMR and local indices of the same cells), in memory order.
  * Both points are only valid for the duration of the call.
  */
 template<typename T, typename U, std::size_t dim>
-void for_each_point_zip(Box<T, dim> const& a, Box<U, dim> const& b, auto&& fn)
+void for_each_point_zip(Box<T, dim> const& a, Box<U, dim> const& b, auto&& fn) _PHARE_ALL_FN_
 {
-    for_each_span(a, b, [&](auto const& a_start, auto const& b_start, std::uint32_t const size) {
-        auto a_point = a_start;
-        auto b_point = b_start;
-        U j          = b_start[dim - 1];
-        for (T i = a_start[dim - 1], end = i + size; i < end; ++i, ++j)
-        {
-            a_point[dim - 1] = i;
-            b_point[dim - 1] = j;
-            fn(a_point, b_point);
-        }
-    });
+    for_each_span(
+        a, b,
+        [&] _PHARE_ALL_FN_(auto const& a_start, auto const& b_start, std::uint32_t const size) {
+            auto a_point = a_start;
+            auto b_point = b_start;
+            U j          = b_start[dim - 1];
+            for (T i = a_start[dim - 1], end = i + size; i < end; ++i, ++j)
+            {
+                a_point[dim - 1] = i;
+                b_point[dim - 1] = j;
+                fn(a_point, b_point);
+            }
+        });
 }
 
 

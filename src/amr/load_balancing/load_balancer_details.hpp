@@ -6,6 +6,9 @@
 
 #include "initializer/data_provider.hpp"
 
+#include <string>
+#include <cstddef>
+
 namespace PHARE::amr
 {
 struct LoadBalancerDetailsDefaults
