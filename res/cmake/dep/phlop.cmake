@@ -2,9 +2,9 @@
 if (withPhlop)
 
   # pinned by commit: the python package (pyproject.toml "timing") must read what these headers write
-  # temporary: PhilipDeegan/phlop next (#64-#76)
+  # temporary: PhilipDeegan/phlop next (#64-#76 + scope_compare runs x ranks)
   if(NOT DEFINED PHARE_PHLOP_VERSION)
-    SET(PHARE_PHLOP_VERSION "00686209c66464692652bb933fc4d2d144fc9300")
+    SET(PHARE_PHLOP_VERSION "3e0a580e299565b77face24ea66637d63e97da61")
   endif()
 
   set(PHLOP_SRCDIR ${CMAKE_CURRENT_SOURCE_DIR}/subprojects/phlop)
