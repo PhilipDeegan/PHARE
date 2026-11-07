@@ -7,7 +7,7 @@
 #include "core/utilities/algorithm.hpp"
 #include "core/models/quantities/mhd_quantities.hpp"
 #include "core/numerics/godunov_fluxes/godunov_utils.hpp"
-#include "core/numerics/riemann_solvers/mhd_speeds.hpp"
+#include "core/numerics/stable_dt/stable_dt.hpp"
 #include "core/utilities/index/index.hpp"
 
 #include "amr/solvers/solver.hpp"
@@ -403,46 +403,8 @@ double SolverMHD<MHDModel, AMR_Types, TimeIntegratorStrategy>::computeStableDt(
     //  safe; min is order independent and tile overlaps don't matter
     auto const waveDt = [&](auto const& layout, auto const& rho, auto const& rhoV, auto const& B,
                             auto const& Etot) {
-        auto const meshSize = layout.meshSize();
-
-        auto const& rhoVx = rhoV(core::Component::X);
-        auto const& rhoVy = rhoV(core::Component::Y);
-        auto const& rhoVz = rhoV(core::Component::Z);
-        auto const& Bx    = B(core::Component::X);
-        auto const& By    = B(core::Component::Y);
-        auto const& Bz    = B(core::Component::Z);
-
-        layout.evalOnBox(rho, [&](auto&... args) mutable {
-            core::MeshIndex<dimension> const index{args...};
-
-            auto const r  = rho(index);
-            auto const vx = rhoVx(index) / r;
-            auto const vy = rhoVy(index) / r;
-            auto const vz = rhoVz(index) / r;
-
-            auto const bx = GridLayout::template project<Scalar::Bx, Scalar::rho>(Bx, index);
-            auto const by = GridLayout::template project<Scalar::By, Scalar::rho>(By, index);
-            auto const bz = GridLayout::template project<Scalar::Bz, Scalar::rho>(Bz, index);
-
-            auto const P     = core::eosEtotToP(gamma_, r, vx, vy, vz, bx, by, bz, Etot(index));
-            auto const BdotB = bx * bx + by * by + bz * bz;
-
-            std::array<double, 3> const v{vx, vy, vz};
-            std::array<double, 3> const b{bx, by, bz};
-
-            // sum_d (|v_d| + c_fast_d + c_whistler_d) / dx_d over simulated directions
-            double invDtWave = 0;
-            for (std::size_t d = 0; d < dimension; ++d)
-            {
-                auto const cfast = core::compute_fast_magnetosonic_(gamma_, r, b[d], BdotB, P);
-                // Hall whistler
-                auto const cw = isHall_ ? std::numbers::pi
-                                              * core::compute_whistler_(1.0 / meshSize[d], r, BdotB)
-                                        : 0.0;
-                invDtWave += (std::abs(v[d]) + cfast + cw) / meshSize[d];
-            }
-            dt = std::min(dt, wave / invDtWave);
-        });
+        dt = std::min(
+            dt, wave / core::max_inv_mhd_wave_dt(layout, gamma_, isHall_, rho, rhoV, B, Etot));
     };
 
     for (auto& patch : level)

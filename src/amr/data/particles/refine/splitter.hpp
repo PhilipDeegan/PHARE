@@ -63,7 +63,7 @@ public:
 
     template<typename FineiCellDelta, typename ParticleIt, typename Particles>
     inline void operator()(FineiCellDelta const& fine, ParticleIt const& coarseParticle,
-                           Particles& refinedParticles, size_t idx = 0) const
+                           Particles& refinedParticles, size_t idx = 0) const _PHARE_ALL_FN_
     {
         dispatch(fine, coarseParticle, refinedParticles, idx);
     }
@@ -87,9 +87,7 @@ public:
 private:
     template<typename FineiCellDelta, typename ParticleIt, typename Particles>
     void dispatch(FineiCellDelta const& fine, ParticleIt const& particle, //
-                  Particles& particles, std::size_t idx) const
-
-
+                  Particles& particles, std::size_t idx) const _PHARE_ALL_FN_
     {
         using Weight_t = std::decay_t<decltype(particle.weight())>;
         using Delta_t  = std::decay_t<decltype(particle.delta()[0])>;

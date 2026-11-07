@@ -94,7 +94,7 @@ struct Box
     }
 
 
-    NO_DISCARD auto unsafe_intersection(Box const& other) const // no optional on gpu
+    NO_DISCARD auto unsafe_intersection(Box const& other) const _PHARE_ALL_FN_ // no optional on gpu
     {
         Box intersection{other};
         for (auto idim = 0u; idim < dim; ++idim)
@@ -108,7 +108,7 @@ struct Box
 
 
     template<typename Modifier>
-    auto& grow(Modifier const& size)
+    auto& grow(Modifier const& size) _PHARE_ALL_FN_
     {
         lower -= size;
         upper += size;
@@ -116,7 +116,7 @@ struct Box
     }
 
     template<typename Modifier>
-    auto& shrink(Modifier const& size)
+    auto& shrink(Modifier const& size) _PHARE_ALL_FN_
     {
         lower += size;
         upper -= size;
@@ -124,8 +124,8 @@ struct Box
     }
 
 
-    NO_DISCARD auto shape() const { return upper - lower + 1; }
-    NO_DISCARD std::size_t size() const { return core::product(shape()); }
+    NO_DISCARD auto shape() const _PHARE_ALL_FN_ { return upper - lower + 1; }
+    NO_DISCARD std::size_t size() const _PHARE_ALL_FN_ { return core::product(shape()); }
 
 
 
@@ -157,14 +157,15 @@ Box(Point<T, s> lower, Point<T, s> upper) -> Box<T, s>;
 
 
 template<typename Particle>
-NO_DISCARD auto isIn(Particle const& particle, Box<int, Particle::dimension> const& box)
+NO_DISCARD auto _PHARE_ALL_FN_ isIn(Particle const& particle,
+                                    Box<int, Particle::dimension> const& box)
     -> decltype(isIn(particle.iCell(), box), bool())
 {
     return isIn(particle.iCell(), box);
 }
 
 template<template<typename, std::size_t> typename Point, typename Type, std::size_t SIZE>
-NO_DISCARD bool isIn(Point<Type, SIZE> const& point, Box<Type, SIZE> const& box)
+NO_DISCARD bool isIn(Point<Type, SIZE> const& point, Box<Type, SIZE> const& box) _PHARE_ALL_FN_
 {
     for (std::size_t iDim = 0; iDim < SIZE; ++iDim)
         if (point[iDim] < box.lower[iDim] || point[iDim] > box.upper[iDim])
@@ -178,7 +179,7 @@ NO_DISCARD bool isIn(Point<Type, SIZE> const& point, Box<Type, SIZE> const& box)
  * Returns occurs at the first box the point is in.
  */
 template<Spannable Boxes>
-NO_DISCARD bool isIn(auto const& point, Boxes const& boxes)
+NO_DISCARD bool _PHARE_ALL_FN_ isIn(auto const& point, Boxes const& boxes)
 {
     for (auto const& box : boxes)
         if (isIn(point, box))
@@ -189,7 +190,7 @@ NO_DISCARD bool isIn(auto const& point, Boxes const& boxes)
 
 
 template<typename Type, std::size_t dim, typename OType>
-Box<Type, dim> grow(Box<Type, dim> const& box, std::array<Type, dim> const& by)
+Box<Type, dim> grow(Box<Type, dim> const& box, std::array<Type, dim> const& by) _PHARE_ALL_FN_
 {
     auto copy{box};
     copy.grow(by);
@@ -198,7 +199,7 @@ Box<Type, dim> grow(Box<Type, dim> const& box, std::array<Type, dim> const& by)
 
 
 template<typename Type, std::size_t dim, typename OType>
-Box<Type, dim> grow(Box<Type, dim> const& box, OType const& size)
+Box<Type, dim> grow(Box<Type, dim> const& box, OType const& size) _PHARE_ALL_FN_
 {
     auto copy{box};
     copy.grow(size);
@@ -206,7 +207,7 @@ Box<Type, dim> grow(Box<Type, dim> const& box, OType const& size)
 }
 
 template<typename Type, std::size_t dim, typename T2>
-NO_DISCARD Box<Type, dim> shrink(Box<Type, dim> const& box, T2 const& size)
+NO_DISCARD Box<Type, dim> shrink(Box<Type, dim> const& box, T2 const& size) _PHARE_ALL_FN_
 {
     auto copy{box};
     copy.shrink(size);
@@ -481,7 +482,7 @@ auto box_from_zero_to_upper(Point_t<Type, SIZE> const& upper)
 }
 
 template<template<typename, std::size_t> typename Point_t, typename Type, std::size_t SIZE>
-auto box_from_zero_to_upper_minus_one(Point_t<Type, SIZE> const& upper)
+auto box_from_zero_to_upper_minus_one(Point_t<Type, SIZE> const& upper) _PHARE_ALL_FN_
 {
     return core::Box<std::uint32_t, SIZE>{
         core::Point<std::uint32_t, SIZE>{core::ConstArray<std::uint32_t, SIZE>()},
@@ -490,13 +491,13 @@ auto box_from_zero_to_upper_minus_one(Point_t<Type, SIZE> const& upper)
 }
 
 template<std::size_t SIZE>
-NO_DISCARD auto as_unsigned(Box<int, SIZE> const& box)
+NO_DISCARD auto as_unsigned(Box<int, SIZE> const& box) _PHARE_ALL_FN_
 {
     return Box<std::uint32_t, SIZE>{box.lower.as_unsigned(), box.upper.as_unsigned()};
 }
 
 template<template<typename, std::size_t> typename Point_t, typename Type, std::size_t SIZE>
-NO_DISCARD auto asBox(Point_t<Type, SIZE> const& point)
+NO_DISCARD auto asBox(Point_t<Type, SIZE> const& point) _PHARE_ALL_FN_
 {
     return Box<Type, SIZE>{point, point};
 }

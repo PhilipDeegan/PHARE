@@ -125,20 +125,26 @@ public:
     // ------------------------------------------------------------------------
 public:
     NO_DISCARD constexpr static std::array<QtyCentering, dim>
-    centering(HybridQuantity::Scalar const qty)
+    centering(HybridQuantity::Scalar const qty) _PHARE_ALL_FN_
     {
         auto const idx = static_cast<std::size_t>(qty);
         if (idx >= scalarCentering_.size())
-            throw std::runtime_error("Wrong hybridQuantity");
+        {
+            throw_runtime_error("Wrong hybridQuantity");
+            return scalarCentering_[0]; // unreachable on host, no exceptions on device
+        }
         return scalarCentering_[idx];
     }
 
     NO_DISCARD constexpr static std::array<std::array<QtyCentering, dim>, 3>
-    centering(HybridQuantity::Vector const qty)
+    centering(HybridQuantity::Vector const qty) _PHARE_ALL_FN_
     {
         auto const idx = static_cast<std::size_t>(qty);
         if (idx >= vectorCentering_.size())
-            throw std::runtime_error("Wrong hybridQuantity");
+        {
+            throw_runtime_error("Wrong hybridQuantity");
+            return vectorCentering_[0]; // unreachable on host, no exceptions on device
+        }
         return vectorCentering_[idx];
     }
 };

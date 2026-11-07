@@ -206,7 +206,7 @@ public:
     {
         auto& startIndex_                 = primal_startIndex_;
         auto& weights_                    = primal_weights_;
-        auto const& [xFlux, yFlux, zFlux] = flux();
+        auto& [xFlux, yFlux, zFlux]       = flux();
 
         for (auto currPart = particleRange.begin(); currPart != particleRange.end(); ++currPart)
         {

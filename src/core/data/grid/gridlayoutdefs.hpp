@@ -16,11 +16,9 @@ namespace PHARE
 {
 namespace core
 {
-    enum class Direction { X, Y, Z };
-
+    enum class Direction : std::uint8_t { X = 0, Y, Z };
     enum class Side { Lower = -1, Upper = 1 };
-
-    enum class QtyCentering : std::uint16_t { primal = 0, dual = 1 };
+    enum class QtyCentering : std::uint8_t { primal = 0, dual = 1 };
 
 
     template<std::size_t dim>
@@ -55,7 +53,7 @@ namespace core
 
     template<auto src, auto dst, std::size_t order = 2, typename Field>
     NO_DISCARD inline auto project(Field const& field,
-                                   Point<std::size_t, Field::dimension> const& index)
+                                   Point<std::size_t, Field::dimension> const& index) _PHARE_ALL_FN_
     {
         constexpr auto stencil = recenteringStencil<src, dst, order>();
 

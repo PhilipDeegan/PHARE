@@ -1,6 +1,7 @@
 #ifndef PHARE_FARADAY_HPP
 #define PHARE_FARADAY_HPP
 
+#include "core/def.hpp"
 #include "core/data/grid/gridlayoutdefs.hpp"
 #include "core/data/vecfield/vecfield_component.hpp"
 #include "core/numerics/differential_operators.hpp"
@@ -18,7 +19,7 @@ public:
     }
 
     template<typename VecField>
-    void operator()(VecField const& B, VecField const& E, VecField& Bnew, double dt)
+    void operator()(VecField const& B, VecField const& E, VecField& Bnew, double dt) _PHARE_ALL_FN_
     {
         dt_ = dt;
         // can't use structured bindings because
@@ -33,15 +34,18 @@ public:
 
         auto const curlE = curl(layout_, E);
 
-        layout_.evalOnBox(Bxnew, [&](auto const&... ijk) {
-            Bxnew(ijk...) = Bx(ijk...) - dt_ * curlE.x({ijk...});
-        });
-        layout_.evalOnBox(Bynew, [&](auto const&... ijk) {
-            Bynew(ijk...) = By(ijk...) - dt_ * curlE.y({ijk...});
-        });
-        layout_.evalOnBox(Bznew, [&](auto const&... ijk) {
-            Bznew(ijk...) = Bz(ijk...) - dt_ * curlE.z({ijk...});
-        });
+        // captureless kernel: fields travel as arguments so the lambda is device-copyable
+        auto const eval = [&](auto& Bc_new, auto const& Bc, auto const& curlEc) {
+            layout_.evalOnBox(
+                Bc_new,
+                [] _PHARE_ALL_FN_(auto const& ijk, auto& Bn, auto const& Bo, auto const& curlc,
+                                  auto const dt) { Bn(ijk) = Bo(ijk) - dt * curlc({ijk}); },
+                Bc_new, Bc, curlEc, dt_);
+        };
+
+        eval(Bxnew, Bx, curlE.x);
+        eval(Bynew, By, curlE.y);
+        eval(Bznew, Bz, curlE.z);
     }
 
 private:

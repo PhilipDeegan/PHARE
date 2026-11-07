@@ -5,13 +5,14 @@
 #include "core/models/quantities/hybrid_quantities.hpp"
 #include "core/numerics/ohm/ohm.hpp"
 #include "core/utilities/algorithm.hpp"
+#include "core/utilities/box/box_spans.hpp"
 #include "mpi/mpi_utils.hpp"
 #include "core/data/vecfield/vecfield.hpp"
 #include "core/data/electrons/electrons.hpp"
 #include "core/data/electromag/electromag.hpp"
 #include "core/data/tensorfield/tensorfield.hpp"
 #include "core/numerics/ion_updater/ion_updater.hpp"
-#include "core/numerics/riemann_solvers/mhd_speeds.hpp"
+#include "core/numerics/stable_dt/stable_dt.hpp"
 #include "core/data/particles/particle_array_def.hpp"
 #include "core/numerics/ion_updater/ion_updater_def.hpp"
 
@@ -372,30 +373,7 @@ double SolverPPC<HybridModel, AMR_Types>::computeStableDt(IPhysicalModel_t& mode
     // on one patch, or one tile of it - tiles are traversed sequentially, so reducing into dt is
     //  safe; min is order independent and tile overlaps don't matter
     auto const whistlerDt = [&](auto const& layout, auto const& n, auto const& B) {
-        auto const meshSize = layout.meshSize();
-
-        auto const& Bx = B(core::Component::X);
-        auto const& By = B(core::Component::Y);
-        auto const& Bz = B(core::Component::Z);
-
-        layout.evalOnBox(n, [&](auto&... args) mutable {
-            core::MeshIndex<dimension> const index{args...};
-
-            auto const rho = n(index);
-            auto const bx  = GridLayout::template project<Scalar::Bx, Scalar::rho>(Bx, index);
-            auto const by  = GridLayout::template project<Scalar::By, Scalar::rho>(By, index);
-            auto const bz  = GridLayout::template project<Scalar::Bz, Scalar::rho>(Bz, index);
-
-            auto const BdotB = bx * bx + by * by + bz * bz;
-
-            double invDtWhistler = 0;
-            for (std::size_t d = 0; d < dimension; ++d)
-                invDtWhistler += std::numbers::pi
-                                 * core::compute_whistler_(1.0 / meshSize[d], rho, BdotB)
-                                 / meshSize[d];
-
-            dt = std::min(dt, wave / invDtWhistler);
-        });
+        dt = std::min(dt, wave / core::max_inv_whistler_dt(layout, n, B));
     };
 
     auto& rm = *hybridModel.resourcesManager;

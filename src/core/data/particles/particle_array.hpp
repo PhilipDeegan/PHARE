@@ -1,16 +1,24 @@
 #ifndef PHARE_CORE_DATA_PARTICLES_PARTICLE_ARRAY_HPP
 #define PHARE_CORE_DATA_PARTICLES_PARTICLE_ARRAY_HPP
 
+#include "core/def.hpp"
 #include "core/data/particles/particle.hpp"
 #include "core/data/particles/particle_array_def.hpp"
 #include "core/data/particles/particle_array_detail.hpp"
+// #include "core/data/particles/particle_array_sorter.hpp"
+// #include "core/data/particles/particle_array_selector.hpp"
+// #include "core/data/particles/particle_array_partitioner.hpp"
 
+#include "core/utilities/span.hpp"
 #include "core/utilities/box/box.hpp"
+#include "core/utilities/box/box_spans.hpp"
 #include "core/utilities/equality.hpp"
+#include "core/utilities/monitoring.hpp"
 
 #include <utility>
 #include <sstream>
 #include <stdexcept>
+#include <type_traits>
 
 namespace PHARE::core
 {
@@ -32,25 +40,31 @@ public:
     auto static constexpr layout_mode  = opts.layout_mode;
     auto static constexpr storage_mode = opts.storage_mode;
     auto static constexpr type_id      = internals::type_id;
+    // auto static constexpr is_mapped    = internals::is_mapped; // torm
+    auto static inline mon = MemoryMonitor{std::string{type_id}};
 
     std::string static id() { return std::string{type_id}; }
 
     ParticleArray(ParticleArray&& that)
         : Super{std::forward<Super>(that)}
     {
+        mon.move();
     }
     ParticleArray(ParticleArray const& that)
         : Super{that}
     {
+        mon.copy();
     }
 
     ParticleArray& operator=(ParticleArray&& that)
     {
+        mon.move_assign();
         super() = std::move(that.super());
         return *this;
     }
     ParticleArray& operator=(ParticleArray const& that)
     {
+        mon.copy_assign();
         super() = that.super();
         return *this;
     }
@@ -58,9 +72,12 @@ public:
     template<typename... Args>
     ParticleArray(Args&&... args)
         requires(self_excluding_constructible<This, Super, Args...>())
-        : Super{std::forward<Args>(args)...}
+    _PHARE_ALL_FN_ : Super{std::forward<Args>(args)...}
     {
+        mon.create();
     }
+
+
 
     auto view() { return view_t{*this}; }
     auto view() const { return view_t{*this}; }
@@ -109,7 +126,7 @@ public:
             static_assert(dependent_false_v<This>, "iteration not supported for this layout");
     }
 
-    Super& super() { return *this; }
+    Super& super() _PHARE_ALL_FN_ { return *this; }
     Super const& super() const { return *this; }
 
     template<auto _opts>
@@ -123,15 +140,19 @@ using AoSParticleArray = ParticleArray<ParticleArrayOptions{dim, LayoutMode::AoS
 template<std::size_t dim>
 using AoSMappedParticleArray = ParticleArray<ParticleArrayOptions{dim, LayoutMode::AoSMapped}>;
 
-// internal only - see LayoutMode::SoA
 template<std::size_t dim>
 using SoAParticleArray = ParticleArray<ParticleArrayOptions{dim, LayoutMode::SoA}>;
+
 
 template<auto opts>
 std::ostream& operator<<(std::ostream& out, ParticleArray<opts> const& arr)
 {
-    for (auto const& p : arr)
-        out << p.copy();
+    if constexpr (ParticleArray<opts>::layout_mode == LayoutMode::SoAPC)
+    {
+    }
+    else
+        for (auto const& p : arr)
+            out << p.copy();
     return out;
 }
 
@@ -210,7 +231,171 @@ EqualityReport operator==(ParticleArray<o> const& p0, std::vector<Particle<o>> c
 template<typename ParticleArray_t>
 auto constexpr base_layout_type()
 {
-    return LayoutMode::AoS;
+    using enum LayoutMode;
+    auto constexpr layout_mode = ParticleArray_t::layout_mode;
+    if constexpr (any_in(layout_mode, AoS, AoSMapped, AoSPC, AoSTS, AoSCMTS, AoSPCTS))
+        return AoS;
+    return SoA;
+}
+
+
+
+template<auto o>
+void check_particles(ParticleArray<o> const& particles, [[maybe_unused]] bool const print = false)
+{
+    using enum LayoutMode;
+
+    PHARE_DEBUG_DO({
+        if constexpr (is_tiled(o.layout_mode))
+            particles.check();
+    })
+}
+
+
+template<auto o>
+void check_particles_views(ParticleArray<o>& particles, [[maybe_unused]] bool const print = false)
+{
+    using enum LayoutMode;
+
+    PHARE_DEBUG_DO({ check_particles(*particles); })
+}
+
+template<auto o>
+void particle_array_domain_is_valid(ParticleArray<o> const& particles, auto const& domain_box)
+{
+    std::size_t in_domain_box = 0, not_in_domain_box = 0;
+
+    if constexpr (o.layout_mode == LayoutMode::AoSPCTS)
+    {
+        for (auto const& tile : particles())
+        {
+            auto const& pc = tile();
+
+            // every particle bucketed anywhere in this tile's ghost box (domain +
+            // halo) must actually sit inside the tile itself, and must be filed
+            // under the same cell its own iCell() maps to
+            for_each_point(pc.ghost_box(), [&](auto const& bix) {
+                auto const local           = pc.local_cell(bix);
+                auto const& cell_particles = pc(local);
+                for (std::size_t i = 0; i < cell_particles.size(); ++i)
+                {
+                    auto const& p = cell_particles[i];
+                    if (not isIn(p, tile))
+                    {
+                        std::ostringstream oss;
+                        oss << "particle_array_domain is not valid: particle outside tile"
+                            << " storage_mode=" << static_cast<int>(o.storage_mode)
+                            << " tile_box=" << tile << " bix=" << Point{bix}
+                            << " local=" << Point{local} << " iCell=" << Point{p.iCell()};
+                        throw std::runtime_error(oss.str());
+                    }
+                    if (not array_equals(pc.local_cell(p.iCell()), local))
+                    {
+                        std::ostringstream oss;
+                        oss << "particle_array_domain is not valid: particle iCell does not "
+                               "match its per-cell bucket"
+                            << " storage_mode=" << static_cast<int>(o.storage_mode)
+                            << " tile_box=" << tile << " bix=" << Point{bix}
+                            << " local=" << Point{local} << " iCell=" << Point{p.iCell()};
+                        throw std::runtime_error(oss.str());
+                    }
+                }
+            });
+        }
+    }
+    else if constexpr (is_tiled(o.layout_mode))
+    {
+        for (auto const& tile : particles())
+            for (auto const& p : tile())
+                if (not isIn(p, tile))
+                    throw std::runtime_error("particle_array_domain is not valid");
+    }
+
+    per_particle(particles, [&](auto const& p) {
+        if (isIn(p, domain_box))
+            ++in_domain_box;
+        else
+            ++not_in_domain_box;
+    });
+
+    if (not(not_in_domain_box == 0 and in_domain_box == particles.size()))
+        throw std::runtime_error("Invalid particles");
+
+    // recurse once into the SPAN view so both storage sides are checked
+    // SPAN views are non-const (AoSSpan holds Span<Particle_t>), this check only reads
+    if constexpr (o.storage_mode == StorageMode::VECTOR)
+        particle_array_domain_is_valid(*const_cast<ParticleArray<o>&>(particles), domain_box);
+}
+
+template<auto o>
+void particle_array_ghost_is_valid(ParticleArray<o> const& particles, auto const& domain_box,
+                                   auto const& ghost_box)
+{
+    std::size_t in_ghost_layer = 0, not_in_ghost_layer = 0, outside_gb = 0;
+
+    per_particle(particles, [&](auto const& p) {
+        auto const ingb = isIn(p, ghost_box);
+        auto const indb = isIn(p, domain_box);
+
+        if (!ingb)
+            ++outside_gb;
+        else if (ingb and not indb)
+            ++in_ghost_layer;
+        else
+            ++not_in_ghost_layer;
+    });
+
+    if constexpr (o.layout_mode == LayoutMode::AoSPCTS)
+    {
+        for (auto const& tile : particles())
+        {
+            auto const& pc = tile();
+
+            // every particle bucketed anywhere in this tile's ghost box (domain +
+            // halo) must actually sit in the halo, i.e. outside the patch's own
+            // domain box, and must be filed under the same cell its own iCell() maps to
+            for_each_point(pc.ghost_box(), [&](auto const& bix) {
+                auto const local           = pc.local_cell(bix);
+                auto const& cell_particles = pc(local);
+                for (std::size_t i = 0; i < cell_particles.size(); ++i)
+                {
+                    auto const& p = cell_particles[i];
+                    if (isIn(p, domain_box))
+                    {
+                        std::ostringstream oss;
+                        oss << "particle_array_ghost is not valid: particle inside domain box"
+                            << " storage_mode=" << static_cast<int>(o.storage_mode)
+                            << " tile_box=" << tile << " bix=" << Point{bix}
+                            << " local=" << Point{local} << " iCell=" << Point{p.iCell()};
+                        throw std::runtime_error(oss.str());
+                    }
+                    if (not array_equals(pc.local_cell(p.iCell()), local))
+                    {
+                        std::ostringstream oss;
+                        oss << "particle_array_ghost is not valid: particle iCell does not "
+                               "match its per-cell bucket"
+                            << " storage_mode=" << static_cast<int>(o.storage_mode)
+                            << " tile_box=" << tile << " bix=" << Point{bix}
+                            << " local=" << Point{local} << " iCell=" << Point{p.iCell()};
+                        throw std::runtime_error(oss.str());
+                    }
+                }
+            });
+        }
+    }
+    else if constexpr (is_tiled(o.layout_mode))
+    {
+        for (std::size_t tidx = 0; tidx < particles().size(); ++tidx)
+        {
+            auto const& tile = particles()[tidx];
+            for (std::size_t i = 0; i < tile().size(); ++i)
+                if (isIn(tile()[i], domain_box))
+                    throw std::runtime_error("particle_array_ghost is not valid");
+        }
+    }
+
+    if (not(outside_gb == 0 and not_in_ghost_layer == 0 and in_ghost_layer == particles.size()))
+        throw std::runtime_error("Invalid particles");
 }
 
 

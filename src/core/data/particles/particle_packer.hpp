@@ -60,6 +60,82 @@ struct PackerBackend<LayoutMode::SoA, ParticleArray_>
 };
 
 template<typename ParticleArray_>
+struct PackerBackend<LayoutMode::AoSPCTS, ParticleArray_>
+{
+    // adjacent tiles duplicate cells in their private ghost halos, so LevelGhost
+    // counts/packs only the clamp-owner's copy (TileSet::tag_cells_) to match
+    // AoSMapped. Domain has no such duplication
+    template<ParticleType ptype>
+    NO_DISCARD static std::size_t size(ParticleArray_ const& particles)
+    {
+        if constexpr (ptype != ParticleType::LevelGhost)
+            return particles.size();
+        else
+        {
+            std::size_t n = 0;
+            visit<ptype>(particles, [&](auto const& pc, auto const& amr) {
+                n += pc(pc.local_cell(amr)).size();
+            });
+            return n;
+        }
+    }
+
+    template<ParticleType ptype, typename SoAParticles_t>
+    static void pack(ParticleArray_ const& particles, SoAParticles_t& copy)
+    {
+        std::size_t idx = 0;
+        visit<ptype>(particles, [&](auto const& pc, auto const& amr) {
+            for (auto const& particle : pc(pc.local_cell(amr)))
+                pack_one(copy, idx++, particle);
+        });
+        if constexpr (ptype != ParticleType::LevelGhost)
+            assert(idx == particles.size());
+    }
+
+private:
+    // visits each owned cell of every tile (tile's own per-cell bucket + AMR cell),
+    // reusing Tile::on_reachable_cells; LevelGhost skips non-clamp-owned cells
+    template<ParticleType ptype, typename Fn>
+    static void visit(ParticleArray_ const& particles, Fn&& fn)
+    {
+        auto const& tile_set = particles();
+        for (auto const& tile : tile_set)
+        {
+            auto const& pc = tile();
+            tile.template on_reachable_cells<ptype>([&](auto const& amr) {
+                if constexpr (ptype == ParticleType::LevelGhost)
+                    if (tile_set.at(amr) != &tile)
+                        return;
+                fn(pc, amr);
+            });
+        }
+    }
+};
+
+// tiled layouts whose tiles hold a flat particle array
+template<LayoutMode layout_mode, typename ParticleArray_>
+    requires(any_in(layout_mode, LayoutMode::AoSTS, LayoutMode::AoSCMTS, LayoutMode::SoATS,
+                    LayoutMode::SoAVXTS))
+struct PackerBackend<layout_mode, ParticleArray_>
+{
+    template<ParticleType>
+    NO_DISCARD static std::size_t size(ParticleArray_ const& particles)
+    {
+        return particles.size();
+    }
+
+    template<ParticleType, typename SoAParticles_t>
+    static void pack(ParticleArray_ const& particles, SoAParticles_t& copy)
+    {
+        std::size_t idx = 0;
+        for (auto const& tile : particles())
+            for (std::size_t i = 0; i < tile().size(); ++i)
+                pack_one(copy, idx++, tile()[i]);
+    }
+};
+
+
+template<typename ParticleArray_>
 struct PackerBackend<LayoutMode::AoSCMTS, ParticleArray_>
 {
     // one flat cell-mapped array per tile; level ghosts live only in their clamp-owner tile

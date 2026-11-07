@@ -104,10 +104,27 @@ def _check_model_layouts(lib):
     assert supported_model_layouts() == cpp_layouts, (
         f"layout mismatch: {supported_model_layouts()} != {cpp_layouts}"
     )
+    cpp_gpu_layouts = [str(l).split(".")[-1] for l in lib.supported_gpu_layouts()]
+    assert supported_gpu_model_layouts() == cpp_gpu_layouts, (
+        f"gpu layout mismatch: {supported_gpu_model_layouts()} != {cpp_gpu_layouts}"
+    )
 
 
 def build_config():
     return cpp_etc_lib().phare_build_config()
+
+
+def compile_options():
+    """what the C++ build was compiled with, e.g. {"gpu": True, ...}"""
+    return cpp_etc_lib().compile_options()
+
+
+def with_gpu():
+    """True if the build targets GPU hardware (e.g. -DwithGPU=ON), False without a build"""
+    try:
+        return compile_options()["gpu"]
+    except ImportError:
+        return False
 
 
 def build_config_as_json():
@@ -178,6 +195,14 @@ def supported_model_layouts():
     from pyphare.pharein.simulation import valid_model_layouts
 
     return list(valid_model_layouts)
+
+
+def supported_gpu_model_layouts():
+    """python copy of the C++ list of layouts usable with allocator="GPU_UNIFIED"
+    checked against C++ on first load of cpp_etc"""
+    from pyphare.pharein.simulation import valid_gpu_model_layouts
+
+    return list(valid_gpu_model_layouts)
 
 
 def supported_mhd_model_layouts():

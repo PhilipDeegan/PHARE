@@ -11,8 +11,10 @@
 #include <algorithm>
 #include <type_traits>
 
+
 namespace PHARE::core
 {
+
 
 template<size_t dim>
 struct Particle
@@ -20,14 +22,15 @@ struct Particle
     static_assert(dim > 0 and dim < 4, "Only dimensions 1,2,3 are supported.");
     static auto constexpr dimension = dim;
 
-    constexpr Particle() {}
+    constexpr Particle() _PHARE_ALL_FN_ {}
     Particle(Particle const&)            = default;
     Particle(Particle&&)                 = default;
     Particle& operator=(Particle const&) = default;
     Particle& operator=(Particle&&)      = default;
 
     Particle(double const& a_weight, std::array<int, dim> const& cell,
-             std::array<double, dim> const& a_delta, std::array<double, 3> const& a_v) //
+             std::array<double, dim> const& a_delta,
+             std::array<double, 3> const& a_v) _PHARE_ALL_FN_ //
         : weight_{a_weight}
         , iCell_{cell}
         , delta_{a_delta}
@@ -35,14 +38,16 @@ struct Particle
     {
     }
 
+
     template<typename Particle_t>
-    Particle(Particle_t const& p) //
+    Particle(Particle_t const& p) _PHARE_ALL_FN_ //
         : weight_{p.weight()}
         , iCell_{p.iCell()}
         , delta_{p.delta()}
         , v_{p.v()}
     {
     }
+
 
     //                                                             1d  2d  3d
     double weight_                 = 0;                         // 8   8   8
@@ -58,20 +63,21 @@ struct Particle
                (this->v_ == that.v_);
     }
 
-    auto& weight() { return weight_; }
-    auto& weight() const { return weight_; }
+    auto& weight() _PHARE_ALL_FN_ { return weight_; }
+    auto& weight() const _PHARE_ALL_FN_ { return weight_; }
 
-    auto& iCell() { return iCell_; }
-    auto& iCell() const { return iCell_; }
+    auto& iCell() _PHARE_ALL_FN_ { return iCell_; }
+    auto& iCell() const _PHARE_ALL_FN_ { return iCell_; }
 
-    auto& delta() { return delta_; }
-    auto& delta() const { return delta_; }
+    auto& delta() _PHARE_ALL_FN_ { return delta_; }
+    auto& delta() const _PHARE_ALL_FN_ { return delta_; }
 
-    auto& v() { return v_; }
-    auto& v() const { return v_; }
+    auto& v() _PHARE_ALL_FN_ { return v_; }
+    auto& v() const _PHARE_ALL_FN_ { return v_; }
 
     template<std::size_t dimension>
     friend std::ostream& operator<<(std::ostream& out, Particle<dimension> const& particle);
+
 
     auto copy() const { return *this; }
 };
@@ -97,17 +103,18 @@ struct ParticleDeltaDistribution
 
 
 template<typename T, std::size_t dim>
-NO_DISCARD auto cellAsPoint(std::array<T, dim> const& iCell)
+NO_DISCARD auto cellAsPoint(std::array<T, dim> const& iCell) _PHARE_ALL_FN_
 {
     return Point<int, dim>{iCell};
 }
 
 
 template<typename Particle>
-NO_DISCARD auto cellAsPoint(Particle const& particle)
+NO_DISCARD auto cellAsPoint(Particle const& particle) _PHARE_ALL_FN_
 {
     return cellAsPoint(particle.iCell());
 }
+
 
 
 template<std::size_t dim>
@@ -118,8 +125,8 @@ struct ParticlePosition
     std::array<int, dim> _iCell;
     std::array<double, dim> _delta;
 
-    auto& iCell() const { return _iCell; }
-    auto& delta() const { return _delta; }
+    auto& iCell() const _PHARE_ALL_FN_ { return _iCell; }
+    auto& delta() const _PHARE_ALL_FN_ { return _delta; }
 };
 
 
@@ -156,6 +163,7 @@ std::ostream& operator<<(std::ostream& out, Particle<dim> const& particle)
 }
 
 
+
 template<std::size_t dim>
 struct ParticleView
 {
@@ -173,7 +181,7 @@ template<typename Box_t, typename RValue = std::size_t>
 struct CellFlattener
 {
     template<typename Icell>
-    NO_DISCARD RValue operator()(Icell const& icell) const
+    NO_DISCARD RValue operator()(Icell const& icell) const _PHARE_ALL_FN_
     {
         if constexpr (Box_t::dimension == 2)
             return icell[1] + icell[0] * shape[1];
@@ -204,7 +212,6 @@ operator==(ParticleA<dim> const& particleA, ParticleB<dim> const& particleB)
            particleA.delta == particleB.delta and   //
            particleA.v == particleB.v;
 }
-
 
 auto shift_particle(auto particle, auto const& shift)
 {

@@ -11,13 +11,19 @@ super: clang_cuda
 #   lnk.flags: -lcudart # -rdynamic # -fuse-ld=gold -Wl,-z,defs
 
 
-# env: |
-#   MKN_GPU_BX_THREADS=512
+# as base.yaml, clang_cuda does not inherit it
+find:
+  hdf5:
+    inc:
+      /usr/include/hdf5/openmpi
+      /usr/include/openmpi-x86_64
+    lib:
+      /usr/lib64/openmpi/lib
+      /usr/lib/x86_64-linux-gnu/hdf5/openmpi
 
 env: |
   OMPI_CXX=clang++
   PATH=/opt/mpi/cuda/bin:${PATH}
-  MKN_GPU_BX_THREADS=256
 
 # inc: /usr/local/cuda-13.2/targets/x86_64-linux/include/cccl
 # path: /usr/local/cuda/targets/x86_64-linux/lib

@@ -198,20 +198,26 @@ public:
     // ------------------------------------------------------------------------
 public:
     NO_DISCARD constexpr static std::array<QtyCentering, dim>
-    centering(MHDQuantity::Scalar const qty)
+    centering(MHDQuantity::Scalar const qty) _PHARE_ALL_FN_
     {
         auto const idx = static_cast<std::size_t>(qty);
         if (idx >= scalarCentering_.size())
-            throw std::runtime_error("Wrong MHDQuantity");
+        {
+            throw_runtime_error("Wrong MHDQuantity");
+            return scalarCentering_[0]; // unreachable on host, no exceptions on device
+        }
         return scalarCentering_[idx];
     }
 
     NO_DISCARD constexpr static std::array<std::array<QtyCentering, dim>, 3>
-    centering(MHDQuantity::Vector const qty)
+    centering(MHDQuantity::Vector const qty) _PHARE_ALL_FN_
     {
         auto const idx = static_cast<std::size_t>(qty);
         if (idx >= vectorCentering_.size())
-            throw std::runtime_error("Wrong MHDQuantity");
+        {
+            throw_runtime_error("Wrong MHDQuantity");
+            return vectorCentering_[0]; // unreachable on host, no exceptions on device
+        }
         return vectorCentering_[idx];
     }
 };

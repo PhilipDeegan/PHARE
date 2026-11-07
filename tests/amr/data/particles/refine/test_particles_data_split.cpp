@@ -1,8 +1,10 @@
 
 #include "core/utilities/box/box.hpp"
+#include "core/utilities/box/box_spans.hpp"
 #include "core/utilities/types.hpp"
-
+#include "core/utilities/monitoring.hpp"
 #include "core/data/particles/particle_array_def.hpp"
+#include "core/data/particles/particle_packer.hpp"
 
 #include "amr/data/particles/particles_data.hpp"
 #include "amr/data/particles/refine/particles_data_split.hpp"
@@ -260,6 +262,12 @@ using ParticlesDatas = testing::Types< //
    ,TestParam<1, LayoutMode::AoSCMTS, AllocatorMode::CPU>
    ,TestParam<3, LayoutMode::AoSCMTS, AllocatorMode::CPU>
 
+PHARE_WITH_GPU(
+   ,TestParam<1, LayoutMode::AoSTS, AllocatorMode::GPU_UNIFIED>
+   ,TestParam<2, LayoutMode::AoSTS, AllocatorMode::GPU_UNIFIED>
+   ,TestParam<3, LayoutMode::AoSTS, AllocatorMode::GPU_UNIFIED>
+)
+
 >;
 // clang-format on
 
@@ -300,6 +308,8 @@ TYPED_TEST(ParticlesDataTest, splitWorksForDomain)
         EXPECT_NE(p.v()[2], 0);
     });
 
+    PHARE::core::MemoryMonitoring::MOVE().print();
+
     // for (auto const& bix : dst.layout.AMRBox())
     // {
     //     EXPECT_TRUE(sum_from(dst.data->domainParticles,
@@ -325,12 +335,21 @@ TYPED_TEST(ParticlesDataTest, splitWorksForLevelGhost)
     std::size_t const expected = (ghost_box.size() - L1domainBox.size()) * ppc
                                  * nb_split_parts(TestFixture::ParticleArray_t::dimension)
                                  / (1u << TestFixture::ParticleArray_t::dimension);
-    EXPECT_EQ(expected, dst.data->levelGhostParticles.size());
+    // AoSPCTS duplicates level ghosts in overlapping tile halos: count only the clamp-owned
+    // copies (as packing does), which is what matches the unique count other layouts store
+    using ParticleArray_t = TestFixture::ParticleArray_t;
+    EXPECT_EQ(expected, ParticlePacker<ParticleArray_t>::template size<ParticleType::LevelGhost>(
+                            dst.data->levelGhostParticles));
 
     // reserves are expected to closely track the final size, not grossly over-allocate
+    // (for AoSPCTS total_size includes the halo duplicates)
     auto const [total_size, total_capacity]
         = total_size_and_capacity(dst.data->levelGhostParticles);
-    EXPECT_EQ(expected, total_size);
+    EXPECT_EQ(dst.data->levelGhostParticles.size(), total_size);
+    if constexpr (ParticleArray_t::layout_mode != LayoutMode::AoSPCTS)
+    {
+        EXPECT_EQ(expected, total_size);
+    }
     EXPECT_LE(total_capacity, static_cast<std::size_t>(total_size * 2.0));
 
     dst.data->levelGhostParticles.check();
@@ -340,6 +359,28 @@ TYPED_TEST(ParticlesDataTest, splitWorksForLevelGhost)
         EXPECT_NE(p.v()[1], 0);
         EXPECT_NE(p.v()[2], 0);
     });
+
+    if constexpr (TestFixture::ParticleArray_t::layout_mode == LayoutMode::AoSPCTS)
+    {
+        for (auto const& tile : dst.data->levelGhostParticles())
+        {
+            auto const& pc = tile();
+            for_each_point(pc.ghost_box(), [&](auto const& bix) {
+                auto const local = pc.local_cell(bix);
+                for (auto const& p : pc(local))
+                {
+                    EXPECT_TRUE(array_equals(pc.local_cell(p.iCell()), local))
+                        << "levelGhost particle in wrong cell bucket: iCell=" << Point{p.iCell()}
+                        << " bucket=" << Point{local} << " tile="
+                        << static_cast<
+                               core::Box<int, TestFixture::ParticleArray_t::dimension> const&>(
+                               tile);
+                }
+            });
+        }
+    }
+
+    PHARE::core::MemoryMonitoring::MOVE().print();
 }
 
 
@@ -351,5 +392,6 @@ int main(int argc, char** argv)
     PHARE::test::amr::SamraiLifeCycle samsam{argc, argv};
     ::testing::InitGoogleTest(&argc, argv);
     auto const r = RUN_ALL_TESTS();
+    PHARE::core::MemoryMonitoring::PRINT();
     return r;
 }

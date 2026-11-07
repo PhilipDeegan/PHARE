@@ -269,13 +269,13 @@ auto clamp_owner_particles(Particles const& particles)
             if (isIn(p.iCell(), particles.ghost_box()) and tiles.at(Point{p.iCell()}) == &tile)
                 out.push_back(p);
         };
-        if constexpr (Particles::layout_mode == LayoutMode::AoSCMTS)
-            for (auto const& p : tile())
-                take(p);
-        else
+        if constexpr (Particles::layout_mode == LayoutMode::AoSPCTS) // per-cell buckets
             for (auto const& cps : tile()())
                 for (auto const& p : cps)
                     take(p);
+        else // flat tiles (AoSCMTS, AoSTS)
+            for (auto const& p : tile())
+                take(p);
     }
     return out;
 }
