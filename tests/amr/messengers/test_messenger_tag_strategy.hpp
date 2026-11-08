@@ -9,8 +9,7 @@
 #include "amr/messengers/hybrid_messenger.hpp"
 #include "amr/physical_models/hybrid_model.hpp"
 #include "amr/resources_manager/amr_utils.hpp"
-#include "amr/solvers/solver_ppc.hpp"
-#include "amr/solvers/solver_ppc_steps.hpp"
+#include "amr/solvers/solver.hpp"
 
 #include <SAMRAI/mesh/StandardTagAndInitStrategy.h>
 
@@ -43,12 +42,12 @@ class TagStrategy : public SAMRAI::mesh::StandardTagAndInitStrategy
 {
 private:
     std::shared_ptr<HybridModel> model_;
-    std::shared_ptr<SolverPPC<HybridModel, SAMRAI_Types>> solver_;
+    std::shared_ptr<ISolver<SAMRAI_Types>> solver_;
     std::shared_ptr<HybridMessenger<HybridModel>> messenger_;
 
 public:
     explicit TagStrategy(std::shared_ptr<HybridModel> model,
-                         std::shared_ptr<SolverPPC<HybridModel, SAMRAI_Types>> solver,
+                         std::shared_ptr<ISolver<SAMRAI_Types>> solver,
                          std::shared_ptr<HybridMessenger<HybridModel>> messenger)
         : model_{std::move(model)}
         , solver_{std::move(solver)}

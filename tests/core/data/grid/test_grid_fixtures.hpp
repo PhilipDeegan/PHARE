@@ -78,8 +78,7 @@ template<typename GridLayout_t, auto opts>
 void zero_ghost_layer(basic::Field<opts>& f, GridLayout_t const& layout)
 {
     for (auto const& ghost : layout.ghostBoxFor(f).remove(layout.domainBoxFor(f)))
-        for (auto const& bix : ghost)
-            f(bix) = 0;
+        for_each_point(ghost, [&](auto const& bix) { f(bix) = 0; });
 }
 
 template<typename GridLayout_t, typename Grid_t, typename Field_t>

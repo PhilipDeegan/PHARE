@@ -221,7 +221,8 @@ void MaxwellianParticleInitializer<ParticleArray_t, GridLayout>::loadParticles(
 
         auto const incoming_estimate = (surface_cell_count_(layout.AMRBox())
                                         * (nbrParticlePerCell_ * over_alloc_factor_));
-        particles.reserve(expected_size + incoming_estimate);
+        if constexpr (requires { particles.reserve(expected_size); }) // not per cell (AoSPCTS)
+            particles.reserve(expected_size + incoming_estimate);
     }
 
     for (std::size_t flatCellIdx = 0; flatCellIdx < ndCellIndices.size(); ++flatCellIdx)

@@ -44,7 +44,7 @@ namespace PHARE::amr
 {
 
 template<typename Iterator>
-NO_DISCARD auto toFineGrid(Iterator iterator)
+NO_DISCARD auto toFineGrid(Iterator const& iterator) _PHARE_ALL_FN_
 {
     constexpr auto dim   = Iterator::dimension;
     constexpr auto ratio = PHARE::amr::refinementRatio;
@@ -61,6 +61,52 @@ NO_DISCARD auto toFineGrid(Iterator iterator)
 
     return finer;
 }
+
+// what a Splitter writes the children of one particle into on the device
+template<typename Particle_t>
+struct DeviceSplitBuffer
+{
+    static constexpr auto layout_mode = core::LayoutMode::AoS;
+
+    auto size() const _PHARE_ALL_FN_ { return n; }
+    auto begin() _PHARE_ALL_FN_ { return ptr; }
+
+    Particle_t* ptr;
+    std::size_t n;
+};
+
+// device_refining transformer: splits a coarse particle into kept (capacity max_children) and
+//  compacts there the children in dst_box (Ghost: also in the ghost box, not the domain)
+template<typename Splitter, core::ParticleType type, std::size_t dim>
+struct DeviceSplitTransformer
+{
+    static constexpr std::size_t max_children = Splitter::nbRefinedPart;
+
+    std::uint16_t operator()(auto const& particle, auto const& dst_box,
+                             auto* const kept) const _PHARE_ALL_FN_
+    {
+        using Particle_t = std::decay_t<decltype(*kept)>;
+        DeviceSplitBuffer<Particle_t> buffer{kept, max_children};
+        split(toFineGrid(particle), particle, buffer);
+
+        std::uint16_t n = 0;
+        for (std::size_t i = 0; i < max_children; ++i)
+        {
+            if (not isIn(kept[i], dst_box))
+                continue;
+            if constexpr (type != core::ParticleType::Domain)
+                if (not isIn(kept[i], ghostBox) or isIn(kept[i], domainBox))
+                    continue;
+            if (n != i)
+                kept[n] = kept[i];
+            ++n;
+        }
+        return n;
+    }
+
+    Splitter split;
+    core::Box<int, dim> domainBox, ghostBox;
+};
 
 
 
@@ -153,32 +199,7 @@ template<typename HybridTypes, ParticlesDataSplitType splitType, typename Splitt
 void ParticlesRefining<HybridTypes, splitType, Splitter>::forBoxes(
     SAMRAI::hier::BoxContainer const& boxes)
 {
-    using ArrayParticleArray = array_type_t;
-
     auto const domainBox = phare_box_from<dim>(destParticlesData.getBox());
-
-    auto const per_particle = [&](auto const& particle, auto const& dst_box) {
-        auto refined_info                 = std::tuple<std::uint16_t, ArrayParticleArray>{0, {}};
-        auto& [p_count, refinedParticles] = refined_info;
-        auto const particleRefinedPos     = toFineGrid(particle);
-        split(particleRefinedPos, particle, refinedParticles);
-        p_count
-            = core::ParticleArrayPartitioner<ArrayParticleArray>{refinedParticles}(dst_box).size();
-
-        if constexpr (ParticleType_v != ParticleType::Domain)
-        {
-            p_count
-                = core::ParticleArrayPartitioner<ArrayParticleArray>{refinedParticles, 0, p_count}(
-                      phare_box_from<dim>(destParticlesData.getGhostBox()))
-                      .size();
-            p_count
-                = core::ParticleArrayPartitioner<ArrayParticleArray>{refinedParticles, 0, p_count}
-                      .notIn(domainBox)
-                      .size();
-        }
-
-        return refined_info;
-    };
 
     if constexpr (ParticleType_v == ParticleType::Domain
                   and ParticleArray::layout_mode == core::LayoutMode::AoSMapped)
@@ -190,10 +211,54 @@ void ParticlesRefining<HybridTypes, splitType, Splitter>::forBoxes(
         destParticles.reserve(destParticles.size() + incoming_estimate * nbRefinedPart);
     }
 
-    auto const refiner = [&](auto const& particle) { return toFineGrid(particle); };
+    if constexpr (device_refining<ParticleArray>)
+    {
+        // by value, device callable, see device_refining
+        auto const refiner
+            = [] _PHARE_ALL_FN_(auto const& particle) { return toFineGrid(particle); };
+        DeviceSplitTransformer<Splitter, ParticleType_v, dim> const transformer{
+            split, domainBox, phare_box_from<dim>(destParticlesData.getGhostBox())};
 
-    export_refined_particles<hybrid_options, ParticleType_v>( //
-        srcParticlesData.domainParticles, destParticles, boxes, refiner, per_particle, domainBox);
+        export_refined_particles<hybrid_options, ParticleType_v>( //
+            srcParticlesData.domainParticles, destParticles, boxes, refiner, transformer,
+            domainBox);
+    }
+    else
+    {
+        using ArrayParticleArray = array_type_t; // local host buffer: CPU partitioner
+
+        auto const per_particle = [&](auto const& particle, auto const& dst_box) {
+            auto refined_info = std::tuple<std::uint16_t, ArrayParticleArray>{0, {}};
+            auto& [p_count, refinedParticles] = refined_info;
+            auto const particleRefinedPos     = toFineGrid(particle);
+            split(particleRefinedPos, particle, refinedParticles);
+            p_count = core::ParticleArrayPartitioner<AllocatorMode::CPU,
+                                                     ArrayParticleArray>{refinedParticles}(dst_box)
+                          .size();
+
+            if constexpr (ParticleType_v != ParticleType::Domain)
+            {
+                p_count = core::ParticleArrayPartitioner<AllocatorMode::CPU,
+                                                         ArrayParticleArray>{refinedParticles, 0,
+                                                                             p_count}(
+                              phare_box_from<dim>(destParticlesData.getGhostBox()))
+                              .size();
+                p_count = core::ParticleArrayPartitioner<AllocatorMode::CPU,
+                                                         ArrayParticleArray>{refinedParticles, 0,
+                                                                             p_count}
+                              .notIn(domainBox)
+                              .size();
+            }
+
+            return refined_info;
+        };
+
+        auto const refiner = [&](auto const& particle) { return toFineGrid(particle); };
+
+        export_refined_particles<hybrid_options, ParticleType_v>( //
+            srcParticlesData.domainParticles, destParticles, boxes, refiner, per_particle,
+            domainBox);
+    }
 
     destParticles.template on_appended<ParticleType_v>();
 }

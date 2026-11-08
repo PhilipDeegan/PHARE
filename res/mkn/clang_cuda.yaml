@@ -21,9 +21,7 @@ property:
 #   repo: git@github.com:mkn/
 #   mod-repo: git@github.com:mkn-mod/
 
-env: |
-  MKN_GPU_BX_THREADS=512
-
+# env: |
 #   OMPI_CXX=clang++-18
 #   PATH=/opt/mpi/cuda/bin:${PATH}
 

@@ -8,6 +8,15 @@ endif()
 
 file(STRINGS ${PHARE_PERMUTATIONS} THIS_FILE)
 
+# GPU permutations are opt-in: only read with -DwithGPU=ON, see res/cmake/gpu.cmake
+if(NOT PHARE_GPU_PERMUTATIONS)
+  set(PHARE_GPU_PERMUTATIONS "${PHARE_PROJECT_DIR}/res/sim/gpu.txt")
+endif()
+if(withGPU)
+  file(STRINGS ${PHARE_GPU_PERMUTATIONS} GPU_FILE)
+  list(APPEND THIS_FILE ${GPU_FILE})
+endif()
+
 # each cpp_<permutation> module is split over several translation units to bound compiler memory
 #  see src/simulator/simulator_decl.hpp
 set(PHARE_CPP_SIMULATOR_SOURCES
@@ -48,6 +57,12 @@ while(THIS_FILE)
         list(LENGTH LINE_LIST LINE_LENGTH)
     elseif(NOT LINE_LENGTH EQUAL 5 AND NOT LINE_LENGTH EQUAL 9)
         message(FATAL_ERROR "PHARE permutation line has unsupported arity (${LINE_LENGTH}): ${LINE}")
+    endif()
+
+    list(GET LINE_LIST 4 _ALLOCATOR)
+    if(NOT withGPU AND NOT "${_ALLOCATOR}" STREQUAL "CPU")
+        message(FATAL_ERROR "PHARE permutation ${LINE} needs -DwithGPU=ON,"
+                            " GPU lines belong in ${PHARE_GPU_PERMUTATIONS}")
     endif()
 
     SET(_OFFSET 3)

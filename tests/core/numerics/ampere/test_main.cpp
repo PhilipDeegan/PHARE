@@ -441,7 +441,7 @@ TEST_F(Ampere2DTest, grownPhysicalBoxIsExactOnQuadraticB)
                 field(ix, iy) = fn(x(field, ix, iy, Direction::X), x(field, ix, iy, Direction::Y));
     };
 
-    auto const& [Bx, By, Bz] = B();
+    auto& [Bx, By, Bz]       = B();
     auto const& [Jx, Jy, Jz] = J();
 
     fill(Bx, bx);

@@ -22,6 +22,8 @@
 #include "pybind11/complex.h"    // IWYU pragma: keep
 #include "pybind11/functional.h" // IWYU pragma: keep
 
+#include "python3/patch_data.hpp"
+
 #include <cstddef>
 
 namespace py = pybind11;
@@ -29,6 +31,55 @@ namespace py = pybind11;
 namespace PHARE::pydata
 {
 
+
+
+template<typename Type, std::size_t dimension>
+void declarePatchData(py::module& m, std::string const& key)
+{
+    using PatchDataType = PatchData<Type, dimension>;
+    py::class_<PatchDataType>(m, key.c_str(), py::module_local())
+        .def_readonly("patchID", &PatchDataType::patchID)
+        .def_readonly("origin", &PatchDataType::origin)
+        .def_readonly("lower", &PatchDataType::lower)
+        .def_readonly("upper", &PatchDataType::upper)
+        .def_readonly("nGhosts", &PatchDataType::nGhosts)
+        .def_readonly("data", &PatchDataType::data);
+}
+
+template<SimOpts opts>
+void declareParticles(py::module& m)
+{
+    using core_types    = core::PHARE_Types<opts>;
+    using ParticleArray = core_types::Hybrid::ParticleArray_t;
+    using Particle_t    = core::Particle<opts.dimension>;
+
+    py::class_<Particle_t, std::shared_ptr<Particle_t>>(m, "Particle", py::module_local())
+        .def_property_readonly("weight", [](Particle_t const& p) { return p.weight(); })
+        .def_property_readonly("iCell", [](Particle_t const& p) { return p.iCell(); })
+        .def_property_readonly("delta", [](Particle_t const& p) { return p.delta(); })
+        .def_property_readonly("v", [](Particle_t const& p) { return p.v(); });
+
+    auto pa = py::class_<ParticleArray, std::shared_ptr<ParticleArray>>(m, "ParticleArray",
+                                                                         py::module_local())
+                  .def("size", [](ParticleArray const& self) { return self.size(); })
+                  .def("__len__", [](ParticleArray const& self) { return self.size(); });
+
+    // flat layouts only (e.g. AoSMapped): tiled layouts' operator[] gives a tile, not a particle
+    if constexpr (requires(ParticleArray& a) {
+                      { a[std::size_t{0}] } -> std::same_as<Particle_t&>;
+                  })
+        pa.def(
+            "__getitem__",
+            [](ParticleArray& self, std::size_t const idx) -> auto& {
+                if (idx >= self.size()) // python iteration stops on IndexError
+                    throw py::index_error();
+                return self[idx];
+            },
+            py::return_value_policy::reference_internal);
+
+    declarePatchData<ParticleArray, opts.dimension>(m, "PatchDataParticleArray");
+    declarePatchData<ParticleArray*, opts.dimension>(m, "PatchDataParticleArrayPtr");
+}
 
 template<typename Simulator, typename PyClass>
 void declareSimulator(PyClass&& sim)
@@ -75,7 +126,11 @@ void inline declare_macro_sim(py::module& m)
     });
 
 
+    declarePatchData<py_array_t<double>, opts.dimension>(m, "PatchPyArrayDouble");
+
     declare_etc<opts>(m);
+    if constexpr (has_hybrid_v<opts>)
+        declareParticles<opts>(m);
 }
 
 

@@ -2,7 +2,6 @@
 #define PHARE_TEST_AMR_HIERARCHY_FIXTURES_HPP
 
 #include "phare_solver.hpp"
-#include "amr/solvers/solver_ppc_steps.hpp"
 #include "amr/messengers/hybrid_hybrid_messenger_strategy_borders.hpp"
 // #include "simulator/simulator_def.hpp"
 #include "amr/types/amr_types.hpp"
@@ -10,6 +9,7 @@
 #include "tests/initializer/init_functions.hpp"
 #include "tests/amr/messengers/test_integrator_strat.hpp"
 #include "tests/amr/messengers/test_messenger_tag_strategy.hpp"
+#include "tests/amr/test_resources_solver.hpp"
 
 
 template<uint8_t dim>
@@ -371,10 +371,11 @@ struct AfullHybridBasicHierarchy
 
     std::shared_ptr<HybridMessenger<HybridModelT>> messenger{
         std::make_shared<HybridMessenger<HybridModelT>>(
-            std::make_unique<HybridHybridT>(resourcesManagerHybrid, firstHybLevel))};
+            std::make_unique<HybridHybridT>(*hybridModel, firstHybLevel))};
 
-    std::shared_ptr<SolverPPC<HybridModelT, SAMRAI_Types>> solver{
-        std::make_shared<SolverPPC<HybridModelT, SAMRAI_Types>>(dict["simulation"]["algo"])};
+    // not SolverPPC: nothing here advances, see test_resources_solver.hpp
+    using Solver_t = PHARE::amr::test::ResourcesSolver<HybridModelT, SAMRAI_Types>;
+    std::shared_ptr<Solver_t> solver{std::make_shared<Solver_t>()};
 
     std::shared_ptr<TagStrategy<HybridModelT>> tagStrat;
     std::shared_ptr<TestIntegratorStrat> integrator;

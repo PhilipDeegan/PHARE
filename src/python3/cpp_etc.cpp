@@ -2,17 +2,14 @@
 
 #include "core/def.hpp"
 #include "core/def/phare_config.hpp" // IWYU pragma: keep
-#include "core/data/particles/particle_array.hpp"
-#include "core/numerics/ohm/ohm.hpp"
+#include "core/numerics/ohm/ohm.hpp" // HyperMode
 #include "core/boundary/boundary_defs.hpp"
-
 #include "core/models/options/mhd_options_def.hpp"
 
 #include "amr/samrai.hpp"             // SamraiLifeCycle without simulators
 #include "amr/wrappers/hierarchy.hpp" // for HierarchyRestarter::getRestartFileFullPath
 
 #include "python3/pybind_def.hpp"
-#include "python3/patch_data.hpp"
 
 #include "core/utilities/timestamps.hpp"
 
@@ -55,38 +52,31 @@ auto supported_layouts()
 {
     using enum core::LayoutMode;
     std::vector layouts{AoSMapped};
-    layouts.emplace_back(AoSCMTS);
+    layouts.emplace_back(AoSCMTS); // AoSPCTS is GPU only for now, see supported_gpu_layouts
     return layouts;
 }
 
-template<typename Type, std::size_t dimension>
-void declarePatchData(py::module& m, std::string key)
+// hybrid layouts with an AllocatorMode::GPU_UNIFIED implementation (AoSTS is GPU only), see
+//  res/sim/gpu.txt and pyphare's valid_gpu_model_layouts
+auto supported_gpu_layouts()
 {
-    using PatchDataType = PatchData<Type, dimension>;
-    py::class_<PatchDataType>(m, key.c_str())
-        .def_readonly("patchID", &PatchDataType::patchID)
-        .def_readonly("origin", &PatchDataType::origin)
-        .def_readonly("lower", &PatchDataType::lower)
-        .def_readonly("upper", &PatchDataType::upper)
-        .def_readonly("nGhosts", &PatchDataType::nGhosts)
-        .def_readonly("data", &PatchDataType::data);
+    using enum core::LayoutMode;
+    return std::vector{AoSTS, AoSPCTS};
 }
 
-template<std::size_t dim>
-void declareDim(py::module& m)
+// what this build was compiled with, "gpu": for GPU hardware (e.g. -DwithGPU=ON)
+auto compile_options()
 {
-    using CP         = core::SoAParticleArray<dim>;
-    std::string name = "ContiguousParticles_" + std::to_string(dim);
-    py::class_<CP, std::shared_ptr<CP>>(m, name.c_str())
-        .def(py::init<std::size_t>())
-        .def_readwrite("iCell", &CP::iCell_)
-        .def_readwrite("delta", &CP::delta_)
-        .def_readwrite("weight", &CP::weight_)
-        .def_readwrite("v", &CP::v_)
-        .def("size", &CP::size);
-
-    name = "PatchData" + name;
-    declarePatchData<CP, dim>(m, name.c_str());
+    return std::unordered_map<std::string, bool>{
+        {"gpu", PHARE_HAVE_GPU == 1},
+        {"mkn_gpu", CompileOptions::WithMknGpu},
+        {"mkn_gpu_hw", CompileOptions::WithMknGpuHW},
+        {"mkn_avx", CompileOptions::WithMknAVX},
+        {"umpire", CompileOptions::WithUmpire},
+        {"raja", CompileOptions::WithRAJA},
+        {"thrust", CompileOptions::WithThrust},
+        {"kokkos", CompileOptions::WithKokkos},
+    };
 }
 
 
@@ -121,7 +111,7 @@ PYBIND11_MODULE(cpp_etc, m, py::mod_gil_not_used())
         .def(py::init<>())
         .def("reset", &SamraiLifeCycle::reset);
 
-    py::class_<PHARE::amr::Hierarchy, std::shared_ptr<PHARE::amr::Hierarchy>>(m, "AMRHierarchy");
+    py::class_<PHARE::amr::Hierarchy, py::smart_holder>(m, "AMRHierarchy");
     m.def("make_hierarchy", []() { return PHARE::make_hierarchy(); });
 
     m.def("makePyArrayWrapper", makePyArrayWrapper<double>);
@@ -170,14 +160,18 @@ PYBIND11_MODULE(cpp_etc, m, py::mod_gil_not_used())
     py::native_enum<core::LayoutMode>(m, "LayoutMode", "enum.Enum")
         .value("AoSMapped", AoSMapped)
         .value("AoSCMTS", AoSCMTS)
+        .value("AoSPCTS", AoSPCTS)
         .value("AoS", AoS)     // MHD only builds, see pyphare's valid_mhd_model_layouts
         .value("AoSTS", AoSTS) // MHD only builds
         .finalize();
 
     m.def("supported_layouts", supported_layouts);
+    m.def("supported_gpu_layouts", supported_gpu_layouts);
+    m.def("compile_options", compile_options);
 
-    py::native_enum<core::AllocatorMode>(m, "AllocatorMode", "enum.Enum")
-        .value("CPU", core::AllocatorMode::CPU)
+    py::native_enum<AllocatorMode>(m, "AllocatorMode", "enum.Enum")
+        .value("CPU", AllocatorMode::CPU)
+        .value("GPU_UNIFIED", AllocatorMode::GPU_UNIFIED)
         .finalize();
 
     py::native_enum<MHDOpts::TimeIntegratorType>(m, "TimeIntegratorType", "enum.Enum")
@@ -232,14 +226,6 @@ PYBIND11_MODULE(cpp_etc, m, py::mod_gil_not_used())
         .value("reflective", core::BoundaryType::Reflective)
         .value("super_magnetofast_inflow", core::BoundaryType::SuperMagnetofastInflow)
         .value("open", core::BoundaryType::Open);
-
-    declareDim<1>(m);
-    declareDim<2>(m);
-    declareDim<3>(m);
-
-    declarePatchData<std::vector<double>, 1>(m, "PatchDataVectorDouble_1D");
-    declarePatchData<std::vector<double>, 2>(m, "PatchDataVectorDouble_2D");
-    declarePatchData<std::vector<double>, 3>(m, "PatchDataVectorDouble_3D");
 }
 
 } // namespace PHARE::pydata

@@ -23,16 +23,23 @@ from tests.simulator.initialize.test_init_hybrid import HybridInitializationTest
 _ref_layout = "AoSMapped"
 cells = 14
 ppc_per_dim = [100, 33, 15]
+# os.environ["PHARE_TILING_MIN_BEFORE_SPLIT"] = "1000"
 
 
 def permute(ndim_list, interp_orders=(1,)):
+    """every layout against the reference (AoSMapped, CPU), plus the GPU layouts with
+    allocator GPU_UNIFIED when the build targets a GPU (cpp.with_gpu())"""
     cmp_layouts = [
-        l for l in cpp.supported_model_layouts() if _ref_layout not in str(l)
+        (layout, "CPU")
+        for layout in cpp.supported_model_layouts()
+        if _ref_layout not in str(layout)
     ]
+    if cpp.with_gpu():
+        cmp_layouts += [(l, "GPU_UNIFIED") for l in cpp.supported_gpu_model_layouts()]
 
     return [
-        dict(ndim=ndim, interp_order=interp, cmp_layout=cmp_layout)
-        for ndim, interp, cmp_layout in itertools.product(
+        dict(ndim=ndim, interp_order=interp, cmp_layout=layout, allocator=allocator)
+        for ndim, interp, (layout, allocator) in itertools.product(
             ndim_list, interp_orders, cmp_layouts
         )
     ]
@@ -106,7 +113,9 @@ def compare_hierarchies(test, run0, run1, atol):
 
 
 class ALayoutInitTest(HybridInitializationTest):
-    def compare_init(self, ndim, interp_order, cmp_layout, atol, **kwargs):
+    def compare_init(
+        self, ndim, interp_order, cmp_layout, atol, allocator="CPU", **kwargs
+    ):
         common = dict(
             cells=cells,
             time_step_nbr=1,
@@ -130,7 +139,8 @@ class ALayoutInitTest(HybridInitializationTest):
             interp_order,
             qty="run",
             model_layout=cmp_layout,
-            diag_outputs=f"{diag_outputs}_{cmp_layout}",
+            allocator=allocator,
+            diag_outputs=f"{diag_outputs}_{cmp_layout}_{allocator}",
             **common,
         )
 
@@ -139,29 +149,33 @@ class ALayoutInitTest(HybridInitializationTest):
 
 
 class LayoutInitL0Test(ALayoutInitTest):
-    def _compare_init(self, ndim, interp_order, cmp_layout):
+    def _compare_init(self, ndim, interp_order, cmp_layout, allocator="CPU"):
         self.compare_init(
             ndim,
             interp_order,
             cmp_layout,
+            allocator=allocator,
             atol=dict(b=0, e=1e-14, moments=1e-14, particles=0),
             refinement_boxes=None,
         )
 
 
 class LayoutInitL1Test(ALayoutInitTest):
-    def _compare_init(self, ndim, interp_order, cmp_layout):
+    def _compare_init(self, ndim, interp_order, cmp_layout, allocator="CPU"):
         self.compare_init(
             ndim,
             interp_order,
             cmp_layout,
+            allocator=allocator,
             atol=dict(b=0, e=1e-14, moments=1e-14, particles=0),
             refinement_boxes={"L0": {"B0": nDBox(ndim, 1, 12)}},
         )
 
 
 class ALayoutAdvanceTest(HybridAdvanceTest):
-    def compare_advance(self, ndim, interp_order, cmp_layout, atol, **kwargs):
+    def compare_advance(
+        self, ndim, interp_order, cmp_layout, atol, allocator="CPU", **kwargs
+    ):
         common = dict(
             cells=cells,
             time_step_nbr=kwargs.pop("time_step_nbr", 1),
@@ -186,7 +200,8 @@ class ALayoutAdvanceTest(HybridAdvanceTest):
             interp_order,
             qty="run",
             model_layout=cmp_layout,
-            diag_outputs=f"{diag_outputs}_{cmp_layout}",
+            allocator=allocator,
+            diag_outputs=f"{diag_outputs}_{cmp_layout}_{allocator}",
             **common,
         )
 
@@ -195,11 +210,12 @@ class ALayoutAdvanceTest(HybridAdvanceTest):
 
 
 class LayoutAdvanceL0Test(ALayoutAdvanceTest):
-    def _compare_advance(self, ndim, interp_order, cmp_layout):
+    def _compare_advance(self, ndim, interp_order, cmp_layout, allocator="CPU"):
         self.compare_advance(
             ndim,
             interp_order,
             cmp_layout,
+            allocator=allocator,
             atol=dict(b=1e-14, e=1e-12, moments=1e-14, particles=1e-14),
             refinement_boxes=None,
         )
@@ -215,11 +231,12 @@ _L1_advance_atol_per_dim = {
 
 
 class LayoutAdvanceL1Test(ALayoutAdvanceTest):
-    def _compare_advance(self, ndim, interp_order, cmp_layout):
+    def _compare_advance(self, ndim, interp_order, cmp_layout, allocator="CPU"):
         self.compare_advance(
             ndim,
             interp_order,
             cmp_layout,
+            allocator=allocator,
             atol=_L1_advance_atol_per_dim[ndim],
             refinement_boxes={"L0": {"B0": nDBox(ndim, 1, 12)}},
         )
@@ -241,11 +258,12 @@ _L2_advance_atol_per_dim = {
 
 
 class LayoutAdvanceL2Test(ALayoutAdvanceTest):
-    def _compare_advance(self, ndim, interp_order, cmp_layout):
+    def _compare_advance(self, ndim, interp_order, cmp_layout, allocator="CPU"):
         self.compare_advance(
             ndim,
             interp_order,
             cmp_layout,
+            allocator=allocator,
             atol=_L2_advance_atol_per_dim[ndim],
             refinement_boxes={
                 "L0": {"B0": nDBox(ndim, 1, 12)},

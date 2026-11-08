@@ -163,6 +163,10 @@ public:
     auto static constexpr alloc_mode   = Particles::alloc_mode;
     auto static constexpr storage_mode = StorageMode::VECTOR;
     auto static constexpr dimension    = dim;
+
+    // move tracking (cellmaps, leavers, on_moved) is host only, a device push can't register
+    //  moves: AoSCMTS is the CPU threaded layout, GPU uses AoSPCTS / AoSTS
+    static_assert(alloc_mode == AllocatorMode::CPU, "AoSCMTS is CPU only");
     using box_t                        = Box<int, dim>;
     using Particle_t                   = ParticleDefaults<dim>::Particle_t;
     using value_type                   = Particle_t;

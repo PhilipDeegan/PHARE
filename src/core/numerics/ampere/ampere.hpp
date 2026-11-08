@@ -1,6 +1,7 @@
 #ifndef PHARE_CORE_NUMERICS_AMPERE_AMPERE_HPP
 #define PHARE_CORE_NUMERICS_AMPERE_AMPERE_HPP
 
+#include "core/def.hpp"
 #include "core/utilities/types.hpp"
 #include "core/data/grid/gridlayoutdefs.hpp"
 #include "core/data/vecfield/vecfield_component.hpp"
@@ -33,7 +34,7 @@ public:
     }
 
     template<typename VecField>
-    void operator()(VecField const& B, VecField& J)
+    void operator()(VecField const& B, VecField& J) // host: launches the kernels below
     {
         // can't use structured bindings because
         //   "reference to local binding declared in enclosing function"
@@ -44,18 +45,23 @@ public:
         Point<std::uint32_t, dimension> const amount{
             ConstArray<std::uint32_t, dimension>(box.amount)};
 
-        auto const eval = [&](auto& Jc, auto&& fn) {
-            if constexpr (box.mode == AmpereMode::ShrinkedGhost)
-                layout_.evalOnShrinkedGhostBox(Jc, amount, fn);
-            else
-                layout_.evalOnBiggerBox(Jc, amount, fn);
-        };
-
         auto const curlB = curl(layout_, B);
 
-        eval(Jx, [&](auto const&... ijk) { Jx(ijk...) = curlB.x({ijk...}); });
-        eval(Jy, [&](auto const&... ijk) { Jy(ijk...) = curlB.y({ijk...}); });
-        eval(Jz, [&](auto const&... ijk) { Jz(ijk...) = curlB.z({ijk...}); });
+        // captureless kernel: fields travel as arguments so the lambda is device-copyable
+        auto const fn = [] _PHARE_ALL_FN_(auto const& ijk, auto& Jc, auto const& curlc) {
+            Jc(ijk) = curlc({ijk});
+        };
+
+        auto const eval = [&](auto& Jc, auto const& curlc) {
+            if constexpr (box.mode == AmpereMode::ShrinkedGhost)
+                layout_.evalOnShrinkedGhostBox(Jc, amount, fn, Jc, curlc);
+            else
+                layout_.evalOnBiggerBox(Jc, amount, fn, Jc, curlc);
+        };
+
+        eval(Jx, curlB.x);
+        eval(Jy, curlB.y);
+        eval(Jz, curlB.z);
     }
 
 

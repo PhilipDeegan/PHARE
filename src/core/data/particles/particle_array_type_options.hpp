@@ -31,9 +31,21 @@ struct ParticleArrayTypeOptions<opts, layout_mode, StorageMode::ARRAY>
     }
 };
 
-// tiled layouts are never ARRAY-backed
+// tiled and per-cell layouts are never ARRAY-backed
 template<auto opts>
 struct ParticleArrayTypeOptions<opts, LayoutMode::AoSCMTS, StorageMode::ARRAY>; // nonsense
+template<auto opts>
+struct ParticleArrayTypeOptions<opts, LayoutMode::AoSTS, StorageMode::ARRAY>; // nonsense
+template<auto opts>
+struct ParticleArrayTypeOptions<opts, LayoutMode::AoSPC, StorageMode::ARRAY>; // nonsense
+template<auto opts>
+struct ParticleArrayTypeOptions<opts, LayoutMode::AoSPCTS, StorageMode::ARRAY>; // nonsense
+template<auto opts>
+struct ParticleArrayTypeOptions<opts, LayoutMode::SoAPC, StorageMode::ARRAY>; // nonsense
+template<auto opts>
+struct ParticleArrayTypeOptions<opts, LayoutMode::SoATS, StorageMode::ARRAY>; // nonsense
+template<auto opts>
+struct ParticleArrayTypeOptions<opts, LayoutMode::SoAVXTS, StorageMode::ARRAY>; // nonsense
 
 
 template<auto opts>
