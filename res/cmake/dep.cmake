@@ -39,3 +39,7 @@ include("${PHARE_PROJECT_DIR}/res/cmake/dep/pybind.cmake")
 
 # Phlop - enabled with -DwithPhlop
 include("${PHARE_PROJECT_DIR}/res/cmake/dep/phlop.cmake")
+
+
+# Darshan - enabled with -DwithDarshan
+include("${PHARE_PROJECT_DIR}/res/cmake/dep/darshan.cmake")
