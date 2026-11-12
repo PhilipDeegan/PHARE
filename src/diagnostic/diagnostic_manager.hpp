@@ -77,7 +77,7 @@ template<typename Writer>
 class DiagnosticsManager : public IDiagnosticsManager
 {
 public:
-    using Model_t = typename Writer::Model_t;
+    using Model_t = Writer::Model_t;
 
     bool dump(double timeStamp, double timeStep) override;
 
@@ -214,6 +214,8 @@ DiagnosticsManager<Writer>::addDiagDict(initializer::PHAREDict const& diagParams
         std::string const key = diagParams["attribute_" + idx + "_key"];
         diagProps.forward_file_attribute(key, diagParams["attribute_" + idx + "_value"]);
     }
+
+    writer_->requestTemporaries(diagProps);
 
     return *this;
 }

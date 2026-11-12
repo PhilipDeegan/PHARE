@@ -1,17 +1,14 @@
 #ifndef PHARE_CORE_NUMERICS_AMPERE_AMPERE_HPP
 #define PHARE_CORE_NUMERICS_AMPERE_AMPERE_HPP
 
-#include "core/data/grid/gridlayoutdefs.hpp"
-#include "core/data/vecfield/vecfield_component.hpp"
-#include "core/numerics/differential_operators.hpp"
+#include "core/def.hpp"
 
 #include <cstdint>
 
 namespace PHARE::core
 {
 
-
-enum class AmpereMode { ShrinkedGhost, GrownPhysical };
+enum class AmpereMode : std::uint16_t { ShrinkedGhost, GrownPhysical };
 
 struct AmpereBox // structural type — usable as NTTP
 {
@@ -20,52 +17,17 @@ struct AmpereBox // structural type — usable as NTTP
 };
 
 
-template<typename GridLayout, AmpereBox box = AmpereBox{}>
-class Ampere
+// J = curl(B), one component at one point: curlc is that component of curl(layout, B)
+//  where and how it is evaluated (boxes, tiles, GPU) is up to the caller,
+//  see core/numerics/ampere/ampere_transformer.hpp
+struct Ampere
 {
-    constexpr static auto dimension = GridLayout::dimension;
-
-public:
-    Ampere(GridLayout const& layout)
-        : layout_{layout}
+    void operator()(auto const& ijk, auto& Jc, auto const& curlc) const _PHARE_ALL_FN_
     {
+        Jc(ijk) = curlc({ijk});
     }
-
-
-    template<typename VecField>
-    void operator()(VecField const& B, VecField& J)
-    {
-        // can't use structured bindings because
-        //   "reference to local binding declared in enclosing function"
-        auto& Jx = J(Component::X);
-        auto& Jy = J(Component::Y);
-        auto& Jz = J(Component::Z);
-
-        Point<std::uint32_t, dimension> amount;
-
-        for (size_t i = 0; i < dimension; ++i)
-        {
-            amount[i] = box.amount;
-        }
-
-        auto eval = [&](auto& Jc, auto&& fn) {
-            if constexpr (box.mode == AmpereMode::ShrinkedGhost)
-                layout_.evalOnShrinkedGhostBox(Jc, amount, fn);
-            else
-                layout_.evalOnBiggerBox(Jc, amount, fn);
-        };
-
-        auto const curlB = curl(layout_, B);
-
-        eval(Jx, [&](auto const&... ijk) { Jx(ijk...) = curlB.x({ijk...}); });
-        eval(Jy, [&](auto const&... ijk) { Jy(ijk...) = curlB.y({ijk...}); });
-        eval(Jz, [&](auto const&... ijk) { Jz(ijk...) = curlB.z({ijk...}); });
-    }
-
-
-private:
-    GridLayout layout_;
 };
 
 } // namespace PHARE::core
+
 #endif

@@ -19,7 +19,7 @@ namespace core
     class IonPopulation
     {
     public:
-        using field_type                       = typename VecField::field_type;
+        using field_type                       = VecField::field_type;
         static constexpr std::size_t dimension = VecField::dimension;
         using particle_array_type              = ParticleArray;
         using vecfield_type                    = VecField;
@@ -46,6 +46,7 @@ namespace core
         NO_DISCARD double charge() const { return charge_; }
 
         NO_DISCARD std::string const& name() const { return name_; }
+
 
 
 
@@ -146,5 +147,7 @@ namespace core
     };
 } // namespace core
 } // namespace PHARE
+
+
 
 #endif

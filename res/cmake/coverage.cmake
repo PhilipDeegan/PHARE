@@ -6,7 +6,8 @@ if (test AND coverage)
 
   set (_Fvr " -fprofile-arcs -ftest-coverage")
 
-  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -pg -DHAVE_EXECINFO_H -g3 -O0 ${_Fvr}")
+  # -g1: gcov uses .gcno/.gcda not DWARF, -g3 (macros, full types) OOMs ld on CI runners
+  set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} -DHAVE_EXECINFO_H -g1 -O0 ${_Fvr}")
   set(CMAKE_EXE_LINKER_FLAGS  "${CMAKE_EXE_LINKER_FLAGS}  ${_Fvr}")
 
   add_custom_target(build-time-make-directory ALL

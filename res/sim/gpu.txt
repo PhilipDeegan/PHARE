@@ -1,0 +1,33 @@
+# GPU simulator permutations (dim,interp,nbRefinedPart,layout,allocator), opt-in: only built
+#  with -DwithGPU=ON, appended to PHARE_PERMUTATIONS (all.txt stays CPU only)
+#  override with -DPHARE_GPU_PERMUTATIONS=<file>, see src/python3/CMakeLists.txt
+# GPU layouts: AoSTS, AoSPCTS, SoAVXChunked; first nbRefinedPart per dim/interp
+1,1,2,AoSTS,GPU_UNIFIED
+1,1,2,AoSPCTS,GPU_UNIFIED
+1,1,2,SoAVXChunked,GPU_UNIFIED
+1,2,2,AoSTS,GPU_UNIFIED
+1,2,2,AoSPCTS,GPU_UNIFIED
+1,2,2,SoAVXChunked,GPU_UNIFIED
+1,3,2,AoSTS,GPU_UNIFIED
+1,3,2,AoSPCTS,GPU_UNIFIED
+1,3,2,SoAVXChunked,GPU_UNIFIED
+2,1,4,AoSTS,GPU_UNIFIED
+2,1,4,AoSPCTS,GPU_UNIFIED
+2,1,4,SoAVXChunked,GPU_UNIFIED
+2,2,4,AoSTS,GPU_UNIFIED
+2,2,4,AoSPCTS,GPU_UNIFIED
+2,2,4,SoAVXChunked,GPU_UNIFIED
+2,3,4,AoSTS,GPU_UNIFIED
+2,3,4,AoSPCTS,GPU_UNIFIED
+2,3,4,SoAVXChunked,GPU_UNIFIED
+3,1,6,AoSTS,GPU_UNIFIED
+3,1,6,AoSPCTS,GPU_UNIFIED
+3,1,6,SoAVXChunked,GPU_UNIFIED
+3,2,6,AoSTS,GPU_UNIFIED
+3,2,6,AoSPCTS,GPU_UNIFIED
+3,2,6,SoAVXChunked,GPU_UNIFIED
+3,3,6,AoSTS,GPU_UNIFIED
+3,3,6,AoSPCTS,GPU_UNIFIED
+3,3,6,SoAVXChunked,GPU_UNIFIED
+# DEBUG (2026-11-09): AoSTS on CPU, to split AoSTS logic from its GPU path in test_layouts_3d L2 - remove after
+3,1,6,AoSTS,CPU

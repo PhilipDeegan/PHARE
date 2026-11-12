@@ -2,6 +2,7 @@
 #define CORE_NUMERICS_GODUNOV_GODUNOV_UTILS_HPP
 
 #include "core/data/field/field.hpp"
+#include "core/data/field/field_tiles.hpp"
 #include "core/data/tensorfield/tensorfield.hpp"
 #include "core/data/vecfield/vecfield_component.hpp"
 #include "core/models/quantities/mhd_quantities.hpp"
@@ -139,8 +140,12 @@ struct is_field_or_tensorfield<TensorField<Field_t, PhysicalQuantity>> : std::tr
 {
 };
 
+// also the views (basic::Field/TensorField, e.g. of one tile) and the tile sets, tensor fields
+// being anything with a field_type
 template<typename T>
-concept NotFieldOrTensorField = !is_field_or_tensorfield<T>::value;
+concept NotFieldOrTensorField
+    = !is_field_or_tensorfield<T>::value
+      and !is_field_v<T> and !is_field_tile_set_v<T> and !requires { typename T::field_type; };
 
 template<typename T>
 concept ViewVector = requires(T t) {
@@ -157,17 +162,30 @@ struct get_value_type
 template<ViewVector T>
 struct get_value_type<T>
 {
-    using type = typename T::value_type;
+    using type = T::value_type;
 };
 
 template<typename T>
-using value_type_t = typename get_value_type<T>::type;
+using value_type_t = get_value_type<T>::type;
 
 template<typename Field, typename VecField>
 struct AllFluxes
 {
-    using Float                     = typename Field::value_type;
+    using Float                     = Field::value_type;
+    using vecfield_type             = VecField;
     static constexpr auto dimension = Field::dimension;
+
+    template<typename VF>
+    using view_t = AllFluxes<typename VF::field_type, VF>;
+
+    template<typename View>
+    auto as(auto&& a, auto&&... args) const
+    {
+        return View{{a(rho_fx, args...)},  {a(rhoV_fx, args...)}, {a(B_fx, args...)},
+                    {a(Etot_fx, args...)}, {a(rho_fy, args...)},  {a(rhoV_fy, args...)},
+                    {a(B_fy, args...)},    {a(Etot_fy, args...)}, {a(rho_fz, args...)},
+                    {a(rhoV_fz, args...)}, {a(B_fz, args...)},    {a(Etot_fz, args...)}};
+    }
 
     AllFluxes<value_type_t<Field>, value_type_t<VecField>> operator[](std::size_t i)
         requires((ViewVector<Field>) && (ViewVector<VecField>))
@@ -181,7 +199,7 @@ struct AllFluxes
     auto get_dir(MeshIndex<Field::dimension> index)
         requires((!ViewVector<Field>) && (!ViewVector<VecField>))
     {
-        using Float = typename Field::value_type;
+        using Float = Field::value_type;
 
         if constexpr (direction == Direction::X)
             return PerIndex<Float&>{

@@ -4,7 +4,7 @@
 
 #include "core/data/field/field.hpp"
 #include "core/utilities/index/index.hpp"
-#include "core/numerics/ampere/ampere.hpp"
+#include "core/numerics/ampere/ampere_transformer.hpp"
 #include "core/data/grid/gridlayoutdefs.hpp"
 
 #include "tests/core/data/field/test_field.hpp"
@@ -18,49 +18,6 @@
 
 using namespace PHARE::core;
 
-
-
-struct GridLayoutMock1D
-{
-    static auto const dimension = 1u;
-
-    std::size_t physicalStartIndex(FieldMock<1>&, Direction /*dir*/) { return 0; }
-    std::size_t physicalEndIndex(FieldMock<1>&, Direction /*dir*/) { return 0; }
-};
-
-struct GridLayoutMock2D
-{
-    static auto const dimension = 2u;
-
-    std::size_t physicalStartIndex(FieldMock<dimension>&, Direction /*dir*/) { return 0; }
-
-    std::size_t physicalEndIndex(FieldMock<dimension>&, Direction /*dir*/) { return 0; }
-};
-
-struct GridLayoutMock3D
-{
-    static auto const dimension = 3u;
-
-    std::size_t physicalStartIndex(FieldMock<dimension>&, Direction /*dir*/) { return 0; }
-    std::size_t physicalEndIndex(FieldMock<dimension>&, Direction /*dir*/) { return 0; }
-};
-
-
-
-TEST(Ampere, canBe1D)
-{
-    Ampere<GridLayoutMock1D> ampere{GridLayoutMock1D{}};
-}
-
-TEST(Ampere, canBe2D)
-{
-    Ampere<GridLayoutMock2D> ampere{GridLayoutMock2D{}};
-}
-
-TEST(Ampere, canBe3D)
-{
-    Ampere<GridLayoutMock3D> ampere{GridLayoutMock3D{}};
-}
 
 
 
@@ -82,12 +39,14 @@ class Ampere1DTest : public ::testing::Test
 protected:
     static constexpr std::size_t dim          = 1;
     static constexpr std::size_t interp_order = 1;
-    using UsableVecFieldND                    = UsableVecField<dim>;
-    using GridLayout_t = PHARE_Types<PHARE::SimOpts{dim, interp_order}>::Hybrid::GridLayout_t;
-    using Ampere_t     = Ampere<GridLayout_t>;
+    using core_types                          = PHARE_Types<PHARE::SimOpts{dim, interp_order}>;
+    using HybridTypes                         = core_types::Hybrid;
+    using GridLayout_t                        = HybridTypes::GridLayout_t;
+    using Ampere_t                            = AmpereTransformer<>;
+    auto static constexpr field_opts          = TensorFieldOptions<HybridTypes>{};
+    using UsableVecFieldND                    = UsableVecField<field_opts>;
 
     GridLayout_t layout;
-
     UsableVecFieldND B, J;
 
 public:
@@ -105,12 +64,14 @@ class Ampere2DTest : public ::testing::Test
 protected:
     static constexpr std::size_t dim          = 2;
     static constexpr std::size_t interp_order = 1;
-    using UsableVecFieldND                    = UsableVecField<dim>;
-    using GridLayout_t = PHARE_Types<PHARE::SimOpts{dim, interp_order}>::Hybrid::GridLayout_t;
-    using Ampere_t     = Ampere<GridLayout_t>;
+    using core_types                          = PHARE_Types<PHARE::SimOpts{dim, interp_order}>;
+    using HybridTypes                         = core_types::Hybrid;
+    using GridLayout_t                        = HybridTypes::GridLayout_t;
+    using Ampere_t                            = AmpereTransformer<>;
+    auto static constexpr field_opts          = TensorFieldOptions<HybridTypes>{};
+    using UsableVecFieldND                    = UsableVecField<field_opts>;
 
     GridLayout_t layout;
-
     UsableVecFieldND B, J;
 
 public:
@@ -128,12 +89,14 @@ class Ampere3DTest : public ::testing::Test
 protected:
     static constexpr std::size_t dim          = 3;
     static constexpr std::size_t interp_order = 1;
-    using UsableVecFieldND                    = UsableVecField<dim>;
-    using GridLayout_t = PHARE_Types<PHARE::SimOpts{dim, interp_order}>::Hybrid::GridLayout_t;
-    using Ampere_t     = Ampere<GridLayout_t>;
+    using core_types                          = PHARE_Types<PHARE::SimOpts{dim, interp_order}>;
+    using HybridTypes                         = core_types::Hybrid;
+    using GridLayout_t                        = HybridTypes::GridLayout_t;
+    using Ampere_t                            = AmpereTransformer<>;
+    auto static constexpr field_opts          = TensorFieldOptions<HybridTypes>{};
+    using UsableVecFieldND                    = UsableVecField<field_opts>;
 
     GridLayout_t layout;
-
     UsableVecFieldND B, J;
 
 public:
@@ -157,7 +120,7 @@ TEST_F(Ampere1DTest, ampere1DCalculatedOk)
     std::uint32_t gsi_d_X = this->layout.ghostStartIndex(QtyCentering::dual, Direction::X);
     std::uint32_t gei_d_X = this->layout.ghostEndIndex(QtyCentering::dual, Direction::X);
 
-    auto const& [Bx, By, Bz] = B();
+    auto& [Bx, By, Bz]       = B();
     auto const& [Jx, Jy, Jz] = J();
 
     for (std::uint32_t ix = gsi_d_X; ix <= gei_d_X; ++ix)
@@ -168,7 +131,7 @@ TEST_F(Ampere1DTest, ampere1DCalculatedOk)
         Bz(ix) = std::sin(2 * M_PI / 5. * point[0]);
     }
 
-    Ampere_t{layout}(B, J);
+    Ampere_t{}(layout, B, J);
 
     auto psi_p_X = this->layout.physicalStartIndex(QtyCentering::primal, Direction::X);
     auto pei_p_X = this->layout.physicalEndIndex(QtyCentering::primal, Direction::X);
@@ -199,7 +162,7 @@ TEST_F(Ampere2DTest, ampere2DCalculatedOk)
     std::uint32_t gsi_d_Y = this->layout.ghostStartIndex(QtyCentering::dual, Direction::Y);
     std::uint32_t gei_d_Y = this->layout.ghostEndIndex(QtyCentering::dual, Direction::Y);
 
-    auto const& [Bx, By, Bz] = B();
+    auto& [Bx, By, Bz]       = B();
     auto const& [Jx, Jy, Jz] = J();
 
     for (std::uint32_t ix = gsi_p_X; ix <= gei_p_X; ++ix)
@@ -232,7 +195,7 @@ TEST_F(Ampere2DTest, ampere2DCalculatedOk)
         }
     }
 
-    Ampere_t{layout}(B, J);
+    Ampere_t{}(layout, B, J);
 
     auto psi_p_X = this->layout.physicalStartIndex(QtyCentering::primal, Direction::X);
     auto pei_p_X = this->layout.physicalEndIndex(QtyCentering::primal, Direction::X);
@@ -301,7 +264,7 @@ TEST_F(Ampere3DTest, ampere3DCalculatedOk)
     std::uint32_t gsi_d_Z = this->layout.ghostStartIndex(QtyCentering::dual, Direction::Z);
     std::uint32_t gei_d_Z = this->layout.ghostEndIndex(QtyCentering::dual, Direction::Z);
 
-    auto const& [Bx, By, Bz] = B();
+    auto& [Bx, By, Bz]       = B();
     auto const& [Jx, Jy, Jz] = J();
 
     for (std::uint32_t ix = gsi_p_X; ix <= gei_p_X; ++ix)
@@ -349,7 +312,7 @@ TEST_F(Ampere3DTest, ampere3DCalculatedOk)
         }
     }
 
-    Ampere_t{layout}(B, J);
+    Ampere_t{}(layout, B, J);
 
     auto psi_p_X = this->layout.physicalStartIndex(QtyCentering::primal, Direction::X);
     auto pei_p_X = this->layout.physicalEndIndex(QtyCentering::primal, Direction::X);
@@ -412,7 +375,7 @@ TEST_F(Ampere3DTest, ampere3DCalculatedOk)
 
 TEST_F(Ampere2DTest, grownPhysicalBoxIsExactOnQuadraticB)
 {
-    using GrownAmpere = Ampere<GridLayout_t, AmpereBox{AmpereMode::GrownPhysical, 1}>;
+    using GrownAmpere = AmpereTransformer<AmpereBox{AmpereMode::GrownPhysical, 1}>;
 
     auto const dl = layout.meshSize();
 
@@ -437,14 +400,14 @@ TEST_F(Ampere2DTest, grownPhysicalBoxIsExactOnQuadraticB)
                 field(ix, iy) = fn(x(field, ix, iy, Direction::X), x(field, ix, iy, Direction::Y));
     };
 
-    auto const& [Bx, By, Bz] = B();
+    auto& [Bx, By, Bz]       = B();
     auto const& [Jx, Jy, Jz] = J();
 
     fill(Bx, bx);
     fill(By, by);
     fill(Bz, bz);
 
-    GrownAmpere{layout}(B, J);
+    GrownAmpere{}(layout, B, J);
 
     auto const check = [&](auto const& Jc, auto const& expected) {
         auto const sx = layout.physicalStartIndex(Jc, Direction::X) - 1;

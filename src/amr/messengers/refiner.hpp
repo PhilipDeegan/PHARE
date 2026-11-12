@@ -1,10 +1,12 @@
 #ifndef PHARE_REFINER_HPP
 #define PHARE_REFINER_HPP
 
-#include "communicator.hpp"
+#include "core/utilities/types.hpp"
 
 #include "amr/messengers/field_operate_transaction.hpp"
-#include "core/utilities/types.hpp"
+#include "amr/messengers/fuser_ops_strategy.hpp"
+
+#include "communicator.hpp"
 
 #include <stdexcept>
 #include <string>
@@ -47,22 +49,40 @@ class Refiner : private Communicator<RefinerTypes, ResourcesManager::dimension>
 {
     using FieldData_t = ResourcesManager::UserField_t::patch_data_type;
 
-    using SetMaxOp     = core::SetMax<typename FieldData_t::value_type>;
-    using PlusEqualsOp = core::PlusEquals<typename FieldData_t::value_type>;
-
-    // hard coded rank cause there's no real tensorfields that use this code yet
-    using TensorFieldData_t = ResourcesManager::template UserTensorField_t<2>::patch_data_type;
     using VecFieldData_t    = ResourcesManager::template UserTensorField_t<1>::patch_data_type;
+    using TensorFieldData_t = ResourcesManager::template UserTensorField_t<2>::patch_data_type;
 
     std::shared_ptr<SAMRAI::xfer::RefinePatchStrategy> patchStrat_ = nullptr;
 
 private:
-    // builds (does not store) the schedule for this Refiner's Type on the given level
+    // GPU_UNIFIED fields' copies are fused (FieldData::copyFuseable), the strategy launches them
+    //  see tests/amr/messengers/fuser_ops_strategy
+    auto constexpr static fuse_copies
+        = CompileOptions::WithRAJA
+          and FieldData_t::grid_type::alloc_mode == AllocatorMode::GPU_UNIFIED;
+
     std::shared_ptr<SAMRAI::xfer::RefineSchedule>
     makeSchedule_(std::shared_ptr<SAMRAI::hier::PatchHierarchy> const& hierarchy,
                   std::shared_ptr<SAMRAI::hier::PatchLevel> const& level,
-                  std::unique_ptr<SAMRAI::xfer::RefineAlgorithm> const& algo) const
+                  std::unique_ptr<SAMRAI::xfer::RefineAlgorithm> const& algo,
+                  std::shared_ptr<SAMRAI::xfer::RefineTransactionFactory> const& refac
+                  = nullptr) const
     {
+        auto schedule = makeSchedule_impl_(hierarchy, level, algo, refac);
+        if constexpr (fuse_copies)
+            schedule->setScheduleOpsStrategy(FuserOpsStrategy::instance());
+        return schedule;
+    }
+
+    // builds (does not store) the schedule for this Refiner's Type on the given level
+    std::shared_ptr<SAMRAI::xfer::RefineSchedule>
+    makeSchedule_impl_(std::shared_ptr<SAMRAI::hier::PatchHierarchy> const& hierarchy,
+                       std::shared_ptr<SAMRAI::hier::PatchLevel> const& level,
+                       std::unique_ptr<SAMRAI::xfer::RefineAlgorithm> const& algo,
+                       std::shared_ptr<SAMRAI::xfer::RefineTransactionFactory> const& refac
+                       = nullptr) const
+    {
+        using enum RefinerType;
         auto const levelNumber = level->getLevelNumber();
 
         // for GhostField we need schedules that take on the level where there is an
@@ -97,48 +117,12 @@ private:
 
         // schedule used to += density and flux for populations
         // on incomplete overlaped ghost box nodes
-        else if constexpr (Type == RefinerType::PatchFieldBorderSum)
+        else if constexpr (core::any_in(Type, PatchFieldBorderSum, PatchVecFieldBorderSum,
+                                        PatchTensorFieldBorderSum, PatchFieldBorderMax,
+                                        PatchVecFieldBorderMax))
         {
-            return algo->createSchedule(
-                level, patchStrat_.get(),
-                std::make_shared<FieldBorderOpTransactionFactory<FieldData_t, PlusEqualsOp>>());
-        }
-
-
-        else if constexpr (Type == RefinerType::PatchTensorFieldBorderSum)
-        {
-            return algo->createSchedule(
-                level, patchStrat_.get(),
-                std::make_shared<
-                    FieldBorderOpTransactionFactory<TensorFieldData_t, PlusEqualsOp>>());
-        }
-
-
-        else if constexpr (Type == RefinerType::PatchVecFieldBorderSum)
-        {
-            return algo->createSchedule(
-                level, patchStrat_.get(),
-                std::make_shared<FieldBorderOpTransactionFactory<VecFieldData_t, PlusEqualsOp>>());
-        }
-
-
-        // schedule used to == max of density and flux for populations
-        // on complete overlaped ghost box nodes
-        else if constexpr (Type == RefinerType::PatchFieldBorderMax)
-        {
-            return algo->createSchedule(
-                level, patchStrat_.get(),
-                std::make_shared<FieldBorderOpTransactionFactory<FieldData_t, SetMaxOp>>());
-        }
-
-
-        // schedule used to == max of density and flux for populations
-        // on complete overlaped ghost box nodes
-        else if constexpr (Type == RefinerType::PatchVecFieldBorderMax)
-        {
-            return algo->createSchedule(
-                level, patchStrat_.get(),
-                std::make_shared<FieldBorderOpTransactionFactory<VecFieldData_t, SetMaxOp>>());
+            assert(refac); // pass on call to registerLevel
+            return algo->createSchedule(level, 0, refac);
         }
 
         // this createSchedule overload is used to initialize fields.
@@ -207,12 +191,14 @@ private:
 
 public:
     void registerLevel(std::shared_ptr<SAMRAI::hier::PatchHierarchy> const& hierarchy,
-                       std::shared_ptr<SAMRAI::hier::PatchLevel> const& level)
+                       std::shared_ptr<SAMRAI::hier::PatchLevel> const& level,
+                       std::shared_ptr<SAMRAI::xfer::RefineTransactionFactory> const& refac
+                       = nullptr)
     {
         auto levelNumber = level->getLevelNumber();
 
         for (auto& algo : this->algos)
-            this->add(algo, makeSchedule_(hierarchy, level, algo), levelNumber);
+            this->add(algo, makeSchedule_(hierarchy, level, algo, refac), levelNumber);
     }
 
 
@@ -271,6 +257,7 @@ public:
             this->findSchedule(algo, levelNumber)->fillData(initDataTime);
     }
 
+
     template<typename VecFieldT>
     void fill(VecFieldT& vec, int const levelNumber, double const fillTime)
     {
@@ -301,7 +288,6 @@ public:
 
 
 
-
     Refiner(std::string const& dst, std::string const& src,
             std::shared_ptr<ResourcesManager> const& rm,
             std::shared_ptr<SAMRAI::hier::RefineOperator> refineOp,
@@ -313,6 +299,7 @@ public:
         auto&& [idDst, idSrc] = rm->getIDsList(dst, src);
         this->add_algorithm()->registerRefine(idDst, idSrc, idDst, refineOp, fillPattern);
     }
+
 
 
 
@@ -355,7 +342,6 @@ public:
         : Refiner{name, name, rm, refineOp}
     {
     }
-
 
 
     auto& register_resource(auto& rm, auto& dst, auto& src, auto& scratch, auto&&... args)

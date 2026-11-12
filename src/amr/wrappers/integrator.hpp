@@ -65,6 +65,8 @@ public:
 
     void initialize() { timeRefIntegrator_->initializeHierarchy(); }
 
+    auto griddingAlgorithm() const { return timeRefIntegrator_->getGriddingAlgorithm(); }
+
     Integrator(PHARE::initializer::PHAREDict const& dict,
                std::shared_ptr<SAMRAI::hier::PatchHierarchy> hierarchy,
                std::shared_ptr<SAMRAI::algs::TimeRefinementLevelStrategy> timeRefLevelStrategy,
@@ -173,8 +175,22 @@ Integrator<_dimension>::Integrator(
         }
 
         if (clustering_type == "tile")
+        {
+            auto tileDB = std::make_shared<SAMRAI::tbox::MemoryDatabase>("Tiledb");
+            if (dict["simulation"]["AMR"].contains("tile_size"))
+            {
+                auto ts = dict["simulation"]["AMR"]["tile_size"].template to<std::vector<int>>();
+                tileDB->putIntegerVector("tile_size", ts);
+            }
+            if (dict["simulation"]["AMR"].contains("allow_remote_tile_extent"))
+            {
+                bool arte
+                    = dict["simulation"]["AMR"]["allow_remote_tile_extent"].template to<bool>();
+                tileDB->putBool("allow_remote_tile_extent", arte);
+            }
             return std::make_shared<SAMRAI::mesh::TileClustering>(
-                SAMRAI::tbox::Dimension{dimension});
+                SAMRAI::tbox::Dimension{dimension}, tileDB);
+        }
 
         throw std::runtime_error(std::string{"Unknown clustering type "} + clustering_type);
     }();

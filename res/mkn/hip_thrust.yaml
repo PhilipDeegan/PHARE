@@ -1,0 +1,26 @@
+property: 
+  cxx.flags: >-
+    --std=c++20 -fsized-deallocation -fPIC
+    -DPHARE_HAVE_MKN_GPU=1 -DPHARE_HAVE_GPU_HARDWARE=1 -DMKN_GPU_ROCM=1 -DMKN_GPU_CUDA=0
+    -isystem /opt/rocm/include
+# rocThrust: /opt/rocm/include ahead of /usr/include, where a distro (CUDA) thrust can be
+#  (Debian libthrust-dev): hipcc would otherwise pick that one. See hip.yaml for no thrust
+
+  lnk.flags: -pthread -lamdhip64
+local:
+  repo: /mkn/r
+  mod-repo: /mkn/m
+remote:
+  repo: git@github.com:mkn/
+  mod-repo: git@github.com:mkn-mod/
+env: |
+  PATH=/opt/rocm/bin:${PATH}
+compiler:
+  mask:
+    g++:
+      hipcc
+file:
+  - type: cpp:cxx:cc:c:S
+    archiver: ar -cr
+    compiler: hipcc ${cxx.flags}
+    linker: hipcc ${lnk.flags}

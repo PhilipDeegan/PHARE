@@ -4,6 +4,7 @@ project(phare_core)
 set( SOURCES_INC
      data/electromag/electromag.hpp
      data/field/field.hpp
+     data/field/field_scratch.hpp
      data/field/field_traits.hpp
      data/field/recentered_field.hpp
      data/grid/gridlayoutdefs.hpp
@@ -42,8 +43,6 @@ set( SOURCES_INC
      numerics/boundary_condition/field_boundary_condition_divergence_free_transverse_neumann.hpp
      numerics/interpolator/interpolator.hpp
      numerics/pusher/boris.hpp
-     numerics/pusher/pusher.hpp
-     numerics/pusher/pusher_factory.hpp
      numerics/ampere/ampere.hpp
      numerics/faraday/faraday.hpp
      numerics/ohm/ohm.hpp
@@ -66,20 +65,17 @@ set( SOURCES_INC
    )
 
 set( SOURCES_CPP
+     data/field/field_scratch.cpp
      data/ions/particle_initializers/maxwellian_particle_initializer.cpp
      utilities/index/index.cpp
     )
 
-set( CORE_EXTRA_SOURCES_CPP )
-if (withPhlop)
-  set( CORE_EXTRA_SOURCES_CPP ${PHARE_PROJECT_DIR}/subprojects/phlop/src/phlop/timing/scope_timer.cpp
-   )
-endif(withPhlop)
-
-add_library(${PROJECT_NAME}  ${SOURCES_INC} ${SOURCES_CPP} ${CORE_EXTRA_SOURCES_CPP} )
-target_compile_options(${PROJECT_NAME}  PRIVATE ${PHARE_WERROR_FLAGS})
+# phlop sources: only common_threaded_timer.cpp, linked in phare_mpi (see src/mpi/CMakeLists.txt),
+#  phlop allows only one of scope_timer.cpp / common_threaded_timer.cpp per program
+add_library(${PROJECT_NAME}  ${SOURCES_INC} ${SOURCES_CPP} )
+target_compile_options(${PROJECT_NAME}  PRIVATE ${PHARE_FLAGS} ${PHARE_WERROR_FLAGS})
 target_link_libraries(${PROJECT_NAME}  PRIVATE phare_initializer
-    PUBLIC cppdict ${PHARE_BASE_LIBS}
+    PUBLIC cppdict magic_enum ${PHARE_BASE_LIBS}
   )
 
 

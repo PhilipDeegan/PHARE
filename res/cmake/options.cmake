@@ -95,6 +95,11 @@ option(bench "Compile PHARE Benchmarks" OFF)
 
 # -Dphare_configurator=OFF
 option(phare_configurator "Best guess setup for compile" OFF)
+# with phare_configurator, see tools/config/config.py
+#  -DPHARE_GPU=auto|off|cuda|hip
+#  -DPHARE_GPU_ARCH=sm_90|gfx90a|... to skip the device query (e.g. build node without a GPU)
+set(PHARE_GPU "auto" CACHE STRING "configurator GPU detection: auto, off, cuda or hip")
+set(PHARE_GPU_ARCH "" CACHE STRING "configurator GPU arch override, e.g. sm_90 or gfx90a")
 
 
 # -DSAMRAI_BUILD_SHARED_LIBS=OFF
@@ -103,6 +108,27 @@ option(SAMRAI_BUILD_SHARED_LIBS "Build SAMRAI shared libraries" ON)
 
 #-DPHARE_EXE=OFF
 option(PHARE_EXE "Build PHARE EXE" OFF)
+
+
+# -DwithKokkos=OFF
+option(withKokkos "Use Kokkos Tooling" OFF)
+
+
+# -DwithRaja=OFF
+option(withRaja "Use RAJA Tooling" OFF)
+# -DwithUmpire=OFF
+option(withUmpire "Use Umpire Tooling" OFF)
+
+
+# -DwithMkn=OFF
+option(withMkn "Use mkn::gpu" OFF)
+
+# -DwithGPU=OFF
+# opt-in: build for the GPU the configurator found (needs -Dphare_configurator=ON), see
+#  res/cmake/gpu.cmake + tools/config/config.py, implies withMkn
+option(withGPU "Build for the GPU found by phare_configurator" OFF)
+
+
 
 
 # print options
@@ -118,6 +144,7 @@ function(print_phare_options)
   message("Enable cppcheck xml report                  : " ${cppcheck})
   message("force the test to be serial under MPI mode  : " ${forceSerialTest})
   message("Enable IPO/LTO if system supported          : " ${withIPO})
+  message("Build for the configurator's GPU            : " ${withGPU} " " ${PHARE_GPU_VENDOR} " " ${PHARE_GPU_ARCH})
   message("build with ubsan support                    : " ${ubsan})
   message("build with asan support                     : " ${asan})
   message("build with ccache (if found) in devMode     : " ${withCcache})

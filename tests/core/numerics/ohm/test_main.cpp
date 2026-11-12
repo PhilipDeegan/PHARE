@@ -1,15 +1,28 @@
 
+
 #include "phare_core.hpp"
 #include "simulator/simulator_def.hpp"
 
-#include "core/numerics/ohm/ohm.hpp"
+#if defined(HAVE_RAJA) and defined(HAVE_UMPIRE)
+#include "SAMRAI/tbox/Collectives.h" // tbox::parallel_synchronize();
+#include "simulator/simulator.h"     // static allocator init - probably should be isolated
+#endif
+
+#if defined(HAVE_RAJA) and defined(HAVE_UMPIRE)
+#include "SAMRAI/tbox/Collectives.h" // tbox::parallel_synchronize();
+#include "simulator/simulator.h"     // static allocator init - probably should be isolated
+#endif
+
+#include "core/numerics/ohm/ohm_transformer.hpp"
 #include "core/data/grid/gridlayoutdefs.hpp"
 
-#include "tests/core/data/vecfield/test_vecfield_fixtures.hpp"
+#include "simulator/simulator_def.hpp"
 
 
 #include "gmock/gmock.h"
 #include "gtest/gtest.h"
+
+#include "tests/core/data/vecfield/test_vecfield_fixtures.hpp"
 
 #include <fstream>
 #include <variant>
@@ -63,10 +76,12 @@ struct OhmTest : public ::testing::Test
     static constexpr auto dim    = typename TypeInfo::first_type{}();
     static constexpr auto interp = typename TypeInfo::second_type{}();
 
-    using GridYee = PHARE::core::PHARE_Types<PHARE::SimOpts{dim, interp}>::Hybrid::GridLayout_t;
-    using UsableVecFieldND = UsableVecField<dim>;
-    using Grid_t           = Grid<NdArrayVector<dim>, HybridQuantity::Scalar>;
-    using Ohm_t            = Ohm<GridYee>;
+    using HybridTypes = PHARE::core::PHARE_Types<PHARE::SimOpts{dim, interp}>::Hybrid;
+    using GridYee     = HybridTypes::GridLayout_t;
+    auto static constexpr field_opts = PHARE::core::TensorFieldOptions<HybridTypes>{};
+    using UsableVecFieldND           = UsableVecField<field_opts>;
+    using Grid_t                     = Grid<NdArrayVector<dim>, HybridQuantity::Scalar>;
+    using Ohm_t                      = Ohm<GridYee>;
 
     GridYee layout = NDlayout<dim, interp>::create();
 
@@ -85,10 +100,10 @@ struct OhmTest : public ::testing::Test
         , Enew{"Enew", layout, HybridQuantity::Vector::E}
         , ohm_info{OhmInfo::FROM(createDict())}
     {
-        auto const& [Bx, By, Bz]          = B();
-        auto const& [Jx, Jy, Jz]          = J();
-        auto const& [Vx, Vy, Vz]          = V();
-        auto const& [Exnew, Eynew, Eznew] = Enew();
+        auto& [Bx, By, Bz] = B();
+        auto& [Jx, Jy, Jz] = J();
+        auto& [Vx, Vy, Vz] = V();
+        // auto const& [Exnew, Eynew, Eznew] = Enew();
 
         if constexpr (dim == 1)
         {
@@ -343,8 +358,6 @@ std::vector<double> read(std::string filename)
 
 TYPED_TEST(OhmTest, ThatElectricFieldIsOkFromOhmsLaw)
 {
-    using Ohm_t = TestFixture::Ohm_t;
-
     TypeParam pair;
     auto constexpr dim    = pair.first();
     auto constexpr interp = pair.second();
@@ -363,7 +376,7 @@ TYPED_TEST(OhmTest, ThatElectricFieldIsOkFromOhmsLaw)
 
     auto const layout = NDlayout<dim, interp>::create();
 
-    Ohm_t{this->ohm_info, layout}(this->n, this->V, this->P, this->B, this->J, this->Enew);
+    OhmTransformer{this->ohm_info}(layout, this->n, this->V, this->P, this->B, this->J, this->Enew);
 
 
     auto const& [Exnew, Eynew, Eznew] = this->Enew();

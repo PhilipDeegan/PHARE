@@ -49,16 +49,17 @@ jobs:
         mkdir -p build && cd build
         cmake .. --fresh \
               -DSAMRAI_ROOT=/usr/local \
-              -DCMAKE_BUILD_TYPE=Debug -Dcoverage=ON \
+              -DCMAKE_BUILD_TYPE=Debug -DCMAKE_CXX_FLAGS_DEBUG="-O0" -Dcoverage=ON \
               -DPHARE_PYTEST_SIMULATORS=1 -Dphare_configurator=ON
 
     - name: Build
       working-directory: ${{github.workspace}}/build
-      run: . /.venv/bin/activate; cmake --build . -j 2
+      run: . /.venv/bin/activate; cmake --build .
 
     - name: Test
       working-directory: ${{github.workspace}}/build
-      run: . /.venv/bin/activate; ctest -j 2 -LE nightly --output-on-failure
+      # physics: dispersion checks, ~2h each under gcov for code other tests already cover
+      run: . /.venv/bin/activate; ctest -j 2 -LE "nightly|physics" --output-on-failure
 
     # a failing test still leaves coverage worth reporting
     - name: Coverage report
