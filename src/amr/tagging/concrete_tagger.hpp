@@ -28,7 +28,7 @@ class ConcreteTagger : public Tagger<typename Model::amr_types>
     using Super           = Tagger<amr_t>;
     using patch_t         = Super::patch_t;
     using IPhysicalModel  = PHARE::solver::IPhysicalModel<amr_t>;
-    using gridlayout_type = typename Model::gridlayout_type;
+    using gridlayout_type = Model::gridlayout_type;
 
 public:
     ConcreteTagger(std::unique_ptr<TaggerStrategy<Model>> strat)
@@ -70,7 +70,7 @@ void ConcreteTagger<Model>::tag(PHARE::solver::IPhysicalModel<amr_t>& model, pat
         // These tags will be saved even if they are not used in diags during this advance
         // concreteModel.tags may contain vectors for patches and levels that no longer exist
         auto key = std::to_string(patch.getPatchLevelNumber()) + "_"
-                   + amr::to_string(patch.getGlobalId());
+                   + core::to_string(patch.getGlobalId());
 
         auto nCells = core::product(layout.nbrCells());
 
@@ -79,7 +79,7 @@ void ConcreteTagger<Model>::tag(PHARE::solver::IPhysicalModel<amr_t>& model, pat
 
         if (!item_exists_and_valid)
         {
-            using Map_value_type = typename std::decay_t<decltype(concreteModel.tags)>::mapped_type;
+            using Map_value_type = std::decay_t<decltype(concreteModel.tags)>::mapped_type;
 
 
             concreteModel.tags[key]

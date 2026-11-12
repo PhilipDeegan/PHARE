@@ -27,6 +27,7 @@ if(HighFive)
   phare_python3_exec(9       run         test_run.py          ${CMAKE_CURRENT_BINARY_DIR}) # serial or n = 2
   phare_python3_exec(9       vtk_diagnostics test_vtk_diagnostics.py  ${CMAKE_CURRENT_BINARY_DIR}) # serial or n = 2
   phare_python3_exec(9       seed_tiling test_seed_tiling.py  ${CMAKE_CURRENT_BINARY_DIR}) # serial or n = 2
+  phare_python3_exec(9       mhd_shared_faces test_mhd_shared_faces.py ${CMAKE_CURRENT_BINARY_DIR})
   # phare_python3_exec(9       tagging     test_tagging.py      ${CMAKE_CURRENT_BINARY_DIR}) # serial or n = 2
 
   if(testMPI)
@@ -38,12 +39,11 @@ if(HighFive)
 
     phare_mpi_python3_exec(9 4 vtk_diagnostics test_vtk_diagnostics.py ${CMAKE_CURRENT_BINARY_DIR})
     phare_mpi_python3_exec(9 3 seed_tiling test_seed_tiling.py ${CMAKE_CURRENT_BINARY_DIR})
+    phare_mpi_python3_exec(9 4 mhd_shared_faces test_mhd_shared_faces.py ${CMAKE_CURRENT_BINARY_DIR})
 
   else() # serial only
     phare_python3_exec(11 test_diagnostic_timestamps test_diagnostic_timestamps.py ${CMAKE_CURRENT_BINARY_DIR})
   endif(testMPI)
-
-
 endif()
 
 configure_file(${CMAKE_CURRENT_SOURCE_DIR}/config.py ${CMAKE_CURRENT_BINARY_DIR}/config.py @ONLY)
@@ -52,4 +52,5 @@ add_subdirectory(initialize)
 add_subdirectory(refinement)
 add_subdirectory(advance)
 add_subdirectory(amr_convergence)
+add_subdirectory(layouts)
 
