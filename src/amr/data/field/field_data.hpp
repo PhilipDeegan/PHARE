@@ -12,6 +12,7 @@
 #include "core/data/field/field_box.hpp"
 #include "core/data/ndarray/ndarray_view.hpp"
 
+#include "amr/messengers/fuser_ops_strategy.hpp"
 #include "amr/samrai.hpp" // restarts
 #include "amr/utilities/box/amr_box.hpp"
 #include "amr/resources_manager/amr_utils.hpp"
@@ -175,6 +176,21 @@ namespace amr
             copy_(fieldSource, fieldOverlap);
         }
 
+        // GPU_UNIFIED: the copies are enqueued in SAMRAI's kernel fuser, launched once per
+        //  schedule by amr::FuserOpsStrategy, else as copy()
+        void copyFuseable(SAMRAI::hier::PatchData const& source,
+                          SAMRAI::hier::BoxOverlap const& overlap) final
+        {
+            if constexpr (Grid_t::alloc_mode == AllocatorMode::GPU_UNIFIED)
+            {
+                PHARE_LOG_SCOPE(3, "FieldData::copyFuseable");
+                auto& fieldSource  = dynamic_cast<FieldData const&>(source);
+                auto& fieldOverlap = dynamic_cast<FieldOverlap const&>(overlap);
+                copy_<amr::SetEqualFuseable<value_type>>(fieldSource, fieldOverlap, field);
+            }
+            else
+                copy(source, overlap);
+        }
 
 
 

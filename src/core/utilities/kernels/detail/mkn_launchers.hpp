@@ -14,6 +14,7 @@
 #include "mkn/gpu/stream.hpp"
 
 #include <vector>
+#include <algorithm>
 
 namespace PHARE::core::gpu
 {
@@ -31,6 +32,13 @@ inline std::size_t max_dynamic_shared_bytes()
 {
     static std::size_t const bytes = mkn::gpu::getMaxSharedMemoryPerBlockOptin(0);
     return bytes;
+}
+
+// streaming multiprocessors (compute units) of the device, queried once
+inline std::size_t sm_count()
+{
+    static std::size_t const n = mkn::gpu::getDeviceProperties(0).multiProcessorCount;
+    return n;
 }
 
 // mkn::gpu launches are asynchronous, _sync waits for the stream (or device) after each launch
@@ -71,6 +79,20 @@ struct DeviceLauncher : public mkn::gpu::DLauncher<Mode>
         return *this;
     }
 };
+
+// n values at p set to zero on stream, no host wait: work queued after it on the same stream
+//  sees zeros (a kernel, as a memset)
+template<typename T>
+void zero_async(T* const p, std::size_t const n, auto& stream)
+{
+    if (n == 0)
+        return;
+    DeviceLauncher<mkn::gpu::Guess, /*sync=*/false>{n}.stream(stream, [=] __device__() {
+        auto const i = PHARE::kernel::idx();
+        if (i < n)
+            p[i] = T{0};
+    });
+}
 
 // n threads per cell, 1 block per cell
 //  Fixed: a Guess launch is re-fit to the kernel's own block size limit, breaking block == cell
@@ -129,6 +151,7 @@ public:
 };
 
 // one block per listed item (e.g. tile), block threads stride the item's work
+//  blocks_per_item > 1 (grid y): the item's work is shared by that many blocks
 template<bool sync = true>
 class BlockPerLauncher : public DeviceLauncher<mkn::gpu::Fixed, sync>
 {
@@ -137,16 +160,65 @@ class BlockPerLauncher : public DeviceLauncher<mkn::gpu::Fixed, sync>
 public:
     static constexpr std::size_t default_threads = 128;
 
-    BlockPerLauncher(std::size_t const n_blocks, std::size_t const threads = default_threads)
+    BlockPerLauncher(std::size_t const n_blocks, std::size_t const threads = default_threads,
+                     std::size_t const blocks_per_item = 1)
         : Super{dim3{}, dim3{}}
     {
         this->g.x = n_blocks;
+        this->g.y = blocks_per_item;
         this->b.x = threads;
+    }
+
+    // blocks per item so the largest item gets ~batches batches of threads per block
+    static std::size_t blocks_for(std::size_t const max_item_work,
+                                  std::size_t const threads = default_threads,
+                                  std::size_t const batches = 8)
+    {
+        auto const per_block = threads * batches;
+        return std::clamp<std::size_t>((max_item_work + per_block - 1) / per_block, 1, 65535);
     }
 
     static std::uint32_t block_idx() _PHARE_DEV_FN_ { return blockIdx.x; }
     static std::uint32_t thread_idx() _PHARE_DEV_FN_ { return threadIdx.x; }
     static std::uint32_t threads() _PHARE_DEV_FN_ { return blockDim.x; }
+    static std::uint32_t item_block_idx() _PHARE_DEV_FN_ { return blockIdx.y; }
+    static std::uint32_t blocks_per_item() _PHARE_DEV_FN_ { return gridDim.y; }
+};
+
+// one block per field tile of a patch, block threads stride the points of a box of that tile
+//  no sync by default: launch on the patch's stream, the consumer waits (see .gpu_todo)
+template<bool sync = false>
+class FieldTileLauncher : public DeviceLauncher<mkn::gpu::Fixed, sync>
+{
+    using Super = DeviceLauncher<mkn::gpu::Fixed, sync>;
+
+public:
+    static constexpr std::size_t default_threads = 256;
+
+    FieldTileLauncher(std::size_t const n_tiles, std::size_t const threads = default_threads)
+        : Super{dim3{}, dim3{}}
+    {
+        this->g.x = n_tiles;
+        this->b.x = threads;
+    }
+
+    static std::uint32_t tile_idx() _PHARE_DEV_FN_ { return blockIdx.x; }
+
+    // fn(point) for each point of box, strided over the block's threads
+    template<typename Box_t, typename Fn>
+    static void for_each_point(Box_t const& box, Fn&& fn) _PHARE_DEV_FN_
+    {
+        for (std::uint32_t i = threadIdx.x; i < box.size(); i += blockDim.x)
+            fn(point_at(box, i));
+    }
+
+    // fn(i) for i in [0, n), strided over the block's threads
+    template<typename Fn>
+    static void for_each_index(std::size_t const n, Fn&& fn) _PHARE_DEV_FN_
+    {
+        for (std::size_t i = threadIdx.x; i < n; i += blockDim.x)
+            fn(i);
+    }
 };
 
 template<bool sync = false>

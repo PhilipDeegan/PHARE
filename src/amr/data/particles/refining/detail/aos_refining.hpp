@@ -298,6 +298,26 @@ void ParticlesRefiner<AoSMapped, GPU_UNIFIED>::operator()(RefineArgs<Src, Dst>& 
 }
 
 
+// SoAVXChunked: as AoS, the coarse particles walked per particle (per_particle), children staged
+//  in AoS and appended (the dst offsets rebuilt by the caller's on_appended). GPU_UNIFIED on the
+//  host, slow
+template<>
+template<auto options, auto type, typename Src, typename Dst>
+void ParticlesRefiner<SoAVXChunked, CPU>::operator()(RefineArgs<Src, Dst>& args, auto fn0,
+                                                     auto fn1)
+{
+    ParticlesRefiner<AoS, CPU>{}.template operator()<options, type>(args, fn0, fn1);
+}
+
+template<> // slow
+template<auto options, auto type, typename Src, typename Dst>
+void ParticlesRefiner<SoAVXChunked, GPU_UNIFIED>::operator()(RefineArgs<Src, Dst>& args, auto fn0,
+                                                             auto fn1)
+{
+    ParticlesRefiner<AoS, CPU>{}.template operator()<options, type>(args, fn0, fn1);
+}
+
+
 // one block per (dst box, src tile reaching it): each thread splits a coarse particle, fn1 keeps
 //  its children in the dst box (see device_refining), gathered in managed memory sized for every
 //  child of every listed particle, then appended to the dst tiles on the device

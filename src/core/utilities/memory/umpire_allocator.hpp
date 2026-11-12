@@ -5,13 +5,48 @@
 
 #if PHARE_HAVE_UMPIRE
 
+#include "umpire/ResourceManager.hpp"
+#include "umpire/strategy/QuickPool.hpp"
+
 #include <new>
+#include <mutex>
 #include <cstddef>
 #include <utility>
 #include <type_traits>
 
 namespace PHARE
 {
+
+// umpire's QuickPool isn't thread safe: concurrent allocate/deallocate from thread pool tasks
+//  (e.g. two patches' post_move_sync) corrupt its free lists and spin forever. Memory is freed on
+//  other threads than allocated it (patch data outlives tasks), so one shared pool, locked
+class LockedQuickPool : public umpire::strategy::QuickPool
+{
+public:
+    using QuickPool::QuickPool;
+
+    void* allocate(std::size_t const bytes) override
+    {
+        std::lock_guard lock{mutex_};
+        return QuickPool::allocate(bytes);
+    }
+
+    void deallocate(void* const ptr, std::size_t const size) override
+    {
+        std::lock_guard lock{mutex_};
+        QuickPool::deallocate(ptr, size);
+    }
+
+    void release() override
+    {
+        std::lock_guard lock{mutex_};
+        QuickPool::release();
+    }
+
+private:
+    std::recursive_mutex mutex_; // QuickPool calls its own virtuals: release() from
+    //  allocate(), allocate/deallocate/release from deallocate's coalesce
+};
 
 // stateless (default constructible) std:: allocator over umpire's "PHARE::data_allocator"
 //  construct = false: default construct is a no-op (like KokkosAllocator / mkn NoConstructAllocator),

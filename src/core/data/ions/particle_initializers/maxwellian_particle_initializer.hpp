@@ -205,6 +205,22 @@ void MaxwellianParticleInitializer<ParticleArray_t, GridLayout>::loadParticles(
     auto const [n, V, Vth] = fns();
     auto const seed        = baseSeed(rngSeed_);
 
+    // GPU_UNIFIED SoAVXChunked: filled on the host in a CPU array, then one bulk copy per
+    //  column (append_columns), instead of a host write into managed memory per particle
+    bool constexpr static staged = ParticleArray_t::layout_mode == LayoutMode::SoAVXChunked
+                                   and ParticleArray_t::alloc_mode == AllocatorMode::GPU_UNIFIED;
+    using Staging_t
+        = std::conditional_t<staged,
+                             ParticleArray<ParticleArray_t::options.with_alloc(AllocatorMode::CPU)>,
+                             ParticleArray_t>;
+    auto staging = [&]() {
+        if constexpr (staged)
+            return Staging_t{particles.box()};
+        else
+            return std::ref(particles);
+    }();
+    Staging_t& out = staging;
+
     if constexpr (is_tiled(ParticleArray_t::layout_mode))
     { // per tile storage: reserve where the particles will land
         core::reserve(particles, layout.AMRBox(), nbrParticlePerCell_);
@@ -221,8 +237,8 @@ void MaxwellianParticleInitializer<ParticleArray_t, GridLayout>::loadParticles(
 
         auto const incoming_estimate = (surface_cell_count_(layout.AMRBox())
                                         * (nbrParticlePerCell_ * over_alloc_factor_));
-        if constexpr (requires { particles.reserve(expected_size); }) // not per cell (AoSPCTS)
-            particles.reserve(expected_size + incoming_estimate);
+        if constexpr (requires { out.reserve(expected_size); }) // not per cell (AoSPCTS)
+            out.reserve(expected_size + incoming_estimate);
     }
 
     for (std::size_t flatCellIdx = 0; flatCellIdx < ndCellIndices.size(); ++flatCellIdx)
@@ -252,12 +268,12 @@ void MaxwellianParticleInitializer<ParticleArray_t, GridLayout>::loadParticles(
             if (basis_ == Basis::Magnetic)
                 particleVelocity = basisTransform(basis, particleVelocity);
 
-            particles.emplace_back(cellWeight, iCell, deltas(deltaDistrib, randGen),
-                                   particleVelocity);
+            out.emplace_back(cellWeight, iCell, deltas(deltaDistrib, randGen), particleVelocity);
         }
     }
 
-    // out_particles = std::move(particles);
+    if constexpr (staged)
+        particles.append_columns(out);
     particles.template on_appended<ParticleType::Domain>();
 }
 

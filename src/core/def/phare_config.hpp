@@ -39,6 +39,15 @@
 
 #endif // PHARE_HAVE_GPU
 
+// 1 in the device compilation pass of _PHARE_ALL_FN_ code, 0 on the host: lets
+//  `if constexpr (PHARE_DEVICE_PASS)` pick device only (atomicAdd...) or host only
+//  (std::string, throw...) paths without #if at the call site
+#if defined(__CUDA_ARCH__) || defined(__HIP_DEVICE_COMPILE__)
+#define PHARE_DEVICE_PASS 1
+#else
+#define PHARE_DEVICE_PASS 0
+#endif
+
 #include "core/def/detail/thrust.hpp"
 
 namespace PHARE

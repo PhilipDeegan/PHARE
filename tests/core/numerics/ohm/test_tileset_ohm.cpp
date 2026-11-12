@@ -8,12 +8,11 @@
 #include "core/def/phare_config.hpp"
 
 #include "core/utilities/types.hpp"
-#include "core/numerics/ohm/ohm.hpp"
+#include "core/numerics/ohm/ohm_transformer.hpp"
 #include "core/data/grid/grid_tiles.hpp"
 #include "core/data/particles/particle_array_def.hpp"
 #include "core/models/quantities/hybrid_quantities.hpp"
 
-#include "amr/solvers/solver_hybrid_field_evolvers.hpp"
 
 #include "simulator/simulator_def.hpp"
 
@@ -36,16 +35,16 @@ auto static const cells     = get_env_as("PHARE_CELLS", std::uint32_t{22});
 template<typename Patch>
 void ref_do(Patch& patch)
 {
-    using GridLayout_t = Patch::GridLayout_t;
-    Ohm<GridLayout_t>{{eta, nu}, patch.layout}( //
-        patch.n, patch.V, patch.P, patch.em.B, patch.J, patch.emNew.E);
+    OhmTransformer{{eta, nu}}(patch.layout, patch.n, patch.V, patch.P, patch.em.B, patch.J,
+                              patch.emNew.E);
 }
 
 template<typename Patch>
 void cmp_do(Patch& patch)
 {
-    solver::OhmSingleTransformer{{eta, nu}}(patch.layout, *patch.n, *patch.V, *patch.P, *patch.em.B,
-                                            *patch.J, *patch.emNew.E);
+    // CPU: tile by tile, GPU: one launch, block per tile
+    OhmTransformer{{eta, nu}}(patch.layout, *patch.n, *patch.V, *patch.P, *patch.em.B, *patch.J,
+                              *patch.emNew.E);
 }
 
 template<auto alloc_mode, typename GridLayout_t, typename R, typename C>
@@ -204,9 +203,9 @@ TYPED_TEST(OhmTileTest, dispatch)
 
 int main(int argc, char** argv)
 {
-    PHARE_WITH_PHLOP(phlop::threaded::ScopeTimerMan::INSTANCE().init();)
+    PHARE_WITH_PHLOP(phlop::scope_timer().init();)
     ::testing::InitGoogleTest(&argc, argv);
     auto const ret = RUN_ALL_TESTS();
-    PHARE_WITH_PHLOP(phlop::threaded::ScopeTimerMan::reset();)
+    PHARE_WITH_PHLOP(if (phlop::scope_timer().active) phlop::shutdown_scope_timer();)
     return ret;
 }

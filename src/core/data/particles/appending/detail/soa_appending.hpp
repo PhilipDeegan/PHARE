@@ -198,6 +198,16 @@ void ParticlesAppender<LM::AoSMapped, AM::CPU, LM::SoAVX, AM::CPU>::operator()( 
         dst.push_back(p);
 }
 
+// unified memory columns, appended on the host as for CPU
+template<>
+template<auto type, typename Src, typename Dst>
+void ParticlesAppender<LM::AoSMapped, AM::CPU, LM::SoAVX, AM::GPU_UNIFIED>::operator()( //
+    Src const& src, Dst& dst)
+{
+    ParticlesAppender<LM::AoSMapped, AM::CPU, LM::SoAVX, AM::CPU>{}.template operator()<type>(
+        src, dst);
+}
+
 
 template<>
 template<auto type, typename Src, typename Dst>

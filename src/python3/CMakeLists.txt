@@ -59,6 +59,14 @@ while(THIS_FILE)
         message(FATAL_ERROR "PHARE permutation line has unsupported arity (${LINE_LENGTH}): ${LINE}")
     endif()
 
+    # SoAVX* layouts need thrust (iteration, sorting), which only GPU builds have: thrust is checked
+    #  by the configurator's GPU check (tools/config/gpu_check.cpp), see core/def/detail/thrust.hpp
+    list(GET LINE_LIST 3 _LAYOUT)
+    if(NOT withGPU AND "${_LAYOUT}" MATCHES "^SoAVX")
+        message(STATUS "PHARE permutation ${LINE} skipped: ${_LAYOUT} needs thrust (-DwithGPU=ON)")
+        continue()
+    endif()
+
     list(GET LINE_LIST 4 _ALLOCATOR)
     if(NOT withGPU AND NOT "${_ALLOCATOR}" STREQUAL "CPU")
         message(FATAL_ERROR "PHARE permutation ${LINE} needs -DwithGPU=ON,"

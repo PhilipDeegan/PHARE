@@ -15,6 +15,10 @@ FILE="tests/amr/data/field/test_fields_schedules.cpp"
 FILE="tests/amr/level_initializer/test_hybrid_level_initializer.cpp"
 FILE="tests/core/numerics/ion_updater/test_multi_updater.cpp"
 CARGS=${CARGS:-""}
+# CI (.github/workflows/build.yml) points these at generated profiles for its GPU (simulated)
+MKN_HIP=${MKN_HIP:-"res/mkn/hip"} # res/mkn/hip_thrust: with rocThrust
+MKN_HIP_MPI=${MKN_HIP_MPI:-"res/mkn/hip_mpi"}
+MKN_HIP_RUN=${MKN_HIP_RUN:-"run"} # MKN_HIP_RUN=dbg for gdb
 
 set -x
 (
@@ -29,16 +33,13 @@ set -x
     mkn clean build -Kqdp test_amr -a "-fPIC" -x res/mkn/mpi -Og 0
   )
 
-  [[ $FILE == tests/core/* ]] && (
-    set -e
-    mkn clean build -p test_core -M "${FILE}" ${CARGS} -w mkn.gpu -x res/mkn/hip run "$@"
-  ) || true
-
-  [[ $FILE != tests/core/* ]] && (
-    set -e
-    mkn clean build -qp test_diagnostics -M "${FILE}" ${CARGS} -w mkn.gpu -x res/mkn/hip_mpi run "$@"
+  # if/else, not `[[ ]] && ( ) || true`: a false test is no failure, a failed build/run still is
+  if [[ $FILE == tests/core/* ]]; then
+    mkn clean build -p test_core -M "${FILE}" ${CARGS} -w mkn.gpu -x ${MKN_HIP} ${MKN_HIP_RUN} "$@"
+  else
+    mkn clean build -qp test_diagnostics -M "${FILE}" ${CARGS} -w mkn.gpu -x ${MKN_HIP_MPI} run "$@"
     echo "ok"
-  ) || true
+  fi
 
 ) 1> >(tee $CWD/.mkn.sh.out ) 2> >(tee $CWD/.mkn.sh.err >&2 )
 
@@ -47,6 +48,6 @@ set -x
 
 (
   set -xe
-  mkn -tp core_tests ${CARGS} clean build test run "$@"
-  mkn -tp more_tests ${CARGS} clean build test run "$@"
+  mkn -tp core_tests ${CARGS} -w mkn.gpu -x ${MKN_HIP} clean build test run "$@"
+  mkn -tp more_tests ${CARGS} -w mkn.gpu -x ${MKN_HIP_MPI} clean build test run "$@"
 )

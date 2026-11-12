@@ -145,8 +145,11 @@ FieldBox(Field_t&, auto const&, auto const&) -> FieldBox<Field_t>;
 template<typename Operator>
 void operate_on_span(auto* dst, auto const* src, std::size_t const size)
 {
-    for (std::size_t i = 0; i < size; ++i)
-        Operator{dst[i]}(src[i]);
+    if constexpr (requires { Operator::span(dst, src, size); }) // the operator does whole spans
+        Operator::span(dst, src, size);
+    else
+        for (std::size_t i = 0; i < size; ++i)
+            Operator{dst[i]}(src[i]);
 }
 
 

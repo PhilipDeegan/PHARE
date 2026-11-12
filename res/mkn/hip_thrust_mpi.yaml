@@ -1,0 +1,28 @@
+super: hip_thrust
+
+# as hip_thrust (rocThrust), compiled and linked through mpicxx (openmpi, OMPI_CXX=hipcc)
+#  as clang_cuda_mpi.yaml over clang_cuda.yaml
+
+find:
+  hdf5:
+    inc:
+      /usr/include/hdf5/openmpi
+      /usr/include/openmpi-x86_64
+    lib:
+      /usr/lib64/openmpi/lib
+      /usr/lib/x86_64-linux-gnu/hdf5/openmpi
+
+env: |
+  OMPI_CXX=hipcc
+  PATH=/opt/rocm/bin:${PATH}
+
+compiler:
+  mask:
+    g++:
+      mpicxx
+
+file:
+  - type: cpp:cxx:cc:c:S
+    archiver: ar -cr
+    compiler: mpicxx ${cxx.flags}
+    linker: mpicxx ${lnk.flags}

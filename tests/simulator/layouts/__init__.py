@@ -65,18 +65,10 @@ def compare_hierarchies(test, run0, run1, atol):
             print(f"{label}\n{eqr}", flush=True)
             failures.append(label)
 
-    # Priority order for debugging: particles -> moments -> B -> E, so the
-    # first failure in the report points at the earliest quantity in the
-    # causal chain (particles feed moments, moments feed E, E feeds B).
+    # Fields (moments -> B -> E) are the pass/fail criteria. Particles are only
+    # compared, as diagnostics, at times where a field compare failed.
     for time in times:
-        for pop in pops:
-            for kind in ["levelGhost", "domain"]:
-                p0 = run0.GetParticles(time, pop, type=kind)
-                p1 = run1.GetParticles(time, pop, type=kind)
-                check(
-                    f"time={time} pop={pop} particles_{kind}",
-                    hierarchy_compare(p0, p1, atol=atol["particles"]),
-                )
+        n_failures = len(failures)
 
         Ni0 = run0.GetNi(time)
         Ni1 = run1.GetNi(time)
@@ -108,6 +100,16 @@ def compare_hierarchies(test, run0, run1, atol):
         e0 = run0.GetE(time, all_primal=False)
         e1 = run1.GetE(time, all_primal=False)
         check(f"time={time} E", hierarchy_compare(e0, e1, atol=atol["e"]))
+
+        if len(failures) > n_failures:
+            for pop in pops:
+                for kind in ["levelGhost", "domain"]:
+                    p0 = run0.GetParticles(time, pop, type=kind)
+                    p1 = run1.GetParticles(time, pop, type=kind)
+                    check(
+                        f"time={time} pop={pop} particles_{kind}",
+                        hierarchy_compare(p0, p1, atol=atol["particles"]),
+                    )
 
     test.assertTrue(not failures, f"{len(failures)} check(s) failed, see output above")
 

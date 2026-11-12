@@ -25,6 +25,7 @@
 #include "umpire/TypedAllocator.hpp"
 #include "umpire/strategy/AllocationAdvisor.hpp"
 #include "umpire/strategy/QuickPool.hpp"
+#include "core/utilities/memory/umpire_allocator.hpp" // LockedQuickPool
 
 namespace PHARE::_umpire_
 {
@@ -52,7 +53,7 @@ inline auto static_init()
     {
         auto allocator = rm.getAllocator("HOST");
         [[maybe_unused]] auto phare_allocator
-            = rm.makeAllocator<umpire::strategy::QuickPool>("PHARE::data_allocator", allocator);
+            = rm.makeAllocator<LockedQuickPool>("PHARE::data_allocator", allocator);
         assert(phare_allocator.getPlatform() == umpire::Platform::host);
         assert(rm.isAllocator("PHARE::data_allocator"));
     }
@@ -77,7 +78,7 @@ inline auto static_init()
             "SET_PREFERRED_LOCATION");
 
         [[maybe_unused]] auto phare_allocator
-            = rm.makeAllocator<umpire::strategy::QuickPool>("PHARE::data_allocator", allocator);
+            = rm.makeAllocator<LockedQuickPool>("PHARE::data_allocator", allocator);
         assert(phare_allocator.getPlatform() != umpire::Platform::host);
         assert(rm.isAllocator("PHARE::data_allocator"));
     }

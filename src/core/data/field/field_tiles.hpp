@@ -10,6 +10,8 @@
 #include "core/utilities/box/box_spans.hpp"
 
 #include <tuple>
+#include <utility>
+#include <optional>
 #include <cassert>
 #include <cstdint>
 #include <string>
@@ -46,7 +48,9 @@ void operate_on_spans(Dst& dst, Box<std::uint32_t, dim> const& dst_lcl_box, Src 
     using value_type = Dst::value_type;
 
     auto const on_span = [](auto* d, auto const* s, std::uint32_t const size) {
-        if constexpr (std::is_same_v<Operator, SetEqual<value_type>>)
+        if constexpr (requires { Operator::span(d, s, size); }) // the operator does whole spans
+            Operator::span(d, s, size);
+        else if constexpr (std::is_same_v<Operator, SetEqual<value_type>>)
             std::copy_n(s, size, d);
         else
             for (std::uint32_t i = 0; i < size; ++i)
@@ -310,8 +314,22 @@ public:
     // tiles can be synced concurrently
     void sync_inner_ghosts(std::size_t const tile_idx)
     {
+        for_each_inner_ghost_overlap(tile_idx, [](auto& t0, auto const& t1, auto const& dst,
+                                                  auto const& src) {
+            operate_on_spans<SetEqual<typename Field_t::value_type>>(t0(), dst, t1(), src);
+        });
+    }
+
+    // fn(t0, t1, dst, src) for each neighbour t1 of tile `tile_idx` (t0) whose field box t0's
+    //  ghosts overlap: dst / src the overlap as local boxes of t0 / t1, see inner_ghost_overlap_
+    //  shared by the host sync above and the device sync (field_tiles_gpu.hpp)
+    void for_each_inner_ghost_overlap(std::size_t const tile_idx, auto&& fn)
+    {
         auto& t0 = super()[tile_idx];
-        traverse_tile_neighbours(super(), t0, [&](auto& t1) { sync_ghosts_from_(t0, t1); });
+        traverse_tile_neighbours(super(), t0, [&](auto& t1) {
+            if (auto const boxes = inner_ghost_overlap_(t0, t1))
+                fn(t0, t1, boxes->first, boxes->second);
+        });
     }
 
 
@@ -342,11 +360,23 @@ private:
     //  outside t0's field_box come from the face neighbours, tiles being a tensor product
     static void sync_ghosts_from_(auto& t0, auto const& t1)
     {
+        if (auto const boxes = inner_ghost_overlap_(t0, t1))
+            operate_on_spans<SetEqual<typename Field_t::value_type>>(t0(), boxes->first, t1(),
+                                                                     boxes->second);
+    }
+
+    // the ghosts of tile t0 that neighbour t1's field box, as local boxes of t0 (dst) and t1
+    //  (src), or nullopt if none
+    static auto inner_ghost_overlap_(auto const& t0, auto const& t1)
+    {
+        using Box_t   = decltype(as_unsigned(shift(t0.ghost_box(), t0.ghost_box().lower * -1)));
+        using Boxes_t = std::optional<std::pair<Box_t, Box_t>>;
+
         auto const t0_fb = t0.field_box();
         auto const t1_fb = t1.field_box();
         auto overlap     = t0.ghost_box() * t1_fb;
         if (!overlap)
-            return;
+            return Boxes_t{};
 
         for (std::size_t d = 0; d < dimension; ++d)
             if (t1_fb.lower[d] > t0_fb.lower[d])
@@ -356,11 +386,10 @@ private:
 
         for (std::size_t d = 0; d < dimension; ++d)
             if (overlap->lower[d] > overlap->upper[d])
-                return;
+                return Boxes_t{};
 
-        operate_on_spans<SetEqual<typename Field_t::value_type>>(
-            t0(), as_unsigned(shift(*overlap, t0.ghost_box().lower * -1)), t1(),
-            as_unsigned(shift(*overlap, t1.ghost_box().lower * -1)));
+        return Boxes_t{std::pair{as_unsigned(shift(*overlap, t0.ghost_box().lower * -1)),
+                                 as_unsigned(shift(*overlap, t1.ghost_box().lower * -1))}};
     }
 
     physical_quantity_type qty_;
@@ -417,6 +446,22 @@ concept has_view_t_c = requires {
     typename std::remove_cvref_t<T>::template view_t<
         typename std::remove_cvref_t<T>::vecfield_type>;
 };
+
+// an untiled (vec)field as plain device copyable views (basic:: types, no names), as tile_at
+//  gives for one tile of a tiled one
+template<typename T>
+auto untiled_view(T&& untiled)
+{
+    using T_t = std::remove_cvref_t<T>;
+    if constexpr (not requires { typename T_t::field_type; }) // a field
+        return typename T_t::Super{untiled};
+    else // a tensor field
+    {
+        using Field_t = typename T_t::field_type::Super;
+        using V_t     = basic::TensorField<Field_t, T_t::rank>;
+        return untiled.template as<V_t>([](auto& c) { return Field_t{c}; });
+    }
+}
 
 template<typename T>
 auto tile_at(T&& tiled, std::size_t const i)

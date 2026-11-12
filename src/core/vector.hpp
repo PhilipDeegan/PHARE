@@ -120,6 +120,17 @@ template<typename T, std::int32_t align>
 bool constexpr is_mkn_gpu_vector_v<std::vector<T, mkn::gpu::ManagedAllocator<T, align>>> = true;
 #endif // PHARE_HAVE_MKN_GPU
 
+// true if V is a std::vector over unified memory whose allocator constructs nothing by default
+//  (resize touches no element on the host), other than mkn::gpu's, e.g. umpire particles
+template<typename V>
+bool constexpr is_unified_non_constructing_vector_v = false;
+
+#if PHARE_HAVE_UMPIRE
+template<typename T>
+bool constexpr is_unified_non_constructing_vector_v<std::vector<T, UmpireAllocator<T, false>>>
+    = true;
+#endif // PHARE_HAVE_UMPIRE
+
 // ^ bi directionality v
 
 template<typename Type, typename allocator_type, std::uint8_t mode = 0>
@@ -335,6 +346,48 @@ struct MinimizingVector
     vector_t v;
     std::uint16_t _c = 0;
 };
+
+
+// capacity of v to at least s, the best way for its allocator: unified memory vectors that
+//  construct nothing on the host get a new buffer and a device copy (copy = false: no copy),
+//  so their elements never migrate to the host, others std::vector::reserve
+template<typename V>
+void reserve(V& v, std::size_t const s, bool const copy = true)
+{
+    if constexpr (is_mkn_gpu_vector_v<V>)
+    {
+        PHARE_WITH_MKN_GPU(mkn::gpu::reserve(v, s, copy));
+    }
+    else if constexpr (is_unified_non_constructing_vector_v<V>)
+    {
+        if (s <= v.capacity())
+            return;
+        V cpy(v.get_allocator());
+        cpy.reserve(s);
+        cpy.resize(v.size()); // constructs nothing
+        if (copy and v.size())
+            core::gpu::copy(cpy.data(), v.data(), v.size());
+        v = std::move(cpy);
+    }
+    else
+        v.reserve(s);
+}
+
+// size of v to s, growing as reserve above
+template<typename V>
+void resize(V& v, std::size_t const s, bool const copy = true)
+{
+    if constexpr (is_mkn_gpu_vector_v<V>)
+    {
+        PHARE_WITH_MKN_GPU(mkn::gpu::resize(v, s, copy));
+    }
+    else
+    {
+        if constexpr (is_unified_non_constructing_vector_v<V>)
+            reserve(v, s, copy);
+        v.resize(s);
+    }
+}
 
 
 } // namespace PHARE

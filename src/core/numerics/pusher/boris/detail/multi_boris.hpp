@@ -1,6 +1,7 @@
 #ifndef PHARE_CORE_PUSHER_BORIS_DETAIL_MULTI_BORIS_HPP
 #define PHARE_CORE_PUSHER_BORIS_DETAIL_MULTI_BORIS_HPP
 
+#include "core/logger.hpp"
 #include "core/utilities/span.hpp"
 #include "core/utilities/kernels.hpp"
 #include "core/utilities/thread_pool.hpp"
@@ -147,6 +148,9 @@ struct MultiBorisBackend
 
     template<auto mode>
     static void move_gpu_copy(auto& in, auto const i);
+
+    // GPU COPY threads per block, blocks per tile follow from the fullest tile
+    static constexpr std::size_t gpu_copy_threads = 128;
 };
 
 
@@ -154,6 +158,8 @@ template<LayoutMode layout, typename ModelAccessor, typename Interpolator>
 template<auto mode>
 void MultiBorisBackend<layout, ModelAccessor, Interpolator>::move_rest(auto& in, auto const i)
 {
+    PHARE_LOG_SCOPE(3, "MultiBoris::move_rest");
+
     auto view       = in.accessor[i];
     auto [ions, em] = view.args;
 
@@ -175,6 +181,8 @@ template<auto mode>
 void MultiBorisBackend<layout, ModelAccessor, Interpolator>::move_cpu_copy(auto& in, auto& boxings,
                                                                            auto const i)
 {
+    PHARE_LOG_SCOPE(3, "MultiBoris::move_cpu_copy");
+
     auto view       = in.accessor[i];
     auto [ions, em] = view.args;
 
@@ -268,6 +276,8 @@ void MultiBorisBackend<layout, ModelAccessor, Interpolator>::move_cpu_copy_poole
 template<LayoutMode layout, typename ModelAccessor, typename Interpolator>
 void MultiBorisBackend<layout, ModelAccessor, Interpolator>::sync_ref(auto& view, auto&... stream)
 {
+    PHARE_LOG_SCOPE(3, "MultiBoris::sync_ref");
+
     auto [ions, _] = view.args;
 
     for (auto& pop : ions)
@@ -315,27 +325,35 @@ void MultiBorisBackend<layout, ModelAccessor, Interpolator>::move_pooled(MultiBo
 
     auto& TP = ThreadPool::INSTANCE();
 
-    for (std::size_t i = 0; i < in.accessor.size(); ++i)
-    {
-        auto& pool = TP.get_pool(TP.first_ready_idx());
-        if constexpr (copy and is_cpu)
-            move_cpu_copy_pooled<mode>(pool, in, boxings, i);
-        else
-            move_rest_pooled<mode>(pool, in, i);
+    { // tile tasks per patch queued on the pools: timed as a whole, per patch only queues
+        PHARE_LOG_SCOPE(3, "MultiBoris::move_pooled::push");
+        for (std::size_t i = 0; i < in.accessor.size(); ++i)
+        {
+            auto& pool = TP.get_pool(TP.first_ready_idx());
+            if constexpr (copy and is_cpu)
+                move_cpu_copy_pooled<mode>(pool, in, boxings, i);
+            else
+                move_rest_pooled<mode>(pool, in, i);
+        }
+        TP.sync(); // every patch's tiles, across every pool, are done
     }
-    TP.sync(); // every patch's tiles, across every pool, are done
 
     if constexpr (not copy)
+    {
+        PHARE_LOG_SCOPE(3, "MultiBoris::move_pooled::sync_ref");
         TP.patch_exec(
             in.accessor.size(), [&](auto const i) { return in.accessor[i]; },
             [](auto& view) { sync_ref(view); });
+    }
 }
 
 
-template<LayoutMode layout, typename ModelAccessor, typename Interpolator>
-void MultiBorisBackend<layout, ModelAccessor, Interpolator>::prepare_gpu_copy(auto& in,
-                                                                              auto const& boxings)
+// every patch's boxings as managed span sets on in (gpu_nlgb, gpu_domain, gpu_non_owned), read by
+//  the GPU COPY kernels per patch index: shared by the tiled and flat backends
+void prepare_gpu_copy_boxes(auto& in, auto const& boxings)
 {
+    PHARE_LOG_SCOPE(3, "MultiBoris::prepare_gpu_copy");
+
     using GpuBoxSpanSet_t = std::remove_cvref_t<decltype(in.gpu_nlgb)>;
 
     auto const to_gpu = [&](auto const& patch_boxes) {
@@ -361,10 +379,20 @@ void MultiBorisBackend<layout, ModelAccessor, Interpolator>::prepare_gpu_copy(au
 
 
 template<LayoutMode layout, typename ModelAccessor, typename Interpolator>
+void MultiBorisBackend<layout, ModelAccessor, Interpolator>::prepare_gpu_copy(auto& in,
+                                                                              auto const& boxings)
+{
+    prepare_gpu_copy_boxes(in, boxings);
+}
+
+
+template<LayoutMode layout, typename ModelAccessor, typename Interpolator>
 template<auto mode>
 void MultiBorisBackend<layout, ModelAccessor, Interpolator>::move_gpu_copy(
     [[maybe_unused]] auto& in, [[maybe_unused]] auto const i)
 {
+    PHARE_LOG_SCOPE(3, "MultiBoris::move_gpu_copy");
+
 #if PHARE_HAVE_GPU
     static_assert(has_gpu_copy);
     using Tile_vt_       = Electromag_t::vecfield_type::field_type::value_type;
@@ -384,20 +412,30 @@ void MultiBorisBackend<layout, ModelAccessor, Interpolator>::move_gpu_copy(
         auto rhop            = pop.particleDensity();
         auto flux            = *pop.flux();
         auto const n_points  = rhop.max_tile_size(); // largest tile field, incl. ghosts
-        auto const extra
-            = Interpolating_::template push_deposit_extra_bytes<typename Particles_t::Particle_t>();
+        auto const extra     = Interpolating_::template push_deposit_extra_bytes<
+                typename Particles_t::Particle_t>(gpu_copy_threads);
         auto const deposit_mode
             = tile_deposit_mode(n_points, extra, gpu::max_dynamic_shared_bytes());
 
         auto const launch = [&](auto parts, auto const filter_box, auto const exclude_boxes) {
             if (parts().size() == 0)
                 return;
+            // grid x = tile, y = blocks per tile, enough for the fullest tile
+            auto const max_tile_particles = [&]() {
+                std::size_t max = 0;
+                for (auto const& tile : parts())
+                    max = std::max<std::size_t>(max, tile().size());
+                return max;
+            }();
+            if (max_tile_particles == 0)
+                return;
+            using Launcher = gpu::BlockPerLauncher<false>;
+            // several blocks per tile beat one even with the staged modes' reduction into the
+            //  tile (measured: 6.8 ms vs 60 ms, 10 tiles of 100k particles)
+            auto const blocks_per_tile = Launcher::blocks_for(max_tile_particles, gpu_copy_threads);
             with_tile_deposit(deposit_mode, [&](auto deposit_c) {
-                using Launcher = gpu::ChunkLauncher<false>;
-                Launcher launcher{1, 0};
-                launcher.b.x = kernel::warp_size();
-                launcher.g.x = parts().size();
-                launcher.ds  = tile_deposit_bytes(deposit_c(), n_points, extra);
+                Launcher launcher{parts().size(), gpu_copy_threads, blocks_per_tile};
+                launcher.ds = tile_deposit_bytes(deposit_c(), n_points, extra);
                 launcher.stream(in.streamer.streams[i], [=] __device__() mutable {
                     Interpolating_::template on_tiles_push_deposit<
                         Tile_vt_, ParticleType::Domain, Particles_t::alloc_mode,
@@ -427,6 +465,40 @@ struct MultiBorisBackend<LayoutMode::AoS, ModelAccessor, Interpolator>
     static constexpr auto dim        = GridLayout_t::dimension;
     static constexpr auto alloc_mode = Particles_t::alloc_mode;
 
+    // mkn_xyz::MultiBoris dispatch: untiled, untracked (leavers partitioned after, see
+    //  post_move_sync), GPU_UNIFIED SoAVX pushes (REF) and pushes copies + deposits (COPY) on the
+    //  device, a thread per particle, global atomics
+    static constexpr bool flat         = true;
+    static constexpr bool has_gpu_copy = alloc_mode == AllocatorMode::GPU_UNIFIED
+                                         and is_soavx(Particles_t::layout_mode);
+
+    static void prepare_gpu_copy(auto& in, auto const& boxings)
+    {
+        prepare_gpu_copy_boxes(in, boxings);
+    }
+
+    template<MultiBorisMode mode>
+    static void move_gpu_copy(auto& in, auto const i);
+
+    template<MultiBorisMode mode>
+    static void move_cpu_copy(auto& in, auto const& boxings, auto const i)
+    {
+        auto view = in.accessor[i];
+        move_patch<mode>(in, view, boxings);
+    }
+
+    template<MultiBorisMode mode>
+    static void move_rest(auto& in, auto const& boxings, auto const i);
+
+    static void sync_ref(auto& /*view*/, auto& /*stream*/) {}
+
+    // one particle, host or device: false if a level ghost left the ghost box on the first
+    //  half step (it is then not accelerated)
+    template<auto type>
+    static bool push_particle(auto& particle, auto const& em, auto const& layout,
+                              auto const& ghostBox, auto const& halfdt,
+                              double const coef1) _PHARE_ALL_FN_;
+
     template<MultiBorisMode mode>
     static void move_sequential(MultiBoris_t& in, auto const& boxings);
 
@@ -444,6 +516,42 @@ struct MultiBorisBackend<LayoutMode::AoS, ModelAccessor, Interpolator>
 
     template<auto type>
     static void push_copies_and_deposit(auto const& particles, auto& pop, auto&&... args);
+
+    // fn(particle) for each particle: SoAVX stores components in columns, so a Particle<dim>
+    //  is loaded per index and, if `store`, written back after fn
+    template<bool store>
+    static void per_particle(auto& particles, auto&& fn)
+    {
+        if constexpr (is_soavx(Particles_t::layout_mode))
+            for (std::size_t i = 0; i < particles.size(); ++i)
+            {
+                auto particle = particles.copy(i);
+                fn(particle);
+                if constexpr (store)
+                    particles.assign(particle, i);
+            }
+        else if constexpr (store)
+            for (auto& particle : particles)
+                fn(particle);
+        else
+            for (auto particle : particles)
+                fn(particle);
+    }
+};
+
+// SoAVX: untiled and untracked like AoS (leavers are sorted / partitioned out after the
+//  push), so the AoS backend, which branches where SoAVX can't be pushed in place
+template<typename ModelAccessor, typename Interpolator>
+struct MultiBorisBackend<LayoutMode::SoAVX, ModelAccessor, Interpolator>
+    : public MultiBorisBackend<LayoutMode::AoS, ModelAccessor, Interpolator>
+{
+};
+
+// SoAVXChunked: as SoAVX, the offsets are rebuilt after the post push sync (on_moved)
+template<typename ModelAccessor, typename Interpolator>
+struct MultiBorisBackend<LayoutMode::SoAVXChunked, ModelAccessor, Interpolator>
+    : public MultiBorisBackend<LayoutMode::AoS, ModelAccessor, Interpolator>
+{
 };
 
 
@@ -476,6 +584,8 @@ template<MultiBorisMode mode>
 void MultiBorisBackend<LayoutMode::AoS, ModelAccessor, Interpolator>::move_patch(
     MultiBoris_t& in, auto& view, auto const& boxings)
 {
+    PHARE_LOG_SCOPE(3, "MultiBoris::flat::move_patch");
+
     auto [ions, em]    = view.args;
     auto const& layout = view.layout;
     auto const& boxing = boxings.at(view.patchID());
@@ -510,16 +620,129 @@ bool MultiBorisBackend<LayoutMode::AoS, ModelAccessor, Interpolator>::push(auto&
                                                                            auto&&... args)
 {
     auto&& [em, layout, boxing, halfdt, coef1, interp] = std::forward_as_tuple(args...);
+    return push_particle<type>(particle, em, layout, boxing.ghostBox, halfdt, coef1);
+}
 
+
+template<typename ModelAccessor, typename Interpolator>
+template<auto type>
+bool MultiBorisBackend<LayoutMode::AoS, ModelAccessor, Interpolator>::push_particle(
+    auto& particle, auto const& em, auto const& layout, auto const& ghostBox, auto const& halfdt,
+    double const coef1) _PHARE_ALL_FN_
+{
     particle.iCell() = boris::advance<alloc_mode>(particle, halfdt);
 
     if constexpr (type == ParticleType::LevelGhost)
-        if (!isIn(particle.iCell(), boxing.ghostBox))
+        if (!isIn(particle.iCell(), ghostBox))
             return false;
 
+    Interpolator_t interp;
     boris::accelerate(particle, interp.m2p(particle, em, layout), coef1);
     particle.iCell() = boris::advance<alloc_mode>(particle, halfdt);
     return true;
+}
+
+
+// REF push of one patch: GPU_UNIFIED SoAVX on the device, a thread per particle loading it from
+//  the columns, pushing and storing it back; else the host loop
+template<typename ModelAccessor, typename Interpolator>
+template<MultiBorisMode mode>
+void MultiBorisBackend<LayoutMode::AoS, ModelAccessor, Interpolator>::move_rest(
+    auto& in, auto const& boxings, auto const i)
+{
+    PHARE_LOG_SCOPE(3, "MultiBoris::flat::move_rest");
+
+    auto view = in.accessor[i];
+    if constexpr (alloc_mode == AllocatorMode::GPU_UNIFIED
+                  and is_soavx(Particles_t::layout_mode))
+    {
+#if PHARE_HAVE_MKN_GPU
+        auto [ions, em]     = view.args;
+        auto const layout   = view.layout;
+        auto const ghostBox = boxings.at(view.patchID()).ghostBox;
+        auto const halfdt   = in.mesh(layout.meshSize(), in.dt);
+
+        for (auto& pop : ions)
+        {
+            double const coef1 = pop.charge() * (0.5 * in.dt / pop.mass());
+            auto const push    = [&]<auto type>(auto& particles) {
+                auto ps = particles.view();
+                if (ps.size() == 0)
+                    return;
+                kernel::launch(in.streamer.streams[i], ps.size(), [=] _PHARE_ALL_FN_() mutable {
+                    auto const pi = kernel::idx();
+                    auto particle = ps.copy(pi);
+                    push_particle<type>(particle, em, layout, ghostBox, halfdt, coef1);
+                    ps.assign(particle, pi);
+                });
+            };
+            push.template operator()<ParticleType::Domain>(pop.domainParticles());
+            push.template operator()<ParticleType::LevelGhost>(pop.levelGhostParticles());
+        }
+#endif
+    }
+    else
+        move_patch<mode>(in, view, boxings);
+}
+
+
+// COPY of one patch on the device: a thread per particle pushes a copy loaded from the columns,
+//  and deposits it (global atomics) if it stays in this patch's deposit boxes, as
+//  push_copies_and_deposit: domain in the non level ghost boxes, level ghosts if owned
+template<typename ModelAccessor, typename Interpolator>
+template<MultiBorisMode mode>
+void MultiBorisBackend<LayoutMode::AoS, ModelAccessor, Interpolator>::move_gpu_copy(
+    [[maybe_unused]] auto& in, [[maybe_unused]] auto const i)
+{
+    PHARE_LOG_SCOPE(3, "MultiBoris::flat::move_gpu_copy");
+
+#if PHARE_HAVE_MKN_GPU
+    static_assert(has_gpu_copy);
+    using Deposit_t = core::Interpolator<dim, GridLayout_t::options.interp_order, /*atomic=*/true>;
+
+    auto view            = in.accessor[i];
+    auto [ions, em]      = view.args;
+    auto const layout    = view.layout;
+    auto const halfdt    = in.mesh(layout.meshSize(), in.dt);
+    auto const ghostBox  = grow(layout.AMRBox(), GridLayout_t::options.particle_ghost_width);
+    auto const nlgb      = in.gpu_nlgb[i];
+    auto const domain    = in.gpu_domain[i];
+    auto const non_owned = in.gpu_non_owned[i];
+
+    for (auto& pop : ions)
+    {
+        double const coef1 = pop.charge() * (0.5 * in.dt / pop.mass());
+        auto rhop          = pop.particleDensity();
+        auto flux          = *pop.flux();
+
+        auto const launch = [&]<auto type>(auto const& particles) {
+            using Span_t = SoAVXConstSpanParticles<dim, alloc_mode>;
+            Span_t const ps{particles};
+            if (ps.size() == 0)
+                return;
+            kernel::launch(in.streamer.streams[i], ps.size(), [=] _PHARE_ALL_FN_() mutable {
+                auto particle = ps.copy(kernel::idx());
+                if (!push_particle<type>(particle, em, layout, ghostBox, halfdt, coef1))
+                    return;
+
+                auto const& cell     = particle.iCell();
+                bool const deposits = [&]() {
+                    if constexpr (type == ParticleType::Domain)
+                        return isIn(cell, nlgb);
+                    else
+                        return isIn(cell, domain[0]) and !isIn(cell, non_owned);
+                }();
+                if (deposits)
+                    Deposit_t{}.particleToMesh(particle, rhop, flux, layout);
+            });
+        };
+
+        launch.template operator()<ParticleType::Domain>(pop.domainParticles());
+        launch.template operator()<ParticleType::LevelGhost>(pop.levelGhostParticles());
+    }
+#else
+    throw std::runtime_error("NEEDS GPU IMPL!");
+#endif
 }
 
 
@@ -528,8 +751,7 @@ template<auto type>
 void MultiBorisBackend<LayoutMode::AoS, ModelAccessor, Interpolator>::push_all(auto& particles,
                                                                                auto&&... args)
 {
-    for (auto& particle : particles)
-        push<type>(particle, args...);
+    per_particle</*store=*/true>(particles, [&](auto& particle) { push<type>(particle, args...); });
 }
 
 
@@ -543,10 +765,9 @@ void MultiBorisBackend<LayoutMode::AoS, ModelAccessor, Interpolator>::push_copie
     auto& rhoP = pop.particleDensity();
     auto& flux = pop.flux();
 
-    for (auto particle : particles)
-    {
+    per_particle</*store=*/false>(particles, [&](auto& particle) { // pushes a copy
         if (!push<type>(particle, args...))
-            continue;
+            return;
 
         bool const deposits = [&]() {
             if constexpr (type == ParticleType::Domain)
@@ -557,7 +778,7 @@ void MultiBorisBackend<LayoutMode::AoS, ModelAccessor, Interpolator>::push_copie
 
         if (deposits)
             interp.particleToMesh(particle, rhoP, flux, layout);
-    }
+    });
 }
 
 
@@ -1030,6 +1251,8 @@ void MultiBoris<ModelAccessor, Interpolator>::move(auto const& boxings)
                 streamer.streams[i].sync();
             Backend::template move_cpu_copy<mode>(*this, boxings, i);
         }
+        else if constexpr (requires { Backend::flat; }) // untiled: needs the patch boxings
+            Backend::template move_rest<mode>(*this, boxings, i);
         else
             Backend::template move_rest<mode>(*this, i);
     };

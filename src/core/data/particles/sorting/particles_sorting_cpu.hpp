@@ -55,7 +55,7 @@ public:
     {
         auto constexpr static layout_mode = ParticleArray::layout_mode;
         using enum LayoutMode;
-        if constexpr (any_in(layout_mode, SoA, SoAVX))
+        if constexpr (any_in(layout_mode, SoA, SoAVX, SoAVXChunked))
         {
             PHARE_WITH_THRUST_ELSE_THROW({
                 using Iterator_t = std::conditional_t<layout_mode == SoA, SoAIteratorAdaptor,
@@ -119,7 +119,7 @@ public:
                 });
             })
         }
-        else if constexpr (any_in(ParticleArray::layout_mode, SoAVX))
+        else if constexpr (any_in(ParticleArray::layout_mode, SoAVX, SoAVXChunked))
         {
             PHARE_WITH_THRUST_ELSE_THROW({
                 using Iterator_t = SoAVXIteratorAdaptor;

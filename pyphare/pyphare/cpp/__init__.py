@@ -189,12 +189,24 @@ def layout_mode_enum():
     return cpp_etc_lib().LayoutMode()
 
 
+def with_thrust():
+    """True if the build has thrust (GPU builds), which SoAVX* layouts need, False without a build"""
+    try:
+        return compile_options()["thrust"]
+    except ImportError:
+        return False
+
+
+def _thrust_filter(layouts):
+    return [l for l in layouts if not l.startswith("SoAVX") or with_thrust()]
+
+
 def supported_model_layouts():
     """python copy of the C++ list, usable without a build (e.g. at test import)
     checked against C++ on first load of cpp_etc"""
     from pyphare.pharein.simulation import valid_model_layouts
 
-    return list(valid_model_layouts)
+    return _thrust_filter(valid_model_layouts)
 
 
 def supported_gpu_model_layouts():
@@ -202,7 +214,7 @@ def supported_gpu_model_layouts():
     checked against C++ on first load of cpp_etc"""
     from pyphare.pharein.simulation import valid_gpu_model_layouts
 
-    return list(valid_gpu_model_layouts)
+    return _thrust_filter(valid_gpu_model_layouts)
 
 
 def supported_mhd_model_layouts():

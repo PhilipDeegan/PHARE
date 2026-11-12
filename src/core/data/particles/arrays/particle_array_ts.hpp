@@ -3,6 +3,7 @@
 
 
 #include "core/def.hpp"
+#include "core/utilities/sort.hpp"
 #include "core/def/phare_config.hpp"
 #include "core/def/detail/thrust.hpp"
 
@@ -215,21 +216,7 @@ protected:
     void sync_tile_rm_left(std::size_t const tidx) _PHARE_ALL_FN_;
 
 
-    void static sort(auto from, auto to) _PHARE_ALL_FN_
-    {
-        [[maybe_unused]] int sorted = 0;
-        PHARE_WITH_THRUST({ //
-            ++sorted;
-            thrust::sort(thrust::seq, from, to /*, std::greater<>()*/);
-        })
-        //
-        PHARE_WITH_THRUST_ELSE({ //
-            ++sorted;
-            std::sort(from, to /*, std::greater<>()*/);
-        }) //
-
-        assert(sorted == 1);
-    }
+    void static sort(auto from, auto to) _PHARE_ALL_FN_ { seq_sort(from, to); }
 
 
     TileSetView<ParticlesTile<Particles>> particles_;
@@ -512,10 +499,7 @@ public:
     template<typename V>
     void static resize(V& v, std::size_t const& s, bool const& copy = true)
     {
-        if constexpr (is_mkn_gpu_vector_v<std::decay_t<V>>)
-            PHARE_WITH_MKN_GPU(mkn::gpu::resize(v, s, copy));
-        else
-            v.resize(s);
+        PHARE::resize(v, s, copy);
     }
 
     void static reserve(Particles& ps, std::size_t const& s, bool const& copy = true)
@@ -532,10 +516,7 @@ public:
         if (s > v.capacity())
             MemoryMonitoring::LOG(__PRETTY_FUNCTION__);
 
-        if constexpr (is_mkn_gpu_vector_v<std::decay_t<V>>)
-            PHARE_WITH_MKN_GPU(mkn::gpu::reserve(v, s, copy));
-        else
-            v.reserve(s);
+        PHARE::reserve(v, s, copy);
     }
 
 

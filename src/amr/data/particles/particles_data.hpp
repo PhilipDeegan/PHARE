@@ -458,6 +458,7 @@ namespace amr
         {
             core::select_particles(sourceData.domainParticles, domainParticles,
                                    phare_box_from<dim>(overlapBox));
+            on_copied_();
         }
 
         void copy_(SamBox const& overlapBox, ParticlesData const& sourceData,
@@ -466,6 +467,15 @@ namespace amr
             auto const offset = as_point<dim>(transformation);
             core::select_particles(sourceData.domainParticles, domainParticles,
                                    shift(phare_box_from<dim>(overlapBox), offset * -1), offset);
+            on_copied_();
+        }
+
+        // SoAVXChunked keeps its offsets eagerly: rebuilt after particles are copied in. Other
+        //  layouts keep their index as they append (AoSMapped's CellMap, tiles)
+        void on_copied_()
+        {
+            if constexpr (ParticleArray::layout_mode == core::LayoutMode::SoAVXChunked)
+                domainParticles.template on_appended<core::ParticleType::Domain>();
         }
 
 
@@ -532,6 +542,7 @@ void ParticlesData<ParticleArray_t>::copy_from_ghost(Args&&... args)
     for (auto const& overlapBox : pOverlap.getDestinationBoxContainer())
         core::select_particles<core::ParticleType::PatchGhost>(
             src_particles, dst_particles, shift(phare_box_from<dim>(overlapBox), noffset), offset);
+    on_copied_();
 }
 
 

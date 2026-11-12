@@ -2,55 +2,20 @@
 #define PHARE_FARADAY_HPP
 
 #include "core/def.hpp"
-#include "core/data/grid/gridlayoutdefs.hpp"
-#include "core/data/vecfield/vecfield_component.hpp"
-#include "core/numerics/differential_operators.hpp"
 
 namespace PHARE::core
 {
 
-template<typename GridLayout>
-class Faraday
+// Bnew = B - dt curl(E), one component at one point: curlEc is that component of curl(layout, E)
+//  where and how it is evaluated (boxes, tiles, GPU) is up to the caller,
+//  see core/numerics/faraday/faraday_transformer.hpp
+struct Faraday
 {
-public:
-    Faraday(GridLayout const& layout)
-        : layout_{layout}
+    void operator()(auto const& ijk, auto& Bnc, auto const& Bc, auto const& curlEc,
+                    double const dt) const _PHARE_ALL_FN_
     {
+        Bnc(ijk) = Bc(ijk) - dt * curlEc({ijk});
     }
-
-    template<typename VecField>
-    void operator()(VecField const& B, VecField const& E, VecField& Bnew, double dt) _PHARE_ALL_FN_
-    {
-        dt_ = dt;
-        // can't use structured bindings because
-        //   "reference to local binding declared in enclosing function"
-        auto const& Bx = B(Component::X);
-        auto const& By = B(Component::Y);
-        auto const& Bz = B(Component::Z);
-
-        auto& Bxnew = Bnew(Component::X);
-        auto& Bynew = Bnew(Component::Y);
-        auto& Bznew = Bnew(Component::Z);
-
-        auto const curlE = curl(layout_, E);
-
-        // captureless kernel: fields travel as arguments so the lambda is device-copyable
-        auto const eval = [&](auto& Bc_new, auto const& Bc, auto const& curlEc) {
-            layout_.evalOnBox(
-                Bc_new,
-                [] _PHARE_ALL_FN_(auto const& ijk, auto& Bn, auto const& Bo, auto const& curlc,
-                                  auto const dt) { Bn(ijk) = Bo(ijk) - dt * curlc({ijk}); },
-                Bc_new, Bc, curlEc, dt_);
-        };
-
-        eval(Bxnew, Bx, curlE.x);
-        eval(Bynew, By, curlE.y);
-        eval(Bznew, Bz, curlE.z);
-    }
-
-private:
-    GridLayout layout_;
-    double dt_;
 };
 
 } // namespace PHARE::core

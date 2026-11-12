@@ -44,6 +44,16 @@
 3,1,6,AoSCMTS,CPU
 3,2,6,AoSCMTS,CPU
 3,3,6,AoSCMTS,CPU
+# --- SoAVXChunked (untiled fields, SoAVX particles sorted by cell) ---
+1,1,2,SoAVXChunked,CPU
+1,2,2,SoAVXChunked,CPU
+1,3,2,SoAVXChunked,CPU
+2,1,4,SoAVXChunked,CPU
+2,2,4,SoAVXChunked,CPU
+2,3,4,SoAVXChunked,CPU
+3,1,6,SoAVXChunked,CPU
+3,2,6,SoAVXChunked,CPU
+3,3,6,SoAVXChunked,CPU
 # --- MHD-only builds (dim,layout,allocator,reconstruction,limiter,riemann,hall) ---
 # CMake normalizes these to dim,0,0,layout,allocator,... (interp/refined 0 so hybrid code is
 # not compiled in -- decoupled surfaces). layout AoS = untiled fields (like master), AoSTS = tiled.

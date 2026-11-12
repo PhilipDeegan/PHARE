@@ -2,18 +2,13 @@
 #define PHARE_CORE_NUMERICS_AMPERE_AMPERE_HPP
 
 #include "core/def.hpp"
-#include "core/utilities/types.hpp"
-#include "core/data/grid/gridlayoutdefs.hpp"
-#include "core/data/vecfield/vecfield_component.hpp"
-#include "core/numerics/differential_operators.hpp"
 
 #include <cstdint>
 
 namespace PHARE::core
 {
 
-
-enum class AmpereMode { ShrinkedGhost, GrownPhysical };
+enum class AmpereMode : std::uint16_t { ShrinkedGhost, GrownPhysical };
 
 struct AmpereBox // structural type — usable as NTTP
 {
@@ -22,51 +17,15 @@ struct AmpereBox // structural type — usable as NTTP
 };
 
 
-template<typename GridLayout, AmpereBox box = AmpereBox{}>
-class Ampere
+// J = curl(B), one component at one point: curlc is that component of curl(layout, B)
+//  where and how it is evaluated (boxes, tiles, GPU) is up to the caller,
+//  see core/numerics/ampere/ampere_transformer.hpp
+struct Ampere
 {
-    constexpr static auto dimension = GridLayout::dimension;
-
-public:
-    Ampere(GridLayout const& layout)
-        : layout_{layout}
+    void operator()(auto const& ijk, auto& Jc, auto const& curlc) const _PHARE_ALL_FN_
     {
+        Jc(ijk) = curlc({ijk});
     }
-
-    template<typename VecField>
-    void operator()(VecField const& B, VecField& J) // host: launches the kernels below
-    {
-        // can't use structured bindings because
-        //   "reference to local binding declared in enclosing function"
-        auto& Jx = J(Component::X);
-        auto& Jy = J(Component::Y);
-        auto& Jz = J(Component::Z);
-
-        Point<std::uint32_t, dimension> const amount{
-            ConstArray<std::uint32_t, dimension>(box.amount)};
-
-        auto const curlB = curl(layout_, B);
-
-        // captureless kernel: fields travel as arguments so the lambda is device-copyable
-        auto const fn = [] _PHARE_ALL_FN_(auto const& ijk, auto& Jc, auto const& curlc) {
-            Jc(ijk) = curlc({ijk});
-        };
-
-        auto const eval = [&](auto& Jc, auto const& curlc) {
-            if constexpr (box.mode == AmpereMode::ShrinkedGhost)
-                layout_.evalOnShrinkedGhostBox(Jc, amount, fn, Jc, curlc);
-            else
-                layout_.evalOnBiggerBox(Jc, amount, fn, Jc, curlc);
-        };
-
-        eval(Jx, curlB.x);
-        eval(Jy, curlB.y);
-        eval(Jz, curlB.z);
-    }
-
-
-private:
-    GridLayout layout_;
 };
 
 } // namespace PHARE::core

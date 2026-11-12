@@ -1,7 +1,7 @@
 //
 //
 
-#include "core/numerics/ampere/ampere.hpp"
+#include "core/numerics/ampere/ampere_transformer.hpp"
 
 #include "simulator/simulator_def.hpp"
 
@@ -32,7 +32,7 @@ auto evolve(/*GridLayout_t const& layout*/)
 
     UsableElectromag<field_opts> em{layout};
     UsableVecField<field_opts> J{"J", layout, HybridQuantity::Vector::J};
-    Ampere<GridLayout_t>{layout}(*em.B, *J);
+    AmpereTransformer<>{}(layout, *em.B, *J);
     return J;
 }
 

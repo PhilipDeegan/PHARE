@@ -46,6 +46,8 @@ template<auto opts>
 struct ParticleArrayTypeOptions<opts, LayoutMode::SoATS, StorageMode::ARRAY>; // nonsense
 template<auto opts>
 struct ParticleArrayTypeOptions<opts, LayoutMode::SoAVXTS, StorageMode::ARRAY>; // nonsense
+template<auto opts>
+struct ParticleArrayTypeOptions<opts, LayoutMode::SoAVXChunked, StorageMode::ARRAY>; // nonsense
 
 
 template<auto opts>

@@ -10,6 +10,7 @@
 #include "core/data/field/field_box.hpp"
 #include "core/data/tensorfield/tensorfield.hpp"
 
+#include "amr/messengers/fuser_ops_strategy.hpp"
 #include "amr/samrai.hpp"
 #include "amr/data/field/field_geometry.hpp"
 #include "amr/data/field/field_layout_data.hpp"
@@ -188,6 +189,22 @@ public:
         auto& fieldOverlap = dynamic_cast<TensorFieldOverlap_t const&>(overlap);
 
         copy_(fieldSource, fieldOverlap);
+    }
+
+    // GPU_UNIFIED: the copies are enqueued in SAMRAI's kernel fuser, launched once per schedule
+    //  by amr::FuserOpsStrategy, else as copy()
+    void copyFuseable(SAMRAI::hier::PatchData const& source,
+                      SAMRAI::hier::BoxOverlap const& overlap) final
+    {
+        if constexpr (Grid_t::alloc_mode == AllocatorMode::GPU_UNIFIED)
+        {
+            PHARE_LOG_SCOPE(3, "TensorFieldData::copyFuseable");
+            auto& fieldSource  = dynamic_cast<TensorFieldData const&>(source);
+            auto& fieldOverlap = dynamic_cast<TensorFieldOverlap_t const&>(overlap);
+            copy_<amr::SetEqualFuseable<value_type>>(fieldSource, fieldOverlap, *this);
+        }
+        else
+            copy(source, overlap);
     }
 
 

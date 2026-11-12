@@ -6,6 +6,7 @@
 #include "core/data/particles/selecting/detail/def_selecting.hpp"
 #include "core/data/particles/selecting/detail/aos_selecting.hpp"
 #include "core/data/particles/selecting/detail/soa_selecting.hpp"
+#include "core/data/particles/selecting/detail/soavx_chunked_selecting.hpp"
 
 namespace PHARE::core
 {

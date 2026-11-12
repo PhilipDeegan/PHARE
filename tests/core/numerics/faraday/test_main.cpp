@@ -5,7 +5,7 @@
 #include "core/utilities/index/index.hpp"
 #include "core/utilities/point/point.hpp"
 #include "core/data/grid/gridlayoutdefs.hpp"
-#include "core/numerics/faraday/faraday.hpp"
+#include "core/numerics/faraday/faraday_transformer.hpp"
 
 #include "simulator/simulator_def.hpp"
 
@@ -21,49 +21,6 @@
 using namespace PHARE::core;
 
 
-struct GridLayoutMock1D
-{
-    static auto const dimension = 1u;
-
-    std::size_t physicalStartIndex(FieldMock<1>&, Direction /*dir*/) { return 0; }
-    std::size_t physicalEndIndex(FieldMock<1>&, Direction /*dir*/) { return 0; }
-};
-
-struct GridLayoutMock2D
-{
-    static auto const dimension = 2u;
-
-    std::size_t physicalStartIndex(FieldMock<dimension>&, Direction /*dir*/) { return 0; }
-    std::size_t physicalEndIndex(FieldMock<dimension>&, Direction /*dir*/) { return 0; }
-};
-
-struct GridLayoutMock3D
-{
-    static auto const dimension = 3u;
-
-
-    std::size_t physicalStartIndex(FieldMock<dimension>&, Direction /*dir*/) { return 0; }
-    std::size_t physicalEndIndex(FieldMock<dimension>&, Direction /*dir*/) { return 0; }
-};
-
-
-
-TEST(Faraday, canBe1D)
-{
-    Faraday<GridLayoutMock1D> faraday{GridLayoutMock1D{}};
-}
-
-
-TEST(Faraday, canBe2D)
-{
-    Faraday<GridLayoutMock2D> faraday{GridLayoutMock2D{}};
-}
-
-
-TEST(Faraday, canBe3D)
-{
-    Faraday<GridLayoutMock3D> faraday{GridLayoutMock3D{}};
-}
 
 
 
@@ -89,7 +46,7 @@ protected:
     using core_types                 = PHARE::core::PHARE_Types<PHARE::SimOpts{dim, interp_order}>;
     using HybridTypes                = core_types::Hybrid;
     using GridLayout_t               = HybridTypes::GridLayout_t;
-    using Faraday_t                  = Faraday<GridLayout_t>;
+    using Faraday_t                  = FaradayTransformer;
     auto static constexpr field_opts = PHARE::core::TensorFieldOptions<HybridTypes>{};
     using UsableVecFieldND           = UsableVecField<field_opts>;
 
@@ -119,7 +76,7 @@ protected:
     using core_types                 = PHARE::core::PHARE_Types<PHARE::SimOpts{dim, interp_order}>;
     using HybridTypes                = core_types::Hybrid;
     using GridLayout_t               = HybridTypes::GridLayout_t;
-    using Faraday_t                  = Faraday<GridLayout_t>;
+    using Faraday_t                  = FaradayTransformer;
     auto static constexpr field_opts = PHARE::core::TensorFieldOptions<HybridTypes>{};
     using UsableVecFieldND           = UsableVecField<field_opts>;
 
@@ -148,7 +105,7 @@ protected:
     using core_types                 = PHARE::core::PHARE_Types<PHARE::SimOpts{dim, interp_order}>;
     using HybridTypes                = core_types::Hybrid;
     using GridLayout_t               = HybridTypes::GridLayout_t;
-    using Faraday_t                  = Faraday<GridLayout_t>;
+    using Faraday_t                  = FaradayTransformer;
     auto static constexpr field_opts = PHARE::core::TensorFieldOptions<HybridTypes>{};
     using UsableVecFieldND           = UsableVecField<field_opts>;
 
@@ -203,7 +160,7 @@ TEST_F(Faraday1DTest, Faraday1DCalculatedOk)
         Bz(ix) = std::tanh(point[0] - 5. / 2.);
     }
 
-    Faraday_t{layout}(B, E, Bnew, 1.);
+    Faraday_t{}(layout, B, E, Bnew, 1.);
 
     auto psi_d_X = this->layout.physicalStartIndex(QtyCentering::dual, Direction::X);
     auto pei_d_X = this->layout.physicalEndIndex(QtyCentering::dual, Direction::X);
@@ -307,7 +264,7 @@ TEST_F(Faraday2DTest, Faraday2DCalculatedOk)
         }
     }
 
-    Faraday_t{layout}(B, E, Bnew, 1.);
+    Faraday_t{}(layout, B, E, Bnew, 1.);
 
     auto psi_p_X = this->layout.physicalStartIndex(QtyCentering::primal, Direction::X);
     auto pei_p_X = this->layout.physicalEndIndex(QtyCentering::primal, Direction::X);
@@ -476,7 +433,7 @@ TEST_F(Faraday3DTest, Faraday3DCalculatedOk)
         }
     }
 
-    Faraday_t{layout}(B, E, Bnew, 1.);
+    Faraday_t{}(layout, B, E, Bnew, 1.);
 
     auto psi_p_X = this->layout.physicalStartIndex(QtyCentering::primal, Direction::X);
     auto pei_p_X = this->layout.physicalEndIndex(QtyCentering::primal, Direction::X);

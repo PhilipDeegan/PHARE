@@ -70,14 +70,9 @@ set( SOURCES_CPP
      utilities/index/index.cpp
     )
 
-set( CORE_EXTRA_SOURCES_CPP )
-if (withPhlop)
-  set( CORE_EXTRA_SOURCES_CPP ${PHARE_PROJECT_DIR}/subprojects/phlop/src/phlop/timing/scope_timer.cpp
-                              ${PHARE_PROJECT_DIR}/subprojects/phlop/src/phlop/timing/common_threaded_timer.cpp
-   )
-endif(withPhlop)
-
-add_library(${PROJECT_NAME}  ${SOURCES_INC} ${SOURCES_CPP} ${CORE_EXTRA_SOURCES_CPP} )
+# phlop sources: only common_threaded_timer.cpp, linked in phare_mpi (see src/mpi/CMakeLists.txt),
+#  phlop allows only one of scope_timer.cpp / common_threaded_timer.cpp per program
+add_library(${PROJECT_NAME}  ${SOURCES_INC} ${SOURCES_CPP} )
 target_compile_options(${PROJECT_NAME}  PRIVATE ${PHARE_FLAGS} ${PHARE_WERROR_FLAGS})
 target_link_libraries(${PROJECT_NAME}  PRIVATE phare_initializer
     PUBLIC cppdict magic_enum ${PHARE_BASE_LIBS}

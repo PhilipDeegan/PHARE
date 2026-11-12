@@ -19,7 +19,8 @@ if (withUmpire)
              NO_DEFAULT_PATH
              PATHS ${umpire_DIR})
 
-  set (PHARE_BASE_LIBS ${PHARE_BASE_LIBS} umpire SAMRAI_tbox) # cudart
+  # umpire::umpire, the plain `umpire` target is deprecated (a CMake warning per use)
+  set (PHARE_BASE_LIBS ${PHARE_BASE_LIBS} umpire::umpire SAMRAI_tbox) # cudart
   set (PHARE_FLAGS ${PHARE_FLAGS} -DHAVE_UMPIRE=1)
 
 endif(withUmpire)

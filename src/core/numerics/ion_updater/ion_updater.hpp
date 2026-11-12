@@ -388,7 +388,7 @@ private:
 template<typename ParticleArray_t, typename GridLayout>
 void ParallelIonUpdater<ParticleArray_t, GridLayout>::reset_moments(auto& accessor)
 {
-    if constexpr (use_main_thread)
+    if constexpr (use_main_thread or not is_tiled(ParticleArray_t::layout_mode))
         for (std::size_t i = 0; i < accessor.size(); ++i)
         {
             auto view      = accessor[i];
@@ -411,8 +411,16 @@ void ParallelIonUpdater<ParticleArray_t, GridLayout>::post_move_sync_(auto& view
     auto const& patch_boxings = boxings.at(view.patchID());
 
     for (auto& pop : ions)
+    {
         core::post_move_sync(pop.domainParticles(), pop.patchGhostParticles(),
                              pop.levelGhostParticles(), patch_boxings);
+        if constexpr (ParticleArray_t::layout_mode == LayoutMode::SoAVXChunked)
+        { // offsets stale after the push and the sync
+            pop.domainParticles().template on_moved<ParticleType::Domain>();
+            pop.patchGhostParticles().template on_moved<ParticleType::PatchGhost>();
+            pop.levelGhostParticles().template on_moved<ParticleType::LevelGhost>();
+        }
+    }
 }
 
 template<typename ParticleArray_t, typename GridLayout>
@@ -616,26 +624,46 @@ void FlatParallelIonUpdater<ParticleArray_t, GridLayout>::updatePopulations(
         return;
 
     dt_ = dt;
-    per_patch(accessor, [](auto& view) { resetMoments(std::get<0>(view.args)); });
+    {
+        PHARE_LOG_SCOPE(2, "FlatParallelIonUpdater::updatePopulations::reset_moments");
+        per_patch(accessor, [](auto& view) { resetMoments(std::get<0>(view.args)); });
+    }
 
     using Accessor_t = std::remove_reference_t<decltype(accessor)>;
     MultiBoris<Accessor_t, Interpolator_t> multi_boris{dt_, accessor};
 
     if (mode == UpdaterMode::domain_only)
     {
+        PHARE_LOG_SCOPE(2, "FlatParallelIonUpdater::updatePopulations::move_copy");
         multi_boris.template move<MultiBorisMode::COPY>(boxings);
         return;
     }
 
-    multi_boris.move(boxings);
+    {
+        PHARE_LOG_SCOPE(2, "FlatParallelIonUpdater::updatePopulations::move");
+        multi_boris.move(boxings);
+    }
 
+    PHARE_LOG_SCOPE(2, "FlatParallelIonUpdater::updatePopulations::per_patch");
     per_patch(accessor, [&](auto& view) {
         auto const& boxing = boxings.at(view.patchID());
         Interpolator_t interp;
         for (auto& pop : std::get<0>(view.args))
         {
-            core::post_move_sync(pop.domainParticles(), pop.patchGhostParticles(),
-                                 pop.levelGhostParticles(), boxing);
+            {
+                PHARE_LOG_SCOPE(2, "FlatParallelIonUpdater::post_move_sync");
+                core::post_move_sync(pop.domainParticles(), pop.patchGhostParticles(),
+                                     pop.levelGhostParticles(), boxing);
+            }
+            if constexpr (ParticleArray_t::layout_mode == LayoutMode::SoAVXChunked)
+            {
+                PHARE_LOG_SCOPE(2, "FlatParallelIonUpdater::on_moved");
+                // offsets stale after the push and the sync
+                pop.domainParticles().template on_moved<ParticleType::Domain>();
+                pop.patchGhostParticles().template on_moved<ParticleType::PatchGhost>();
+                pop.levelGhostParticles().template on_moved<ParticleType::LevelGhost>();
+            }
+            PHARE_LOG_SCOPE(2, "FlatParallelIonUpdater::deposit");
             interp(pop.domainParticles(), pop.particleDensity(), pop.flux(), view.layout);
             interp(pop.patchGhostParticles(), pop.particleDensity(), pop.flux(), view.layout);
         }
@@ -679,7 +707,41 @@ private:
                                  std::unordered_map<std::string, Boxing_t> const& boxings);
     void updateAndDepositAll_(auto& accessor,
                               std::unordered_map<std::string, Boxing_t> const& boxings);
+
+    // untiled GPU_UNIFIED: moments zeroed on each patch's stream, ahead of its push / deposit
+    static constexpr bool moments_on_streams
+        = ParticleArray_t::alloc_mode == AllocatorMode::GPU_UNIFIED
+          and not is_tiled(ParticleArray_t::layout_mode);
+
+    void reset_moments_(auto& accessor, auto& in);
 };
+
+
+template<typename ParticleArray_t, typename GridLayout>
+void ParallelIonUpdater<ParticleArray_t, GridLayout>::reset_moments_(auto& accessor, auto& in)
+{
+    if constexpr (moments_on_streams)
+    {
+        auto zero = [&](auto const i) mutable {
+            auto view      = accessor[i];
+            auto [ions, _] = view.args;
+            auto& stream   = in.streamer.streams[i];
+            for (auto& pop : ions)
+            {
+                auto& density = pop.particleDensity();
+                gpu::zero_async(density.data(), density.size(), stream);
+                for (auto& component : pop.flux())
+                    gpu::zero_async(component.data(), component.size(), stream);
+            }
+        };
+
+        if constexpr (use_main_thread)
+            for (std::size_t i = 0; i < accessor.size(); ++i)
+                zero(i);
+        else
+            in.streamer.host(std::move(zero));
+    }
+}
 
 
 template<typename ParticleArray_t, typename GridLayout>
@@ -689,7 +751,8 @@ void ParallelIonUpdater<ParticleArray_t, GridLayout>::updatePopulations(
 {
     PHARE_LOG_SCOPE(2, "mkn_xyz::IonUpdater::updatePopulations");
 
-    Super::reset_moments(accessor);
+    if constexpr (not moments_on_streams) // else zeroed on each patch's stream, see reset_moments_
+        Super::reset_moments(accessor);
     this->dt_ = dt;
     if (mode == UpdaterMode::domain_only)
         updateAndDepositDomain_(accessor, boxings);
@@ -709,6 +772,7 @@ void ParallelIonUpdater<ParticleArray_t, GridLayout>::updateAndDepositDomain_(
 
     using Accessor_t = std::remove_reference_t<decltype(accessor)>;
     MultiBoris<Accessor_t, Interpolator_t> in{this->dt_, accessor};
+    reset_moments_(accessor, in);
     in.template move<MultiBorisMode::COPY>(boxings);
 
     if constexpr (not use_main_thread)
@@ -732,6 +796,7 @@ void ParallelIonUpdater<ParticleArray_t, GridLayout>::updateAndDepositAll_(
     using Tile_vt    = Accessor_t::Model_t::electromag_type::vecfield_type::field_type::value_type;
 
     MultiBoris<Accessor_t, Interpolator_t> in{this->dt_, accessor};
+    reset_moments_(accessor, in);
     in.move(boxings);
 
     auto post_move_sync
@@ -743,7 +808,8 @@ void ParallelIonUpdater<ParticleArray_t, GridLayout>::updateAndDepositAll_(
     else
         in.streamer.host(std::move(post_move_sync));
 
-    if constexpr (ParticleArray_t::alloc_mode == AllocatorMode::GPU_UNIFIED)
+    if constexpr (ParticleArray_t::alloc_mode == AllocatorMode::GPU_UNIFIED
+                  and is_tiled(ParticleArray_t::layout_mode))
     {
         auto deposit = [&](auto const i) mutable {
             auto view      = accessor[i];
@@ -806,7 +872,25 @@ void ParallelIonUpdater<ParticleArray_t, GridLayout>::updateAndDepositAll_(
     }
     else
     {
-        auto deposit = [&](auto const i) mutable { Super::deposit(accessor, boxings, i); };
+        auto deposit = [&](auto const i) mutable {
+            if constexpr (ParticleArray_t::alloc_mode == AllocatorMode::GPU_UNIFIED)
+            { // untiled: this updater's atomic interpolating, a device kernel per array
+                auto view            = accessor[i];
+                auto [ions, _]       = view.args;
+                auto const& boxing_i = boxings.at(view.patchID());
+                auto& stream         = in.streamer.streams[i];
+                Interpolating_t interp;
+                for (auto& pop : ions)
+                {
+                    interp.particleToMesh(pop.domainParticles(), boxing_i.layout,
+                                          pop.particleDensity(), pop.flux(), 1., stream);
+                    interp.particleToMesh(pop.patchGhostParticles(), boxing_i.layout,
+                                          pop.particleDensity(), pop.flux(), 1., stream);
+                }
+            }
+            else
+                Super::deposit(accessor, boxings, i);
+        };
 
         if constexpr (use_main_thread)
             for (std::size_t i = 0; i < accessor.size(); ++i)
@@ -853,8 +937,8 @@ namespace PHARE::core
 {
 namespace detail
 {
-    // tiled layouts in unified memory update on the device: mkn_xyz::ParallelIonUpdater, as
-    //  test_multi_updater checks them (UpdaterVersion::mkn_parallel)
+    // layouts in unified memory update on the device: mkn_xyz::ParallelIonUpdater, as
+    //  test_multi_updater checks them (UpdaterVersion::mkn_parallel), CPU tiled: ParallelIonUpdater
     template<typename ParticleArray_t, typename GridLayout>
     using TiledIonUpdaterFor_t =
 #if PHARE_HAVE_MKN_GPU
@@ -866,13 +950,15 @@ namespace detail
 #endif
 } // namespace detail
 
+// unified memory updates on the device (mkn_xyz::ParallelIonUpdater), tiled or not: untiled
+//  GPU_UNIFIED (SoAVXChunked) through FlatParallelIonUpdater deposited on the host
 template<typename ParticleArray_t, typename GridLayout>
-using IonUpdaterFor_t
-    = std::conditional_t<ParticleArray_t::layout_mode == LayoutMode::AoSMapped,
-                         IonUpdater<ParticleArray_t, GridLayout>,
-                         std::conditional_t<is_tiled(ParticleArray_t::layout_mode),
-                                            detail::TiledIonUpdaterFor_t<ParticleArray_t, GridLayout>,
-                                            FlatParallelIonUpdater<ParticleArray_t, GridLayout>>>;
+using IonUpdaterFor_t = std::conditional_t<
+    ParticleArray_t::layout_mode == LayoutMode::AoSMapped, IonUpdater<ParticleArray_t, GridLayout>,
+    std::conditional_t<is_tiled(ParticleArray_t::layout_mode)
+                           or ParticleArray_t::alloc_mode == AllocatorMode::GPU_UNIFIED,
+                       detail::TiledIonUpdaterFor_t<ParticleArray_t, GridLayout>,
+                       FlatParallelIonUpdater<ParticleArray_t, GridLayout>>>;
 
 } // namespace PHARE::core
 

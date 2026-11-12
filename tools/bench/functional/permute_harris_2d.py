@@ -32,11 +32,12 @@ def _cells():
 
 
 permutables = [
-    ("model_layout", ["AoSMapped", "AoSCMTS"]),
+    ("model_layout", ["AoSMapped", "AoSCMTS", "SoAVXChunked", "AoSTS"]),
+    ("allocator", ["CPU"] + (["GPU_UNIFIED"] if cpp.with_gpu() else [])),
     ("interp_order", [1]),
     ("cells", _cells()),
-    ("ppc", [100]),
-    ("max_nbr_levels", [3]),
+    ("ppc", [ppc]),
+    ("max_nbr_levels", [1]),
     ("tag_buffer", [3]),  # , 4, 5, 10
     ("tagging_threshold", [0.1]),  # , 0.2, 0.3, 0.4
     ("tile_size", [3]),  # , 4, 5, 6, 7, 8   (SAMRAI clustering, not PHARE tiling)
@@ -48,14 +49,22 @@ launches = [
     {"mpirun": 4, "pools": 1, "threads": 1},
     {"mpirun": 2, "pools": 1, "threads": 2},
     {"mpirun": 1, "pools": 2, "threads": 2},
+    {"mpirun": 1, "pools": 1, "threads": 1},  # GPU runs only, one rank per GPU
 ]
 
 
-def skip(record):  # AoSMapped has no tile threading, only compare it under flat MPI
-    return (
-        record["model_layout"] == "AoSMapped"
-        and record["pools"] * record["threads"] > 1
-    )
+def skip(record):
+    layout, threaded = record["model_layout"], record["pools"] * record["threads"] > 1
+    cores = record["mpirun"] * record["pools"] * record["threads"]
+    if record["allocator"] == "GPU_UNIFIED":  # GPU layouts only (as test_layouts)
+        # one rank: there's one GPU here and CUDA aware MPI isn't used (yet)
+        return layout not in cpp.supported_gpu_model_layouts() or cores > 1
+    if cores == 1:  # CPU runs compare at equal total cores
+        return True
+    if layout not in cpp.supported_model_layouts():  # e.g. AoSTS is GPU only
+        return True
+    # untiled layouts have no tile threading, only compare them under flat MPI
+    return layout in ("AoSMapped", "SoAVXChunked") and threaded
 
 
 def config(**kwargs):
@@ -65,6 +74,7 @@ def config(**kwargs):
         refinement="tagging",
         interp_order=kwargs.get("interp_order", 1),
         model_layout=kwargs.get("model_layout", "AoSMapped"),
+        allocator=kwargs.get("allocator", "CPU"),
         time_step=kwargs.get("time_step", time_step),
         final_time=kwargs.get("final_time", final_time),
         dl=kwargs.get("dl", dl),

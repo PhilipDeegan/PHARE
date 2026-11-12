@@ -1,7 +1,9 @@
 property: 
   cxx.flags: >-
     --std=c++20 -fsized-deallocation -fPIC
-    -DPHARE_HAVE_MKN_GPU=1 -DPHARE_HAVE_GPU_HARDWARE=1 -DMKN_GPU_ROCM=1 -DDMKN_GPU_CUDA=0
+    -DPHARE_HAVE_MKN_GPU=1 -DPHARE_HAVE_GPU_HARDWARE=1 -DMKN_GPU_ROCM=1 -DMKN_GPU_CUDA=0
+    -DPHARE_HAVE_THRUST=0
+# no thrust on ROCm yet (rocThrust untested): thrust only paths (SoAVX GPU) are off
 
   lnk.flags: -pthread -lamdhip64
 local:

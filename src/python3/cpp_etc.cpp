@@ -53,6 +53,8 @@ auto supported_layouts()
     using enum core::LayoutMode;
     std::vector layouts{AoSMapped};
     layouts.emplace_back(AoSCMTS); // AoSPCTS is GPU only for now, see supported_gpu_layouts
+    if constexpr (PHARE_HAVE_THRUST) // SoAVX* need thrust, see src/python3/CMakeLists.txt
+        layouts.emplace_back(SoAVXChunked);
     return layouts;
 }
 
@@ -61,7 +63,10 @@ auto supported_layouts()
 auto supported_gpu_layouts()
 {
     using enum core::LayoutMode;
-    return std::vector{AoSTS, AoSPCTS};
+    std::vector layouts{AoSTS, AoSPCTS};
+    if constexpr (PHARE_HAVE_THRUST) // SoAVX* need thrust, see src/python3/CMakeLists.txt
+        layouts.emplace_back(SoAVXChunked);
+    return layouts;
 }
 
 // what this build was compiled with, "gpu": for GPU hardware (e.g. -DwithGPU=ON)
@@ -161,6 +166,7 @@ PYBIND11_MODULE(cpp_etc, m, py::mod_gil_not_used())
         .value("AoSMapped", AoSMapped)
         .value("AoSCMTS", AoSCMTS)
         .value("AoSPCTS", AoSPCTS)
+        .value("SoAVXChunked", SoAVXChunked)
         .value("AoS", AoS)     // MHD only builds, see pyphare's valid_mhd_model_layouts
         .value("AoSTS", AoSTS) // MHD only builds
         .finalize();

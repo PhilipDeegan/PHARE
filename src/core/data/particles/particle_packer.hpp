@@ -39,7 +39,10 @@ struct PackerBackend
     static void pack(ParticleArray_ const& particles, SoAParticles_t& copy)
     {
         for (std::size_t idx = 0; idx < particles.size(); ++idx)
-            pack_one(copy, idx, particles[idx]);
+            if constexpr (is_soavx(layout_mode)) // columns: no particle reference, a copy
+                pack_one(copy, idx, particles.copy(idx));
+            else
+                pack_one(copy, idx, particles[idx]);
     }
 };
 

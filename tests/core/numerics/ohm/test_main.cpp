@@ -13,7 +13,7 @@
 #include "simulator/simulator.h"     // static allocator init - probably should be isolated
 #endif
 
-#include "core/numerics/ohm/ohm.hpp"
+#include "core/numerics/ohm/ohm_transformer.hpp"
 #include "core/data/grid/gridlayoutdefs.hpp"
 
 #include "simulator/simulator_def.hpp"
@@ -358,8 +358,6 @@ std::vector<double> read(std::string filename)
 
 TYPED_TEST(OhmTest, ThatElectricFieldIsOkFromOhmsLaw)
 {
-    using Ohm_t = TestFixture::Ohm_t;
-
     TypeParam pair;
     auto constexpr dim    = pair.first();
     auto constexpr interp = pair.second();
@@ -378,7 +376,7 @@ TYPED_TEST(OhmTest, ThatElectricFieldIsOkFromOhmsLaw)
 
     auto const layout = NDlayout<dim, interp>::create();
 
-    Ohm_t{this->ohm_info, layout}(this->n, this->V, this->P, this->B, this->J, this->Enew);
+    OhmTransformer{this->ohm_info}(layout, this->n, this->V, this->P, this->B, this->J, this->Enew);
 
 
     auto const& [Exnew, Eynew, Eznew] = this->Enew();

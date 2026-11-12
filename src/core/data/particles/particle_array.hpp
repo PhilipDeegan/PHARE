@@ -233,7 +233,9 @@ auto constexpr base_layout_type()
 {
     using enum LayoutMode;
     auto constexpr layout_mode = ParticleArray_t::layout_mode;
-    if constexpr (any_in(layout_mode, AoS, AoSMapped, AoSPC, AoSTS, AoSCMTS, AoSPCTS))
+    // SoAVX: AoS staging (pack buffers, refine buffers), SoA has no ARRAY storage
+    if constexpr (any_in(layout_mode, AoS, AoSMapped, AoSPC, AoSTS, AoSCMTS, AoSPCTS, SoAVX,
+                         SoAVXChunked))
         return AoS;
     return SoA;
 }

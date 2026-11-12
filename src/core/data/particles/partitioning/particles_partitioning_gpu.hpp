@@ -39,7 +39,7 @@ public:
             return range_t{box, array.begin() + start,
                            array.begin() + std::distance(view.begin(), pivot)};
         }
-        else if constexpr (any_in(ParticleArray::layout_mode, SoAVX, SoAVXTS))
+        else if constexpr (any_in(ParticleArray::layout_mode, SoAVX, SoAVXChunked, SoAVXTS))
             throw std::runtime_error("no impl");
         else if constexpr (ParticleArray::layout_mode == SoA)
         {
@@ -63,7 +63,7 @@ public:
             return range_t{box, array.begin() + start,
                            array.begin() + std::distance(array.begin(), pivot)};
         }
-        else if constexpr (any_in(ParticleArray::layout_mode, SoAVX, SoAVXTS))
+        else if constexpr (any_in(ParticleArray::layout_mode, SoAVX, SoAVXChunked, SoAVXTS))
             throw std::runtime_error("no impl");
         else if constexpr (ParticleArray::layout_mode == SoA)
         {

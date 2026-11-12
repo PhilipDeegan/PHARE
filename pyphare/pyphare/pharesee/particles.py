@@ -226,21 +226,20 @@ def compare_particles(part1, part2, atol=1e-12):
                 part1.iCells[idx1], part2.iCells[idx2], verbose=True
             )
 
-            msg = "bad v"
-            np.testing.assert_allclose(
-                part1.v[idx1, 0], part2.v[idx2, 0], atol=atol, rtol=0
-            )
-            np.testing.assert_allclose(
-                part1.v[idx1, 1], part2.v[idx2, 1], atol=atol, rtol=0
-            )
-            np.testing.assert_allclose(
-                part1.v[idx1, 2], part2.v[idx2, 2], atol=atol, rtol=0
-            )
-
-            msg = "bad delta"
-            np.testing.assert_allclose(
-                part1.deltas[idx1], part2.deltas[idx2], atol=atol, rtol=0
-            )
+            # icells match: report every bad v component and delta, not just the first
+            bad = []
+            for name, a, b in [
+                ("vx", part1.v[idx1, 0], part2.v[idx2, 0]),
+                ("vy", part1.v[idx1, 1], part2.v[idx2, 1]),
+                ("vz", part1.v[idx1, 2], part2.v[idx2, 2]),
+                ("delta", part1.deltas[idx1], part2.deltas[idx2]),
+            ]:
+                try:
+                    np.testing.assert_allclose(a, b, atol=atol, rtol=0)
+                except AssertionError as ex:
+                    bad.append(f"bad {name}{ex}")
+            if bad:
+                return phut.EqualityCheck(False, "\n".join(bad))
 
             return True
         except AssertionError as ex:

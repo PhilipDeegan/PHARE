@@ -15,6 +15,7 @@
 #include "core/data/particles/arrays/particle_array_aos.hpp"
 #include "core/data/particles/arrays/particle_array_soa.hpp"
 #include "core/data/particles/arrays/particle_array_soavx.hpp"
+#include "core/data/particles/arrays/particle_array_soavx_chunked.hpp"
 
 
 namespace PHARE::core
@@ -236,6 +237,21 @@ struct ParticleArrayLayoutResolver<opts, o, LayoutMode::SoAVX, StorageMode::SPAN
 
 
 template<auto opts, auto o>
+struct ParticleArrayLayoutResolver<opts, o, LayoutMode::SoAVXChunked, StorageMode::VECTOR>
+{
+    using value_type = SoAVXChunkedParticles<SoAVXChunkedVector<opts.dim, opts.alloc_mode>>;
+};
+template<auto opts, auto o> // NOT DEFINED CAUSE NOT SENSICAL!
+struct ParticleArrayLayoutResolver<opts, o, LayoutMode::SoAVXChunked, StorageMode::ARRAY>;
+template<auto opts, auto o>
+struct ParticleArrayLayoutResolver<opts, o, LayoutMode::SoAVXChunked, StorageMode::SPAN>
+{
+    using value_type = SoAVXChunkedParticles<SoAVXChunkedSpan<opts.dim, opts.alloc_mode>>;
+};
+
+
+
+template<auto opts, auto o>
 struct ParticleArrayLayoutResolver<opts, o, LayoutMode::SoAVXTS, StorageMode::VECTOR>
 {
     using Inner      = ParticleArray<opts.with_layout(LayoutMode::SoAVX)>;
@@ -260,7 +276,8 @@ void per_particle_iterate(Particles_t& particles, auto const&& fn)
 }
 
 template<typename Particles_t>
-    requires(any_in(Particles_t::layout_mode, LayoutMode::AoS, LayoutMode::SoA, LayoutMode::SoAVX))
+    requires(any_in(Particles_t::layout_mode, LayoutMode::AoS, LayoutMode::SoA, LayoutMode::SoAVX,
+                    LayoutMode::SoAVXChunked))
 void per_particle(Particles_t& particles, auto const&& fn)
 {
     per_particle_iterate(particles, std::move(fn));

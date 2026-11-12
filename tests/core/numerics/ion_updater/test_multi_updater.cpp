@@ -26,7 +26,9 @@
 
 #include "gtest/gtest.h"
 
+#include <cmath>
 #include <tuple>
+#include <algorithm>
 #include <cstddef>
 #include <cstdlib>
 
@@ -288,7 +290,19 @@ void check_particles(GridLayout_t const& layout, P0& ref, P1& cmp_, double const
 
     EXPECT_EQ(ref.size(), cmp.size()) << name;
 
-    auto const report = compare_particles(ref, cmp, atol);
+    // atol is absolute: scale it by the largest |v|, else for |v| > ~4.5 one ULP (8.9e-16 at
+    //  |v| in [4, 8)) already exceeds 1e-15 and any rounding difference between two push
+    //  implementations (e.g. FMA contraction, seen with hipcc) fails the comparison
+    auto const v_max = [&]() {
+        double v = 0;
+        for (std::size_t i = 0; i < ref.size(); ++i)
+            for (std::size_t d = 0; d < 3; ++d)
+                v = std::max(v, std::abs(ref[i].v()[d]));
+        return v;
+    }();
+    auto const p_atol = atol * std::max(1., 4 * v_max);
+
+    auto const report = compare_particles(ref, cmp, p_atol);
     if (report)
     {
         PHARE_LOG_LINE_SS("Comparing Particle Arrays OK: " << P0::id() << " vs " << P1::id());
@@ -298,8 +312,29 @@ void check_particles(GridLayout_t const& layout, P0& ref, P1& cmp_, double const
         PHARE_LOG_LINE_SS("Comparing Particle Arrays FAIL: " << P0::id() << " vs " << P1::id());
     }
     PHARE_LOG_LINE_SS("results: " << report.why());
-    if (ref.size())
-        PHARE_LOG_LINE_SS("eg: " << ref[0]);
+    if (not report and report.idx < ref.size() and report.idx < cmp.size())
+    { // how they differ: the first mismatch, the largest differences, how many
+        auto const& r = ref[report.idx];
+        auto const& c = cmp[report.idx];
+        PHARE_LOG_LINE_SS("ref[" << report.idx << "]: " << r);
+        PHARE_LOG_LINE_SS("cmp[" << report.idx << "]: " << c);
+
+        double max_dv = 0, max_ddelta = 0;
+        std::size_t n_bad = 0;
+        for (std::size_t i = 0; i < std::min(ref.size(), cmp.size()); ++i)
+        {
+            for (std::size_t d = 0; d < 3; ++d)
+                max_dv = std::max(max_dv, std::abs(ref[i].v()[d] - cmp[i].v()[d]));
+            for (std::size_t d = 0; d < GridLayout_t::dimension; ++d)
+                max_ddelta
+                    = std::max(max_ddelta, std::abs(ref[i].delta()[d] - cmp[i].delta()[d]));
+            if (not particle_compare(ref[i], cmp[i], i, p_atol))
+                ++n_bad;
+        }
+        PHARE_LOG_LINE_SS("atol " << p_atol << ", max |dv| " << max_dv << ", max |ddelta| "
+                                  << max_ddelta << ", " << n_bad << " of " << ref.size()
+                                  << " particles differ");
+    }
 
     EXPECT_TRUE(report);
 }
@@ -470,6 +505,23 @@ using Permutations_t = testing::Types< // ! notice commas !
    ,TestParam<3, LayoutMode::AoS, AllocatorMode::CPU, UpdaterMode::domain_only>
    ,TestParam<3, LayoutMode::AoS, AllocatorMode::CPU, UpdaterMode::all>
 
+PHARE_WITH_THRUST( // SoAVX* iteration needs thrust; SoAVX (unsorted) off: not a priority, its
+                  //  GPU_UNIFIED mkn_parallel cases fail intermittently (moments/particles race)
+//   ,TestParam<1, LayoutMode::SoAVX, AllocatorMode::CPU, UpdaterMode::domain_only>
+//   ,TestParam<1, LayoutMode::SoAVX, AllocatorMode::CPU, UpdaterMode::all>
+//   ,TestParam<2, LayoutMode::SoAVX, AllocatorMode::CPU, UpdaterMode::domain_only>
+//   ,TestParam<2, LayoutMode::SoAVX, AllocatorMode::CPU, UpdaterMode::all>
+//   ,TestParam<3, LayoutMode::SoAVX, AllocatorMode::CPU, UpdaterMode::domain_only>
+//   ,TestParam<3, LayoutMode::SoAVX, AllocatorMode::CPU, UpdaterMode::all>
+
+   ,TestParam<1, LayoutMode::SoAVXChunked, AllocatorMode::CPU, UpdaterMode::domain_only>
+   ,TestParam<1, LayoutMode::SoAVXChunked, AllocatorMode::CPU, UpdaterMode::all>
+   ,TestParam<2, LayoutMode::SoAVXChunked, AllocatorMode::CPU, UpdaterMode::domain_only>
+   ,TestParam<2, LayoutMode::SoAVXChunked, AllocatorMode::CPU, UpdaterMode::all>
+   ,TestParam<3, LayoutMode::SoAVXChunked, AllocatorMode::CPU, UpdaterMode::domain_only>
+   ,TestParam<3, LayoutMode::SoAVXChunked, AllocatorMode::CPU, UpdaterMode::all>
+)
+
    ,TestParam<1, LayoutMode::AoSTS, AllocatorMode::CPU, UpdaterMode::domain_only>
    ,TestParam<1, LayoutMode::AoSTS, AllocatorMode::CPU, UpdaterMode::all>
    ,TestParam<2, LayoutMode::AoSTS, AllocatorMode::CPU, UpdaterMode::domain_only>
@@ -500,6 +552,22 @@ PHARE_WITH_GPU(
    ,TestParam<2, LayoutMode::AoSTS, AllocatorMode::GPU_UNIFIED, UpdaterMode::all,         UpdaterVersion::mkn_parallel>
    ,TestParam<3, LayoutMode::AoSTS, AllocatorMode::GPU_UNIFIED, UpdaterMode::domain_only, UpdaterVersion::mkn_parallel>
    ,TestParam<3, LayoutMode::AoSTS, AllocatorMode::GPU_UNIFIED, UpdaterMode::all,         UpdaterVersion::mkn_parallel>
+
+PHARE_WITH_THRUST( // SoAVX* GPU needs thrust (rocThrust on ROCm)
+//   ,TestParam<1, LayoutMode::SoAVX, AllocatorMode::GPU_UNIFIED, UpdaterMode::domain_only, UpdaterVersion::mkn_parallel>
+//   ,TestParam<1, LayoutMode::SoAVX, AllocatorMode::GPU_UNIFIED, UpdaterMode::all,         UpdaterVersion::mkn_parallel>
+//   ,TestParam<2, LayoutMode::SoAVX, AllocatorMode::GPU_UNIFIED, UpdaterMode::domain_only, UpdaterVersion::mkn_parallel>
+//   ,TestParam<2, LayoutMode::SoAVX, AllocatorMode::GPU_UNIFIED, UpdaterMode::all,         UpdaterVersion::mkn_parallel>
+//   ,TestParam<3, LayoutMode::SoAVX, AllocatorMode::GPU_UNIFIED, UpdaterMode::domain_only, UpdaterVersion::mkn_parallel>
+//   ,TestParam<3, LayoutMode::SoAVX, AllocatorMode::GPU_UNIFIED, UpdaterMode::all,         UpdaterVersion::mkn_parallel>
+
+   ,TestParam<1, LayoutMode::SoAVXChunked, AllocatorMode::GPU_UNIFIED, UpdaterMode::domain_only, UpdaterVersion::mkn_parallel>
+   ,TestParam<1, LayoutMode::SoAVXChunked, AllocatorMode::GPU_UNIFIED, UpdaterMode::all,         UpdaterVersion::mkn_parallel>
+   ,TestParam<2, LayoutMode::SoAVXChunked, AllocatorMode::GPU_UNIFIED, UpdaterMode::domain_only, UpdaterVersion::mkn_parallel>
+   ,TestParam<2, LayoutMode::SoAVXChunked, AllocatorMode::GPU_UNIFIED, UpdaterMode::all,         UpdaterVersion::mkn_parallel>
+   ,TestParam<3, LayoutMode::SoAVXChunked, AllocatorMode::GPU_UNIFIED, UpdaterMode::domain_only, UpdaterVersion::mkn_parallel>
+   ,TestParam<3, LayoutMode::SoAVXChunked, AllocatorMode::GPU_UNIFIED, UpdaterMode::all,         UpdaterVersion::mkn_parallel>
+)
 )
 
 >;

@@ -2,6 +2,7 @@
 #define PHARE_CORE_DATA_PARTICLES_PARTICLE_ARRAY_PerCell_HPP
 
 #include "core/operators.hpp"
+#include "core/utilities/sort.hpp"
 #include "core/utilities/span.hpp"
 #include "core/utilities/kernels.hpp"
 #include "core/utilities/box/box_spans.hpp"
@@ -90,21 +91,7 @@ public:
     // append src[idx] into cell bix if capacity allows — false when the cell is full
     bool append_from(locell_t const& bix, auto const& src, std::size_t const idx) _PHARE_ALL_FN_;
 
-    void static sort(auto from, auto to) _PHARE_ALL_FN_
-    {
-        [[maybe_unused]] int sorted = 0;
-        PHARE_WITH_THRUST({ //
-            ++sorted;
-            thrust::sort(thrust::seq, from, to);
-        })
-        //
-        PHARE_WITH_THRUST_ELSE({ //
-            ++sorted;
-            std::sort(from, to);
-        }) //
-
-        assert(sorted == 1);
-    }
+    void static sort(auto from, auto to) _PHARE_ALL_FN_ { seq_sort(from, to); }
 
     void clear()
     {

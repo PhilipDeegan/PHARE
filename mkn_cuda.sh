@@ -7,16 +7,20 @@ cls
 
 set -e
 
-FILE="tests/core/numerics/ohm/test_tileset_ohm.cpp"
-FILE="tests/core/numerics/ampere/test_tileset_ampere.cpp"
 FILE="tests/core/data/tiles/test_tile.cpp"
 FILE="tests/amr/data/field/test_fields_schedules.cpp"
 FILE="tests/amr/level_initializer/test_hybrid_level_initializer.cpp"
 FILE="tests/core/data/particles/test_particles_construction.cpp"
-FILE="tests/core/numerics/faraday/test_tileset_faraday.cpp"
-FILE="tests/core/numerics/ion_updater/test_multi_updater.cpp"
 FILE="tests/amr/data/particles/refine/test_particles_data_split.cpp"
+FILE="tests/core/numerics/ampere/test_tileset_ampere.cpp"
+FILE="tests/core/numerics/faraday/test_tileset_faraday.cpp"
+FILE="tests/core/numerics/ohm/test_tileset_ohm.cpp"
+FILE="tests/core/numerics/ion_updater/test_multi_updater.cpp"
 CARGS=${CARGS:-""}
+# CI (.github/workflows/build.yml) points these at generated profiles for its GPU (simulated H100)
+MKN_CUDA=${MKN_CUDA:-"res/mkn/clang_cuda"}
+MKN_CUDA_MPI=${MKN_CUDA_MPI:-"res/mkn/clang_cuda_mpi"}
+MKN_CUDA_RUN=${MKN_CUDA_RUN:-"run"} # MKN_CUDA_RUN=dbg for gdb
 
 set -x
 (
@@ -31,16 +35,13 @@ set -x
     mkn clean build -Kqdp test_amr -a "-fPIC" -x res/mkn/mpi -Og 0
   )
 
-  [[ $FILE == tests/core/* ]] && (
-    set -e
-    mkn clean build -p test_core -M "${FILE}" ${CARGS} -w mkn.gpu -x res/mkn/clang_cuda dbg "$@"
-  ) || true
-
-  [[ $FILE != tests/core/* ]] && (
-    set -e
-    mkn clean build -qp test_diagnostics -M "${FILE}" ${CARGS} -w mkn.gpu -x res/mkn/clang_cuda_mpi run "$@"
+  # if/else, not `[[ ]] && ( ) || true`: a false test is no failure, a failed build/run still is
+  if [[ $FILE == tests/core/* ]]; then
+    mkn clean build -p test_core -M "${FILE}" ${CARGS} -w mkn.gpu -x ${MKN_CUDA} ${MKN_CUDA_RUN} "$@"
+  else
+    mkn clean build -qp test_diagnostics -M "${FILE}" ${CARGS} -w mkn.gpu -x ${MKN_CUDA_MPI} run "$@"
     echo "ok"
-  ) || true
+  fi
 
 ) 1> >(tee $CWD/.mkn.sh.out ) 2> >(tee $CWD/.mkn.sh.err >&2 )
 
@@ -49,6 +50,6 @@ set -x
 
 (
   set -xe
-  mkn -tp core_tests ${CARGS} clean build test run "$@"
-  mkn -tp more_tests ${CARGS} clean build test run "$@"
+  mkn -tp core_tests ${CARGS} -w mkn.gpu -x ${MKN_CUDA} clean build test run "$@"
+  mkn -tp more_tests ${CARGS} -w mkn.gpu -x ${MKN_CUDA_MPI} clean build test run "$@"
 )

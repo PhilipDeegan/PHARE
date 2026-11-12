@@ -31,12 +31,20 @@ enum class LayoutMode : std::uint16_t {
     SoAVXTS,   // 8
     SoAPC,     // 9
     AoSPCTS,   // 10
+    SoAVXChunked, // 11 - SoAVX sorted by cell, per cell offsets (as AoSMapped: AoS + CellMap)
 };
 
 bool constexpr is_tiled(LayoutMode lm)
 {
     using enum LayoutMode;
     return any_in(lm, AoSCMTS, AoSTS, SoATS, SoAVXTS, AoSPCTS);
+}
+
+// flat SoAVX columns, with or without per cell offsets
+bool constexpr is_soavx(LayoutMode lm)
+{
+    using enum LayoutMode;
+    return any_in(lm, SoAVX, SoAVXChunked);
 }
 
 // guards a forwarding constructor `template<typename... Args> This(Args&&...)` so that a
@@ -194,7 +202,7 @@ Particles_t make_particles(Box<T, D> const& box, std::size_t const ghost_cells)
         return Particles_t{box, ghost_cells};
     else if constexpr (is_tiled(Particles_t::layout_mode))
         return Particles_t{box, ghost_cells};
-    else if constexpr (any_in(Particles_t::layout_mode, AoSMapped))
+    else if constexpr (any_in(Particles_t::layout_mode, AoSMapped, SoAVXChunked))
     {
         // !!! TODO(PHAREHUB/PHARE#1565): TEMPORARY margin, back to grow(box, ghost_cells) !!!
         int const ghosts = static_cast<int>(ghost_cells);

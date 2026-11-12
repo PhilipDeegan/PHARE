@@ -5,6 +5,7 @@
 #include "core/def.hpp"
 
 #include "core/utilities/span.hpp"
+#include "core/utilities/kernels.hpp"
 #include "core/utilities/types.hpp"
 #include "core/data/field/field.hpp"
 #include "core/data/field/recentered_field.hpp"
@@ -172,12 +173,136 @@ void transform(FieldTileSet<GL, ND, PQ> const& in0, FieldTileSet<GL, ND, PQ> con
 }
 
 
+// average as jobs: (x0, x1, avg, size) over contiguous buffers, an untiled field is one buffer, a
+//  tile set one per tile. Collected per field, patch or level, then run once: a device launch for
+//  GPU_UNIFIED (a block per job), else on the host
+namespace detail
+{
+    template<typename T>
+    struct AverageJob
+    {
+        T const* x0;
+        T const* x1;
+        T* avg;
+        std::size_t size;
+    };
+
+    // buffers are split so a whole patch isn't one block
+    std::size_t constexpr static average_job_chunk = 1 << 12;
+
+    void append_average_jobs(auto const* x0, auto const* x1, auto* avg, std::size_t const size,
+                             auto& jobs)
+    {
+        for (std::size_t off = 0; off < size; off += average_job_chunk)
+            jobs.push_back({x0 + off, x1 + off, avg + off,
+                            std::min(average_job_chunk, size - off)});
+    }
+} // namespace detail
+
+template<auto opts>
+void average_jobs(basic::Field<opts> const& f1, basic::Field<opts> const& f2,
+                  basic::Field<opts>& avg, auto& jobs)
+{
+    detail::append_average_jobs(f1.data(), f2.data(), avg.data(), avg.size(), jobs);
+}
+
+template<typename GL, typename ND, typename PQ>
+void average_jobs(FieldTileSet<GL, ND, PQ> const& f1, FieldTileSet<GL, ND, PQ> const& f2,
+                  FieldTileSet<GL, ND, PQ>& avg, auto& jobs)
+{
+    for (std::size_t i = 0; i < avg().size(); ++i)
+        detail::append_average_jobs(f1[i]().data(), f2[i]().data(), avg[i]().data(),
+                                    avg[i]().size(), jobs);
+}
+
+template<typename Field_t, std::size_t rank>
+void average_jobs(basic::TensorField<Field_t, rank> const& vf1,
+                  basic::TensorField<Field_t, rank> const& vf2,
+                  basic::TensorField<Field_t, rank>& Vavg, auto& jobs)
+{
+    for (std::size_t i = 0; i < detail::tensor_field_dim_from_rank<rank>(); ++i)
+        average_jobs(vf1[i], vf2[i], Vavg[i], jobs);
+}
+
+// the scalar type of a field's buffers, tiled or not
+template<typename F>
+auto constexpr field_scalar_type_()
+{
+    if constexpr (is_field_tile_set_v<F>)
+        return std::type_identity<typename F::value_type::type>{};
+    else
+        return std::type_identity<typename F::value_type>{};
+}
+template<typename F>
+using field_scalar_t = decltype(field_scalar_type_<std::remove_cvref_t<F>>())::type;
+
+// a reused job list per thread, so a call doesn't allocate (managed memory for GPU_UNIFIED)
+template<typename T, auto alloc_mode>
+auto& average_job_list()
+{
+    using Job_t = detail::AverageJob<T>;
+    if constexpr (alloc_mode == AllocatorMode::GPU_UNIFIED)
+    {
+#if PHARE_HAVE_GPU
+        static thread_local gpu::Vec_t<Job_t> jobs;
+#else // run_average_jobs throws
+        static thread_local std::vector<Job_t> jobs;
+#endif
+        jobs.clear();
+        return jobs;
+    }
+    else
+    {
+        static thread_local std::vector<Job_t> jobs;
+        jobs.clear();
+        return jobs;
+    }
+}
+
+template<auto alloc_mode>
+void run_average_jobs(auto const& jobs)
+{
+    using Job_t = std::decay_t<decltype(jobs[0])>;
+    if constexpr (alloc_mode == AllocatorMode::GPU_UNIFIED)
+    {
+#if PHARE_HAVE_GPU
+        if (jobs.empty())
+            return;
+        using Launcher = gpu::FieldTileLauncher</*sync=*/true>;
+        auto* const jp = jobs.data();
+        Launcher{jobs.size()}([=] _PHARE_ALL_FN_() mutable {
+            auto const& job = jp[Launcher::tile_idx()];
+            Launcher::for_each_index(job.size, [&](auto const i) {
+                job.avg[i] = (job.x0[i] + job.x1[i]) * .5;
+            });
+        });
+#else
+        throw std::runtime_error("average: GPU_UNIFIED needs a GPU build");
+#endif
+    }
+    else
+        for (Job_t const& job : jobs)
+            for (std::size_t i = 0; i < job.size; ++i)
+                job.avg[i] = (job.x0[i] + job.x1[i]) * .5;
+}
+
 template<typename GL, typename ND, typename PQ>
 void average(FieldTileSet<GL, ND, PQ> const& f1, FieldTileSet<GL, ND, PQ> const& f2,
              FieldTileSet<GL, ND, PQ>& avg)
 {
-    core::transform(f1, f2, avg, std::plus<double>());
-    core::transform(avg, avg, [](double x) { return x * 0.5; });
+    using Tiles_t = FieldTileSet<GL, ND, PQ>;
+    if constexpr (Tiles_t::alloc_mode == AllocatorMode::GPU_UNIFIED)
+    {
+        using T    = std::remove_cvref_t<decltype(*avg[0]().data())>;
+        auto& jobs = average_job_list<T, Tiles_t::alloc_mode>();
+        average_jobs(f1, f2, avg, jobs);
+        run_average_jobs<Tiles_t::alloc_mode>(jobs);
+    }
+    else
+    {
+        core::transform(f1, f2, avg, std::plus<double>());
+        core::transform(avg, avg, [](double x) { return x * 0.5; });
+    }
 }
 
 
@@ -198,8 +323,18 @@ void transform(basic::Field<opts> const& in0, basic::Field<opts> const& in1,
 template<auto opts>
 void average(basic::Field<opts> const& f1, basic::Field<opts> const& f2, basic::Field<opts>& avg)
 {
-    core::transform(f1, f2, avg, std::plus<double>());
-    core::transform(avg, avg, [](double x) { return x * 0.5; });
+    if constexpr (opts.alloc_mode == AllocatorMode::GPU_UNIFIED)
+    {
+        using T    = std::remove_cvref_t<decltype(*avg.data())>;
+        auto& jobs = average_job_list<T, opts.alloc_mode>();
+        average_jobs(f1, f2, avg, jobs);
+        run_average_jobs<opts.alloc_mode>(jobs);
+    }
+    else
+    {
+        core::transform(f1, f2, avg, std::plus<double>());
+        core::transform(avg, avg, [](double x) { return x * 0.5; });
+    }
 }
 
 template<typename Field_t, std::size_t rank>

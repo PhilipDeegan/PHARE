@@ -643,15 +643,18 @@ namespace core
             requires(has_physicalQuantity_v<Field>)
         _PHARE_ALL_FN_
         {
-            PHARE_DEBUG_DO(
-                constexpr auto expected = centering(src);
-                if (centering(field) != expected) {
-                    std::string msg = "GridLayout::project: field centering does not match the "
-                                      "source quantity";
-                    if constexpr (requires { field.name(); }) // basic:: tile views have no name
-                        msg += ": " + field.name();
-                    throw std::runtime_error(msg);
-                })
+            if constexpr (not PHARE_DEVICE_PASS) // host only: std::string, throw
+            {
+                PHARE_DEBUG_DO(
+                    constexpr auto expected = centering(src);
+                    if (centering(field) != expected) {
+                        std::string msg = "GridLayout::project: field centering does not match "
+                                          "the source quantity";
+                        if constexpr (requires { field.name(); }) // basic:: tile views: no name
+                            msg += ": " + field.name();
+                        throw std::runtime_error(msg);
+                    })
+            }
 
             return core::project<centering(src), centering(dst)>(field, index);
         }

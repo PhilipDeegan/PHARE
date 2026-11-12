@@ -22,24 +22,15 @@ namespace PHARE::core
 template<std::size_t dim>
 static auto soaxv_as_tuple(auto& v)
 {
+    // every component its own container: weight, iCell[dim], delta[dim], v[3]
     auto tup = std::tuple_cat(
-        std::forward_as_tuple(v.weight_, v.iCell_),
+        std::forward_as_tuple(v.weight_),
+        for_N<dim, for_N_R_mode::forward_tuple>([&](auto i) -> auto& { return v.iCell_[i]; }),
         for_N<dim, for_N_R_mode::forward_tuple>([&](auto i) -> auto& { return v.delta_[i]; }),
         for_N<3, for_N_R_mode::forward_tuple>([&](auto i) -> auto& { return v.v_[i]; }) //
     );
 
-    if constexpr (dim == 1)
-    {
-        static_assert(std::tuple_size_v<decltype(tup)> == 6);
-    }
-    if constexpr (dim == 2)
-    {
-        static_assert(std::tuple_size_v<decltype(tup)> == 7);
-    }
-    if constexpr (dim == 3)
-    {
-        static_assert(std::tuple_size_v<decltype(tup)> == 8);
-    }
+    static_assert(std::tuple_size_v<decltype(tup)> == 1 + dim + dim + 3); // 6, 8, 10
 
     return tup;
 }
@@ -60,7 +51,8 @@ struct SoAVXArray
         assert(dst < size_);
         assert(idx < src.size());
         this->weight_[dst] = src.weight(idx);
-        this->iCell_[dst]  = src.iCell(idx);
+        auto const cell    = src.iCell(idx);
+        for_N<dim>([&](auto vi) { this->iCell_[vi][dst] = cell[vi]; });
         for_N<dim>([&](auto vi) { this->delta_[vi][dst] = src.delta(idx)[vi]; });
         for_N<3>([&](auto vi) { this->v_[vi][dst] = src.v(idx)[vi]; });
     }
@@ -70,7 +62,8 @@ struct SoAVXArray
     {
         assert(dst < size_);
         this->weight_[dst] = src.weight();
-        this->iCell_[dst]  = src.iCell();
+        auto const cell    = src.iCell();
+        for_N<dim>([&](auto vi) { this->iCell_[vi][dst] = cell[vi]; });
         for_N<dim>([&](auto vi) { this->delta_[vi][dst] = src.delta()[vi]; });
         for_N<3>([&](auto vi) { this->v_[vi][dst] = src.v()[vi]; });
     }
@@ -97,7 +90,8 @@ struct SoAVXArray
 
 
 // used when the memory is owned elsewhere, e.g. numpy arrays
-template<std::size_t dim, auto alloc_mode_>
+//  _const_: columns are T const*, a view of const particles (as SoASpan)
+template<std::size_t dim, auto alloc_mode_, auto _const_ = 0>
 struct SoAVXSpan
 {
     static_assert(std::is_same_v<decltype(alloc_mode_), PHARE::AllocatorMode>);
@@ -109,7 +103,7 @@ struct SoAVXSpan
     using SIZE_T = default_span_size_t;
 
     template<typename T>
-    using container_t = T*;
+    using container_t = std::conditional_t<_const_, T const*, T*>;
 
     SoAVXSpan() = default;
 
@@ -127,14 +121,14 @@ struct SoAVXSpan
     }
 
     template<typename ParticleArray, // SFINAE protection to only allow particle arrays
-             typename = std::enable_if_t<ParticleArray::layout_mode == LayoutMode::SoAVX>>
+             typename = std::enable_if_t<is_soavx(std::decay_t<ParticleArray>::layout_mode)>>
     SoAVXSpan(ParticleArray& array)
         : SoAVXSpan{array, 0, array.size()}
     {
     }
 
     template<typename ParticleArray, // SFINAE protection to only allow particle arrays
-             typename = std::enable_if_t<ParticleArray::layout_mode == LayoutMode::SoAVX>>
+             typename = std::enable_if_t<is_soavx(std::decay_t<ParticleArray>::layout_mode)>>
     SoAVXSpan(ParticleArray&& array)
         : SoAVXSpan{array, 0, array.size()}
     {
@@ -157,16 +151,23 @@ struct SoAVXSpan
     template<typename Particles_t>
     void reset(Particles_t& src)
     {
-        this->weight_ = src.weight_.data();
-        this->iCell_  = src.iCell_.data();
-        for_N<dim>([&](auto vi) { this->delta_[vi] = src.delta()[vi].data(); });
-        for_N<3>([&](auto vi) { this->v_[vi] = src.v()[vi].data(); });
+        // src columns are vectors, or pointers if src is itself a span
+        auto const data = [](auto& column) {
+            if constexpr (std::is_pointer_v<std::decay_t<decltype(column)>>)
+                return column;
+            else
+                return column.data();
+        };
+        this->weight_ = data(src.weight_);
+        for_N<dim>([&](auto vi) { this->iCell_[vi] = data(src.iCell_[vi]); });
+        for_N<dim>([&](auto vi) { this->delta_[vi] = data(src.delta_[vi]); });
+        for_N<3>([&](auto vi) { this->v_[vi] = data(src.v_[vi]); });
         size_ = src.size();
     }
 
     SIZE_T size_;
     container_t<double> weight_;
-    container_t<std::array<int, dim>> iCell_;
+    std::array<container_t<int>, dim> iCell_;
     std::array<container_t<double>, dim> delta_;
     std::array<container_t<double>, 3> v_;
 };
@@ -186,13 +187,8 @@ struct SoAVXVector
 
     SoAVXVector() {}
 
-    SoAVXVector(std::size_t size)
-        : weight_(size)
-        , iCell_(size)
-        , delta_(size)
-        , v_(size)
-    {
-    }
+    // every component container sized (std::array members can't be from a size directly)
+    SoAVXVector(std::size_t size) { resize(size); }
 
     auto size() const _PHARE_ALL_FN_ { return weight_.size(); }
 
@@ -226,10 +222,8 @@ struct SoAVXVector
 
 
     container_t<double> weight_;
-
-    // NO AVX FOR ICELL DUE TO thrust::tuple zip_iterator only supports 10 values
-    container_t<std::array<int, dim>> iCell_;
-
+    std::array<container_t<int>, dim> iCell_; // per component, 10 zipped columns in 3d is fine
+                                              //  with thrust >= 2 (variadic cuda::std::tuple)
     std::array<container_t<double>, dim> delta_;
     std::array<container_t<double>, 3> v_;
 
@@ -301,8 +295,12 @@ public:
     auto& weight(std::size_t i) const _PHARE_ALL_FN_ { return weight_[i]; }
     auto& weight(std::size_t i) _PHARE_ALL_FN_ { return weight_[i]; }
 
-    auto& iCell(std::size_t i) const _PHARE_ALL_FN_ { return iCell_[i]; }
-    auto& iCell(std::size_t i) _PHARE_ALL_FN_ { return iCell_[i]; }
+    // per component storage: a copy, const so writing through it doesn't compile,
+    //  writers use iCell_[d][i]
+    std::array<int, dimension> const iCell(std::size_t i) const _PHARE_ALL_FN_
+    {
+        return for_N<dimension, for_N_R_mode::make_array>([&](auto d) { return iCell_[d][i]; });
+    }
 
     auto& delta(std::size_t i) const _PHARE_ALL_FN_ { return delta_[i]; }
     auto& delta(std::size_t i) _PHARE_ALL_FN_ { return delta_[i]; }
@@ -357,7 +355,9 @@ public:
     void push_back(iterator_impl<Impl> const& iter)
     {
         Super::get_vec(this->weight_).push_back(iter.weight());
-        Super::get_vec(this->iCell_).push_back(iter.iCell());
+        auto const cell = iter.iCell();
+        for_N<dimension, for_N_R_mode::forward_tuple>(
+            [&](auto i) { Super::get_vec(this->iCell_[i]).push_back(cell[i]); });
         for_N<dimension, for_N_R_mode::forward_tuple>([&](auto i) {
             Super::get_vec(this->delta_[i]).push_back(iter.template delta<dimension, i>());
         });
@@ -372,7 +372,9 @@ public:
     void push_back(Particle_t const& particle)
     {
         Super::get_vec(this->weight_).push_back(particle.weight());
-        Super::get_vec(this->iCell_).push_back(particle.iCell());
+        auto const cell = particle.iCell();
+        for_N<dimension, for_N_R_mode::forward_tuple>(
+            [&](auto i) { Super::get_vec(this->iCell_[i]).push_back(cell[i]); });
         for_N<dimension, for_N_R_mode::forward_tuple>(
             [&](auto i) { Super::get_vec(this->delta_[i]).push_back(particle.delta()[i]); });
         for_N<3, for_N_R_mode::forward_tuple>(
@@ -533,10 +535,8 @@ public:
         if (a == b)
             return;
 
-        std::swap(weight_[a], weight_[b]);
-        std::swap(iCell_[a], iCell_[b]);
-        std::swap(delta_[a], delta_[b]);
-        std::swap(v_[a], v_[b]);
+        // particle a with particle b, in every component container
+        std::apply([&](auto&... v) { (std::swap(v[a], v[b]), ...); }, as_tuple());
     }
 
 
@@ -564,7 +564,8 @@ public:
     auto copy(std::size_t i) const _PHARE_ALL_FN_
     {
         return Particle<dimension>{
-            weight_[i], iCell_[i],
+            weight_[i],
+            for_N<dimension, for_N_R_mode::make_array>([&](auto d) { return iCell_[d][i]; }),
             for_N<dimension, for_N_R_mode::make_array>(
                 [&](auto d) -> auto& { return delta_[d][i]; }),
             for_N<3, for_N_R_mode::make_array>([&](auto d) -> auto& { return v_[d][i]; })};
@@ -575,12 +576,14 @@ public:
     auto front() { return (*this)[0]; }
 
 
+    // bytes of one particle: one element of each component container
     auto constexpr static size_of_particle()
     {
-        return sizeof(typename decltype(iCell_)::value_type)
-               + sizeof(typename decltype(delta_)::value_type)
-               + sizeof(typename decltype(weight_)::value_type)
-               + sizeof(typename decltype(v_)::value_type);
+        using Tuple = std::decay_t<decltype(std::declval<This&>().as_tuple())>;
+        return []<std::size_t... I>(std::index_sequence<I...>) {
+            return (sizeof(std::decay_t<decltype(std::declval<std::tuple_element_t<I, Tuple>>()[0])>)
+                    + ...);
+        }(std::make_index_sequence<std::tuple_size_v<Tuple>>{});
     }
 
 
@@ -595,11 +598,15 @@ public:
         std::apply([&](auto&... v) { ((v[dst] = v[src]), ...); }, as_tuple());
     }
 
+    // particle src into the columns at dst
     void assign(Particle<dimension> const& src, std::size_t const& dst) _PHARE_ALL_FN_
     {
-        auto this_tuple = as_tuple();
-        for_N<std::tuple_size_v<decltype(this_tuple)>>(
-            [&](auto i) { std::get<i>(this_tuple)[dst] = std::get<i>(*src); });
+        weight_[dst] = src.weight();
+        for_N<dimension>([&](auto d) {
+            iCell_[d][dst] = src.iCell()[d];
+            delta_[d][dst] = src.delta()[d];
+        });
+        for_N<3>([&](auto d) { v_[d][dst] = src.v()[d]; });
     }
 
     template<typename Particle_t>
@@ -636,6 +643,10 @@ public:
 template<std::size_t dim, auto alloc_mode = AllocatorMode::CPU>
 using SoAVXVectorParticles = SoAVXParticles<SoAVXVector<dim, alloc_mode>>;
 
+// a view of const SoAVX particles, columns T const*
+template<std::size_t dim, auto alloc_mode = AllocatorMode::CPU>
+using SoAVXConstSpanParticles = SoAVXParticles<SoAVXSpan<dim, alloc_mode, /*const*/ 1>>;
+
 template<std::size_t dim, std::size_t size>
 using SoAVXArrayParticles = SoAVXParticles<SoAVXArray<dim, size>>;
 
@@ -646,8 +657,9 @@ template<typename T>
 struct SoAVXParticles<OuterSuper>::iterator_impl
 {
     auto static constexpr dimension = OuterSuper::dimension;
-    auto static constexpr is_const  = std::is_const_v<T>;
-    auto static constexpr is_soavx  = true; // used for SFINAE
+    // T is the array, or a pointer to it: const if what it points to is
+    auto static constexpr is_const = std::is_const_v<std::remove_pointer_t<std::remove_reference_t<T>>>;
+    auto static constexpr is_soavx = true; // used for SFINAE
 
     using outer_type        = std::decay_t<T>;
     using difference_type   = std::size_t;
@@ -753,8 +765,7 @@ struct SoAVXParticles<OuterSuper>::iterator_impl
     auto& weight() const _PHARE_ALL_FN_ { return particle.weight(); }
     // auto& iCell() _PHARE_ALL_FN_ { return deref(particles).iCell_[curr_pos]; }
 
-    auto& iCell() _PHARE_ALL_FN_ { return particle.iCell(); }
-    auto& iCell() const _PHARE_ALL_FN_ { return particle.iCell(); }
+    decltype(auto) iCell() const _PHARE_ALL_FN_ { return particle.iCell(); } // const copy
 
     // auto& delta() _PHARE_ALL_FN_ { return deref(particles).delta_[curr_pos]; }
     auto delta() const _PHARE_ALL_FN_ { return particle.fdelta(); }

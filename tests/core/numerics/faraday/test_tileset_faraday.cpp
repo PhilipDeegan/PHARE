@@ -11,7 +11,7 @@
 #include "core/def/phare_config.hpp"
 
 #include "core/utilities/types.hpp"
-#include "core/numerics/faraday/faraday.hpp"
+#include "core/numerics/faraday/faraday_transformer.hpp"
 
 #include "simulator/simulator_def.hpp"
 
@@ -36,27 +36,24 @@ static ::BS::thread_pool pool{4};
 template<typename Patch>
 void ref_do(Patch& patch)
 {
-    using GridLayout_t = Patch::GridLayout_t;
-
-    Faraday<GridLayout_t>{patch.layout}(patch.em.B, patch.em.E, patch.emNew.B, dt);
+    FaradayTransformer{}(patch.layout, patch.em.B, patch.em.E, patch.emNew.B, dt);
 }
 
 template<typename Patch>
 void cmp_do(Patch& patch)
 {
-    using GridLayout_t = Patch::GridLayout_t;
+    FaradayTransformer const faraday{};
 
-    auto const n_tiles = patch.em.B[0]().size();
-    for (std::uint16_t ti = 0; ti < n_tiles; ++ti)
+    if constexpr (Patch::alloc_mode == AllocatorMode::GPU_UNIFIED)
     {
-        auto const B = tile_at(patch.em.B, ti);
-        auto const E = tile_at(patch.em.E, ti);
-        auto BNew    = tile_at(patch.emNew.B, ti);
-
-        pool.detach_task([=, layout = patch.em.B[0][ti].layout()]() mutable {
-            Faraday<GridLayout_t>{layout}(B, E, BNew, dt);
-        });
+        faraday(patch.layout, patch.em.B, patch.em.E, patch.emNew.B, dt); // one launch
+        return;
     }
+
+    // a pool task per tile, as the level transformer
+    for (std::size_t ti = 0; ti < tile_count(patch.emNew.B); ++ti)
+        pool.detach_task(
+            [&, ti]() { faraday.on_tile(ti, patch.em.B, patch.em.E, patch.emNew.B, dt); });
     pool.wait();
 }
 

@@ -19,5 +19,9 @@ def run(cmd, shell=True, capture_output=True, check=True, print_cmd=True):
 
 
 def build(*args):
-    cmd = "cmake --build build -- " + " ".join(args)
+    import os
+
+    # modules are several TUs (see src/simulator/simulator_decl.hpp): an unbounded -j can OOM
+    jobs = os.environ.get("THREADS", "4")
+    cmd = f"cmake --build build -j {jobs} -- " + " ".join(args)
     run(cmd, capture_output=False)

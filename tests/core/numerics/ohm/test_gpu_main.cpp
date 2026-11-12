@@ -1,7 +1,7 @@
 //
 //
 
-#include "core/numerics/ohm/ohm.hpp"
+#include "core/numerics/ohm/ohm_transformer.hpp"
 #include "simulator/simulator_def.hpp"
 
 #include "tests/core/data/gridlayout/test_gridlayout.hpp"
@@ -38,7 +38,7 @@ auto evolve(/*GridLayout_t const& layout*/)
     VecField_t V{"V", layout, HybridQuantity::Vector::V};
 
     double eta = 1, nu = 1;
-    Ohm<GridLayout_t>{{eta, nu}, layout}(*n, *V, *P, *em.B, *J, *em.E);
+    OhmTransformer{{eta, nu}}(layout, *n, *V, *P, *em.B, *J, *em.E);
     return em;
 }
 

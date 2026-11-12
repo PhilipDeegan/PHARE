@@ -5,6 +5,7 @@
 #include "core/models/quantities/hybrid_quantities.hpp"
 #include "core/numerics/ohm/ohm.hpp"
 #include "core/utilities/algorithm.hpp"
+#include "core/data/field/field_tiles_gpu.hpp"
 #include "core/utilities/box/box_spans.hpp"
 #include "mpi/mpi_utils.hpp"
 #include "core/data/vecfield/vecfield.hpp"
@@ -435,18 +436,35 @@ void SolverPPC<HybridModel, AMR_Types>::average_(level_t& level, HybridModel& mo
         TimeSetter setTime{level, model, newTime};
         auto accessor = amr::make_model_level_accessor(level, model, model.state.electromag,
                                                        electromagPred_, electromagAvg_);
-        amr::level_exec(
-            accessor, [](auto& view) -> auto& { return std::get<2>(view.args).B; },
-            [](auto& view, auto const&... tile_idx) {
+
+        using VecField_t               = std::decay_t<decltype(electromagAvg_.B)>;
+        auto constexpr static alloc_mode = VecField_t::field_type::alloc_mode;
+        if constexpr (alloc_mode == AllocatorMode::GPU_UNIFIED)
+        { // tiled or not: every patch's E and B jobs, one launch for the level
+            using T    = core::field_scalar_t<typename VecField_t::field_type>;
+            auto& jobs = core::average_job_list<T, alloc_mode>();
+            for (std::size_t i = 0; i < accessor.size(); ++i)
+            {
+                auto view                     = accessor[i];
                 auto& [electromag, pred, avg] = view.args;
-                auto const average            = [&](auto& x, auto& x_pred, auto& x_avg) {
-                    auto&& x_avg_t = core::maybe_tile_at(x_avg, tile_idx...);
-                    PHARE::core::average(core::maybe_tile_at(x, tile_idx...),
-                                                    core::maybe_tile_at(x_pred, tile_idx...), x_avg_t);
-                };
-                average(electromag.B, pred.B, avg.B);
-                average(electromag.E, pred.E, avg.E);
-            });
+                core::average_jobs(electromag.B, pred.B, avg.B, jobs);
+                core::average_jobs(electromag.E, pred.E, avg.E, jobs);
+            }
+            core::run_average_jobs<alloc_mode>(jobs);
+        }
+        else
+            amr::level_exec(
+                accessor, [](auto& view) -> auto& { return std::get<2>(view.args).B; },
+                [](auto& view, auto const&... tile_idx) {
+                    auto& [electromag, pred, avg] = view.args;
+                    auto const average            = [&](auto& x, auto& x_pred, auto& x_avg) {
+                        auto&& x_avg_t = core::maybe_tile_at(x_avg, tile_idx...);
+                        PHARE::core::average(core::maybe_tile_at(x, tile_idx...),
+                                             core::maybe_tile_at(x_pred, tile_idx...), x_avg_t);
+                    };
+                    average(electromag.B, pred.B, avg.B);
+                    average(electromag.E, pred.E, avg.E);
+                });
 
         setTime(electromagAvg_.B);
         setTime(electromagAvg_.E);

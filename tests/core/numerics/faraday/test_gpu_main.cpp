@@ -2,7 +2,7 @@
 //
 //
 
-#include "core/numerics/faraday/faraday.hpp"
+#include "core/numerics/faraday/faraday_transformer.hpp"
 
 #include "simulator/simulator_def.hpp"
 
@@ -34,7 +34,7 @@ auto evolve(/*GridLayout_t const& layout*/)
     using Electromag_t = UsableElectromag<field_opts>;
     Electromag_t em{layout};
     Electromag_t emNew{layout};
-    Faraday<GridLayout_t>{layout}(*em.B, *em.E, *emNew.B, .05);
+    FaradayTransformer{}(layout, *em.B, *em.E, *emNew.B, .05);
     return emNew;
 }
 

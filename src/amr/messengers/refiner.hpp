@@ -4,6 +4,7 @@
 #include "core/utilities/types.hpp"
 
 #include "amr/messengers/field_operate_transaction.hpp"
+#include "amr/messengers/fuser_ops_strategy.hpp"
 
 #include "communicator.hpp"
 
@@ -54,13 +55,32 @@ class Refiner : private Communicator<RefinerTypes, ResourcesManager::dimension>
     std::shared_ptr<SAMRAI::xfer::RefinePatchStrategy> patchStrat_ = nullptr;
 
 private:
-    // builds (does not store) the schedule for this Refiner's Type on the given level
+    // GPU_UNIFIED fields' copies are fused (FieldData::copyFuseable), the strategy launches them
+    //  see tests/amr/messengers/fuser_ops_strategy
+    auto constexpr static fuse_copies
+        = CompileOptions::WithRAJA
+          and FieldData_t::grid_type::alloc_mode == AllocatorMode::GPU_UNIFIED;
+
     std::shared_ptr<SAMRAI::xfer::RefineSchedule>
     makeSchedule_(std::shared_ptr<SAMRAI::hier::PatchHierarchy> const& hierarchy,
                   std::shared_ptr<SAMRAI::hier::PatchLevel> const& level,
                   std::unique_ptr<SAMRAI::xfer::RefineAlgorithm> const& algo,
                   std::shared_ptr<SAMRAI::xfer::RefineTransactionFactory> const& refac
                   = nullptr) const
+    {
+        auto schedule = makeSchedule_impl_(hierarchy, level, algo, refac);
+        if constexpr (fuse_copies)
+            schedule->setScheduleOpsStrategy(FuserOpsStrategy::instance());
+        return schedule;
+    }
+
+    // builds (does not store) the schedule for this Refiner's Type on the given level
+    std::shared_ptr<SAMRAI::xfer::RefineSchedule>
+    makeSchedule_impl_(std::shared_ptr<SAMRAI::hier::PatchHierarchy> const& hierarchy,
+                       std::shared_ptr<SAMRAI::hier::PatchLevel> const& level,
+                       std::unique_ptr<SAMRAI::xfer::RefineAlgorithm> const& algo,
+                       std::shared_ptr<SAMRAI::xfer::RefineTransactionFactory> const& refac
+                       = nullptr) const
     {
         using enum RefinerType;
         auto const levelNumber = level->getLevelNumber();

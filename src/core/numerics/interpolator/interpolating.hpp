@@ -7,7 +7,9 @@
 #include "core/utilities/range/range.hpp"
 #include "core/data/electromag/electromag.hpp"
 #include "core/data/tensorfield/tensorfield.hpp"
+#include "core/data/particles/particle_array.hpp"
 #include "core/data/particles/particle_array_def.hpp"
+#include "core/data/particles/arrays/particle_array_soavx.hpp"
 #include "core/numerics/pusher/boris/basics.hpp"
 
 #include "interpolator.hpp"
@@ -257,18 +259,20 @@ public:
             throw std::runtime_error("fail");
     }
 
+    // stream: optional, GPU_UNIFIED SoAVX deposits on it (queued after prior work on it)
     template<auto type = ParticleType::Domain, typename Particles>
     void particleToMesh(Particles const& particles, auto const& layout, auto& rhoP, auto& flux,
-                        double coef = 1.)
+                        double coef = 1., auto&... stream)
         requires(any_in(Particles::layout_mode, LayoutMode::AoS, LayoutMode::SoA,
-                        LayoutMode::SoAVX))
+                        LayoutMode::SoAVX, LayoutMode::SoAVXChunked))
     _PHARE_ALL_FN_
     {
         auto constexpr static alloc_mode = Particles::alloc_mode;
 
-        if constexpr (alloc_mode == AllocatorMode::CPU)
+        // not atomic (level init, messenger ghosts): on the host, GPU_UNIFIED memory included
+        if constexpr (alloc_mode == AllocatorMode::CPU or !atomic_ops)
         {
-            if constexpr (Particles::layout_mode == LayoutMode::SoAVX)
+            if constexpr (is_soavx(Particles::layout_mode))
             {
                 for (auto const& it : particles)
                     interp_.particleToMesh(it, rhoP, flux, layout, coef);
@@ -276,17 +280,33 @@ public:
             else
                 interp_(particles, rhoP, flux, layout, coef);
         }
-        else if (alloc_mode == AllocatorMode::GPU_UNIFIED)
+        else if constexpr (alloc_mode == AllocatorMode::GPU_UNIFIED)
         {
             static_assert(atomic_ops, "GPU must be atomic");
-            PHARE_WITH_MKN_GPU( //
-                kernel::launch(particles.size(),
-                               [=] _PHARE_ALL_FN_() mutable {
-                                   auto particle = particles.begin() + kernel::idx();
-                                   Interpolator_t{}.particleToMesh(deref(particle), rhoP, flux,
-                                                                   layout, coef);
-                               }); //
-            )
+            if constexpr (is_soavx(Particles::layout_mode))
+            {
+                // a thread per particle, loaded from the columns, global atomics
+                PHARE_WITH_MKN_GPU( //
+                    SoAVXConstSpanParticles<Particles::dimension, alloc_mode> const ps{
+                        particles}; //
+                    kernel::launch(stream..., ps.size(),
+                                   [=] _PHARE_ALL_FN_() mutable {
+                                       Interpolator_t{}.particleToMesh(ps.copy(kernel::idx()),
+                                                                       rhoP, flux, layout, coef);
+                                   }); //
+                )
+            }
+            else
+            {
+                PHARE_WITH_MKN_GPU( //
+                    kernel::launch(particles.size(),
+                                   [=] _PHARE_ALL_FN_() mutable {
+                                       auto particle = particles.begin() + kernel::idx();
+                                       Interpolator_t{}.particleToMesh(deref(particle), rhoP, flux,
+                                                                       layout, coef);
+                                   }); //
+                )
+            }
         }
         else
             throw std::runtime_error("fail");
@@ -417,6 +437,14 @@ public:
         auto rho = pdensity;
         auto fs  = flux;
 
+        // staged sums into the tile's fields: several blocks per tile (gridDim.y) add atomically
+        auto const flush = [multi = gridDim.y > 1](double& dst, double const v) {
+            if (multi)
+                atomicAdd(&dst, v);
+            else
+                dst += v;
+        };
+
         if constexpr (deposit_v == global)
         {
             each_particle([&](auto const& p) {
@@ -447,10 +475,10 @@ public:
 
             for (int i = tidx; i < ziz; i += bdim)
             {
-                pdensity.data()[i] += s_rho.data()[i];
-                flux[0].data()[i] += s_fx.data()[i];
-                flux[1].data()[i] += s_fy.data()[i];
-                flux[2].data()[i] += s_fz.data()[i];
+                flush(pdensity.data()[i], s_rho.data()[i]);
+                flush(flux[0].data()[i], s_fx.data()[i]);
+                flush(flux[1].data()[i], s_fy.data()[i]);
+                flush(flux[2].data()[i], s_fz.data()[i]);
             }
         }
         else if constexpr (deposit_v == shared_one)
@@ -479,7 +507,7 @@ public:
                 __syncthreads();
 
                 for (int i = tidx; i < ziz; i += bdim)
-                    dst.data()[i] += s_f.data()[i];
+                    flush(dst.data()[i], s_f.data()[i]);
                 __syncthreads(); // shared memory is reused by the next field
             });
         }
@@ -504,29 +532,31 @@ public:
 #endif
     }
 
-    // dynamic shared memory on_tiles_push_deposit needs after its staged fields
+    // dynamic shared memory on_tiles_push_deposit needs after its staged fields, for block_size
+    //  threads per block
     template<typename Particle_t>
-    static std::size_t push_deposit_extra_bytes()
+    static std::size_t push_deposit_extra_bytes(std::size_t const block_size)
     {
-        return 2 * kernel::warp_size() * sizeof(Particle_t) + sizeof(int);
+        return 2 * block_size * sizeof(Particle_t) + sizeof(int);
     }
 
     // Combined Boris push + particle-to-mesh deposit in a single GPU kernel.
     // Originals are untouched: each thread works on a register copy.
     // Qualifying particles (isIn filter_box and not in exclude_boxes after push) are atomically
-    // placed into a shared warp buffer. Once the buffer holds a full warp the whole warp
+    // placed into a shared block buffer. Once the buffer holds a full block the whole block
     // deposits together; any remainder is flushed at the end. With shared_one the push runs
     // once per staged field.
+    // Grid: x = tile, y = blocks per tile, each block a strided share of the tile's particles.
     //
     // Shared memory layout (launcher.ds = tile_deposit_bytes(deposit_v, ziz,
     //                                                        push_deposit_extra_bytes<Particle_t>())):
     //   [tile_deposit_fields(deposit_v) * ziz * sizeof(double)]  staged fields
-    //   [2 * warp_size * sizeof(Particle_t)]                     warp buffer
+    //   [2 * blockDim.x * sizeof(Particle_t)]                    block buffer
     //   [sizeof(int)]                                            atomic fill counter
     //
-    // 2*warp_size slots are the minimum needed: before a batch buf_count can be
-    // warp_size-1, and if every thread in the batch qualifies buf_count reaches
-    // 2*warp_size-1 — still within bounds.
+    // 2*blockDim.x slots are the minimum needed: before a batch buf_count can be
+    // blockDim.x-1, and if every thread in the batch qualifies buf_count reaches
+    // 2*blockDim.x-1 — still within bounds.
     template<typename Field_t, auto particle_type_v, auto alloc_mode_v,
              auto deposit_v = TileDeposit::shared_all>
     static void on_tiles_push_deposit(auto& particles, auto const& electromag, auto& Flux,
@@ -548,9 +578,9 @@ public:
         auto const tbox = rhop_tile.ghost_box();
         auto const ziz  = product(tbox.shape());
         auto const tidx = threadIdx.x;
-        auto const ws   = kernel::warp_size();
+        auto const ws   = blockDim.x;
 
-        // warp buffer and atomic counter after the staged fields
+        // block buffer and atomic counter after the staged fields
         auto* const part_buf = reinterpret_cast<Particle_t*>(
             reinterpret_cast<char*>(&data[0])
             + tile_deposit_fields(deposit_v) * ziz * sizeof(double));
@@ -564,9 +594,11 @@ public:
         });
         auto const& layout = electromag.E[0][blockIdx.x].layout();
 
-        auto& parts       = particles()[blockIdx.x]();
-        auto const n      = parts.size();
-        auto const nbatch = (n + ws - 1) / ws;
+        auto& parts        = particles()[blockIdx.x]();
+        auto const n       = parts.size();
+        auto const stride  = static_cast<std::size_t>(ws) * gridDim.y; // a batch over all blocks
+        auto const nbatch  = (n + stride - 1) / stride;
+        auto const b_start = static_cast<std::size_t>(blockIdx.y) * ws;
 
         auto const push_and_deposit = [&](auto&& dep) {
             if (tidx == 0)
@@ -575,7 +607,7 @@ public:
 
             for (std::size_t batch = 0; batch < nbatch; ++batch)
             {
-                std::size_t const pidx = batch * ws + tidx;
+                std::size_t const pidx = batch * stride + b_start + tidx;
                 if (pidx < n)
                 {
                     Particle_t p = parts[pidx]; // register copy — original untouched
@@ -781,6 +813,30 @@ public:
         requires(Particles_t::layout_mode == LayoutMode::AoSMapped)
     {
         interp_(particles, momentumTensor, layout, mass);
+    }
+
+    // SoAVX columns have no particle reference to iterate: deposited from an AoS buffer
+    //  loaded in batches, on the host (diagnostics only)
+    template<auto type = ParticleType::Domain, typename Particles_t>
+    void particleToMesh(Particles_t& particles, auto& momentumTensor, auto const& layout,
+                        double mass = 1.)
+        requires(is_soavx(Particles_t::layout_mode))
+    {
+        static constexpr std::size_t batch = 1024;
+        using Buffer_t                     = ParticleArray<ParticleArrayOptions{
+                                Particles_t::dimension, LayoutMode::AoS}>;
+
+        Buffer_t buffer;
+        buffer.reserve(std::min(batch, particles.size()));
+        for (std::size_t i = 0; i < particles.size(); ++i)
+        {
+            buffer.emplace_back(particles.copy(i));
+            if (buffer.size() == batch or i + 1 == particles.size())
+            {
+                interp_(buffer, momentumTensor, layout, mass);
+                buffer.clear();
+            }
+        }
     }
 
     // unlike Interpolating::particleToMesh, level ghosts are deposited after the tile reduction

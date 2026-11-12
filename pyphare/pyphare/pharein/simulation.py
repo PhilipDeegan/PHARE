@@ -191,10 +191,10 @@ def check_layout(**kwargs):
 
 # with a hybrid model, the particle layout also selects the fields' (tiled or not)
 # AoSPCTS on CPU is deprioritized (no CPU modules in res/sim/all.txt): GPU only for now
-valid_model_layouts = ("AoSMapped", "AoSCMTS")
+valid_model_layouts = ("AoSMapped", "AoSCMTS", "SoAVXChunked")
 
 # hybrid layouts with allocator="GPU_UNIFIED" (AoSTS is GPU only), see res/sim/gpu.txt
-valid_gpu_model_layouts = ("AoSTS", "AoSPCTS")
+valid_gpu_model_layouts = ("AoSTS", "AoSPCTS", "SoAVXChunked")
 
 # without a hybrid model there are no particles, fields untiled (AoS, like master) or tiled
 valid_mhd_model_layouts = ("AoS", "AoSTS")
@@ -1057,7 +1057,7 @@ class Simulation:
         These parameters are more advanced, modify them at your own risk
 
             * **layout** (``str``), layout of the physical quantities on the mesh (default = "yee")
-            * **model_layout** (``str``), in-memory layout of the model's particles and fields, with a hybrid model one of "AoSMapped", "AoSCMTS" (default = "AoSMapped"), with allocator "GPU_UNIFIED" one of "AoSTS", "AoSPCTS", without one "AoS" (untiled fields, the default) or "AoSTS" (tiled fields)
+            * **model_layout** (``str``), in-memory layout of the model's particles and fields, with a hybrid model one of "AoSMapped", "AoSCMTS", "SoAVXChunked" (default = "AoSMapped"), with allocator "GPU_UNIFIED" one of "AoSTS", "AoSPCTS", "SoAVXChunked", without one "AoS" (untiled fields, the default) or "AoSTS" (tiled fields)
             * **allocator** (``str``), particle/field data allocator, one of "CPU", "GPU_UNIFIED" (default = "CPU")
             * **threading** (``dict``), thread pools per MPI rank, ``{"pools": 1, "threads_per_pool": 1}`` (default). A pool works one patch at a time, its threads the tiles of that patch, so only tiled particle layouts use more than one thread. Overridden by the env vars ``PHARE_THREAD_POOLS`` and ``PHARE_THREADS_PER_POOL``
 

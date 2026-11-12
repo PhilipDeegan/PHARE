@@ -37,3 +37,6 @@ configure_file(${CMAKE_CURRENT_SOURCE_DIR}/job.py.in ${CMAKE_CURRENT_BINARY_DIR}
 
 add_subdirectory(composite_refine_patch_strategy)
 add_subdirectory(mhd_regrid)
+if(withGPU AND withRaja) # SAMRAI kernel fusion: RAJA, run on the device
+  add_subdirectory(fuser_ops_strategy)
+endif()

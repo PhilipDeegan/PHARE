@@ -5,10 +5,10 @@
 #include "core/def/phare_config.hpp"
 
 #include "core/utilities/types.hpp"
-#include "core/numerics/ohm/ohm.hpp"
+#include "core/numerics/ohm/ohm_transformer.hpp"
 #include "core/data/grid/grid_tiles.hpp"
-#include "core/numerics/ampere/ampere.hpp"
-#include "core/numerics/faraday/faraday.hpp"
+#include "core/numerics/ampere/ampere_transformer.hpp"
+#include "core/numerics/faraday/faraday_transformer.hpp"
 #include "core/models/quantities/hybrid_quantities.hpp"
 
 
@@ -42,22 +42,22 @@ static ::BS::thread_pool pool{4};
 template<typename Patch>
 void ref_do(Patch& patch)
 {
-    FaradaySingleTransformer{}(patch.layout, *patch.em.B, *patch.em.E, *patch.emNew.B, dt);
+    FaradayTransformer{}(patch.layout, *patch.em.B, *patch.em.E, *patch.emNew.B, dt);
 
-    AmpereSingleTransformer{}(patch.layout, *patch.emNew.B, *patch.J);
+    AmpereTransformer<>{}(patch.layout, *patch.emNew.B, *patch.J);
 
-    OhmSingleTransformer{{eta, nu}}(patch.layout, *patch.n, *patch.V, *patch.P, *patch.emNew.B,
+    OhmTransformer{{eta, nu}}(patch.layout, *patch.n, *patch.V, *patch.P, *patch.emNew.B,
                                     *patch.J, *patch.emNew.E);
 }
 
 template<typename Patch>
 void cmp_do(Patch& patch)
 {
-    FaradaySingleTransformer{}(patch.layout, *patch.em.B, *patch.em.E, *patch.emNew.B, dt);
+    FaradayTransformer{}(patch.layout, *patch.em.B, *patch.em.E, *patch.emNew.B, dt);
 
-    AmpereSingleTransformer{}(patch.layout, *patch.emNew.B, *patch.J);
+    AmpereTransformer<>{}(patch.layout, *patch.emNew.B, *patch.J);
 
-    OhmSingleTransformer{{eta, nu}}(patch.layout, *patch.n, *patch.V, *patch.P, *patch.emNew.B,
+    OhmTransformer{{eta, nu}}(patch.layout, *patch.n, *patch.V, *patch.P, *patch.emNew.B,
                                     *patch.J, *patch.emNew.E);
 }
 

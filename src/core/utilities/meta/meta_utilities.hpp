@@ -168,7 +168,7 @@ namespace core
      * });
      * @endcode
      *
-     * @see core::Ohm::operator() in core/numerics/ohm/ohm.hpp (two bools)
+     * @see core::OhmTransformer in core/numerics/ohm/ohm_transformer.hpp (two bools)
      * @see core::Godunov::operator() in core/numerics/godunov_fluxes/godunov_fluxes.hpp
      *      (two bools + an enum)
      */

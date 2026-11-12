@@ -158,9 +158,10 @@ struct SoAVXIteratorAdaptor
     {
         auto constexpr static dim = Particles::dimension;
 
+        // weight, iCell[dim], delta[dim], v[3]: as soaxv_as_tuple
         if constexpr (dim == 1)
             return thrust::make_tuple(&v.weight_[idx],   // 0
-                                      &v.iCell_[idx],    // 1
+                                      &v.iCell_[0][idx], // 1
                                       &v.delta_[0][idx], // 2
                                       &v.v_[0][idx],     // 3
                                       &v.v_[1][idx],     // 4
@@ -169,23 +170,26 @@ struct SoAVXIteratorAdaptor
 
         if constexpr (dim == 2)
             return thrust::make_tuple(&v.weight_[idx],   // 0
-                                      &v.iCell_[idx],    // 1
-                                      &v.delta_[0][idx], // 2
-                                      &v.delta_[1][idx], // 3
-                                      &v.v_[0][idx],     // 4
-                                      &v.v_[1][idx],     // 5
-                                      &v.v_[2][idx]      // 6
+                                      &v.iCell_[0][idx], // 1
+                                      &v.iCell_[1][idx], // 2
+                                      &v.delta_[0][idx], // 3
+                                      &v.delta_[1][idx], // 4
+                                      &v.v_[0][idx],     // 5
+                                      &v.v_[1][idx],     // 6
+                                      &v.v_[2][idx]      // 7
             );
 
         if constexpr (dim == 3)
             return thrust::make_tuple(&v.weight_[idx],   // 0
-                                      &v.iCell_[idx],    // 1
-                                      &v.delta_[0][idx], // 2
-                                      &v.delta_[1][idx], // 3
-                                      &v.delta_[2][idx], // 4
-                                      &v.v_[0][idx],     // 5
-                                      &v.v_[1][idx],     // 6
-                                      &v.v_[2][idx]      // 7
+                                      &v.iCell_[0][idx], // 1
+                                      &v.iCell_[1][idx], // 2
+                                      &v.iCell_[2][idx], // 3
+                                      &v.delta_[0][idx], // 4
+                                      &v.delta_[1][idx], // 5
+                                      &v.delta_[2][idx], // 6
+                                      &v.v_[0][idx],     // 7
+                                      &v.v_[1][idx],     // 8
+                                      &v.v_[2][idx]      // 9
             );
     }
 
@@ -203,15 +207,21 @@ struct SoAVXIteratorAdaptor
     {
         return thrust::get<0>(it);
     }
+    // the cell of a zipped particle, per component columns: a copy, const so writing through it
+    //  doesn't compile, writers use the columns
     template<typename T>
-    static auto& iCell(T&& it) _PHARE_ALL_FN_
+    static decltype(auto) iCell(T&& it) _PHARE_ALL_FN_ // decltype(auto) keeps the const
     {
-        return thrust::get<1>(it);
+        // 1 + 2 * dim + 3 columns
+        auto constexpr dim = (thrust::tuple_size<std::decay_t<T>>::value - 4) / 2;
+        using Cell_t       = std::array<int, dim> const;
+        return Cell_t{for_N<dim, for_N_R_mode::make_array>(
+            [&](auto d) -> int { return thrust::get<1 + d>(it); })};
     }
     template<std::uint8_t dim, std::uint8_t idx = 0, typename T>
     static auto& delta(T&& it) _PHARE_ALL_FN_
     {
-        return thrust::get<2 + idx>(it);
+        return thrust::get<1 + dim + idx>(it);
     }
 
     template<std::uint8_t dim, typename T>
@@ -224,10 +234,10 @@ struct SoAVXIteratorAdaptor
     template<std::uint8_t dim, std::uint8_t idx = 0, typename T>
     static auto& v(T&& it) _PHARE_ALL_FN_
     {
-        // 1d start = 3  // 2 + 1 + 0 == 3
-        // 3d start = 5  // 2 + 3 + 0 == 5
+        // 1d start = 3  // 1 + 2 * 1 == 3
+        // 3d start = 7  // 1 + 2 * 3 == 7
 
-        return thrust::get<2 + dim + idx>(it);
+        return thrust::get<1 + 2 * dim + idx>(it);
     }
 
     template<std::uint8_t dim, typename T>
@@ -255,8 +265,7 @@ struct SoAVXZipParticle
 
     auto& weight() _PHARE_ALL_FN_ { return SoAVXIteratorAdaptor::weight(*it); }
     auto& weight() const _PHARE_ALL_FN_ { return SoAVXIteratorAdaptor::weight(*it); }
-    auto& iCell() _PHARE_ALL_FN_ { return SoAVXIteratorAdaptor::iCell(*it); }
-    auto& iCell() const _PHARE_ALL_FN_ { return SoAVXIteratorAdaptor::iCell(*it); }
+    decltype(auto) iCell() const _PHARE_ALL_FN_ { return SoAVXIteratorAdaptor::iCell(*it); }
     // auto& delta() _PHARE_ALL_FN_ { return SoAVXIteratorAdaptor::delta(*it); }
     // auto& delta() const _PHARE_ALL_FN_ { return SoAVXIteratorAdaptor::delta(*it); }
     // auto& v() _PHARE_ALL_FN_ { return SoAVXIteratorAdaptor::v(*it); }
@@ -283,7 +292,7 @@ struct SoAVXZipConstParticle
     void set(auto that) { it = that.it; }
 
     auto& weight() const _PHARE_ALL_FN_ { return SoAVXIteratorAdaptor::weight(*it); }
-    auto& iCell() const _PHARE_ALL_FN_ { return SoAVXIteratorAdaptor::iCell(*it); }
+    decltype(auto) iCell() const _PHARE_ALL_FN_ { return SoAVXIteratorAdaptor::iCell(*it); }
     // auto& delta() const _PHARE_ALL_FN_ { return SoAVXIteratorAdaptor::delta(*it); }
     // auto& v() const _PHARE_ALL_FN_ { return SoAVXIteratorAdaptor::v(*it); }
 
@@ -334,7 +343,7 @@ auto particle_zip_iterator(Particles& ps, std::size_t const i)
     using enum LayoutMode;
     if constexpr (any_in(Particles::layout_mode, SoA))
         return typename SoAZipParticle_t<Particles>::value_type{ps, i};
-    else if constexpr (any_in(Particles::layout_mode, SoAVX))
+    else if constexpr (any_in(Particles::layout_mode, SoAVX, SoAVXChunked))
         return typename SoAVXZipParticle_t<Particles>::value_type{ps, i};
     else
         throw std::runtime_error("no impl");

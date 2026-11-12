@@ -45,74 +45,29 @@ public:
     {
     }
 
-    template<typename VecField, typename Field>
-    void operator()(Field const& n, VecField const& Ve, Field const& Pe, VecField const& B,
-                    VecField const& J, VecField& Enew) const
+    // E component c at one point: gradPe_c is that component of grad(layout, Pe), layout the
+    //  one of the fields at ijk (patch or tile). The resistive / hyper-resistive runtime flags
+    //  come in as compile-time tags: no branch on them per point, the projection / laplacian
+    //  are skipped when eta or nu is zero. Where and how it is evaluated (boxes, tiles, GPU) is
+    //  up to the caller, see core/numerics/ohm/ohm_transformer.hpp
+    template<auto c, bool isResistive, bool isHyperResistive>
+    void operator()(auto const& ijk, auto const& n, auto const& Ve, auto const& gradPe_c,
+                    auto const& B, auto const& J, auto& E) const _PHARE_ALL_FN_
     {
-        // lift the resistive / hyper-resistive runtime flags into compile-time tags: the per-cell
-        // E_Eq_ branches only via if constexpr, skipping the projection / laplacian when eta or
-        // nu is zero without ever testing the flags inside the evalOnBox loop.
-        Constexprifier{isResistive(),
-                       isHyperResistive()}([&]<bool isResistiveV, bool isHyperResistiveV>() {
-            solve_<isResistiveV, isHyperResistiveV>(n, Ve, Pe, B, J, Enew);
-        });
+        static_assert(Components::check<c>());
+
+        auto E_ = ideal_<c>(Ve, B, ijk) + pressure_<c>(n, gradPe_c, ijk);
+
+        if constexpr (isResistive)
+            E_ += resistive_<c>(J, ijk);
+        if constexpr (isHyperResistive)
+            E_ += hyperresistive_<c>(J, B, n, ijk);
+
+        E(c)(ijk) = E_;
     }
 
 private:
     GridLayout layout_; // GPU copy needs object not pointer!
-
-    // captureless kernels: every field and *this travel as arguments so the lambda is
-    // device-copyable (see GridLayout::evalOnAnyBox GPU dispatch)
-    template<bool isResistive, bool isHyperResistive, typename VecField, typename Field>
-    void solve_(Field const& n, VecField const& Ve, Field const& Pe, VecField const& B,
-                VecField const& J, VecField& Enew) const
-    {
-        auto const& [Exnew, Eynew, Eznew] = Enew();
-
-        auto const gradPe = grad(layout_, Pe);
-
-        layout_.evalOnBox(
-            Exnew,
-            [] _PHARE_ALL_FN_(auto&&... args) {
-                E_Eq_<Component::X, isResistive, isHyperResistive>(args...);
-            },
-            n, Ve, gradPe.x, B, J, Enew, *this);
-        layout_.evalOnBox(
-            Eynew,
-            [] _PHARE_ALL_FN_(auto&&... args) {
-                E_Eq_<Component::Y, isResistive, isHyperResistive>(args...);
-            },
-            n, Ve, gradPe.y, B, J, Enew, *this);
-        layout_.evalOnBox(
-            Eznew,
-            [] _PHARE_ALL_FN_(auto&&... args) {
-                E_Eq_<Component::Z, isResistive, isHyperResistive>(args...);
-            },
-            n, Ve, gradPe.z, B, J, Enew, *this);
-    }
-
-
-    template<auto Tag, bool isResistive, bool isHyperResistive>
-    static void E_Eq_(auto const& ijk, auto&&... args) _PHARE_ALL_FN_
-    {
-        auto const& [n, Ve, gradPe, B, J, E, self] = std::forward_as_tuple(args...);
-        auto& Exyz                                 = E(Tag);
-
-        static_assert(Components::check<Tag>());
-
-        auto E_
-            = self.template ideal_<Tag>(Ve, B, ijk) + self.template pressure_<Tag>(n, gradPe, ijk);
-
-        if constexpr (isResistive)
-            E_ += self.template resistive_<Tag>(J, ijk);
-        if constexpr (isHyperResistive)
-            E_ += self.template hyperresistive_<Tag>(J, B, n, ijk);
-
-        Exyz(ijk) = E_;
-    }
-
-
-
 
     template<auto component, typename VecField>
     auto ideal_(VecField const& Ve, VecField const& B,
