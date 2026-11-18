@@ -30,18 +30,9 @@ from dataclasses import dataclass, field
 import numpy as np
 
 from pyphare.core.box import Box
+from pyphare.core.gridlayout import HybridGridLayoutFor
 
 _TAGGING_PATH = "simulation/AMR/refinement/tagging/"
-
-# hybrid Yee layout: per B component, primal or not per direction
-_yee_primal = {
-    "Bx": (True, False, False),
-    "By": (False, True, False),
-    "Bz": (False, False, True),
-}
-
-# hybrid field ghost width per interpolation order (HybridFieldOptions)
-_field_ghost_width = {1: 2, 2: 4, 3: 4}
 
 
 class _DictCollector:
@@ -174,7 +165,6 @@ class Tagger:
         self.periodic = np.asarray([b == "periodic" for b in boundary])
         self.ratio = int(getattr(sim, "refinement_ratio", 2))
         self.interp = sim.interp_order
-        self.ghosts = _field_ghost_width[self.interp]
         self.dict = tagging_dict(sim)
         model = sim.model.model_dict
         self.functions = {"Bx": model["bx"], "By": model["by"], "Bz": model["bz"]}
@@ -197,21 +187,18 @@ class Tagger:
         return Box(np.zeros(self.ndim, dtype=int), self.cells * self.ratio**ln - 1)
 
     def _values(self, name, ln, patch):
-        """the component over its allocation on patch: shape the layout's allocSize"""
-        primal = _yee_primal[name][: self.ndim]
+        """the component over its allocation on patch (the hybrid layout's coordinates, ghosts
+        included), periodic directions wrapped into the domain"""
         dx = self.dl / self.ratio**ln
+        origin = self.origin + patch.lower * dx
+        layout = HybridGridLayoutFor(patch, origin.tolist(), dx.tolist(), self.interp)
         length = self.dl * self.cells
         xs = []
-        for d in range(self.ndim):
-            idx = np.arange(
-                patch.lower[d] - self.ghosts,
-                patch.upper[d] + self.ghosts + (2 if primal[d] else 1),
-                dtype=float,
-            )
-            x = (idx + (0.0 if primal[d] else 0.5)) * dx[d]
+        for d, direction in enumerate("xyz"[: self.ndim]):
+            x = np.asarray(layout.yeeCoordsFor(name, direction, withGhosts=True))
             if self.periodic[d]:
-                x = np.mod(x, length[d])
-            xs.append(self.origin[d] + x)
+                x = self.origin[d] + np.mod(x - self.origin[d], length[d])
+            xs.append(x)
         mesh = np.meshgrid(*xs, indexing="ij")
         v = np.asarray(self.functions[name](*[m.ravel() for m in mesh]), dtype=float)
         return np.array(
