@@ -14,6 +14,7 @@
 
 #include "python3/pybind_def.hpp"
 #include "python3/patch_data.hpp"
+#include "python3/tagging.hpp"
 
 #include "core/utilities/timestamps.hpp"
 
@@ -123,6 +124,8 @@ PYBIND11_MODULE(cpp_etc, m)
     });
 
     m.def("samrai_restart_file", samrai_restart_file);
+
+    declareTagging(m);
 
     m.def("restart_path_for_time", [](std::string path, double timestamp) {
         return PHARE::amr::Hierarchy::restartFilePathForTime(path, timestamp);
