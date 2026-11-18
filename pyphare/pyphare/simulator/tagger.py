@@ -96,40 +96,83 @@ def chop_evenly(box, size, granularity=1):
     return [Box(np.array(lo), np.array(up)) for lo, up in pieces]
 
 
-def _union(a, b):
-    differ = [
-        d
-        for d in range(len(a.lower))
-        if a.lower[d] != b.lower[d] or a.upper[d] != b.upper[d]
-    ]
-    if not differ:
-        return a
-    if len(differ) > 1:
-        return None
-    d = differ[0]
-    if a.upper[d] + 1 != b.lower[d] and b.upper[d] + 1 != a.lower[d]:
-        return None
-    return Box(np.minimum(a.lower, b.lower), np.maximum(a.upper, b.upper))
-
-
-def coalesce(boxes):
-    """boxes merged two by two while their union is a box, in lower corner order"""
-    boxes = list(boxes)
-    merged = True
-    while merged:
-        merged = False
-        boxes.sort(key=lambda b: (tuple(b.lower), tuple(b.upper)))
-        for i in range(len(boxes)):
-            for j in range(i + 1, len(boxes)):
-                u = _union(boxes[i], boxes[j])
-                if u is not None:
-                    boxes[i] = u
-                    del boxes[j]
-                    merged = True
-                    break
+def sweep_boxes(mask):
+    """the True cells of a bool array as disjoint boxes [(lower, upper)]: runs along the first
+    direction, then equal runs merged along the next directions in turn"""
+    ndim = mask.ndim
+    boxes = []  # (lower, upper) arrays
+    idx = np.argwhere(mask)
+    if not len(idx):
+        return boxes
+    # runs along direction 0, per line of the other directions
+    order = np.lexsort([idx[:, 0]] + [idx[:, d] for d in range(1, ndim)])
+    idx = idx[order]
+    runs = []
+    start = idx[0].copy()
+    prev = idx[0].copy()
+    for c in idx[1:]:
+        if np.array_equal(c[1:], prev[1:]) and c[0] == prev[0] + 1:
+            prev = c
+            continue
+        runs.append((start.copy(), prev.copy()))
+        start, prev = c.copy(), c.copy()
+    runs.append((start, prev))
+    # merge along directions 1.., boxes equal in every other direction and adjacent in d
+    for d in range(1, ndim):
+        others = [i for i in range(ndim) if i != d]
+        runs.sort(
+            key=lambda b: (
+                tuple(b[0][i] for i in others)
+                + tuple(b[1][i] for i in others)
+                + (b[0][d],)
+            )
+        )
+        merged = []
+        for lo, up in runs:
             if merged:
-                break
+                mlo, mup = merged[-1]
+                same = all(mlo[i] == lo[i] and mup[i] == up[i] for i in others)
+                if same and mup[d] + 1 == lo[d]:
+                    mup[d] = up[d]
+                    continue
+            merged.append((lo.copy(), up.copy()))
+        runs = merged
+    boxes = runs
     return boxes
+
+
+def merge_boxes(boxes):
+    """disjoint boxes [(lower, upper)] merged while two are adjacent along a direction with the
+    same extent in every other: passes over the directions until none merge"""
+    boxes = [(np.asarray(lo).copy(), np.asarray(up).copy()) for lo, up in boxes]
+    if not boxes:
+        return boxes
+    ndim = len(boxes[0][0])
+    while True:
+        before = len(boxes)
+        for d in range(ndim):
+            others = [i for i in range(ndim) if i != d]
+            boxes.sort(
+                key=lambda b: (
+                    tuple(b[0][i] for i in others)
+                    + tuple(b[1][i] for i in others)
+                    + (b[0][d],)
+                )
+            )
+            merged = []
+            for lo, up in boxes:
+                if merged:
+                    mlo, mup = merged[-1]
+                    if (
+                        all(mlo[i] == lo[i] and mup[i] == up[i] for i in others)
+                        and mup[d] + 1 == lo[d]
+                    ):
+                        mup[d] = up[d]
+                        continue
+                merged.append((lo, up))
+            boxes = merged
+        if len(boxes) == before:
+            return boxes
 
 
 @dataclass
@@ -149,6 +192,7 @@ class Tagger:
     tag_box_size: int = 8  # SAMRAI TileClustering's default tile size
     levels: list = field(default_factory=list)
     tags: dict = field(default_factory=dict)  # {level: [(patch Box, tagged cells)]}
+    keep_tags: bool = True  # the patches' tags, for hierarchy() (off for large domains)
 
     def __post_init__(self):
         sim = self.sim
@@ -220,51 +264,149 @@ class Tagger:
             size = np.maximum(gran, self.patch_size // gran * gran)
         return chop_evenly(box, size, gran)
 
-    def _cluster(self, ln, level_boxes, tags):
+    def _grid_shape(self, ln):
+        return -(-np.asarray(self.domain(ln).shape) // self.tag_box_size)
+
+    def _mark(self, grown, ln, patch, t):
+        """the tag boxes (level ln's grid) the patch's tagged cells grown by tag_buffer touch"""
         shape = np.asarray(self.domain(ln).shape)
-        size = np.full(self.ndim, self.tag_box_size)
+        size, tb = self.tag_box_size, self.tag_buffer
+        cells = np.argwhere(t) + patch.lower
+        if not len(cells):
+            return
+        sides = []  # per direction: the tag boxes of the lowest and highest grown cell
+        for d in range(self.ndim):
+            lo, hi = cells[:, d] - tb, cells[:, d] + tb
+            if self.periodic[d]:
+                lo, hi = np.mod(lo, shape[d]), np.mod(hi, shape[d])
+            else:
+                lo, hi = np.clip(lo, 0, shape[d] - 1), np.clip(hi, 0, shape[d] - 1)
+            sides.append(
+                (lo // size, hi // size)
+            )  # tag_buffer < size: at most these two
+        for pick in np.ndindex(*([2] * self.ndim)):
+            grown[tuple(sides[d][pick[d]] for d in range(self.ndim))] = True
 
-        grown = np.zeros(shape, dtype=bool)
-        tb = self.tag_buffer
-        for patch, t in tags:
-            cells = np.argwhere(t) + patch.lower
-            for off in np.ndindex(*([2 * tb + 1] * self.ndim)):
-                c = cells + np.asarray(off) - tb
-                keep = np.ones(len(c), dtype=bool)
-                for d in range(self.ndim):
-                    if self.periodic[d]:
-                        c[:, d] = np.mod(c[:, d], shape[d])
-                    else:
-                        keep &= (c[:, d] >= 0) & (c[:, d] < shape[d])
-                grown[tuple(c[keep].T)] = True
+    def _coverage(self, ln, level_boxes):
+        """per tag box of level ln, its cells on the level's boxes (boxes do not overlap), and
+        its cells in the domain"""
+        shape = np.asarray(self.domain(ln).shape)
+        grid = self._grid_shape(ln)
+        size = self.tag_box_size
 
-        covered = np.zeros(shape, dtype=bool)
+        def per_axis(lo, up, d):  # cells of [lo, up] in each tag box along d
+            k = np.arange(grid[d])
+            return np.maximum(
+                0,
+                np.minimum(up, np.minimum(k * size + size - 1, shape[d] - 1))
+                - np.maximum(lo, k * size)
+                + 1,
+            )
+
+        def outer(counts):
+            out = counts[0]
+            for c in counts[1:]:
+                out = np.multiply.outer(out, c)
+            return out
+
+        covered = np.zeros(grid, dtype=np.int64)
         for b in level_boxes:
-            covered[tuple(slice(lo, up + 1) for lo, up in zip(b.lower, b.upper))] = True
+            covered += outer(
+                [per_axis(b.lower[d], b.upper[d], d) for d in range(self.ndim)]
+            )
+        cells = outer([per_axis(0, shape[d] - 1, d) for d in range(self.ndim)])
+        return covered, cells
+
+    def _nested_cells(self, ln, level_boxes, lower, upper):
+        """the cells lower..upper whose every cell within nesting_buffer is on level ln's boxes
+        (periodic images wrapped, past a non periodic boundary counting as covered): a mask"""
+        shape = np.asarray(self.domain(ln).shape)
+        nb = self.nesting_buffer
+        glo, gup = lower - nb, upper + nb
+        covered = np.zeros(gup - glo + 1, dtype=bool)
+        for d in range(self.ndim):  # outside a non periodic domain: covered
+            if not self.periodic[d]:
+                idx = np.arange(glo[d], gup[d] + 1)
+                out = (idx < 0) | (idx >= shape[d])
+                view = [None] * self.ndim
+                view[d] = slice(None)
+                covered |= out[tuple(view)]
+        shifts = [np.asarray(s) * shape for s in np.ndindex(*([3] * self.ndim))]
+        for b in level_boxes:
+            for s in shifts:
+                s = np.where(self.periodic, s - shape, 0)
+                lo = np.maximum(glo, b.lower + s)
+                up = np.minimum(gup, b.upper + s)
+                if np.all(lo <= up):
+                    covered[
+                        tuple(slice(l - g, u - g + 1) for l, u, g in zip(lo, up, glo))
+                    ] = True
         nested = covered.copy()
         for d in range(self.ndim):
             out = nested.copy()
-            for k in range(1, self.nesting_buffer + 1):
-                for sign in (-1, 1):
-                    shifted = np.roll(nested, -sign * k, axis=d)
-                    if not self.periodic[d]:
-                        idx = [slice(None)] * self.ndim
-                        idx[d] = slice(-k, None) if sign > 0 else slice(0, k)
-                        shifted[tuple(idx)] = True
-                    out &= shifted
+            for k in range(1, nb + 1):
+                out[
+                    tuple(
+                        slice(k, None) if i == d else slice(None)
+                        for i in range(self.ndim)
+                    )
+                ] &= nested[
+                    tuple(
+                        slice(None, -k) if i == d else slice(None)
+                        for i in range(self.ndim)
+                    )
+                ]
+                out[
+                    tuple(
+                        slice(None, -k) if i == d else slice(None)
+                        for i in range(self.ndim)
+                    )
+                ] &= nested[
+                    tuple(
+                        slice(k, None) if i == d else slice(None)
+                        for i in range(self.ndim)
+                    )
+                ]
             nested = out
+        return nested[
+            tuple(slice(nb, -nb) if nb else slice(None) for _ in range(self.ndim))
+        ]
 
-        boxes = []
-        for tag_box in sorted({tuple(t) for t in np.argwhere(grown) // size}):
-            lower = np.asarray(tag_box) * size
-            upper = np.minimum(lower + size - 1, shape - 1)
-            sub = nested[tuple(slice(lo, up + 1) for lo, up in zip(lower, upper))]
-            if sub.all():
-                boxes.append(Box(lower, upper))
-            else:
-                boxes += [Box(c.copy(), c.copy()) for c in np.argwhere(sub) + lower]
+    def _cluster(self, ln, level_boxes, grown):
+        """level ln + 1's boxes from level ln's grown tags on the tag box grid"""
+        shape = np.asarray(self.domain(ln).shape)
+        size = self.tag_box_size
+        covered, cells = self._coverage(ln, level_boxes)
+        full = covered == cells
+
+        # wholly nested: the tag box and every neighbour within one tag box (nesting_buffer <
+        #  tag_box_size) fully covered (past a non periodic boundary: covered)
+        whole = full.copy()
+        for d in range(self.ndim):
+            out = whole.copy()
+            for sign in (-1, 1):
+                shifted = np.roll(whole, -sign, axis=d)
+                if not self.periodic[d]:
+                    idx = [slice(None)] * self.ndim
+                    idx[d] = slice(-1, None) if sign > 0 else slice(0, 1)
+                    shifted[tuple(idx)] = True
+                out &= shifted
+            whole = out
+
+        boxes = [
+            Box(lo * size, np.minimum((up + 1) * size, shape) - 1)
+            for lo, up in sweep_boxes(grown & whole)
+        ]
+        for t in np.argwhere(grown & ~whole & (covered > 0)):  # at the level's edge
+            lower = t * size
+            upper = np.minimum(lower + size, shape) - 1
+            nested = self._nested_cells(ln, level_boxes, lower, upper)
+            boxes += [Box(lower + lo, lower + up) for lo, up in sweep_boxes(nested)]
         r = self.ratio
-        return [Box(b.lower * r, (b.upper + 1) * r - 1) for b in coalesce(boxes)]
+        return [
+            Box(lo * r, (up + 1) * r - 1)
+            for lo, up in merge_boxes((b.lower, b.upper) for b in boxes)
+        ]
 
     def tag(self, depth=None):
         """{level: [Box]}: the levels from the initial fields, up to depth levels above 0
@@ -276,16 +418,18 @@ class Tagger:
         self.tags = {}
         while len(self.levels) < max_levels:
             lvl = self.levels[-1]
-            tags = [
-                (patch, self._tags(lvl.number, patch))
-                for box in lvl.boxes
-                for patch in self._patches(lvl.number, box)
-            ]
-            self.tags[lvl.number] = tags
-            lvl.tagged = int(sum(t.sum() for _, t in tags))
+            ln = lvl.number
+            grown = np.zeros(self._grid_shape(ln), dtype=bool)
+            for box in lvl.boxes:
+                for patch in self._patches(ln, box):
+                    t = self._tags(ln, patch)
+                    lvl.tagged += int(t.sum())
+                    self._mark(grown, ln, patch, t)
+                    if self.keep_tags:
+                        self.tags.setdefault(ln, []).append((patch, t))
             if not lvl.tagged:
                 break
-            boxes = self._cluster(lvl.number, lvl.boxes, tags)
+            boxes = self._cluster(ln, lvl.boxes, grown)
             if not boxes:
                 break
             self.levels.append(TaggedLevel(lvl.number + 1, boxes))
@@ -332,9 +476,10 @@ class Tagger:
             levels[ln] = PatchLevel(ln, patches)
         return PatchHierarchy({0.0: levels}, self.domain(0))
 
-    def weights(self, substeps=True):
-        """per level 0 cell the work expected on it and above: every level's cells over it times
-        the particles per cell, times the level's substeps (ratio^l) if substeps"""
+    def weights(self, substeps=True, block=1):
+        """per level 0 block (block cells a side; 1: per cell) the work expected on it and above:
+        every level's cells over it times the particles per cell, times the level's substeps
+        (ratio^l) if substeps"""
         if not self.levels:
             self.tag()
         model = self.sim.model
@@ -342,14 +487,15 @@ class Tagger:
             sum(model.model_dict[p]["nbrParticlesPerCell"] for p in model.populations)
             or 1
         )
-        w = np.zeros(self.cells)
+        blocks = -(-self.cells // block)
+        w = np.zeros(blocks)
         for lvl in self.levels:
             r = self.ratio**lvl.number
             scale = ppc * (r if substeps else 1)
             for b in lvl.boxes:
                 counts = [
-                    np.bincount(np.arange(lo, up + 1) // r, minlength=n)[:n]
-                    for lo, up, n in zip(b.lower, b.upper, self.cells)
+                    np.bincount(np.arange(lo, up + 1) // (r * block), minlength=n)[:n]
+                    for lo, up, n in zip(b.lower, b.upper, blocks)
                 ]
                 per_cell = counts[0]
                 for c in counts[1:]:
